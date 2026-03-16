@@ -5,7 +5,6 @@
       "mcp__mcp-tools-py__run_pylint_check",
       "mcp__mcp-tools-py__run_pytest_check",
       "mcp__mcp-tools-py__run_mypy_check",
-      "mcp__mcp-tools-py__second_sleep",
       "mcp__filesystem__get_reference_projects",
       "mcp__filesystem__list_reference_directory",
       "mcp__filesystem__read_reference_file",
