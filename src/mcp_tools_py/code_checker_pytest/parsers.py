@@ -6,7 +6,7 @@ import json
 from dataclasses import fields
 from typing import Any, Dict
 
-from mcp_code_checker.code_checker_pytest.models import (
+from mcp_tools_py.code_checker_pytest.models import (
     Collector,
     CollectorResult,
     Crash,

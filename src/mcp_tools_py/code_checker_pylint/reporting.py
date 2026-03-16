@@ -9,13 +9,13 @@ from typing import NamedTuple, Optional
 
 import structlog
 
-from mcp_code_checker.code_checker_pylint.models import (
+from mcp_tools_py.code_checker_pylint.models import (
     PylintMessage,
     PylintResult,
 )
-from mcp_code_checker.code_checker_pylint.runners import get_pylint_results
-from mcp_code_checker.code_checker_pylint.utils import normalize_path
-from mcp_code_checker.log_utils import log_function_call
+from mcp_tools_py.code_checker_pylint.runners import get_pylint_results
+from mcp_tools_py.code_checker_pylint.utils import normalize_path
+from mcp_tools_py.log_utils import log_function_call
 
 MAX_LOCATIONS_PER_ISSUE = 50
 

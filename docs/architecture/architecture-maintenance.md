@@ -2,7 +2,7 @@
 
 ## Overview
 
-**Purpose**: Maintain comprehensive Arc42 architecture documentation that enables LLM navigation and understanding of the mcp-code-checker system.
+**Purpose**: Maintain comprehensive Arc42 architecture documentation that enables LLM navigation and understanding of the mcp-tools-py system.
 
 **Key Job**: When code changes occur, analyze impact on architecture and update documentation accordingly. Ensure documentation stays synchronized with codebase.
 
@@ -39,7 +39,7 @@
 **Process**: Maintain accurate file/folder navigation paths for LLM code location
 
 **Maintenance Steps**:
-1. **Scan Codebase**: List all files in `src/mcp_code_checker/` directory structure
+1. **Scan Codebase**: List all files in `src/mcp_tools_py/` directory structure
 2. **Verify Paths**: Check all documented paths exist and are correct
 3. **Update Descriptions**: Ensure component descriptions match actual functionality
 4. **Apply Pattern**: Use consistent `Component: path/file.py - Description` format
@@ -50,7 +50,7 @@
 - Key files appendix: `docs/architecture/architecture.md` Section 5 (Key Files Reference)
 
 **Validation Source**:
-- File structure: `src/mcp_code_checker/` directory tree
+- File structure: `src/mcp_tools_py/` directory tree
 
 ### 1.3 Testing Strategy Documentation
 **Process**: Ensure testing markers and strategy remain synchronized across configuration files
@@ -97,7 +97,7 @@
 
 ### 3.1 Component Relationship Updates
 **Trigger Events**:
-- New modules added to `src/mcp_code_checker/`
+- New modules added to `src/mcp_tools_py/`
 - New checker tool integration (e.g., adding ruff, bandit)
 - Interface changes between components
 - Changes to the checker module pattern (models/parsers/reporting/runners)
@@ -163,7 +163,7 @@ Begin with Section 4.1 now." --store-response
 mcp-coder prompt "Analyze recent code changes and identify architectural impacts:
 
 1. CHANGE ANALYSIS:
-   - List all modified files in src/mcp_code_checker/
+   - List all modified files in src/mcp_tools_py/
    - Identify new dependencies in pyproject.toml
    - Check for new checker modules or tools
    - Review changes to .claude/CLAUDE.md

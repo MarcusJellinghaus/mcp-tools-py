@@ -1,9 +1,9 @@
 @echo off
 setlocal enabledelayedexpansion
-REM Reinstall mcp-code-checker package in development mode
+REM Reinstall mcp-tools-py package in development mode
 REM Usage: call tools\reinstall_local.bat  (from project root)
 echo =============================================
-echo MCP-Code-Checker Package Reinstallation
+echo MCP-Tools-Py Package Reinstallation
 echo =============================================
 echo.
 
@@ -37,8 +37,8 @@ echo.
 
 echo [1/4] Uninstalling existing packages...
 REM Note: mcp-config is uninstalled here but will be automatically reinstalled
-REM as a dependency when mcp-code-checker is installed (see pyproject.toml)
-"!VENV_PIP!" uninstall mcp-code-checker mcp-config mcp-server-filesystem -y
+REM as a dependency when mcp-tools-py is installed (see pyproject.toml)
+"!VENV_PIP!" uninstall mcp-tools-py mcp-config mcp-server-filesystem -y
 echo [OK] Packages uninstalled
 
 echo.
@@ -56,12 +56,12 @@ echo [OK] Package and dev dependencies installed
 echo.
 echo [3/4] Verifying CLI entry points in venv...
 
-if not exist "!VENV_SCRIPTS!\mcp-code-checker.exe" (
-    echo [FAIL] mcp-code-checker.exe not found in !VENV_SCRIPTS!
+if not exist "!VENV_SCRIPTS!\mcp-tools-py.exe" (
+    echo [FAIL] mcp-tools-py.exe not found in !VENV_SCRIPTS!
     echo   The entry point was not installed into the virtual environment.
     exit /b 1
 )
-echo [OK] mcp-code-checker.exe found in !VENV_SCRIPTS!
+echo [OK] mcp-tools-py.exe found in !VENV_SCRIPTS!
 
 if not exist "!VENV_SCRIPTS!\mcp-server-filesystem.exe" (
     echo [FAIL] mcp-server-filesystem.exe not found in !VENV_SCRIPTS!
@@ -72,12 +72,12 @@ echo [OK] mcp-server-filesystem.exe found in !VENV_SCRIPTS!
 
 echo.
 echo [4/4] Verifying CLI functionality...
-"!VENV_SCRIPTS!\mcp-code-checker.exe" --help >nul 2>&1
+"!VENV_SCRIPTS!\mcp-tools-py.exe" --help >nul 2>&1
 if !ERRORLEVEL! NEQ 0 (
-    echo [FAIL] mcp-code-checker CLI verification failed!
+    echo [FAIL] mcp-tools-py CLI verification failed!
     exit /b 1
 )
-echo [OK] mcp-code-checker CLI works
+echo [OK] mcp-tools-py CLI works
 
 "!VENV_SCRIPTS!\mcp-server-filesystem.exe" --help >nul 2>&1
 if !ERRORLEVEL! NEQ 0 (
@@ -91,7 +91,7 @@ echo =============================================
 echo Reinstallation completed successfully!
 echo.
 echo Entry points installed in: !VENV_SCRIPTS!
-echo   - mcp-code-checker.exe
+echo   - mcp-tools-py.exe
 echo   - mcp-server-filesystem.exe
 echo =============================================
 echo.

@@ -2,7 +2,7 @@
 
 import os
 
-from mcp_code_checker.code_checker_pylint.utils import normalize_path
+from mcp_tools_py.code_checker_pylint.utils import normalize_path
 
 
 class TestNormalizePath:

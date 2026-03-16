@@ -2,7 +2,7 @@
   "mcpServers": {
     "code-checker": {
       "type": "stdio",
-      "command": "${VIRTUAL_ENV}\\Scripts\\mcp-code-checker.exe",
+      "command": "${VIRTUAL_ENV}\\Scripts\\mcp-tools-py.exe",
       "args": [
         "--project-dir",
         "${MCP_CODER_PROJECT_DIR}",

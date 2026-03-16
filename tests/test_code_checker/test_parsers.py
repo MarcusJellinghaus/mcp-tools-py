@@ -2,7 +2,7 @@
 Tests for the code_checker_pytest report parsing functionality.
 """
 
-from mcp_code_checker.code_checker_pytest import PytestReport, parse_pytest_report
+from mcp_tools_py.code_checker_pytest import PytestReport, parse_pytest_report
 
 from .test_code_checker_pytest_common import SAMPLE_JSON
 

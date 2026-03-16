@@ -6,8 +6,8 @@ from pathlib import Path
 
 import pytest
 
-from mcp_code_checker.code_checker_mypy import run_mypy_check
-from mcp_code_checker.server import CodeCheckerServer
+from mcp_tools_py.code_checker_mypy import run_mypy_check
+from mcp_tools_py.server import CodeCheckerServer
 
 
 def test_mypy_tool_registration() -> None:

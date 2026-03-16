@@ -2,7 +2,7 @@
 cls
 setlocal enabledelayedexpansion
 REM Local launcher for Claude Code with MCP servers using active environment
-REM Assumes mcp-code-checker is installed in currently active virtual environment
+REM Assumes mcp-tools-py is installed in currently active virtual environment
 
 REM Check if local .venv exists
 if not exist ".venv\Scripts\activate.bat" (
@@ -36,10 +36,10 @@ if "!VIRTUAL_ENV!"=="" (
     )
 )
 
-REM Check if mcp-code-checker is available in the local environment
-python -c "import mcp_code_checker" 2>nul
+REM Check if mcp-tools-py is available in the local environment
+python -c "import mcp_tools_py" 2>nul
 if !errorlevel! neq 0 (
-    echo ERROR: mcp-code-checker not found in local virtual environment
+    echo ERROR: mcp-tools-py not found in local virtual environment
     echo Local environment: !VIRTUAL_ENV!
     echo Please run: call tools\reinstall_local.bat
     exit /b 1
@@ -50,7 +50,7 @@ set "MCP_CODER_PROJECT_DIR=%CD%"
 set "MCP_CODER_VENV_DIR=%CD%\.venv"
 set "DISABLE_AUTOUPDATER=1"
 
-REM Start Claude Code using the local mcp-code-checker installation
+REM Start Claude Code using the local mcp-tools-py installation
 echo Starting Claude Code with:
 echo VIRTUAL_ENV=!VIRTUAL_ENV!
 echo MCP_CODER_PROJECT_DIR=!MCP_CODER_PROJECT_DIR!

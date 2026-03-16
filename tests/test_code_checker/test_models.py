@@ -2,13 +2,13 @@
 Tests for the code_checker_pytest models.
 """
 
-from mcp_code_checker.code_checker_pytest import (
+from mcp_tools_py.code_checker_pytest import (
     Crash,
     PytestReport,
     StageInfo,
     TracebackEntry,
 )
-from mcp_code_checker.code_checker_pytest.parsers import parse_pytest_report
+from mcp_tools_py.code_checker_pytest.parsers import parse_pytest_report
 
 from .test_code_checker_pytest_common import SAMPLE_JSON
 

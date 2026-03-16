@@ -7,7 +7,7 @@ from typing import Generator
 
 import pytest
 
-from mcp_code_checker.code_checker_pylint import get_pylint_results
+from mcp_tools_py.code_checker_pylint import get_pylint_results
 
 
 # Helper functions needed for tests

@@ -2,8 +2,8 @@
 
 import pytest
 
-from mcp_code_checker.code_checker_mypy.models import MypyMessage
-from mcp_code_checker.code_checker_mypy.parsers import parse_mypy_json_output
+from mcp_tools_py.code_checker_mypy.models import MypyMessage
+from mcp_tools_py.code_checker_mypy.parsers import parse_mypy_json_output
 
 
 def test_parse_mypy_json_output_valid() -> None:

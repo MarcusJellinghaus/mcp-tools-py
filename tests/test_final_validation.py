@@ -12,7 +12,7 @@ from typing import Generator
 
 import pytest
 
-from mcp_code_checker.server import CodeCheckerServer
+from mcp_tools_py.server import CodeCheckerServer
 
 
 class TestParameterCombinationsValidation:
@@ -104,7 +104,7 @@ class TestParameterCombinationsValidation:
         server = CodeCheckerServer(temp_project)
 
         # Test the formatting method directly with mock test results
-        from mcp_code_checker.code_checker_pytest.models import PytestReport, Summary
+        from mcp_tools_py.code_checker_pytest.models import PytestReport, Summary
 
         mock_test_results = PytestReport(
             created=0.0,
@@ -155,7 +155,7 @@ class TestParameterCombinationsValidation:
         server = CodeCheckerServer(temp_project)
 
         # Need test_results to be present for failures to trigger hint logic
-        from mcp_code_checker.code_checker_pytest.models import PytestReport, Summary
+        from mcp_tools_py.code_checker_pytest.models import PytestReport, Summary
 
         mock_test_results = PytestReport(
             created=0.0,

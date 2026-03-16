@@ -1,6 +1,6 @@
-# Contributing to MCP Code Checker
+# Contributing to MCP Tools Py
 
-Thank you for your interest in contributing to MCP Code Checker! This document provides guidelines and information for developers who want to contribute to the project.
+Thank you for your interest in contributing to MCP Tools Py! This document provides guidelines and information for developers who want to contribute to the project.
 
 ## Table of Contents
 
@@ -24,8 +24,8 @@ Thank you for your interest in contributing to MCP Code Checker! This document p
 
 1. **Fork and clone the repository:**
    ```bash
-   git clone https://github.com/your-username/mcp-code-checker.git
-   cd mcp-code-checker
+   git clone https://github.com/your-username/mcp-tools-py.git
+   cd mcp-tools-py
    ```
 
 2. **Create and activate virtual environment:**
@@ -46,7 +46,7 @@ Thank you for your interest in contributing to MCP Code Checker! This document p
 
 4. **Verify installation:**
    ```bash
-   mcp-code-checker --help
+   mcp-tools-py --help
    pytest --version
    ```
 
@@ -134,7 +134,7 @@ We use **Python 3.11+** with modern type hints:
 ### Project Structure
 
 ```
-mcp-code-checker/
+mcp-tools-py/
 ├── src/                          # Main source code
 │   ├── main.py                   # Entry point
 │   ├── server.py                 # MCP server implementation
@@ -291,7 +291,7 @@ Test your changes with MCP Inspector:
 npx @modelcontextprotocol/inspector python -m src.main --project-dir .
 
 # For installed package
-npx @modelcontextprotocol/inspector mcp-code-checker --project-dir .
+npx @modelcontextprotocol/inspector mcp-tools-py --project-dir .
 ```
 
 ### VSCode Integration Testing
@@ -322,4 +322,4 @@ See `tests/manual_vscode_testing.md` for comprehensive VSCode integration testin
 
 ---
 
-**Happy Contributing!** Your contributions help make MCP Code Checker better for everyone.
+**Happy Contributing!** Your contributions help make MCP Tools Py better for everyone.

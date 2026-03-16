@@ -15,11 +15,11 @@ if not exist "docs\architecture\dependencies" mkdir "docs\architecture\dependenc
 
 REM Always generate DOT file (no GraphViz needed)
 echo Creating DOT file...
-pydeps src/mcp_code_checker --max-bacon 2 --cluster --rankdir TB --no-output --show-dot > docs/architecture/dependencies/pydeps_graph.dot 2>nul
+pydeps src/mcp_tools_py --max-bacon 2 --cluster --rankdir TB --no-output --show-dot > docs/architecture/dependencies/pydeps_graph.dot 2>nul
 
 REM Try to generate SVG (requires GraphViz)
 echo Creating SVG file (requires GraphViz)...
-pydeps src/mcp_code_checker --max-bacon 2 --cluster --rankdir TB --noshow -x "tests.*" -o docs/architecture/dependencies/pydeps_graph.svg 2>nul
+pydeps src/mcp_tools_py --max-bacon 2 --cluster --rankdir TB --noshow -x "tests.*" -o docs/architecture/dependencies/pydeps_graph.svg 2>nul
 
 if %ERRORLEVEL% EQU 0 (
     echo.

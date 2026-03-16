@@ -3,8 +3,8 @@
 import sys
 from unittest.mock import patch
 
-from mcp_code_checker.code_checker_pylint.models import PylintMessage, PylintResult
-from mcp_code_checker.code_checker_pylint.reporting import (
+from mcp_tools_py.code_checker_pylint.models import PylintMessage, PylintResult
+from mcp_tools_py.code_checker_pylint.reporting import (
     MAX_LOCATIONS_PER_ISSUE,
     _group_and_sort_issues,
     get_direct_instruction_for_pylint_code,
@@ -318,7 +318,7 @@ class TestGetPylintPrompt:
         mock_result = PylintResult(return_code=4, messages=messages)
 
         with patch(
-            "mcp_code_checker.code_checker_pylint.reporting.get_pylint_results",
+            "mcp_tools_py.code_checker_pylint.reporting.get_pylint_results",
             return_value=mock_result,
         ):
             prompt = get_pylint_prompt("/project", python_executable=sys.executable)
@@ -357,7 +357,7 @@ class TestGetPylintPromptMaxIssues:
         """No messages returns None (unchanged behavior)."""
         mock_result = PylintResult(return_code=0, messages=[])
         with patch(
-            "mcp_code_checker.code_checker_pylint.reporting.get_pylint_results",
+            "mcp_tools_py.code_checker_pylint.reporting.get_pylint_results",
             return_value=mock_result,
         ):
             result = get_pylint_prompt("/project", python_executable=sys.executable)
@@ -375,7 +375,7 @@ class TestGetPylintPromptMaxIssues:
         mock_result = PylintResult(return_code=4, messages=messages)
 
         with patch(
-            "mcp_code_checker.code_checker_pylint.reporting.get_pylint_results",
+            "mcp_tools_py.code_checker_pylint.reporting.get_pylint_results",
             return_value=mock_result,
         ):
             prompt = get_pylint_prompt("/project", python_executable=sys.executable)
@@ -400,7 +400,7 @@ class TestGetPylintPromptMaxIssues:
         mock_result = PylintResult(return_code=4, messages=messages)
 
         with patch(
-            "mcp_code_checker.code_checker_pylint.reporting.get_pylint_results",
+            "mcp_tools_py.code_checker_pylint.reporting.get_pylint_results",
             return_value=mock_result,
         ):
             prompt = get_pylint_prompt(
@@ -430,7 +430,7 @@ class TestGetPylintPromptMaxIssues:
         mock_result = PylintResult(return_code=4, messages=messages)
 
         with patch(
-            "mcp_code_checker.code_checker_pylint.reporting.get_pylint_results",
+            "mcp_tools_py.code_checker_pylint.reporting.get_pylint_results",
             return_value=mock_result,
         ):
             prompt = get_pylint_prompt(
@@ -456,7 +456,7 @@ class TestGetPylintPromptMaxIssues:
         mock_result = PylintResult(return_code=4, messages=messages)
 
         with patch(
-            "mcp_code_checker.code_checker_pylint.reporting.get_pylint_results",
+            "mcp_tools_py.code_checker_pylint.reporting.get_pylint_results",
             return_value=mock_result,
         ):
             prompt = get_pylint_prompt(
@@ -474,7 +474,7 @@ class TestGetPylintPromptMaxIssues:
         """Pylint error returns error string (unchanged behavior)."""
         mock_result = PylintResult(return_code=1, messages=[], error="Pylint timed out")
         with patch(
-            "mcp_code_checker.code_checker_pylint.reporting.get_pylint_results",
+            "mcp_tools_py.code_checker_pylint.reporting.get_pylint_results",
             return_value=mock_result,
         ):
             result = get_pylint_prompt("/project", python_executable=sys.executable)

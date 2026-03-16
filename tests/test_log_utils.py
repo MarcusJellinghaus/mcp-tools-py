@@ -9,7 +9,7 @@ from unittest.mock import patch
 
 import pytest
 
-from mcp_code_checker.log_utils import log_function_call, setup_logging
+from mcp_tools_py.log_utils import log_function_call, setup_logging
 
 
 class TestSetupLogging:
@@ -80,7 +80,7 @@ class TestSetupLogging:
 class TestLogFunctionCall:
     """Tests for the log_function_call decorator."""
 
-    @patch("mcp_code_checker.log_utils.stdlogger")
+    @patch("mcp_tools_py.log_utils.stdlogger")
     def test_log_function_call_basic(self, mock_stdlogger: mock.Mock) -> None:
         """Test the basic functionality of the decorator."""
 
@@ -96,7 +96,7 @@ class TestLogFunctionCall:
         assert result == 3
         assert mock_stdlogger.debug.call_count == 2  # Called for start and end logging
 
-    @patch("mcp_code_checker.log_utils.stdlogger")
+    @patch("mcp_tools_py.log_utils.stdlogger")
     def test_log_function_call_with_exception(self, mock_stdlogger: mock.Mock) -> None:
         """Test that exceptions are properly logged."""
 
@@ -113,7 +113,7 @@ class TestLogFunctionCall:
         assert mock_stdlogger.debug.call_count == 1
         assert mock_stdlogger.error.call_count == 1
 
-    @patch("mcp_code_checker.log_utils.stdlogger")
+    @patch("mcp_tools_py.log_utils.stdlogger")
     def test_log_function_call_with_path_param(self, mock_stdlogger: mock.Mock) -> None:
         """Test that Path objects are properly serialized."""
 
@@ -141,7 +141,7 @@ class TestLogFunctionCall:
         call_args = mock_stdlogger.debug.call_args_list[0][0][0]
         assert "path_func" in call_args
 
-    @patch("mcp_code_checker.log_utils.stdlogger")
+    @patch("mcp_tools_py.log_utils.stdlogger")
     def test_log_function_call_with_large_result(
         self, mock_stdlogger: mock.Mock
     ) -> None:
@@ -164,8 +164,8 @@ class TestLogFunctionCall:
         # Verify that the result was summarized rather than fully logged
         assert "<Large result of type list" in call_args
 
-    @patch("mcp_code_checker.log_utils.structlog")
-    @patch("mcp_code_checker.log_utils.stdlogger")
+    @patch("mcp_tools_py.log_utils.structlog")
+    @patch("mcp_tools_py.log_utils.stdlogger")
     def test_log_function_call_with_structured_logging(
         self, mock_stdlogger: mock.Mock, mock_structlog: mock.Mock
     ) -> None:
@@ -174,7 +174,7 @@ class TestLogFunctionCall:
         mock_structlogger = mock_structlog.get_logger.return_value
 
         # Mock to simulate FileHandler being present
-        with patch("mcp_code_checker.log_utils.any", return_value=True):
+        with patch("mcp_tools_py.log_utils.any", return_value=True):
             # Define a test function
             @log_function_call
             def test_func(a: int, b: int) -> int:

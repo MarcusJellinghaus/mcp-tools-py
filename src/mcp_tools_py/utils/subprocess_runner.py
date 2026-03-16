@@ -18,7 +18,7 @@ from typing import Any, Callable
 
 import structlog
 
-from mcp_code_checker.log_utils import log_function_call
+from mcp_tools_py.log_utils import log_function_call
 
 logger = logging.getLogger(__name__)
 structured_logger = structlog.get_logger(__name__)

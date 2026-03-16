@@ -1,5 +1,5 @@
 [project]
-name = "mcp-code-checker"
+name = "mcp-tools-py"
 dynamic = ["version"]
 authors = [
     {name = "Marcus Jellinghaus"},
@@ -47,12 +47,12 @@ dev = [
     ]
 
 [project.scripts]
-mcp-code-checker = "mcp_code_checker.main:main"
+mcp-tools-py = "mcp_tools_py.main:main"
 
 [project.urls]
-"Homepage" = "https://github.com/MarcusJellinghaus/mcp-code-checker"
-"Bug Tracker" = "https://github.com/MarcusJellinghaus/mcp-code-checker/issues"
-"Documentation" = "https://github.com/MarcusJellinghaus/mcp-code-checker#readme"
+"Homepage" = "https://github.com/MarcusJellinghaus/mcp-tools-py"
+"Bug Tracker" = "https://github.com/MarcusJellinghaus/mcp-tools-py/issues"
+"Documentation" = "https://github.com/MarcusJellinghaus/mcp-tools-py#readme"
 
 [tool.pytest.ini_options]
 testpaths = ["tests"]
@@ -85,7 +85,7 @@ namespace_packages = true
 explicit_package_bases = true
 
 [[tool.mypy.overrides]]
-module = ["mcp_code_checker.utils.subprocess_runner"]
+module = ["mcp_tools_py.utils.subprocess_runner"]
 # Disable unused ignore warnings for platform-specific Unix attributes
 warn_unused_ignores = false
 

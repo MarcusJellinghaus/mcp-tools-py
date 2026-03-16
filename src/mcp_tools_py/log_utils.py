@@ -1,4 +1,4 @@
-"""Logging utilities for the MCP Code Checker server."""
+"""Logging utilities for the MCP Tools Py server."""
 
 import json
 import logging

@@ -6,12 +6,12 @@ from typing import Any
 
 import pytest
 
-from mcp_code_checker.code_checker_pytest import (
+from mcp_tools_py.code_checker_pytest import (
     create_prompt_for_failed_tests,
     get_test_summary,
     parse_pytest_report,
 )
-from mcp_code_checker.code_checker_pytest.models import PytestReport, Summary
+from mcp_tools_py.code_checker_pytest.models import PytestReport, Summary
 
 from .test_code_checker_pytest_common import SAMPLE_JSON
 

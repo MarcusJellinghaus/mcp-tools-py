@@ -1,4 +1,4 @@
-# Vulture whitelist for mcp-code-checker
+# Vulture whitelist for mcp-tools-py
 # This file contains identifiers that vulture should not report as dead code
 
 # MCP server entry points and handlers

@@ -9,18 +9,18 @@ from typing import Any, Callable, Dict, List, Optional, Protocol, TypeVar
 import structlog
 
 # Import all code checking modules at the top
-from mcp_code_checker.code_checker_mypy import MypyResult, get_mypy_prompt
-from mcp_code_checker.code_checker_pylint import get_pylint_prompt
-from mcp_code_checker.code_checker_pytest.reporting import (
+from mcp_tools_py.code_checker_mypy import MypyResult, get_mypy_prompt
+from mcp_tools_py.code_checker_pylint import get_pylint_prompt
+from mcp_tools_py.code_checker_pytest.reporting import (
     MAX_FAILURES,
     MAX_OUTPUT_LINES,
     SMALL_TEST_RUN_THRESHOLD,
     create_prompt_for_failed_tests,
     should_show_details,
 )
-from mcp_code_checker.code_checker_pytest.runners import check_code_with_pytest
-from mcp_code_checker.log_utils import log_function_call
-from mcp_code_checker.utils.subprocess_runner import execute_command
+from mcp_tools_py.code_checker_pytest.runners import check_code_with_pytest
+from mcp_tools_py.log_utils import log_function_call
+from mcp_tools_py.utils.subprocess_runner import execute_command
 
 # Type definitions for FastMCP
 T = TypeVar("T")

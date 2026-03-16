@@ -10,15 +10,15 @@ from typing import Any, Dict, List, Optional
 
 import structlog
 
-from mcp_code_checker.code_checker_pytest.models import PytestReport
-from mcp_code_checker.code_checker_pytest.parsers import parse_pytest_report
-from mcp_code_checker.code_checker_pytest.reporting import (
+from mcp_tools_py.code_checker_pytest.models import PytestReport
+from mcp_tools_py.code_checker_pytest.parsers import parse_pytest_report
+from mcp_tools_py.code_checker_pytest.reporting import (
     create_prompt_for_failed_tests,
     get_test_summary,
 )
-from mcp_code_checker.code_checker_pytest.utils import create_error_context, read_file
-from mcp_code_checker.log_utils import log_function_call
-from mcp_code_checker.utils.subprocess_runner import (
+from mcp_tools_py.code_checker_pytest.utils import create_error_context, read_file
+from mcp_tools_py.log_utils import log_function_call
+from mcp_tools_py.utils.subprocess_runner import (
     check_tool_missing_error,
     execute_command,
     truncate_stderr,

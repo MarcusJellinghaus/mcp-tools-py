@@ -4,7 +4,7 @@ Utility functions for code checker pytest operations.
 
 from typing import Tuple
 
-from mcp_code_checker.code_checker_pytest.models import ErrorContext
+from mcp_tools_py.code_checker_pytest.models import ErrorContext
 
 
 def read_file(file_path: str) -> str:

@@ -1,4 +1,4 @@
-# MCP Code Checker Architecture Documentation
+# MCP Tools Py Architecture Documentation
 
 **Framework**: Arc42 Template | **Version**: 1.0 | **Last Updated**: 2026-03-07
 **Maintainer**: Marcus Jellinghaus | **Review Frequency**: On major changes
@@ -62,7 +62,7 @@ See `pyproject.toml` for version constraints.
 
 ```
 ┌─────────────────┐    STDIO/MCP     ┌──────────────────┐    subprocess    ┌─────────────┐
-│   MCP Client    │◄────────────────►│  mcp-code-checker │───────────────►│  pylint     │
+│   MCP Client    │◄────────────────►│  mcp-tools-py │───────────────►│  pylint     │
 │                 │                   │                   │               │  pytest     │
 │ • Claude Code   │                   │  (MCP Server)     │               │  mypy       │
 │ • Claude Desktop│                   │                   │               │             │
@@ -110,19 +110,19 @@ See `pyproject.toml` for version constraints.
 ```
 ┌─────────────────────────────────────────────────────┐
 │  Entry Point Layer                                   │
-│  └── mcp_code_checker.main                          │
+│  └── mcp_tools_py.main                          │
 ├─────────────────────────────────────────────────────┤
 │  Server Layer                                        │
-│  └── mcp_code_checker.server                        │
+│  └── mcp_tools_py.server                        │
 ├─────────────────────────────────────────────────────┤
 │  Checker Implementation Layer                        │
-│  ├── mcp_code_checker.code_checker_pytest           │
-│  ├── mcp_code_checker.code_checker_pylint           │
-│  └── mcp_code_checker.code_checker_mypy             │
+│  ├── mcp_tools_py.code_checker_pytest           │
+│  ├── mcp_tools_py.code_checker_pylint           │
+│  └── mcp_tools_py.code_checker_mypy             │
 ├─────────────────────────────────────────────────────┤
 │  Utilities Layer                                     │
-│  ├── mcp_code_checker.utils                         │
-│  └── mcp_code_checker.log_utils                     │
+│  ├── mcp_tools_py.utils                         │
+│  └── mcp_tools_py.log_utils                     │
 └─────────────────────────────────────────────────────┘
 ```
 
@@ -209,7 +209,7 @@ See [README.md](../../README.md) for installation, CLI parameters, and MCP clien
 ### Logging
 - Dual mode: console (human-readable) or JSON file (structured), configurable via CLI
 - `@log_function_call` decorator captures parameters, timing, and results
-- Default log location: `{project_dir}/logs/mcp_code_checker_{timestamp}.log`
+- Default log location: `{project_dir}/logs/mcp_tools_py_{timestamp}.log`
 
 ### Architecture Enforcement
 

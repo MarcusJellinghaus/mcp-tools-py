@@ -1,4 +1,4 @@
-# Installation Guide for MCP Code Checker
+# Installation Guide for MCP Tools Py
 
 ## Prerequisites
 
@@ -12,24 +12,24 @@
 
 ```bash
 # Install the latest release
-pip install mcp-code-checker
+pip install mcp-tools-py
 
 # Verify installation
-mcp-code-checker --version
-mcp-code-checker --help
+mcp-tools-py --version
+mcp-tools-py --help
 ```
 
 ### Method 2: Install from GitHub (Recommended)
 
 ```bash
 # Install directly from the main branch
-pip install git+https://github.com/MarcusJellinghaus/mcp-code-checker.git
+pip install git+https://github.com/MarcusJellinghaus/mcp-tools-py.git
 
 # Or install a specific version/tag
-pip install git+https://github.com/MarcusJellinghaus/mcp-code-checker.git@v1.0.0
+pip install git+https://github.com/MarcusJellinghaus/mcp-tools-py.git@v1.0.0
 
 # Verify installation
-mcp-code-checker --help
+mcp-tools-py --help
 ```
 
 ### Method 3: Development Installation
@@ -38,8 +38,8 @@ For contributors or when you need to modify the code:
 
 ```bash
 # Clone the repository
-git clone https://github.com/MarcusJellinghaus/mcp-code-checker.git
-cd mcp-code-checker
+git clone https://github.com/MarcusJellinghaus/mcp-tools-py.git
+cd mcp-tools-py
 
 # Create a virtual environment (recommended)
 python -m venv .venv
@@ -54,7 +54,7 @@ source .venv/bin/activate
 pip install -e ".[dev]"
 
 # Verify installation
-mcp-code-checker --help
+mcp-tools-py --help
 
 # Run tests to ensure everything works
 pytest
@@ -66,22 +66,22 @@ pytest
 
 ```bash
 # Check if command is available
-which mcp-code-checker  # Unix/macOS
-where mcp-code-checker  # Windows
+which mcp-tools-py  # Unix/macOS
+where mcp-tools-py  # Windows
 
 # Test the command
-mcp-code-checker --version
-mcp-code-checker --help
+mcp-tools-py --version
+mcp-tools-py --help
 ```
 
 ### 2. Verify Python Module
 
 ```bash
 # Test as Python module
-python -m mcp_code_checker --help
+python -m mcp_tools_py --help
 
 # Verify import works
-python -c "import mcp_code_checker; print('✓ Package imported successfully')"
+python -c "import mcp_tools_py; print('✓ Package imported successfully')"
 ```
 
 ## Installation in Virtual Environments
@@ -99,36 +99,36 @@ python -m venv .venv
 source .venv/bin/activate  # Unix/macOS
 .venv\Scripts\activate      # Windows
 
-# Install MCP Code Checker
-pip install mcp-code-checker
+# Install MCP Tools Py
+pip install mcp-tools-py
 ```
 
 ### Using with Poetry
 
 ```bash
 # Add to your project
-poetry add mcp-code-checker
+poetry add mcp-tools-py
 
 # Or add as development dependency
-poetry add --dev mcp-code-checker
+poetry add --dev mcp-tools-py
 
 # Verify in poetry shell
 poetry shell
-mcp-code-checker --help
+mcp-tools-py --help
 ```
 
 ### Using with Pipenv
 
 ```bash
 # Add to Pipfile
-pipenv install mcp-code-checker
+pipenv install mcp-tools-py
 
 # Or as dev dependency
-pipenv install --dev mcp-code-checker
+pipenv install --dev mcp-tools-py
 
 # Verify in pipenv shell
 pipenv shell
-mcp-code-checker --help
+mcp-tools-py --help
 ```
 
 ## Platform-Specific Instructions
@@ -137,17 +137,17 @@ mcp-code-checker --help
 
 1. **Command Prompt (cmd.exe)**
    ```batch
-   pip install mcp-code-checker
-   mcp-code-checker --help
+   pip install mcp-tools-py
+   mcp-tools-py --help
    ```
 
 2. **PowerShell**
    ```powershell
-   pip install mcp-code-checker
-   mcp-code-checker --help
+   pip install mcp-tools-py
+   mcp-tools-py --help
    
    # If you get execution policy errors:
-   python -m mcp_code_checker --help
+   python -m mcp_tools_py --help
    ```
 
 3. **Adding to PATH**
@@ -171,13 +171,13 @@ mcp-code-checker --help
    which python3
    # Should show: /opt/homebrew/bin/python3 or /usr/local/bin/python3
    
-   python3 -m pip install mcp-code-checker
+   python3 -m pip install mcp-tools-py
    ```
 
 2. **With System Python**
    ```bash
    # Use --user flag to avoid permission issues
-   pip install --user mcp-code-checker
+   pip install --user mcp-tools-py
    
    # Add user bin to PATH if needed
    export PATH="$HOME/.local/bin:$PATH"
@@ -192,8 +192,8 @@ mcp-code-checker --help
    sudo apt update
    sudo apt install python3-pip
    
-   # Install MCP Code Checker
-   pip install --user mcp-code-checker
+   # Install MCP Tools Py
+   pip install --user mcp-tools-py
    
    # Add to PATH if needed
    export PATH="$HOME/.local/bin:$PATH"
@@ -205,13 +205,13 @@ mcp-code-checker --help
    # Install pip if needed
    sudo dnf install python3-pip
    
-   # Install MCP Code Checker
-   pip install --user mcp-code-checker
+   # Install MCP Tools Py
+   pip install --user mcp-tools-py
    ```
 
 ## Configuration
 
-After installation, you need to configure MCP Code Checker for your preferred client.
+After installation, you need to configure MCP Tools Py for your preferred client.
 
 ### Claude Desktop Configuration
 
@@ -220,13 +220,13 @@ After installation, you need to configure MCP Code Checker for your preferred cl
    - **macOS**: `~/Library/Application Support/Claude/claude_desktop_config.json`
    - **Linux**: `~/.config/claude/claude_desktop_config.json`
 
-2. Add the MCP Code Checker configuration:
+2. Add the MCP Tools Py configuration:
 
    ```json
    {
      "mcpServers": {
        "code_checker": {
-         "command": "mcp-code-checker",
+         "command": "mcp-tools-py",
          "args": [
            "--project-dir",
            "/path/to/your/project",
@@ -251,7 +251,7 @@ After installation, you need to configure MCP Code Checker for your preferred cl
            "/path/to/your/project"
          ],
          "env": {
-           "PYTHONPATH": "/path/to/mcp-code-checker/"
+           "PYTHONPATH": "/path/to/mcp-tools-py/"
          }
        }
      }
@@ -269,7 +269,7 @@ VSCode 1.102+ supports MCP servers natively. Create or edit the configuration fi
 {
   "servers": {
     "code-checker": {
-      "command": "mcp-code-checker",
+      "command": "mcp-tools-py",
       "args": ["--project-dir", "."]
     }
   }
@@ -285,7 +285,7 @@ VSCode 1.102+ supports MCP servers natively. Create or edit the configuration fi
 {
   "servers": {
     "code-checker": {
-      "command": "mcp-code-checker",
+      "command": "mcp-tools-py",
       "args": ["--project-dir", "/path/to/your/projects"]
     }
   }
@@ -296,11 +296,11 @@ VSCode 1.102+ supports MCP servers natively. Create or edit the configuration fi
 
 ### Command Not Found
 
-If `mcp-code-checker` command is not found after installation:
+If `mcp-tools-py` command is not found after installation:
 
 1. **Check installation location:**
    ```bash
-   pip show mcp-code-checker
+   pip show mcp-tools-py
    ```
 
 2. **Check if scripts were installed:**
@@ -311,7 +311,7 @@ If `mcp-code-checker` command is not found after installation:
 
 3. **Use Python module as fallback:**
    ```bash
-   python -m mcp_code_checker --help
+   python -m mcp_tools_py --help
    ```
 
 ### Permission Errors
@@ -320,15 +320,15 @@ If you get permission errors during installation:
 
 ```bash
 # Option 1: Use --user flag
-pip install --user mcp-code-checker
+pip install --user mcp-tools-py
 
 # Option 2: Use virtual environment (recommended)
 python -m venv .venv
 source .venv/bin/activate  # or .venv\Scripts\activate on Windows
-pip install mcp-code-checker
+pip install mcp-tools-py
 
 # Option 3: Use pipx for isolated installation
-pipx install mcp-code-checker
+pipx install mcp-tools-py
 ```
 
 ### Import Errors
@@ -337,13 +337,13 @@ If you get import errors when running the command:
 
 ```bash
 # Reinstall with all dependencies
-pip install --force-reinstall mcp-code-checker
+pip install --force-reinstall mcp-tools-py
 
 # Check for conflicting packages
 pip list | grep mcp
 
 # In development mode, ensure you're in the right directory
-cd /path/to/mcp-code-checker
+cd /path/to/mcp-tools-py
 pip install -e .
 ```
 
@@ -353,7 +353,7 @@ You can test the MCP server using the MCP Inspector:
 
 ### For Installed Package
 ```bash
-npx @modelcontextprotocol/inspector mcp-code-checker --project-dir /path/to/project
+npx @modelcontextprotocol/inspector mcp-tools-py --project-dir /path/to/project
 ```
 
 ### For Development Mode
@@ -367,11 +367,11 @@ npx @modelcontextprotocol/inspector \
 
 ## Uninstallation
 
-To remove MCP Code Checker:
+To remove MCP Tools Py:
 
 ```bash
 # Uninstall the package
-pip uninstall mcp-code-checker
+pip uninstall mcp-tools-py
 
 # Remove configuration files manually if needed
 # Claude Desktop: Edit claude_desktop_config.json
@@ -385,7 +385,7 @@ pip cache purge
 
 If you encounter issues:
 
-1. Check the project's GitHub Issues: https://github.com/MarcusJellinghaus/mcp-code-checker/issues
+1. Check the project's GitHub Issues: https://github.com/MarcusJellinghaus/mcp-tools-py/issues
 2. Run the command with `--help` to see all available options
 3. Use `--log-level DEBUG` for more detailed logging
 4. Ask for help with detailed error messages and system information

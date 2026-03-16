@@ -8,10 +8,10 @@ from typing import List, Optional
 
 import structlog
 
-from mcp_code_checker.code_checker_pylint.models import PylintResult
-from mcp_code_checker.code_checker_pylint.parsers import parse_pylint_json_output
-from mcp_code_checker.log_utils import log_function_call
-from mcp_code_checker.utils.subprocess_runner import (
+from mcp_tools_py.code_checker_pylint.models import PylintResult
+from mcp_tools_py.code_checker_pylint.parsers import parse_pylint_json_output
+from mcp_tools_py.log_utils import log_function_call
+from mcp_tools_py.utils.subprocess_runner import (
     check_tool_missing_error,
     execute_command,
     truncate_stderr,

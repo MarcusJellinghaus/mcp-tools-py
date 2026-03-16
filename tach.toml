@@ -18,55 +18,55 @@ name = "utilities"
 
 # Define architectural modules
 [[modules]]
-path = "mcp_code_checker.code_checker_pytest"
+path = "mcp_tools_py.code_checker_pytest"
 layer = "checker_implementation"
 depends_on = [
-    { path = "mcp_code_checker.utils" },
-    { path = "mcp_code_checker.log_utils" }
+    { path = "mcp_tools_py.utils" },
+    { path = "mcp_tools_py.log_utils" }
 ]
 
 [[modules]]
-path = "mcp_code_checker.code_checker_pylint"
+path = "mcp_tools_py.code_checker_pylint"
 layer = "checker_implementation"
 depends_on = [
-    { path = "mcp_code_checker.utils" },
-    { path = "mcp_code_checker.log_utils" }
+    { path = "mcp_tools_py.utils" },
+    { path = "mcp_tools_py.log_utils" }
 ]
 
 [[modules]]
-path = "mcp_code_checker.code_checker_mypy"
+path = "mcp_tools_py.code_checker_mypy"
 layer = "checker_implementation"
 depends_on = [
-    { path = "mcp_code_checker.utils" },
-    { path = "mcp_code_checker.log_utils" }
+    { path = "mcp_tools_py.utils" },
+    { path = "mcp_tools_py.log_utils" }
 ]
 
 [[modules]]
-path = "mcp_code_checker.server"
+path = "mcp_tools_py.server"
 layer = "server"
 depends_on = [
-    { path = "mcp_code_checker.code_checker_pytest" },
-    { path = "mcp_code_checker.code_checker_pylint" },
-    { path = "mcp_code_checker.code_checker_mypy" },
-    { path = "mcp_code_checker.utils" },
-    { path = "mcp_code_checker.log_utils" }
+    { path = "mcp_tools_py.code_checker_pytest" },
+    { path = "mcp_tools_py.code_checker_pylint" },
+    { path = "mcp_tools_py.code_checker_mypy" },
+    { path = "mcp_tools_py.utils" },
+    { path = "mcp_tools_py.log_utils" }
 ]
 
 [[modules]]
-path = "mcp_code_checker.main"
+path = "mcp_tools_py.main"
 layer = "entry_point"
 depends_on = [
-    { path = "mcp_code_checker.server" }
+    { path = "mcp_tools_py.server" }
 ]
 
 [[modules]]
-path = "mcp_code_checker.utils"
+path = "mcp_tools_py.utils"
 layer = "utilities"
 depends_on = [
-    { path = "mcp_code_checker.log_utils" }
+    { path = "mcp_tools_py.log_utils" }
 ]
 
 [[modules]]
-path = "mcp_code_checker.log_utils"
+path = "mcp_tools_py.log_utils"
 layer = "utilities"
 depends_on = []

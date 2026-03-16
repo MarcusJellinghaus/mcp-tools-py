@@ -1,4 +1,4 @@
-# MCP Code Checker
+# MCP Tools Py
 
 A Model Context Protocol (MCP) server providing code quality checking operations with easy client configuration. This server offers an API for performing code quality checks within a specified project directory, following the MCP protocol design.
 
@@ -78,7 +78,7 @@ The mypy tools expose the following parameters for customization:
 ### Basic Usage
 
 ```bash
-mcp-code-checker --project-dir /path/to/project [options]
+mcp-tools-py --project-dir /path/to/project [options]
 ```
 
 ### Required Parameters
@@ -121,13 +121,13 @@ The `--python-executable` and `--venv-path` options must point to the environmen
 
 ### Correct Configuration
 
-Point to the venv where mcp-code-checker and its tools are installed:
+Point to the venv where mcp-tools-py and its tools are installed:
 
 ```json
 {
     "mcpServers": {
         "code_checker": {
-            "command": "mcp-code-checker",
+            "command": "mcp-tools-py",
             "args": [
                 "--project-dir", "/path/to/your/project",
                 "--venv-path", "${VIRTUAL_ENV}"
@@ -145,7 +145,7 @@ Do **not** point to your project's runtime venv if it doesn't have pytest/pylint
 {
     "mcpServers": {
         "code_checker": {
-            "command": "mcp-code-checker",
+            "command": "mcp-tools-py",
             "args": [
                 "--project-dir", "/path/to/your/project",
                 "--venv-path", "/path/to/your/project/.venv"
@@ -170,22 +170,22 @@ See [INSTALL.md](INSTALL.md) for detailed installation instructions.
 
 ```bash
 # Install from GitHub (recommended)
-pip install git+https://github.com/MarcusJellinghaus/mcp-code-checker.git
+pip install git+https://github.com/MarcusJellinghaus/mcp-tools-py.git
 
 # Verify installation
-mcp-code-checker --help
+mcp-tools-py --help
 ```
 
 **Development install:**
 
 ```bash
 # Clone and install for development
-git clone https://github.com/MarcusJellinghaus/mcp-code-checker.git
-cd mcp-code-checker
+git clone https://github.com/MarcusJellinghaus/mcp-tools-py.git
+cd mcp-tools-py
 python -m venv .venv
 source .venv/bin/activate  # On Windows: .venv\Scripts\activate
 pip install -e ".[dev]"
-mcp-code-checker --help
+mcp-tools-py --help
 ```
 
 ## MCP Client Configuration
@@ -207,7 +207,7 @@ This server can be easily configured using the [mcp-config](https://github.com/M
 Add this line to your `requirements.txt`:
 
 ```txt
-mcp-code-checker @ git+https://github.com/MarcusJellinghaus/mcp-code-checker.git
+mcp-tools-py @ git+https://github.com/MarcusJellinghaus/mcp-tools-py.git
 ```
 
 ### In pyproject.toml
@@ -217,14 +217,14 @@ Add to your project dependencies:
 ```toml
 [project]
 dependencies = [
-    "mcp-code-checker @ git+https://github.com/MarcusJellinghaus/mcp-code-checker.git",
+    "mcp-tools-py @ git+https://github.com/MarcusJellinghaus/mcp-tools-py.git",
     # ... other dependencies
 ]
 
 # Or as an optional dependency
 [project.optional-dependencies]
 dev = [
-    "mcp-code-checker @ git+https://github.com/MarcusJellinghaus/mcp-code-checker.git",
+    "mcp-tools-py @ git+https://github.com/MarcusJellinghaus/mcp-tools-py.git",
 ]
 ```
 
@@ -245,17 +245,17 @@ pip install ".[dev]"
 ## Running the Server
 
 ### Using the CLI Command (Recommended)
-After installation, you can run the server using the `mcp-code-checker` command:
+After installation, you can run the server using the `mcp-tools-py` command:
 
 ```bash
-mcp-code-checker --project-dir /path/to/project [options]
+mcp-tools-py --project-dir /path/to/project [options]
 ```
 
 ### Using Python Module (Alternative)
 You can also run the server as a Python module:
 
 ```bash
-python -m mcp_code_checker --project-dir /path/to/project [options]
+python -m mcp_tools_py --project-dir /path/to/project [options]
 
 # Or for development (from source directory)
 python -m src.main --project-dir /path/to/project [options]
@@ -294,7 +294,7 @@ The server provides comprehensive logging capabilities:
 - **Function call tracking** with parameters, timing, and results
 - **Automatic error context capture** with full stack traces
 - **Configurable log levels** (DEBUG, INFO, WARNING, ERROR, CRITICAL)
-- **Default timestamped log files** in `project_dir/logs/mcp_code_checker_{timestamp}.log`
+- **Default timestamped log files** in `project_dir/logs/mcp_tools_py_{timestamp}.log`
 
 Example structured log entries:
 ```json
@@ -316,7 +316,7 @@ Use `--console-only` to disable file logging for simple development scenarios.
 
 1. **First install the server:**
    ```bash
-   pip install git+https://github.com/MarcusJellinghaus/mcp-code-checker.git
+   pip install git+https://github.com/MarcusJellinghaus/mcp-tools-py.git
    ```
 
 2. **Configure with mcp-config:**
@@ -325,7 +325,7 @@ Use `--console-only` to disable file logging for simple development scenarios.
    ```
    Then select "Add New" and search for this server, or run directly:
    ```bash
-   mcp-config mcp-code-checker
+   mcp-config mcp-tools-py
    ```
 
 This will prompt you for your project directory and automatically configure your MCP client.
@@ -339,7 +339,7 @@ If you prefer manual configuration, edit your MCP configuration file:
 {
     "mcpServers": {
         "code_checker": {
-            "command": "mcp-code-checker",
+            "command": "mcp-tools-py",
             "args": ["--project-dir", "/path/to/your/project"]
         }
     }
@@ -359,7 +359,7 @@ If you prefer manual configuration, edit your MCP configuration file:
                 "/path/to/your/project"
             ],
             "env": {
-                "PYTHONPATH": "/path/to/mcp-code-checker"
+                "PYTHONPATH": "/path/to/mcp-tools-py"
             }
         }
     }
@@ -371,7 +371,7 @@ If you prefer manual configuration, edit your MCP configuration file:
 {
     "servers": {
         "code-checker": {
-            "command": "mcp-code-checker",
+            "command": "mcp-tools-py",
             "args": ["--project-dir", "."]
         }
     }
@@ -386,7 +386,7 @@ If you prefer manual configuration, edit your MCP configuration file:
             "command": "python",
             "args": ["-m", "src.main", "--project-dir", "."],
             "env": {
-                "PYTHONPATH": "/path/to/mcp-code-checker"
+                "PYTHONPATH": "/path/to/mcp-tools-py"
             }
         }
     }
@@ -398,7 +398,7 @@ If you prefer manual configuration, edit your MCP configuration file:
 ## Testing with MCP Inspector
 
 ```bash
-npx @modelcontextprotocol/inspector mcp-code-checker --project-dir /path/to/project
+npx @modelcontextprotocol/inspector mcp-tools-py --project-dir /path/to/project
 ```
 
 ## Available Tools
@@ -430,8 +430,8 @@ The server exposes the following MCP tools:
 
 ```bash
 # Clone the repository
-git clone https://github.com/MarcusJellinghaus/mcp-code-checker.git
-cd mcp-code-checker
+git clone https://github.com/MarcusJellinghaus/mcp-tools-py.git
+cd mcp-tools-py
 
 # Create and activate a virtual environment
 python -m venv .venv

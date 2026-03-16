@@ -9,9 +9,9 @@ from pathlib import Path
 import structlog
 
 # Import logging utilities and version
-from mcp_code_checker import __version__  # pylint: disable=no-name-in-module
-from mcp_code_checker.log_utils import setup_logging
-from mcp_code_checker.server import create_server
+from mcp_tools_py import __version__  # pylint: disable=no-name-in-module
+from mcp_tools_py.log_utils import setup_logging
+from mcp_tools_py.server import create_server
 
 # Create loggers
 stdlogger = logging.getLogger(__name__)
@@ -26,13 +26,13 @@ def parse_args() -> argparse.Namespace:
         Parsed arguments
     """
     parser = argparse.ArgumentParser(
-        description="MCP Code Checker Server - Run pylint, pytest, and mypy checks on Python code",
+        description="MCP Tools Py Server - Run pylint, pytest, and mypy checks on Python code",
         formatter_class=argparse.RawDescriptionHelpFormatter,
         epilog="""
 Examples:
-  mcp-code-checker --project-dir /path/to/project
-  mcp-code-checker --project-dir . --log-level DEBUG --keep-temp-files
-  mcp-code-checker --project-dir /path/to/project --venv-path .venv --test-folder tests
+  mcp-tools-py --project-dir /path/to/project
+  mcp-tools-py --project-dir . --log-level DEBUG --keep-temp-files
+  mcp-tools-py --project-dir /path/to/project --venv-path .venv --test-folder tests
         """,
     )
     parser.add_argument(
@@ -90,7 +90,7 @@ Examples:
         default=None,
         help=(
             "Path for structured JSON logs "
-            "(default: mcp_code_checker_{timestamp}.log in project_dir/logs/)."
+            "(default: mcp_tools_py_{timestamp}.log in project_dir/logs/)."
         ),
     )
     parser.add_argument(
@@ -128,7 +128,7 @@ def main() -> None:
         # Create default log file in project_dir/logs/ with timestamp
         timestamp = datetime.now().strftime("%Y%m%d_%H%M%S")
         logs_dir = project_dir / "logs"
-        log_file = str(logs_dir / f"mcp_code_checker_{timestamp}.log")
+        log_file = str(logs_dir / f"mcp_tools_py_{timestamp}.log")
 
     # Configure logging now that we have the project directory
     setup_logging(args.log_level, log_file)
@@ -140,11 +140,11 @@ def main() -> None:
     )
 
     stdlogger.info(
-        "Starting MCP Code Checker server with project directory: %s", project_dir
+        "Starting MCP Tools Py server with project directory: %s", project_dir
     )
     if log_file:
         structured_logger.info(
-            "Starting MCP Code Checker server",
+            "Starting MCP Tools Py server",
             project_dir=str(project_dir),
             log_level=args.log_level,
             log_file=log_file,

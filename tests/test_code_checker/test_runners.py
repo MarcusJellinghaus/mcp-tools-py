@@ -9,7 +9,7 @@ from unittest.mock import MagicMock, patch
 
 import pytest
 
-from mcp_code_checker.code_checker_pytest import (
+from mcp_tools_py.code_checker_pytest import (
     PytestReport,
     check_code_with_pytest,
     run_tests,
@@ -123,7 +123,7 @@ def test_run_tests_no_tests_found() -> None:
             _cleanup_test_project(test_dir)
 
 
-@patch("mcp_code_checker.code_checker_pytest.runners.run_tests")
+@patch("mcp_tools_py.code_checker_pytest.runners.run_tests")
 def test_check_code_with_pytest(mock_run_tests: MagicMock) -> None:
     """Test the full check_code_with_pytest function."""
     # Create a mock Summary instance for our mock report
@@ -166,7 +166,7 @@ def test_check_code_with_pytest(mock_run_tests: MagicMock) -> None:
     assert result["test_results"] == mock_report
 
 
-@patch("mcp_code_checker.code_checker_pytest.runners.run_tests")
+@patch("mcp_tools_py.code_checker_pytest.runners.run_tests")
 def test_check_code_with_pytest_with_custom_parameters(
     mock_run_tests: MagicMock,
 ) -> None:
@@ -233,7 +233,7 @@ def test_check_code_with_pytest_with_custom_parameters(
     assert result["success"] is True
 
 
-@patch("mcp_code_checker.code_checker_pytest.runners.run_tests")
+@patch("mcp_tools_py.code_checker_pytest.runners.run_tests")
 def test_check_code_with_pytest_with_failed_tests(mock_run_tests: MagicMock) -> None:
     """Test check_code_with_pytest with failed tests."""
     # Create a mock Summary instance for our mock report
@@ -296,7 +296,7 @@ def test_check_code_with_pytest_with_failed_tests(mock_run_tests: MagicMock) -> 
     assert result["test_results"] == mock_report
 
 
-@patch("mcp_code_checker.code_checker_pytest.runners.run_tests")
+@patch("mcp_tools_py.code_checker_pytest.runners.run_tests")
 def test_check_code_with_pytest_with_error(mock_run_tests: MagicMock) -> None:
     """Test check_code_with_pytest with an error during test execution."""
     # Make run_tests raise an exception

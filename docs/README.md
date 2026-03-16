@@ -1,6 +1,6 @@
 # Documentation Index
 
-Complete documentation for MCP Code Checker.
+Complete documentation for MCP Tools Py.
 
 ---
 

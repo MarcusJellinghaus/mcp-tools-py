@@ -12,7 +12,7 @@ from unittest.mock import patch
 
 import pytest
 
-from mcp_code_checker.utils.subprocess_runner import (
+from mcp_tools_py.utils.subprocess_runner import (
     CommandOptions,
     CommandResult,
     execute_command,

@@ -2,8 +2,8 @@
 
 import pytest
 
-from mcp_code_checker.code_checker_mypy.models import MypyMessage, MypyResult
-from mcp_code_checker.code_checker_mypy.reporting import create_mypy_prompt
+from mcp_tools_py.code_checker_mypy.models import MypyMessage, MypyResult
+from mcp_tools_py.code_checker_mypy.reporting import create_mypy_prompt
 
 
 def test_create_mypy_prompt_no_messages() -> None:
@@ -104,7 +104,7 @@ def test_create_mypy_prompt_many_messages_same_code() -> None:
 
 def test_create_mypy_prompt_execution_error() -> None:
     """Test prompt creation when there's an execution error."""
-    from mcp_code_checker.code_checker_mypy.reporting import get_mypy_prompt
+    from mcp_tools_py.code_checker_mypy.reporting import get_mypy_prompt
 
     # Test with an empty result (no messages)
     result = MypyResult(return_code=1, messages=[])

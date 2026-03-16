@@ -27,7 +27,7 @@ async def test_run_pytest_check_parameters(mock_project_dir: Path) -> None:
     """Test that run_pytest_check properly uses server parameters and passes parameters correctly."""
     with (
         patch("mcp.server.fastmcp.FastMCP") as mock_fastmcp,
-        patch("mcp_code_checker.server.check_code_with_pytest") as mock_check_pytest,
+        patch("mcp_tools_py.server.check_code_with_pytest") as mock_check_pytest,
     ):
         # Setup mocks
         mock_tool = MagicMock()
@@ -41,7 +41,7 @@ async def test_run_pytest_check_parameters(mock_project_dir: Path) -> None:
         }
 
         # Import after patching to ensure mocks are in place
-        from mcp_code_checker.server import CodeCheckerServer
+        from mcp_tools_py.server import CodeCheckerServer
 
         # Create server with the static parameters
         with patch.object(
@@ -91,7 +91,7 @@ async def test_run_pylint_check_signature() -> None:
         mock_tool = MagicMock()
         mock_fastmcp.return_value.tool.return_value = mock_tool
 
-        from mcp_code_checker.server import CodeCheckerServer
+        from mcp_tools_py.server import CodeCheckerServer
 
         with patch.object(
             CodeCheckerServer,
@@ -127,7 +127,7 @@ def mock_server() -> Tuple[Any, MagicMock]:
         mock_tool = MagicMock()
         mock_fastmcp.return_value.tool.return_value = mock_tool
 
-        from mcp_code_checker.server import CodeCheckerServer
+        from mcp_tools_py.server import CodeCheckerServer
 
         with patch.object(
             CodeCheckerServer,
@@ -198,7 +198,7 @@ async def test_run_pytest_check_with_show_details_true(
     """Test that run_pytest_check properly handles show_details=True parameter."""
     server, mock_tool = mock_server
 
-    with patch("mcp_code_checker.server.check_code_with_pytest") as mock_check:
+    with patch("mcp_tools_py.server.check_code_with_pytest") as mock_check:
         mock_check.return_value = {
             "success": True,
             "summary": {"passed": 3, "failed": 0, "error": 0, "collected": 3},
@@ -232,7 +232,7 @@ async def test_run_pytest_check_with_show_details_false(
     """Test that run_pytest_check properly handles show_details=False parameter."""
     server, mock_tool = mock_server
 
-    with patch("mcp_code_checker.server.check_code_with_pytest") as mock_check:
+    with patch("mcp_tools_py.server.check_code_with_pytest") as mock_check:
         mock_check.return_value = {
             "success": True,
             "summary": {"passed": 5, "failed": 0, "error": 0, "collected": 5},
@@ -261,7 +261,7 @@ async def test_run_pytest_check_show_details_default_value() -> None:
         mock_tool = MagicMock()
         mock_fastmcp.return_value.tool.return_value = mock_tool
 
-        from mcp_code_checker.server import CodeCheckerServer
+        from mcp_tools_py.server import CodeCheckerServer
 
         with patch.object(
             CodeCheckerServer,
@@ -293,7 +293,7 @@ async def test_run_pytest_check_backward_compatibility(
     """Test that existing function calls work without show_details parameter."""
     server, mock_tool = mock_server
 
-    with patch("mcp_code_checker.server.check_code_with_pytest") as mock_check:
+    with patch("mcp_tools_py.server.check_code_with_pytest") as mock_check:
         mock_check.return_value = {
             "success": True,
             "summary": {"passed": 8, "failed": 0, "error": 0, "collected": 8},
@@ -322,9 +322,9 @@ async def test_show_details_with_focused_test_run(
     server, mock_tool = mock_server
 
     with (
-        patch("mcp_code_checker.server.check_code_with_pytest") as mock_check,
+        patch("mcp_tools_py.server.check_code_with_pytest") as mock_check,
         patch(
-            "mcp_code_checker.server.create_prompt_for_failed_tests"
+            "mcp_tools_py.server.create_prompt_for_failed_tests"
         ) as mock_create_prompt,
     ):
         mock_check.return_value = mock_pytest_results_few_tests
@@ -357,9 +357,9 @@ async def test_show_details_with_many_failures(
     server, mock_tool = mock_server
 
     with (
-        patch("mcp_code_checker.server.check_code_with_pytest") as mock_check,
+        patch("mcp_tools_py.server.check_code_with_pytest") as mock_check,
         patch(
-            "mcp_code_checker.server.create_prompt_for_failed_tests"
+            "mcp_tools_py.server.create_prompt_for_failed_tests"
         ) as mock_create_prompt,
     ):
         mock_check.return_value = mock_pytest_results_many_failures
@@ -401,9 +401,9 @@ async def test_show_details_output_length_limits(
     }
 
     with (
-        patch("mcp_code_checker.server.check_code_with_pytest") as mock_check,
+        patch("mcp_tools_py.server.check_code_with_pytest") as mock_check,
         patch(
-            "mcp_code_checker.server.create_prompt_for_failed_tests"
+            "mcp_tools_py.server.create_prompt_for_failed_tests"
         ) as mock_create_prompt,
     ):
         mock_check.return_value = long_output_results
@@ -434,7 +434,7 @@ async def test_server_method_signature_includes_show_details() -> None:
         mock_tool = MagicMock()
         mock_fastmcp.return_value.tool.return_value = mock_tool
 
-        from mcp_code_checker.server import CodeCheckerServer
+        from mcp_tools_py.server import CodeCheckerServer
 
         with patch.object(
             CodeCheckerServer,
@@ -473,7 +473,7 @@ async def test_mcp_tool_decorator_compatibility() -> None:
         mock_tool = MagicMock()
         mock_fastmcp.return_value.tool.return_value = mock_tool
 
-        from mcp_code_checker.server import CodeCheckerServer
+        from mcp_tools_py.server import CodeCheckerServer
 
         with patch.object(
             CodeCheckerServer,
@@ -505,9 +505,9 @@ async def test_enhanced_reporting_integration_preparation(
 
     # Test that current implementation can handle enhanced reporting calls
     with (
-        patch("mcp_code_checker.server.check_code_with_pytest") as mock_check,
+        patch("mcp_tools_py.server.check_code_with_pytest") as mock_check,
         patch(
-            "mcp_code_checker.server.create_prompt_for_failed_tests"
+            "mcp_tools_py.server.create_prompt_for_failed_tests"
         ) as mock_create_prompt,
     ):
         # Setup mocks
@@ -530,7 +530,7 @@ async def test_enhanced_reporting_integration_preparation(
 
         # Verify that enhanced reporting functions are available
         # The reporting module should have the enhanced functions from Steps 1-2
-        from mcp_code_checker.code_checker_pytest.reporting import should_show_details
+        from mcp_tools_py.code_checker_pytest.reporting import should_show_details
 
         # Test that should_show_details function works
         test_results = {"summary": {"collected": 3, "failed": 1, "error": 0}}
@@ -549,14 +549,14 @@ class TestServerPylintMaxIssues:
         with (
             patch("mcp.server.fastmcp.FastMCP") as mock_fastmcp,
             patch(
-                "mcp_code_checker.server.get_pylint_prompt"
+                "mcp_tools_py.server.get_pylint_prompt"
             ) as mock_get_pylint_prompt,
         ):
             mock_tool = MagicMock()
             mock_fastmcp.return_value.tool.return_value = mock_tool
             mock_get_pylint_prompt.return_value = "some issues"
 
-            from mcp_code_checker.server import CodeCheckerServer
+            from mcp_tools_py.server import CodeCheckerServer
 
             _server = CodeCheckerServer(project_dir=Path("/test/project"))
             run_pylint_check = _get_tool(mock_tool, "run_pylint_check")
@@ -571,14 +571,14 @@ class TestServerPylintMaxIssues:
         with (
             patch("mcp.server.fastmcp.FastMCP") as mock_fastmcp,
             patch(
-                "mcp_code_checker.server.get_pylint_prompt"
+                "mcp_tools_py.server.get_pylint_prompt"
             ) as mock_get_pylint_prompt,
         ):
             mock_tool = MagicMock()
             mock_fastmcp.return_value.tool.return_value = mock_tool
             mock_get_pylint_prompt.return_value = None
 
-            from mcp_code_checker.server import CodeCheckerServer
+            from mcp_tools_py.server import CodeCheckerServer
 
             _server = CodeCheckerServer(project_dir=Path("/test/project"))
             run_pylint_check = _get_tool(mock_tool, "run_pylint_check")
@@ -594,7 +594,7 @@ class TestServerPylintMaxIssues:
             mock_tool = MagicMock()
             mock_fastmcp.return_value.tool.return_value = mock_tool
 
-            from mcp_code_checker.server import CodeCheckerServer
+            from mcp_tools_py.server import CodeCheckerServer
 
             server = CodeCheckerServer(project_dir=Path("/test/project"))
 
@@ -613,7 +613,7 @@ class TestServerPylintMaxIssues:
             mock_tool = MagicMock()
             mock_fastmcp.return_value.tool.return_value = mock_tool
 
-            from mcp_code_checker.server import CodeCheckerServer
+            from mcp_tools_py.server import CodeCheckerServer
 
             _server = CodeCheckerServer(project_dir=Path("/test/project"))
             run_pylint_check = _get_tool(mock_tool, "run_pylint_check")
@@ -632,7 +632,7 @@ async def test_parameter_type_validation(mock_server: Tuple[Any, MagicMock]) -> 
     """Test that parameters are properly typed and validated."""
     server, mock_tool = mock_server
 
-    with patch("mcp_code_checker.server.check_code_with_pytest") as mock_check:
+    with patch("mcp_tools_py.server.check_code_with_pytest") as mock_check:
         mock_check.return_value = {
             "success": True,
             "summary": {"passed": 1, "failed": 0, "error": 0, "collected": 1},
@@ -666,7 +666,7 @@ async def test_integration_with_existing_server_parameters(
     assert server.test_folder == "tests"  # default
     assert server.keep_temp_files == False  # default
 
-    with patch("mcp_code_checker.server.check_code_with_pytest") as mock_check:
+    with patch("mcp_tools_py.server.check_code_with_pytest") as mock_check:
         mock_check.return_value = {
             "success": True,
             "summary": {"passed": 3, "failed": 0, "error": 0, "collected": 3},

@@ -8,15 +8,15 @@ from typing import Any, Dict, Generator, List, cast
 
 import pytest
 
-from mcp_code_checker.code_checker_pytest.models import (
+from mcp_tools_py.code_checker_pytest.models import (
     Crash,
     PytestReport,
     StageInfo,
     Summary,
     Test,
 )
-from mcp_code_checker.code_checker_pytest.parsers import parse_pytest_report
-from mcp_code_checker.server import CodeCheckerServer
+from mcp_tools_py.code_checker_pytest.parsers import parse_pytest_report
+from mcp_tools_py.server import CodeCheckerServer
 
 
 class TestIntegrationShowDetails:

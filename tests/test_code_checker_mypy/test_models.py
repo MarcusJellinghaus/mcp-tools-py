@@ -2,7 +2,7 @@
 
 import pytest
 
-from mcp_code_checker.code_checker_mypy.models import (
+from mcp_tools_py.code_checker_mypy.models import (
     MypyMessage,
     MypyResult,
     MypySeverity,

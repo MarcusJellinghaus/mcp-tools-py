@@ -4,7 +4,7 @@ import logging
 
 import structlog
 
-from mcp_code_checker.code_checker_mypy.models import MypyMessage, MypyResult
+from mcp_tools_py.code_checker_mypy.models import MypyMessage, MypyResult
 
 logger = logging.getLogger(__name__)
 structured_logger = structlog.get_logger(__name__)
@@ -105,7 +105,7 @@ def get_mypy_prompt(
     Returns:
         LLM prompt string or None if no issues
     """
-    from mcp_code_checker.code_checker_mypy.runners import run_mypy_check
+    from mcp_tools_py.code_checker_mypy.runners import run_mypy_check
 
     result = run_mypy_check(
         project_dir=project_dir,

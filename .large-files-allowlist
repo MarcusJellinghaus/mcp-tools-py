@@ -1,4 +1,4 @@
-# Large files allowlist for mcp-code-checker
+# Large files allowlist for mcp-tools-py
 # Files listed here are allowed to exceed the normal size limits
 
 # Large test files with extensive test cases
@@ -8,6 +8,6 @@ tests/test_subprocess_runner.py
 tests/test_server_params.py
 
 # Core implementation files that may be legitimately large
-src/mcp_code_checker/server.py
-src/mcp_code_checker/utils/data_files.py
-src/mcp_code_checker/utils/subprocess_runner.py
+src/mcp_tools_py/server.py
+src/mcp_tools_py/utils/data_files.py
+src/mcp_tools_py/utils/subprocess_runner.py

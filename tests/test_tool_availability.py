@@ -8,13 +8,13 @@ from unittest.mock import MagicMock, patch
 
 import pytest
 
-from mcp_code_checker.utils.subprocess_runner import CommandResult
+from mcp_tools_py.utils.subprocess_runner import CommandResult
 from tests.conftest import make_command_result
 
 
 def _create_server(**kwargs: Any) -> Any:
     """Create a CodeCheckerServer with mocked FastMCP and execute_command."""
-    from mcp_code_checker.server import CodeCheckerServer
+    from mcp_tools_py.server import CodeCheckerServer
 
     return CodeCheckerServer(**kwargs)
 
@@ -32,9 +32,9 @@ class TestResolvePythonExecutable:
         project_dir = Path("/project")
         with (
             patch("mcp.server.fastmcp.FastMCP") as mock_fastmcp,
-            patch("mcp_code_checker.server.execute_command") as mock_exec,
-            patch("mcp_code_checker.server.os.name", "nt"),
-            patch("mcp_code_checker.server.os.path.exists", return_value=True),
+            patch("mcp_tools_py.server.execute_command") as mock_exec,
+            patch("mcp_tools_py.server.os.name", "nt"),
+            patch("mcp_tools_py.server.os.path.exists", return_value=True),
         ):
             mock_fastmcp.return_value.tool.return_value = MagicMock()
             mock_exec.return_value = make_command_result(return_code=0, stdout="ok")
@@ -49,9 +49,9 @@ class TestResolvePythonExecutable:
         """When venv_path is set and os.name!='nt', resolve to bin/python."""
         with (
             patch("mcp.server.fastmcp.FastMCP") as mock_fastmcp,
-            patch("mcp_code_checker.server.execute_command") as mock_exec,
-            patch("mcp_code_checker.server.os.name", "posix"),
-            patch("mcp_code_checker.server.os.path.exists", return_value=True),
+            patch("mcp_tools_py.server.execute_command") as mock_exec,
+            patch("mcp_tools_py.server.os.name", "posix"),
+            patch("mcp_tools_py.server.os.path.exists", return_value=True),
         ):
             mock_fastmcp.return_value.tool.return_value = MagicMock()
             mock_exec.return_value = make_command_result(return_code=0, stdout="ok")
@@ -66,8 +66,8 @@ class TestResolvePythonExecutable:
         project_dir = Path("/project")
         with (
             patch("mcp.server.fastmcp.FastMCP") as mock_fastmcp,
-            patch("mcp_code_checker.server.os.name", "nt"),
-            patch("mcp_code_checker.server.os.path.exists", return_value=False),
+            patch("mcp_tools_py.server.os.name", "nt"),
+            patch("mcp_tools_py.server.os.path.exists", return_value=False),
         ):
             mock_fastmcp.return_value.tool.return_value = MagicMock()
 
@@ -78,7 +78,7 @@ class TestResolvePythonExecutable:
         """When no venv_path but python_executable is set, use it directly."""
         with (
             patch("mcp.server.fastmcp.FastMCP") as mock_fastmcp,
-            patch("mcp_code_checker.server.execute_command") as mock_exec,
+            patch("mcp_tools_py.server.execute_command") as mock_exec,
         ):
             mock_fastmcp.return_value.tool.return_value = MagicMock()
             mock_exec.return_value = make_command_result(return_code=0, stdout="ok")
@@ -94,7 +94,7 @@ class TestResolvePythonExecutable:
         """When neither venv_path nor python_executable is set, use sys.executable."""
         with (
             patch("mcp.server.fastmcp.FastMCP") as mock_fastmcp,
-            patch("mcp_code_checker.server.execute_command") as mock_exec,
+            patch("mcp_tools_py.server.execute_command") as mock_exec,
         ):
             mock_fastmcp.return_value.tool.return_value = MagicMock()
             mock_exec.return_value = make_command_result(return_code=0, stdout="ok")
@@ -116,7 +116,7 @@ class TestCheckToolAvailability:
         """When all tools return success, all should be True."""
         with (
             patch("mcp.server.fastmcp.FastMCP") as mock_fastmcp,
-            patch("mcp_code_checker.server.execute_command") as mock_exec,
+            patch("mcp_tools_py.server.execute_command") as mock_exec,
         ):
             mock_fastmcp.return_value.tool.return_value = MagicMock()
             mock_exec.return_value = make_command_result(
@@ -146,7 +146,7 @@ class TestCheckToolAvailability:
 
         with (
             patch("mcp.server.fastmcp.FastMCP") as mock_fastmcp,
-            patch("mcp_code_checker.server.execute_command") as mock_exec,
+            patch("mcp_tools_py.server.execute_command") as mock_exec,
         ):
             mock_fastmcp.return_value.tool.return_value = MagicMock()
             mock_exec.side_effect = side_effect
@@ -161,7 +161,7 @@ class TestCheckToolAvailability:
         """When all tools fail, all should be False."""
         with (
             patch("mcp.server.fastmcp.FastMCP") as mock_fastmcp,
-            patch("mcp_code_checker.server.execute_command") as mock_exec,
+            patch("mcp_tools_py.server.execute_command") as mock_exec,
         ):
             mock_fastmcp.return_value.tool.return_value = MagicMock()
             mock_exec.return_value = make_command_result(
@@ -180,7 +180,7 @@ class TestCheckToolAvailability:
         """When a tool check times out, it should be marked as unavailable."""
         with (
             patch("mcp.server.fastmcp.FastMCP") as mock_fastmcp,
-            patch("mcp_code_checker.server.execute_command") as mock_exec,
+            patch("mcp_tools_py.server.execute_command") as mock_exec,
         ):
             mock_fastmcp.return_value.tool.return_value = MagicMock()
             mock_exec.return_value = make_command_result(return_code=1, timed_out=True)
@@ -222,7 +222,7 @@ class TestToolHandlerShortCircuit:
         """When pytest is unavailable, tool handler returns error string."""
         with (
             patch("mcp.server.fastmcp.FastMCP") as mock_fastmcp,
-            patch("mcp_code_checker.server.execute_command") as mock_exec,
+            patch("mcp_tools_py.server.execute_command") as mock_exec,
         ):
             registered_tools = _capture_tools(mock_fastmcp)
             mock_exec.return_value = make_command_result(return_code=0, stdout="ok")
@@ -243,7 +243,7 @@ class TestToolHandlerShortCircuit:
         """When pylint is unavailable, tool handler returns error string."""
         with (
             patch("mcp.server.fastmcp.FastMCP") as mock_fastmcp,
-            patch("mcp_code_checker.server.execute_command") as mock_exec,
+            patch("mcp_tools_py.server.execute_command") as mock_exec,
         ):
             registered_tools = _capture_tools(mock_fastmcp)
             mock_exec.return_value = make_command_result(return_code=0, stdout="ok")
@@ -264,7 +264,7 @@ class TestToolHandlerShortCircuit:
         """When mypy is unavailable, tool handler returns error string."""
         with (
             patch("mcp.server.fastmcp.FastMCP") as mock_fastmcp,
-            patch("mcp_code_checker.server.execute_command") as mock_exec,
+            patch("mcp_tools_py.server.execute_command") as mock_exec,
         ):
             registered_tools = _capture_tools(mock_fastmcp)
             mock_exec.return_value = make_command_result(return_code=0, stdout="ok")
@@ -285,8 +285,8 @@ class TestToolHandlerShortCircuit:
         """When tool is available, normal execution proceeds."""
         with (
             patch("mcp.server.fastmcp.FastMCP") as mock_fastmcp,
-            patch("mcp_code_checker.server.execute_command") as mock_exec,
-            patch("mcp_code_checker.server.check_code_with_pytest") as mock_check,
+            patch("mcp_tools_py.server.execute_command") as mock_exec,
+            patch("mcp_tools_py.server.check_code_with_pytest") as mock_check,
         ):
             registered_tools = _capture_tools(mock_fastmcp)
             mock_exec.return_value = make_command_result(return_code=0, stdout="ok")
@@ -313,8 +313,8 @@ class TestToolHandlerShortCircuit:
         """Verify that _resolved_python (not python_executable) is passed to the runner."""
         with (
             patch("mcp.server.fastmcp.FastMCP") as mock_fastmcp,
-            patch("mcp_code_checker.server.execute_command") as mock_exec,
-            patch("mcp_code_checker.server.check_code_with_pytest") as mock_check,
+            patch("mcp_tools_py.server.execute_command") as mock_exec,
+            patch("mcp_tools_py.server.check_code_with_pytest") as mock_check,
         ):
             registered_tools = _capture_tools(mock_fastmcp)
             mock_exec.return_value = make_command_result(return_code=0, stdout="ok")

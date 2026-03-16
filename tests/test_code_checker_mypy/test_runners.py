@@ -4,7 +4,7 @@ import sys
 
 import pytest
 
-from mcp_code_checker.code_checker_mypy import run_mypy_check
+from mcp_tools_py.code_checker_mypy import run_mypy_check
 
 
 def test_run_mypy_check_on_project() -> None:
