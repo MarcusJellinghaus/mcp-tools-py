@@ -8,7 +8,7 @@ description = "An MCP server for running python code checks (pylint, pytest and 
 readme = "README.md"
 requires-python = ">=3.11"
 license = {text = "MIT"}
-keywords = ["mcp", "code-checker", "pylint", "pytest", "mypy", "claude", "ai"]
+keywords = ["mcp", "mcp-tools-py", "pylint", "pytest", "mypy", "claude", "ai"]
 classifiers = [
     "Programming Language :: Python :: 3",
     "Operating System :: OS Independent",

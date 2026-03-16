@@ -225,7 +225,7 @@ After installation, you need to configure MCP Tools Py for your preferred client
    ```json
    {
      "mcpServers": {
-       "code_checker": {
+       "mcp-tools-py": {
          "command": "mcp-tools-py",
          "args": [
            "--project-dir",
@@ -242,7 +242,7 @@ After installation, you need to configure MCP Tools Py for your preferred client
    ```json
    {
      "mcpServers": {
-       "code_checker": {
+       "mcp-tools-py": {
          "command": "python",
          "args": [
            "-m",
@@ -268,7 +268,7 @@ VSCode 1.102+ supports MCP servers natively. Create or edit the configuration fi
 ```json
 {
   "servers": {
-    "code-checker": {
+    "mcp-tools-py": {
       "command": "mcp-tools-py",
       "args": ["--project-dir", "."]
     }
@@ -284,7 +284,7 @@ VSCode 1.102+ supports MCP servers natively. Create or edit the configuration fi
 ```json
 {
   "servers": {
-    "code-checker": {
+    "mcp-tools-py": {
       "command": "mcp-tools-py",
       "args": ["--project-dir", "/path/to/your/projects"]
     }

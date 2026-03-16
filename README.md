@@ -126,7 +126,7 @@ Point to the venv where mcp-tools-py and its tools are installed:
 ```json
 {
     "mcpServers": {
-        "code_checker": {
+        "mcp-tools-py": {
             "command": "mcp-tools-py",
             "args": [
                 "--project-dir", "/path/to/your/project",
@@ -144,7 +144,7 @@ Do **not** point to your project's runtime venv if it doesn't have pytest/pylint
 ```json
 {
     "mcpServers": {
-        "code_checker": {
+        "mcp-tools-py": {
             "command": "mcp-tools-py",
             "args": [
                 "--project-dir", "/path/to/your/project",
@@ -338,7 +338,7 @@ If you prefer manual configuration, edit your MCP configuration file:
 ```json
 {
     "mcpServers": {
-        "code_checker": {
+        "mcp-tools-py": {
             "command": "mcp-tools-py",
             "args": ["--project-dir", "/path/to/your/project"]
         }
@@ -350,7 +350,7 @@ If you prefer manual configuration, edit your MCP configuration file:
 ```json
 {
     "mcpServers": {
-        "code_checker": {
+        "mcp-tools-py": {
             "command": "python",
             "args": [
                 "-m",
@@ -370,7 +370,7 @@ If you prefer manual configuration, edit your MCP configuration file:
 ```json
 {
     "servers": {
-        "code-checker": {
+        "mcp-tools-py": {
             "command": "mcp-tools-py",
             "args": ["--project-dir", "."]
         }
@@ -382,7 +382,7 @@ If you prefer manual configuration, edit your MCP configuration file:
 ```json
 {
     "servers": {
-        "code-checker": {
+        "mcp-tools-py": {
             "command": "python",
             "args": ["-m", "src.main", "--project-dir", "."],
             "env": {

@@ -17,9 +17,9 @@
 | Read file | `Read()` | `mcp__filesystem__read_file()` |
 | Edit file | `Edit()` | `mcp__filesystem__edit_file()` |
 | Write file | `Write()` | `mcp__filesystem__save_file()` |
-| Run pytest | `Bash("pytest ...")` | `mcp__code-checker__run_pytest_check()` |
-| Run pylint | `Bash("pylint ...")` | `mcp__code-checker__run_pylint_check()` |
-| Run mypy | `Bash("mypy ...")` | `mcp__code-checker__run_mypy_check()` |
+| Run pytest | `Bash("pytest ...")` | `mcp__mcp-tools-py__run_pytest_check()` |
+| Run pylint | `Bash("pylint ...")` | `mcp__mcp-tools-py__run_pylint_check()` |
+| Run mypy | `Bash("mypy ...")` | `mcp__mcp-tools-py__run_mypy_check()` |
 | Git operations | ✅ `Bash("git ...")` | ✅ `Bash("git ...")` (allowed) |
 
 ## 🔴 CRITICAL: Code Quality Requirements
@@ -27,9 +27,9 @@
 **MANDATORY**: After making ANY code changes (after EACH edit), you MUST run ALL THREE code quality checks using the EXACT MCP tool names below:
 
 ```
-mcp__code-checker__run_pylint_check
-mcp__code-checker__run_pytest_check
-mcp__code-checker__run_mypy_check
+mcp__mcp-tools-py__run_pylint_check
+mcp__mcp-tools-py__run_pytest_check
+mcp__mcp-tools-py__run_mypy_check
 ```
 
 This runs:
@@ -55,13 +55,13 @@ This runs:
 **Examples:**
 ```python
 # RECOMMENDED: Fast unit tests (excludes integration tests)
-mcp__code-checker__run_pytest_check(extra_args=["-n", "auto", "-m", "not integration"])
+mcp__mcp-tools-py__run_pytest_check(extra_args=["-n", "auto", "-m", "not integration"])
 
 # All tests including slow integration tests (not recommended for regular development)
-mcp__code-checker__run_pytest_check(extra_args=["-n", "auto"])
+mcp__mcp-tools-py__run_pytest_check(extra_args=["-n", "auto"])
 
 # Specific integration tests (only when needed)
-mcp__code-checker__run_pytest_check(extra_args=["-n", "auto"], markers=["integration"])
+mcp__mcp-tools-py__run_pytest_check(extra_args=["-n", "auto"], markers=["integration"])
 ```
 
 **Important:** Without the `-m "not integration"` exclusions, pytest runs ALL tests including slow integration tests that may require external resources. For regular development, always use the exclusion pattern as shown in the first example above.
@@ -98,7 +98,7 @@ Bash("pytest tests/")
 mcp__filesystem__read_file(file_path="src/example.py")
 mcp__filesystem__edit_file(file_path="src/example.py", edits=[...])
 mcp__filesystem__save_file(file_path="src/new.py", content="...")
-mcp__code-checker__run_pytest_check(extra_args=["-v"])
+mcp__mcp-tools-py__run_pytest_check(extra_args=["-v"])
 ```
 
 **WHY MCP TOOLS ARE MANDATORY:**
