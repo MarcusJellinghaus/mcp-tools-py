@@ -17,13 +17,13 @@ set "VENV_DIR=!PROJECT_DIR!\.venv"
 set "VENV_SCRIPTS=!VENV_DIR!\Scripts"
 set "VENV_PIP=!VENV_SCRIPTS!\pip.exe"
 
-echo [0/4] Checking Python environment...
+echo [0/5] Checking Python environment...
 
 REM Check if local .venv exists
 if not exist "!VENV_SCRIPTS!\activate.bat" (
-    echo [FAIL] Local virtual environment not found at !VENV_DIR!
-    echo Please create it first: python -m venv .venv
-    exit /b 1
+    echo Local virtual environment not found at !VENV_DIR!
+    python -m venv .venv
+    echo Local virtual environment created at !VENV_DIR!
 )
 
 if not exist "!VENV_PIP!" (
@@ -35,14 +35,27 @@ if not exist "!VENV_PIP!" (
 echo [OK] Using venv pip: !VENV_PIP!
 echo.
 
-echo [1/4] Uninstalling existing packages...
+echo [1/5] Uninstalling existing packages...
 REM Note: mcp-config is uninstalled here but will be automatically reinstalled
 REM as a dependency when mcp-tools-py is installed (see pyproject.toml)
-"!VENV_PIP!" uninstall mcp-tools-py mcp-config mcp-server-filesystem -y
+"!VENV_PIP!" uninstall mcp-tools-py mcp-config mcp-workspace -y
 echo [OK] Packages uninstalled
 
 echo.
-echo [2/4] Installing in development mode with dev dependencies...
+echo [2/5] Installing mcp-coder from git...
+REM Install mcp-coder FIRST so that its dependency on mcp-tools-py gets
+REM overridden by our local editable install in the next step.
+"!VENV_PIP!" install "mcp-coder @ git+https://github.com/MarcusJellinghaus/mcp_coder.git"
+if !ERRORLEVEL! NEQ 0 (
+    echo [FAIL] mcp-coder installation failed!
+    exit /b 1
+)
+echo [OK] mcp-coder installed
+
+echo.
+echo [3/5] Installing mcp-tools-py in development mode (takes priority)...
+REM Editable install AFTER mcp-coder so this local project takes priority
+REM over whatever version mcp-coder pulled as a dependency.
 pushd "!PROJECT_DIR!"
 "!VENV_PIP!" install -e ".[dev]"
 if !ERRORLEVEL! NEQ 0 (
@@ -54,7 +67,7 @@ popd
 echo [OK] Package and dev dependencies installed
 
 echo.
-echo [3/4] Verifying CLI entry points in venv...
+echo [4/5] Verifying CLI entry points in venv...
 
 if not exist "!VENV_SCRIPTS!\mcp-tools-py.exe" (
     echo [FAIL] mcp-tools-py.exe not found in !VENV_SCRIPTS!
@@ -63,15 +76,22 @@ if not exist "!VENV_SCRIPTS!\mcp-tools-py.exe" (
 )
 echo [OK] mcp-tools-py.exe found in !VENV_SCRIPTS!
 
-if not exist "!VENV_SCRIPTS!\mcp-server-filesystem.exe" (
-    echo [FAIL] mcp-server-filesystem.exe not found in !VENV_SCRIPTS!
+if not exist "!VENV_SCRIPTS!\mcp-workspace.exe" (
+    echo [FAIL] mcp-workspace.exe not found in !VENV_SCRIPTS!
     echo   The entry point was not installed into the virtual environment.
     exit /b 1
 )
-echo [OK] mcp-server-filesystem.exe found in !VENV_SCRIPTS!
+echo [OK] mcp-workspace.exe found in !VENV_SCRIPTS!
+
+if not exist "!VENV_SCRIPTS!\mcp-coder.exe" (
+    echo [FAIL] mcp-coder.exe not found in !VENV_SCRIPTS!
+    echo   The entry point was not installed into the virtual environment.
+    exit /b 1
+)
+echo [OK] mcp-coder.exe found in !VENV_SCRIPTS!
 
 echo.
-echo [4/4] Verifying CLI functionality...
+echo [5/5] Verifying CLI functionality...
 "!VENV_SCRIPTS!\mcp-tools-py.exe" --help >nul 2>&1
 if !ERRORLEVEL! NEQ 0 (
     echo [FAIL] mcp-tools-py CLI verification failed!
@@ -79,12 +99,19 @@ if !ERRORLEVEL! NEQ 0 (
 )
 echo [OK] mcp-tools-py CLI works
 
-"!VENV_SCRIPTS!\mcp-server-filesystem.exe" --help >nul 2>&1
+"!VENV_SCRIPTS!\mcp-workspace.exe" --help >nul 2>&1
 if !ERRORLEVEL! NEQ 0 (
     echo [FAIL] mcp-server-filesystem CLI verification failed!
     exit /b 1
 )
 echo [OK] mcp-server-filesystem CLI works
+
+"!VENV_SCRIPTS!\mcp-coder.exe" --help >nul 2>&1
+if !ERRORLEVEL! NEQ 0 (
+    echo [FAIL] mcp-coder CLI verification failed!
+    exit /b 1
+)
+echo [OK] mcp-coder CLI works
 
 echo.
 echo =============================================
@@ -92,7 +119,8 @@ echo Reinstallation completed successfully!
 echo.
 echo Entry points installed in: !VENV_SCRIPTS!
 echo   - mcp-tools-py.exe
-echo   - mcp-server-filesystem.exe
+echo   - mcp-workspace.exe
+echo   - mcp-coder.exe
 echo =============================================
 echo.
 
