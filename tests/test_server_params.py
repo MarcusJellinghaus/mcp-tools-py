@@ -548,9 +548,7 @@ class TestServerPylintMaxIssues:
         """Verify max_issues=3 is forwarded to get_pylint_prompt."""
         with (
             patch("mcp.server.fastmcp.FastMCP") as mock_fastmcp,
-            patch(
-                "mcp_tools_py.server.get_pylint_prompt"
-            ) as mock_get_pylint_prompt,
+            patch("mcp_tools_py.server.get_pylint_prompt") as mock_get_pylint_prompt,
         ):
             mock_tool = MagicMock()
             mock_fastmcp.return_value.tool.return_value = mock_tool
@@ -570,9 +568,7 @@ class TestServerPylintMaxIssues:
         """Verify default max_issues=1 is forwarded to get_pylint_prompt."""
         with (
             patch("mcp.server.fastmcp.FastMCP") as mock_fastmcp,
-            patch(
-                "mcp_tools_py.server.get_pylint_prompt"
-            ) as mock_get_pylint_prompt,
+            patch("mcp_tools_py.server.get_pylint_prompt") as mock_get_pylint_prompt,
         ):
             mock_tool = MagicMock()
             mock_fastmcp.return_value.tool.return_value = mock_tool

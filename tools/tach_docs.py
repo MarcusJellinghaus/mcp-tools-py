@@ -173,9 +173,7 @@ def main() -> int:
     print("Generating architecture documentation...")
 
     # Ensure output directory exists
-    output_dir = (
-        Path(__file__).parent.parent / "docs" / "architecture" / "dependencies"
-    )
+    output_dir = Path(__file__).parent.parent / "docs" / "architecture" / "dependencies"
     output_dir.mkdir(parents=True, exist_ok=True)
 
     # Generate dependency graph
