@@ -8,7 +8,7 @@ description = "An MCP server for running python code checks (pylint, pytest and 
 readme = "README.md"
 requires-python = ">=3.11"
 license = {text = "MIT"}
-keywords = ["mcp", "mcp-tools-py", "pylint", "pytest", "mypy", "claude", "ai"]
+keywords = ["mcp", "code-quality", "llm", "pylint", "pytest", "mypy", "claude", "ai"]
 classifiers = [
     "Programming Language :: Python :: 3",
     "Operating System :: OS Independent",
@@ -37,7 +37,7 @@ dependencies = [
 dev = [
     "black>=24.10.0",
     "isort>=5.13.2",
-    "mcp-server-filesystem @ git+https://github.com/MarcusJellinghaus/mcp_server_filesystem.git",
+    "mcp-workspace @ git+https://github.com/MarcusJellinghaus/mcp-workspace.git",
     # Architecture and code quality tools
     "import-linter>=2.0",
     "tach>=0.15.0",

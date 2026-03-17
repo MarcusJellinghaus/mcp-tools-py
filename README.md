@@ -463,4 +463,4 @@ The MIT License is a permissive license that allows reuse with minimal restricti
 ## Links
 
 - [MCP Python SDK](https://github.com/modelcontextprotocol/python-sdk)
-- [MCP Filesystem Tools](https://github.com/MarcusJellinghaus/mcp_server_filesystem)
+- [MCP Filesystem Tools](https://github.com/MarcusJellinghaus/mcp-workspace)
