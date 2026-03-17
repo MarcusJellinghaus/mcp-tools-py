@@ -21,7 +21,7 @@
     },
     "filesystem": {
       "type": "stdio",
-      "command": "${VIRTUAL_ENV}\\Scripts\\mcp-server-filesystem.exe",
+      "command": "${VIRTUAL_ENV}\\Scripts\\mcp-workspace.exe",
       "args": [
         "--project-dir",
         "${MCP_CODER_PROJECT_DIR}",
@@ -32,7 +32,7 @@
         "--reference-project",
         "p_config=${USERPROFILE}\\Documents\\GitHub\\mcp-config",
         "--reference-project",
-        "p_filesystem=${USERPROFILE}\\Documents\\GitHub\\mcp_server_filesystem"
+        "p_filesystem=${USERPROFILE}\\Documents\\GitHub\\mcp-workspace"
       ],
       "env": {
         "PYTHONPATH": "${MCP_CODER_VENV_DIR}\\Lib\\"

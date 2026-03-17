@@ -37,7 +37,7 @@ dependencies = [
 dev = [
     "black>=24.10.0",
     "isort>=5.13.2",
-    "mcp-server-filesystem @ git+https://github.com/MarcusJellinghaus/mcp_server_filesystem.git",
+    "mcp-workspace @ git+https://github.com/MarcusJellinghaus/mcp-workspace.git",
     # Architecture and code quality tools
     "import-linter>=2.0",
     "tach>=0.15.0",
