@@ -7,7 +7,7 @@
 ## Part A: Include raw stderr/stdout in error messages
 
 ### WHERE
-- **Modify**: `src/mcp_code_checker/code_checker_pytest/runners.py`
+- **Modify**: `src/mcp_tools_py/code_checker_pytest/runners.py`
 
 ### WHAT
 In `check_code_with_pytest()`, the except block currently returns only `str(e)`. Enhance it to include raw subprocess output when available from the exception context.
@@ -79,7 +79,7 @@ Apply the same pattern to **both** "no tests found" raise sites (there are two i
 ```
 
 ### HOW
-- `truncate_stderr` is already imported from `mcp_code_checker.utils.subprocess_runner`
+- `truncate_stderr` is already imported from `mcp_tools_py.utils.subprocess_runner`
 - No new imports needed
 - No signature changes to `run_tests()` or `check_code_with_pytest()`
 

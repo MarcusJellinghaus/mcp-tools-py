@@ -44,6 +44,12 @@ def test_tests_path_removed()
     # sanitize_extra_args(["tests"], None) -> cleaned_args=[], verbosity=2
     # sanitize_extra_args(["tests/"], None) -> cleaned_args=[], verbosity=2
 
+def test_test_path_selector_preserved()
+    # sanitize_extra_args(["tests/test_file.py::test_func", "-x"], None)
+    # -> cleaned_args=["tests/test_file.py::test_func", "-x"], verbosity=2, notes=[]
+    # sanitize_extra_args(["tests/test_file.py", "-x"], None)
+    # -> cleaned_args=["tests/test_file.py", "-x"], verbosity=2, notes=[]
+
 def test_combined_deduplication()
     # sanitize_extra_args(["-s", "-vvv", "-m", "slow", "tests", "-x"], ["unit"])
     # -> cleaned_args=["-x"], verbosity=3
@@ -53,8 +59,8 @@ def test_combined_deduplication()
 ### HOW
 ```python
 import pytest
-from mcp_code_checker.code_checker_pytest.utils import sanitize_extra_args
-from mcp_code_checker.code_checker_pytest.models import SanitizedArgs
+from mcp_tools_py.code_checker_pytest.utils import sanitize_extra_args
+from mcp_tools_py.code_checker_pytest.models import SanitizedArgs
 ```
 
 ### DATA
@@ -65,7 +71,7 @@ Each test asserts against `SanitizedArgs` fields: `cleaned_args`, `verbosity`, `
 ## Part B: SanitizedArgs dataclass
 
 ### WHERE
-- **Modify**: `src/mcp_code_checker/code_checker_pytest/models.py`
+- **Modify**: `src/mcp_tools_py/code_checker_pytest/models.py`
 
 ### WHAT
 Add at the end of the file (after `PytestReport`):
@@ -88,7 +94,7 @@ class SanitizedArgs:
 ## Part C: Export SanitizedArgs
 
 ### WHERE
-- **Modify**: `src/mcp_code_checker/code_checker_pytest/__init__.py`
+- **Modify**: `src/mcp_tools_py/code_checker_pytest/__init__.py`
 
 ### WHAT
 - Add `SanitizedArgs` to the import from `models`
@@ -99,7 +105,7 @@ class SanitizedArgs:
 ## Part D: sanitize_extra_args() function
 
 ### WHERE
-- **Modify**: `src/mcp_code_checker/code_checker_pytest/utils.py`
+- **Modify**: `src/mcp_tools_py/code_checker_pytest/utils.py`
 
 ### WHAT
 ```python
@@ -125,20 +131,22 @@ def sanitize_extra_args(
 
 ### HOW
 ```python
-from mcp_code_checker.code_checker_pytest.models import ErrorContext, SanitizedArgs
+from mcp_tools_py.code_checker_pytest.models import ErrorContext, SanitizedArgs
 ```
 - Add import of `SanitizedArgs` to existing import line
 - Add `import structlog` and log notes via `structured_logger.info("extra_args sanitized", ...)`
 
+### DOCSTRING NOTE
+Document in the `sanitize_extra_args` function docstring that only `-m` as two separate args (`["-m", "slow"]`) is handled, not the combined `-m=slow` form. Do **not** document this limitation in the MCP tool docstring.
+
 ### DATA
 - **Input**: `extra_args: list[str] | None`, `markers: list[str] | None`
 - **Output**: `SanitizedArgs(cleaned_args=list[str], verbosity=int, notes=list[str])`
-- Only handles `-m` as two separate args (`["-m", "slow"]`), not combined form
 
 ---
 
 ## Verification
 After this step:
 - `pytest tests/test_code_checker_pytest/test_extra_args.py` passes
-- `mypy src/mcp_code_checker/code_checker_pytest/models.py src/mcp_code_checker/code_checker_pytest/utils.py` passes
+- `mypy src/mcp_tools_py/code_checker_pytest/models.py src/mcp_tools_py/code_checker_pytest/utils.py` passes
 - No changes to `server.py` or `runners.py` yet

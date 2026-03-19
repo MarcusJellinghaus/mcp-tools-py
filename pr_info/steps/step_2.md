@@ -1,15 +1,15 @@
-# Step 2: Simplify server.py run_pytest_check + defensive error handling
+# Step 2: Simplify server.py run_pytest_check + defensive error handling + test updates
 
 > **Context**: Read `pr_info/steps/summary.md` for the full issue overview. This step depends on Step 1 (`SanitizedArgs`, `sanitize_extra_args`).
 
-## TDD: The existing tests in `test_server_params.py` will break after this change. Step 4 fixes them. Run `test_extra_args.py` from Step 1 to verify sanitization still works.
+## This step includes test_server_params.py updates to keep the test suite green.
 
 ---
 
 ## Part A: Simplify run_pytest_check signature
 
 ### WHERE
-- **Modify**: `src/mcp_code_checker/server.py`
+- **Modify**: `src/mcp_tools_py/server.py`
 
 ### WHAT — Remove parameters
 Remove `verbosity` and `show_details` from the `run_pytest_check` function signature:
@@ -41,23 +41,23 @@ Update the docstring to remove `verbosity` and `show_details` descriptions. Ment
 ## Part B: Add new import
 
 ### WHERE
-- **Modify**: `src/mcp_code_checker/server.py` (top imports section)
+- **Modify**: `src/mcp_tools_py/server.py` (top imports section)
 
 ### WHAT
 Add import of `sanitize_extra_args`:
 
 ```python
-from mcp_code_checker.code_checker_pytest.utils import sanitize_extra_args
+from mcp_tools_py.code_checker_pytest.utils import sanitize_extra_args
 ```
 
-Note: `server.py` already imports from `mcp_code_checker.code_checker_pytest.reporting` and `mcp_code_checker.code_checker_pytest.runners`. Importing from `utils` is allowed by `tach.toml` (server depends on `code_checker_pytest`).
+Note: `server.py` already imports from `mcp_tools_py.code_checker_pytest.reporting` and `mcp_tools_py.code_checker_pytest.runners`. Importing from `utils` is allowed by `tach.toml` (server depends on `code_checker_pytest`).
 
 ---
 
 ## Part C: Integrate sanitize_extra_args + always show details
 
 ### WHERE
-- **Modify**: `src/mcp_code_checker/server.py`, inside `run_pytest_check` function body
+- **Modify**: `src/mcp_tools_py/server.py`, inside `run_pytest_check` function body
 
 ### ALGORITHM (pseudocode for new function body)
 ```
@@ -128,7 +128,7 @@ if sanitized.notes:
 ## Part D: Wrap entire function body in defensive try/except
 
 ### WHERE
-- **Modify**: `src/mcp_code_checker/server.py`, `run_pytest_check` function
+- **Modify**: `src/mcp_tools_py/server.py`, `run_pytest_check` function
 
 ### WHAT
 The existing try/except **raises** on error. Change it to **return a string** instead:
@@ -161,8 +161,83 @@ except Exception as e:
 
 ---
 
+## Part E: Update test_server_params.py
+
+### WHERE
+- **Modify**: `tests/test_server_params.py`
+
+### WHAT — Remove tests that assert removed parameters
+
+**Remove these tests** (they assert `verbosity`/`show_details` in the signature):
+- `test_run_pytest_check_show_details_default_value` — asserts `show_details` in signature
+- `test_server_method_signature_includes_show_details` — asserts `show_details` in signature
+- `test_parameter_type_validation` — asserts `verbosity` annotation and default
+
+**Remove `show_details`/`verbosity` assertions from these tests** (keep the tests, update assertions):
+- `test_run_pytest_check_with_show_details_true` — remove `show_details=True` from call, keep rest of test logic
+- `test_run_pytest_check_with_show_details_false` — remove `verbosity=1` from call, keep rest
+- `test_show_details_with_focused_test_run` — simplify: both calls should now show detailed output (no more False->True toggle)
+- `test_show_details_with_many_failures` — simplify similarly
+- `test_show_details_output_length_limits` — remove `show_details=True` from call (always True now)
+- `test_run_pytest_check_parameters` — remove `verbosity=3` from call, update mock assertion (no `verbosity` in call args)
+- `test_run_pytest_check_backward_compatibility` — keep as-is (tests calling without optional params)
+- `test_mcp_tool_decorator_compatibility` — keep as-is
+- `test_enhanced_reporting_integration_preparation` — remove `show_details=True` from call
+
+### WHAT — Update mock assertions for check_code_with_pytest calls
+
+When tests mock `check_code_with_pytest` and assert call args, the `verbosity` value now comes from `sanitize_extra_args` (default 2), not from the function parameter:
+
+```python
+# Before:
+mock_check.assert_called_once_with(
+    ...
+    verbosity=3,       # was passed as parameter
+    extra_args=["--no-header"],
+    ...
+)
+
+# After:
+mock_check.assert_called_once_with(
+    ...
+    verbosity=2,       # default from sanitize_extra_args
+    extra_args=["--no-header", "-s"],  # -s always appended
+    ...
+)
+```
+
+### WHAT — Add new tests
+
+**Add test for simplified signature:**
+```python
+def test_run_pytest_check_simplified_signature():
+    # Assert signature has: markers, extra_args, env_vars
+    # Assert signature does NOT have: verbosity, show_details
+```
+
+**Add test for defensive error handling:**
+```python
+def test_run_pytest_check_never_raises():
+    # Mock check_code_with_pytest to raise RuntimeError
+    # Assert run_pytest_check returns a string (not raises)
+    # Assert string contains "Unexpected error"
+```
+
+**Add test for deduplication notes in output:**
+```python
+def test_run_pytest_check_prepends_dedup_notes():
+    # Call with extra_args=["-m", "slow"] AND markers=["unit"]
+    # Assert result starts with "Note: -m flag in extra_args was ignored..."
+```
+
+### HOW
+The existing test infrastructure (mock_server fixture, _get_tool helper) remains unchanged.
+Tests that call `run_pytest_check` need to also mock or patch `sanitize_extra_args` where appropriate, or let it run naturally since it's a pure function.
+
+---
+
 ## Verification
 After this step:
 - `pytest tests/test_code_checker_pytest/test_extra_args.py` still passes (Step 1 unaffected)
-- Some tests in `test_server_params.py` will fail (they assert `verbosity`/`show_details` in signature) — fixed in Step 4
+- `pytest tests/test_server_params.py` passes (test fixes included in this step)
 - The server can be instantiated and `run_pytest_check` called with the new simplified signature

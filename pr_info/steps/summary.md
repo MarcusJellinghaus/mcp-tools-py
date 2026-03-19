@@ -37,11 +37,11 @@ MCP Client
 
 | File | Change |
 |------|--------|
-| `src/mcp_code_checker/code_checker_pytest/models.py` | Add `SanitizedArgs` dataclass |
-| `src/mcp_code_checker/code_checker_pytest/utils.py` | Add `sanitize_extra_args()` function |
-| `src/mcp_code_checker/code_checker_pytest/__init__.py` | Export `SanitizedArgs` |
-| `src/mcp_code_checker/server.py` | Simplify `run_pytest_check` signature, integrate sanitization, defensive try/except |
-| `src/mcp_code_checker/code_checker_pytest/runners.py` | Include raw stderr/stdout in error messages |
+| `src/mcp_tools_py/code_checker_pytest/models.py` | Add `SanitizedArgs` dataclass |
+| `src/mcp_tools_py/code_checker_pytest/utils.py` | Add `sanitize_extra_args()` function |
+| `src/mcp_tools_py/code_checker_pytest/__init__.py` | Export `SanitizedArgs` |
+| `src/mcp_tools_py/server.py` | Simplify `run_pytest_check` signature, integrate sanitization, defensive try/except |
+| `src/mcp_tools_py/code_checker_pytest/runners.py` | Include raw stderr/stdout in error messages |
 
 ## Files Created
 
@@ -59,9 +59,9 @@ MCP Client
 ## Implementation Steps
 
 1. **Step 1** - `SanitizedArgs` dataclass + `sanitize_extra_args()` function with unit tests
-2. **Step 2** - `server.py` interface simplification + defensive error handling
+2. **Step 2** - `server.py` interface simplification + defensive error handling + `test_server_params.py` updates
 3. **Step 3** - `runners.py` error propagation improvement
-4. **Step 4** - Test file updates (rename, slim down, update signature tests)
+4. **Step 4** - Integration test file rename and cleanup (`test_integration_show_details.py` -> `test_integration_formatting.py`)
 
 ## Design Decisions
 
@@ -73,3 +73,5 @@ MCP Client
 | `sanitize_extra_args()` in `utils.py` | Consistent — `utils.py` already has pytest-specific helpers |
 | Defensive try/except wraps entire function body | Guarantees string return, LLM always gets actionable output |
 | Let FastMCP handle unknown params | No dead code for backwards compatibility |
+| `-m=slow` combined form not handled | Document limitation in `sanitize_extra_args` docstring only (not in MCP tool docstring) |
+| Test fixes moved to Step 2 | Keeps test suite green throughout all steps |
