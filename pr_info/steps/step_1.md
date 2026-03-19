@@ -134,10 +134,14 @@ def sanitize_extra_args(
 from mcp_tools_py.code_checker_pytest.models import ErrorContext, SanitizedArgs
 ```
 - Add import of `SanitizedArgs` to existing import line
-- Add `import structlog` and log notes via `structured_logger.info("extra_args sanitized", ...)`
+- No structlog in this function — keep it a pure function with no side effects (logging happens in `server.py`)
 
 ### DOCSTRING NOTE
-Document in the `sanitize_extra_args` function docstring that only `-m` as two separate args (`["-m", "slow"]`) is handled, not the combined `-m=slow` form. Do **not** document this limitation in the MCP tool docstring.
+Document in the `sanitize_extra_args` function docstring:
+- Only `-m` as two separate args (`["-m", "slow"]`) is handled, not the combined `-m=slow` form
+- Combined short flags like `-xvs` pass through as-is (not decomposed)
+
+Do **not** document these limitations in the MCP tool docstring.
 
 ### DATA
 - **Input**: `extra_args: list[str] | None`, `markers: list[str] | None`

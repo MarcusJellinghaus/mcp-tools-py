@@ -71,7 +71,13 @@ MCP Client
 | Keep `_format_pytest_result_with_details()`, `should_show_details()`, helpers | Less churn, easy to re-enable `show_details` toggle later |
 | `SanitizedArgs` dataclass in `models.py` | Consistent with `ErrorContext`, `PytestReport` pattern |
 | `sanitize_extra_args()` in `utils.py` | Consistent — `utils.py` already has pytest-specific helpers |
+| No `-n` flag deduplication | `-n` is not auto-added internally; no real duplication risk |
 | Defensive try/except wraps entire function body | Guarantees string return, LLM always gets actionable output |
 | Let FastMCP handle unknown params | No dead code for backwards compatibility |
 | `-m=slow` combined form not handled | Document limitation in `sanitize_extra_args` docstring only (not in MCP tool docstring) |
+| Combined short flags (`-xvs`) not decomposed | Document limitation in `sanitize_extra_args` docstring only; harmless in practice |
+| `sanitize_extra_args()` is a pure function | No structlog inside; logging happens in `server.py` only |
+| Dead `show_details=False` branches kept with comment | Add comment noting branches are retained but inactive since `show_details` is always `True` |
 | Test fixes moved to Step 2 | Keeps test suite green throughout all steps |
+
+See [Decisions.md](./Decisions.md) for full discussion log.

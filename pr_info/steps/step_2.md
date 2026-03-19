@@ -100,7 +100,7 @@ sanitized = sanitize_extra_args(extra_args, markers)
 # Always add -s for print statement capture
 final_extra_args = sanitized.cleaned_args + ["-s"]
 
-# Log any deduplication notes
+# Log any deduplication notes (sanitize_extra_args is a pure function; logging happens here)
 for note in sanitized.notes:
     structured_logger.info("extra_args sanitized", note=note)
 
@@ -113,6 +113,8 @@ test_results = check_code_with_pytest(
 )
 
 # Always show detailed failure output
+# Note: show_details is always True now; the False branches in
+# _format_pytest_result_with_details are retained but inactive.
 result = self._format_pytest_result_with_details(
     test_results, show_details=True
 )
