@@ -16,28 +16,28 @@ These are the additional git permissions needed specifically for rebase operatio
 
 ```
 # Status and investigation
-Bash(git status:*)
-Bash(git log:*)
-Bash(git branch:*)
-Bash(git ls-files:*)
+Bash(git status), Bash(git status *)
+Bash(git log *)
+Bash(git branch), Bash(git branch *)
+Bash(git ls-files *)
 
 # Fetching and rebasing
-Bash(git fetch:*)
-Bash(git rebase:*)
+Bash(git fetch), Bash(git fetch *)
+Bash(git rebase *)
 
 # Staging and committing
-Bash(git add:*)
-Bash(git rm:*)
-Bash(git commit:*)
+Bash(git add *)
+Bash(git rm *)
+Bash(git commit *)
 
 # Conflict resolution helpers
-Bash(git checkout --ours:*)
-Bash(git checkout --theirs:*)
-Bash(git restore:*)
-Bash(git stash:*)
+Bash(git checkout --ours *)
+Bash(git checkout --theirs *)
+Bash(git restore *)
+Bash(git stash), Bash(git stash *)
 
 # Pushing
-Bash(git push --force-with-lease:*)
+Bash(git push --force-with-lease *)
 ```
 
 ### 2. General Permissions (not documented here)

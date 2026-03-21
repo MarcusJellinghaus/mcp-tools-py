@@ -1,5 +1,5 @@
 ---
-allowed-tools: Bash(gh issue comment:*), Read, Bash(MSYS_NO_PATHCONV=1 gh issue comment:*)
+allowed-tools: Bash(gh issue comment *), Read, Bash(MSYS_NO_PATHCONV=1 gh issue comment *)
 workflow-stage: issue-discussion
 suggested-next: (bot runs create_plan) -> /clear -> plan_review
 ---

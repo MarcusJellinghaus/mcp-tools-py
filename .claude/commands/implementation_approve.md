@@ -1,5 +1,5 @@
 ---
-allowed-tools: Bash(mcp-coder set-status:*)
+allowed-tools: Bash(mcp-coder set-status *)
 workflow-stage: code-review
 suggested-next: (bot runs create_pr) -> merge in GitHub
 ---

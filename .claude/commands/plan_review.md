@@ -1,5 +1,5 @@
 ---
-allowed-tools: Bash(git fetch:*), Bash(git status:*), Read, Glob, Grep
+allowed-tools: Bash(git fetch *), Bash(git fetch), Bash(git status), Read, Glob, Grep
 workflow-stage: plan-review
 suggested-next: discuss -> plan_update -> commit_push -> plan_approve
 ---
