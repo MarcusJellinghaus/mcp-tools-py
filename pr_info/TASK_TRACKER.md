@@ -48,9 +48,9 @@ This tracks **Feature Implementation** consisting of multiple **Tasks**.
 
 ### Step 4: Integration test file rename and cleanup — [step_4.md](./steps/step_4.md)
 
-- [ ] Part A: Rename `test_integration_show_details.py` to `test_integration_formatting.py`, rename class, remove obsolete toggle tests
-- [ ] Run quality checks (pylint, pytest, mypy) and fix all issues
-- [ ] Prepare git commit message for Step 4
+- [x] Part A: Rename `test_integration_show_details.py` to `test_integration_formatting.py`, rename class, remove obsolete toggle tests
+- [x] Run quality checks (pylint, pytest, mypy) and fix all issues
+- [x] Prepare git commit message for Step 4
 
 ---
 
