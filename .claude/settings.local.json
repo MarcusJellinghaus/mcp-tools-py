@@ -34,6 +34,7 @@
       "Skill(implementation_new_tasks)",
       "Skill(implementation_review)",
       "Skill(implementation_review_supervisor)",
+      "Skill(check_branch_status)",
       "Skill(issue_analyse)",
       "Skill(issue_approve)",
       "Skill(issue_create)",
