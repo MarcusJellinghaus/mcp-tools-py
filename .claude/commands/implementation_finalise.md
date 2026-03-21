@@ -1,6 +1,6 @@
 ---
 workflow-stage: utility
-suggested-next: implementation_review or implementation_review_supervised
+suggested-next: implementation_review or implementation_review_supervisor
 ---
 
 # Implementation Finalise
