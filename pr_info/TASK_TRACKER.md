@@ -32,13 +32,13 @@ This tracks **Feature Implementation** consisting of multiple **Tasks**.
 
 ### Step 2: Simplify server.py run_pytest_check + defensive error handling + test updates — [step_2.md](./steps/step_2.md)
 
-- [ ] Part A: Remove `verbosity` and `show_details` from `run_pytest_check` signature in `src/mcp_tools_py/server.py`
-- [ ] Part B: Add `sanitize_extra_args` import to `src/mcp_tools_py/server.py`
-- [ ] Part C: Integrate `sanitize_extra_args` and always show details in `run_pytest_check` body
-- [ ] Part D: Wrap entire `run_pytest_check` body in defensive try/except (return string, never raise)
-- [ ] Part E: Update `tests/test_server_params.py` — remove obsolete tests, update assertions, add new tests
-- [ ] Run quality checks (pylint, pytest, mypy) and fix all issues
-- [ ] Prepare git commit message for Step 2
+- [x] Part A: Remove `verbosity` and `show_details` from `run_pytest_check` signature in `src/mcp_tools_py/server.py`
+- [x] Part B: Add `sanitize_extra_args` import to `src/mcp_tools_py/server.py`
+- [x] Part C: Integrate `sanitize_extra_args` and always show details in `run_pytest_check` body
+- [x] Part D: Wrap entire `run_pytest_check` body in defensive try/except (return string, never raise)
+- [x] Part E: Update `tests/test_server_params.py` — remove obsolete tests, update assertions, add new tests
+- [x] Run quality checks (pylint, pytest, mypy) and fix all issues
+- [x] Prepare git commit message for Step 2
 
 ### Step 3: Improve error propagation in runners.py — [step_3.md](./steps/step_3.md)
 

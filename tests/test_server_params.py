@@ -61,20 +61,20 @@ async def test_run_pytest_check_parameters(mock_project_dir: Path) -> None:
         # Call with only the dynamic parameters (without test_folder and keep_temp_files)
         result = run_pytest_check(
             markers=["slow", "integration"],
-            verbosity=3,
             extra_args=["--no-header"],
             env_vars={"TEST_ENV": "value"},
         )
 
         # Verify check_code_with_pytest was called with correct parameters
         # test_folder and keep_temp_files should come from the server instance
+        # verbosity comes from sanitize_extra_args (default 2), -s is always appended
         mock_check_pytest.assert_called_once_with(
             project_dir=str(mock_project_dir),
             test_folder="custom_tests",  # From server constructor
             python_executable=_server._resolved_python,  # Resolved by server
             markers=["slow", "integration"],
-            verbosity=3,
-            extra_args=["--no-header"],
+            verbosity=2,
+            extra_args=["--no-header", "-s"],
             env_vars={"TEST_ENV": "value"},
             venv_path=None,
             keep_temp_files=True,  # From server constructor
@@ -208,9 +208,8 @@ async def test_run_pytest_check_with_show_details_true(
         # Get the run_pytest_check function
         run_pytest_check = _get_tool(mock_tool, "run_pytest_check")
 
-        # Call with show_details=True (this will be added in Step 4)
-        # For now, test the existing interface
-        result = run_pytest_check(markers=["unit"], verbosity=2)
+        # Call with simplified signature (no show_details or verbosity)
+        result = run_pytest_check(markers=["unit"])
 
         # Verify check_code_with_pytest was called correctly
         mock_check.assert_called_once()
@@ -219,7 +218,7 @@ async def test_run_pytest_check_with_show_details_true(
         # Verify standard parameters are passed correctly
         assert call_args[1]["project_dir"] == str(Path("/test/project"))
         assert call_args[1]["markers"] == ["unit"]
-        assert call_args[1]["verbosity"] == 2
+        assert call_args[1]["verbosity"] == 2  # default from sanitize_extra_args
 
         # Verify result formatting
         assert "All 3 tests passed successfully" in result
@@ -242,48 +241,16 @@ async def test_run_pytest_check_with_show_details_false(
         # Get the run_pytest_check function
         run_pytest_check = _get_tool(mock_tool, "run_pytest_check")
 
-        # Call with standard parameters (show_details=False is default)
-        result = run_pytest_check(verbosity=1)
+        # Call with simplified signature (always shows details now)
+        result = run_pytest_check()
 
         # Verify check_code_with_pytest was called correctly
         mock_check.assert_called_once()
         call_args = mock_check.call_args
 
-        # Verify parameters
-        assert call_args[1]["verbosity"] == 1
+        # Verify verbosity defaults from sanitize_extra_args
+        assert call_args[1]["verbosity"] == 2
         assert "All 5 tests passed successfully" in result
-
-
-@pytest.mark.asyncio
-async def test_run_pytest_check_show_details_default_value() -> None:
-    """Test that show_details parameter has correct default value."""
-    with patch("mcp.server.fastmcp.FastMCP") as mock_fastmcp:
-        mock_tool = MagicMock()
-        mock_fastmcp.return_value.tool.return_value = mock_tool
-
-        from mcp_tools_py.server import CodeCheckerServer
-
-        with patch.object(
-            CodeCheckerServer,
-            "_check_tool_availability",
-            return_value={"pytest": True, "pylint": True, "mypy": True},
-        ):
-            server = CodeCheckerServer(project_dir=Path("/test/project"))
-
-        # Get the run_pytest_check function and inspect its signature
-        run_pytest_check = _get_tool(mock_tool, "run_pytest_check")
-        signature = inspect.signature(run_pytest_check)
-
-        # Verify current parameters exist
-        assert "markers" in signature.parameters
-        assert "verbosity" in signature.parameters
-        assert "extra_args" in signature.parameters
-        assert "env_vars" in signature.parameters
-
-        # Verify show_details parameter was added in Step 4
-        assert "show_details" in signature.parameters
-        assert signature.parameters["show_details"].default == False
-        assert signature.parameters["show_details"].annotation == bool
 
 
 @pytest.mark.asyncio
@@ -333,19 +300,12 @@ async def test_show_details_with_focused_test_run(
         # Get the run_pytest_check function
         run_pytest_check = _get_tool(mock_tool, "run_pytest_check")
 
-        # Call function WITHOUT show_details=True (default behavior)
+        # Call function - always shows details now
         result = run_pytest_check(markers=["unit"])
 
-        # For default behavior (show_details=False), should show hint message
-        mock_create_prompt.assert_not_called()
-        assert "Try show_details=True for more information" in result
-
-        # Now test WITH show_details=True
-        result_with_details = run_pytest_check(markers=["unit"], show_details=True)
-
-        # With show_details=True and few tests, should show detailed output
+        # With always show_details=True and few tests, should show detailed output
         mock_create_prompt.assert_called_once()
-        assert "Detailed failure information..." in result_with_details
+        assert "Detailed failure information..." in result
 
 
 @pytest.mark.asyncio
@@ -368,22 +328,12 @@ async def test_show_details_with_many_failures(
         # Get the run_pytest_check function
         run_pytest_check = _get_tool(mock_tool, "run_pytest_check")
 
-        # Call function WITHOUT show_details=True (default behavior)
-        result = run_pytest_check(verbosity=3)
+        # Call function - always shows details now
+        result = run_pytest_check()
 
-        # For many failures without show_details=True, should show short message (no hint for >3 tests)
-        mock_create_prompt.assert_not_called()
-        assert "Pytest completed with failures" in result
-        assert (
-            "Try show_details=True for more information" not in result
-        )  # No hint for many tests
-
-        # Now test WITH show_details=True
-        result_with_details = run_pytest_check(verbosity=3, show_details=True)
-
-        # With show_details=True and many failures (but ≤10), should show detailed output
+        # With always show_details=True, should show detailed output
         mock_create_prompt.assert_called_once()
-        assert "Many failures detected..." in result_with_details
+        assert "Many failures detected..." in result
 
 
 @pytest.mark.asyncio
@@ -413,8 +363,8 @@ async def test_show_details_output_length_limits(
         # Get the run_pytest_check function
         run_pytest_check = _get_tool(mock_tool, "run_pytest_check")
 
-        # Call function with show_details=True to get detailed output
-        result = run_pytest_check(show_details=True)
+        # Call function - always shows details now
+        result = run_pytest_check()
 
         # Verify create_prompt_for_failed_tests was called
         mock_create_prompt.assert_called_once()
@@ -425,45 +375,6 @@ async def test_show_details_output_length_limits(
 
 
 # Integration Tests
-
-
-@pytest.mark.asyncio
-async def test_server_method_signature_includes_show_details() -> None:
-    """Test that server method signature includes show_details parameter."""
-    with patch("mcp.server.fastmcp.FastMCP") as mock_fastmcp:
-        mock_tool = MagicMock()
-        mock_fastmcp.return_value.tool.return_value = mock_tool
-
-        from mcp_tools_py.server import CodeCheckerServer
-
-        with patch.object(
-            CodeCheckerServer,
-            "_check_tool_availability",
-            return_value={"pytest": True, "pylint": True, "mypy": True},
-        ):
-            server = CodeCheckerServer(project_dir=Path("/test/project"))
-
-        # Get the run_pytest_check function
-        run_pytest_check = _get_tool(mock_tool, "run_pytest_check")
-        signature = inspect.signature(run_pytest_check)
-
-        # Check that all expected parameters are present (including show_details added in Step 4)
-        current_params = list(signature.parameters.keys())
-        expected_params = [
-            "markers",
-            "verbosity",
-            "extra_args",
-            "env_vars",
-            "show_details",
-        ]
-
-        for param in expected_params:
-            assert param in current_params, f"Expected parameter {param} not found"
-
-        # Verify show_details parameter properties
-        show_details_param = signature.parameters["show_details"]
-        assert show_details_param.default == False
-        assert show_details_param.annotation == bool
 
 
 @pytest.mark.asyncio
@@ -521,10 +432,10 @@ async def test_enhanced_reporting_integration_preparation(
         # Get the run_pytest_check function
         run_pytest_check = _get_tool(mock_tool, "run_pytest_check")
 
-        # Call function with show_details=True to test enhanced integration
-        result = run_pytest_check(show_details=True)
+        # Call function - always shows details now
+        result = run_pytest_check()
 
-        # With show_details=True, should use enhanced reporting
+        # Always shows details, should use enhanced reporting
         mock_create_prompt.assert_called_once()
         assert "Enhanced failure details..." in result
 
@@ -624,33 +535,6 @@ class TestServerPylintMaxIssues:
 
 
 @pytest.mark.asyncio
-async def test_parameter_type_validation(mock_server: Tuple[Any, MagicMock]) -> None:
-    """Test that parameters are properly typed and validated."""
-    server, mock_tool = mock_server
-
-    with patch("mcp_tools_py.server.check_code_with_pytest") as mock_check:
-        mock_check.return_value = {
-            "success": True,
-            "summary": {"passed": 1, "failed": 0, "error": 0, "collected": 1},
-            "test_results": None,
-        }
-
-        # Get the run_pytest_check function
-        run_pytest_check = _get_tool(mock_tool, "run_pytest_check")
-        signature = inspect.signature(run_pytest_check)
-
-        # Check parameter types for current parameters
-        assert signature.parameters["verbosity"].annotation == int
-        assert signature.parameters["verbosity"].default == 2
-
-        # Test with valid parameters
-        result = run_pytest_check(verbosity=3)
-        assert "1 tests passed" in result
-
-        mock_check.assert_called_once()
-
-
-@pytest.mark.asyncio
 async def test_integration_with_existing_server_parameters(
     mock_server: Tuple[Any, MagicMock],
 ) -> None:
@@ -682,3 +566,76 @@ async def test_integration_with_existing_server_parameters(
         assert call_args[1]["project_dir"] == str(Path("/test/project"))
         assert call_args[1]["test_folder"] == "tests"
         assert call_args[1]["keep_temp_files"] == False
+
+
+# Tests for simplified signature and defensive error handling
+
+
+@pytest.mark.asyncio
+async def test_run_pytest_check_simplified_signature(
+    mock_server: Tuple[Any, MagicMock],
+) -> None:
+    """Test that run_pytest_check has simplified signature without verbosity/show_details."""
+    _server, mock_tool = mock_server
+
+    run_pytest_check = _get_tool(mock_tool, "run_pytest_check")
+    signature = inspect.signature(run_pytest_check)
+    params = list(signature.parameters.keys())
+
+    # Assert signature has: markers, extra_args, env_vars
+    assert "markers" in params
+    assert "extra_args" in params
+    assert "env_vars" in params
+
+    # Assert signature does NOT have: verbosity, show_details
+    assert "verbosity" not in params
+    assert "show_details" not in params
+
+
+@pytest.mark.asyncio
+async def test_run_pytest_check_never_raises(
+    mock_server: Tuple[Any, MagicMock],
+) -> None:
+    """Test that run_pytest_check returns a string on error, never raises."""
+    _server, mock_tool = mock_server
+
+    with patch("mcp_tools_py.server.check_code_with_pytest") as mock_check:
+        mock_check.side_effect = RuntimeError("something broke")
+
+        run_pytest_check = _get_tool(mock_tool, "run_pytest_check")
+
+        # Should not raise
+        result = run_pytest_check()
+
+        assert isinstance(result, str)
+        assert "Unexpected error" in result
+        assert "RuntimeError" in result
+        assert "something broke" in result
+
+
+@pytest.mark.asyncio
+async def test_run_pytest_check_prepends_dedup_notes(
+    mock_server: Tuple[Any, MagicMock],
+) -> None:
+    """Test that deduplication notes from sanitize_extra_args are prepended to output."""
+    _server, mock_tool = mock_server
+
+    with patch("mcp_tools_py.server.check_code_with_pytest") as mock_check:
+        mock_check.return_value = {
+            "success": True,
+            "summary": {"passed": 5, "failed": 0, "error": 0, "collected": 5},
+            "test_results": None,
+        }
+
+        run_pytest_check = _get_tool(mock_tool, "run_pytest_check")
+
+        # Call with extra_args containing -m flag AND markers parameter
+        # sanitize_extra_args should produce a note about -m being ignored
+        result = run_pytest_check(
+            extra_args=["-m", "slow"],
+            markers=["unit"],
+        )
+
+        # The note about -m flag should be prepended
+        assert "Note:" in result
+        assert "-m" in result
