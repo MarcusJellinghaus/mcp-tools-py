@@ -1,6 +1,6 @@
 {
   "mcpServers": {
-    "mcp-tools-py": {
+    "tools-py": {
       "type": "stdio",
       "command": "${VIRTUAL_ENV}\\Scripts\\mcp-tools-py.exe",
       "args": [
