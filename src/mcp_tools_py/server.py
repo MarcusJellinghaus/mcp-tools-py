@@ -160,7 +160,10 @@ class CodeCheckerServer:
                     f"Pytest found issues that need attention:\n\n{failed_tests_prompt}"
                 )
             else:
-                # Check if we should suggest show_details=True for small test runs
+                # NOTE: This branch is currently dead code -- show_details is
+                # always passed as True from run_pytest_check().  Retained for
+                # possible future use.  The hint below references the removed
+                # show_details parameter and would need updating if re-enabled.
                 hint = (
                     " Try show_details=True for more information."
                     if collected <= SMALL_TEST_RUN_THRESHOLD

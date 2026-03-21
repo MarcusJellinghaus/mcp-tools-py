@@ -24,6 +24,24 @@ from mcp_tools_py.utils.subprocess_runner import (
     truncate_stderr,
 )
 
+
+def _build_error_detail(output: str, error_output: str) -> str:
+    """Build a stderr/stdout snippet string for error messages."""
+    stderr_snippet = (
+        truncate_stderr(error_output.strip())
+        if error_output and error_output.strip()
+        else ""
+    )
+    stdout_snippet = (
+        truncate_stderr(output.strip()) if output and output.strip() else ""
+    )
+    detail = ""
+    if stderr_snippet:
+        detail += f" stderr: {stderr_snippet}"
+    if stdout_snippet:
+        detail += f" stdout: {stdout_snippet}"
+    return detail
+
 logger = logging.getLogger(__name__)
 structured_logger = structlog.get_logger(__name__)
 
@@ -284,19 +302,7 @@ def run_tests(
             # Check specifically for 'no tests found' case
             if "collected 0 items" in combined_output or process.returncode == 5:
                 print("No tests found, raising specific exception")
-                stderr_snippet = (
-                    truncate_stderr(error_output.strip())
-                    if error_output and error_output.strip()
-                    else ""
-                )
-                stdout_snippet = (
-                    truncate_stderr(output.strip()) if output and output.strip() else ""
-                )
-                detail = ""
-                if stderr_snippet:
-                    detail += f" stderr: {stderr_snippet}"
-                if stdout_snippet:
-                    detail += f" stdout: {stdout_snippet}"
+                detail = _build_error_detail(output, error_output)
                 raise ValueError(
                     f"No Tests Found: Pytest did not find any tests to run.{detail}"
                 )
@@ -350,21 +356,7 @@ def run_tests(
             if not report_exists:
                 print(combined_output)
                 if "collected 0 items" in combined_output:
-                    stderr_snippet = (
-                        truncate_stderr(error_output.strip())
-                        if error_output and error_output.strip()
-                        else ""
-                    )
-                    stdout_snippet = (
-                        truncate_stderr(output.strip())
-                        if output and output.strip()
-                        else ""
-                    )
-                    detail = ""
-                    if stderr_snippet:
-                        detail += f" stderr: {stderr_snippet}"
-                    if stdout_snippet:
-                        detail += f" stdout: {stdout_snippet}"
+                    detail = _build_error_detail(output, error_output)
                     raise ValueError(
                         f"No Tests Found: Pytest did not find any tests to run.{detail}"
                     )

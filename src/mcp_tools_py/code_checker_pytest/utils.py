@@ -38,7 +38,7 @@ def sanitize_extra_args(
     notes: list[str] = []
     skip_next = False
 
-    for i, arg in enumerate(extra_args):
+    for arg in extra_args:
         if skip_next:
             skip_next = False
             continue
