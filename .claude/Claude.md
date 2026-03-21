@@ -10,16 +10,16 @@
 
 **BEFORE EVERY TOOL USE, ASK: "Does an MCP version exist?"**
 
-### Tool Mapping Reference:
+### Tool Mapping Reference
 
 | Task | ❌ NEVER USE | ✅ USE MCP TOOL |
 |------|--------------|------------------|
 | Read file | `Read()` | `mcp__filesystem__read_file()` |
 | Edit file | `Edit()` | `mcp__filesystem__edit_file()` |
 | Write file | `Write()` | `mcp__filesystem__save_file()` |
-| Run pytest | `Bash("pytest ...")` | `mcp__mcp-tools-py__run_pytest_check()` |
-| Run pylint | `Bash("pylint ...")` | `mcp__mcp-tools-py__run_pylint_check()` |
-| Run mypy | `Bash("mypy ...")` | `mcp__mcp-tools-py__run_mypy_check()` |
+| Run pytest | `Bash("pytest ...")` | `mcp__tools-py__run_pytest_check()` |
+| Run pylint | `Bash("pylint ...")` | `mcp__tools-py__run_pylint_check()` |
+| Run mypy | `Bash("mypy ...")` | `mcp__tools-py__run_mypy_check()` |
 | Git operations | ✅ `Bash("git ...")` | ✅ `Bash("git ...")` (allowed) |
 
 ## 🔴 CRITICAL: Code Quality Requirements
@@ -27,12 +27,13 @@
 **MANDATORY**: After making ANY code changes (after EACH edit), you MUST run ALL THREE code quality checks using the EXACT MCP tool names below:
 
 ```
-mcp__mcp-tools-py__run_pylint_check
-mcp__mcp-tools-py__run_pytest_check
-mcp__mcp-tools-py__run_mypy_check
+mcp__tools-py__run_pylint_check
+mcp__tools-py__run_pytest_check
+mcp__tools-py__run_mypy_check
 ```
 
 This runs:
+
 - **Pylint** - Code quality and style analysis
 - **Pytest** - All unit and integration tests
 - **Mypy** - Static type checking
@@ -53,15 +54,16 @@ This runs:
 - **Specific integration tests**: Use specific `markers` parameter when testing integration functionality
 
 **Examples:**
+
 ```python
 # RECOMMENDED: Fast unit tests (excludes integration tests)
-mcp__mcp-tools-py__run_pytest_check(extra_args=["-n", "auto", "-m", "not integration"])
+mcp__tools-py__run_pytest_check(extra_args=["-n", "auto", "-m", "not integration"])
 
 # All tests including slow integration tests (not recommended for regular development)
-mcp__mcp-tools-py__run_pytest_check(extra_args=["-n", "auto"])
+mcp__tools-py__run_pytest_check(extra_args=["-n", "auto"])
 
 # Specific integration tests (only when needed)
-mcp__mcp-tools-py__run_pytest_check(extra_args=["-n", "auto"], markers=["integration"])
+mcp__tools-py__run_pytest_check(extra_args=["-n", "auto"], markers=["integration"])
 ```
 
 **Important:** Without the `-m "not integration"` exclusions, pytest runs ALL tests including slow integration tests that may require external resources. For regular development, always use the exclusion pattern as shown in the first example above.
@@ -85,7 +87,7 @@ mcp__filesystem__edit_file
 
 **⚠️ ABSOLUTELY FORBIDDEN:** Using `Read`, `Write`, `Edit`, `MultiEdit` tools when MCP filesystem tools are available.
 
-### Quick Examples:
+### Quick Examples
 
 ```python
 # ❌ WRONG - Standard tools
@@ -98,14 +100,19 @@ Bash("pytest tests/")
 mcp__filesystem__read_file(file_path="src/example.py")
 mcp__filesystem__edit_file(file_path="src/example.py", edits=[...])
 mcp__filesystem__save_file(file_path="src/new.py", content="...")
-mcp__mcp-tools-py__run_pytest_check(extra_args=["-v"])
+mcp__tools-py__run_pytest_check(extra_args=["-n", "auto"])
 ```
 
 **WHY MCP TOOLS ARE MANDATORY:**
+
 - Proper security and access control
 - Consistent error handling
 - Better integration with the development environment
 - Required for this project's architecture
+
+## ✍️ Writing Style
+
+**Be concise.** Keep code comments, commit messages, documentation changes, and prompt additions short and direct. If one line works, don't use three.
 
 ## 🚨 COMPLIANCE VERIFICATION
 
@@ -142,6 +149,7 @@ git diff  # Should show formatting changes if any
 ```
 
 **Format all code before committing:**
+
 - Run `./tools/format_all.sh` (or `tools\format_all.bat` on Windows) to format with black and isort
 - Review the changes to ensure they're formatting-only
 - Stage the formatted files
@@ -152,17 +160,25 @@ git diff  # Should show formatting changes if any
 ```
 git status
 git diff
-git add
-git commit
-git push
+git log
+git fetch
+git ls-tree
 ```
 
+**⚠️ Bash discipline (applies to subagents too):**
+
+- No `cd` prefix, no `git -C` — the working directory is already correct. Just `git status`, never `git -C "/some/path" status`.
+- Stick to approved commands above. Avoid unapproved bash commands — they trigger user authorization prompts and interrupt the workflow.
+- Do not chain approved commands with unapproved ones (e.g. `git status && echo "---" && git diff`). The `echo` makes the whole command unapproved. Run approved commands separately instead.
+
 **Git commit message format:**
+
 - Use standard commit message format without advertising footers
 - Focus on clear, descriptive commit messages
 - No Claude Code attribution or links
 
 **Pull Request format:**
+
 - No "Generated with Claude Code" footer or similar attribution
 - Focus on clear summary and test plan
 - Keep PR descriptions concise and professional
@@ -170,9 +186,10 @@ git push
 ## 📏 File Size Check
 
 Check for large files (>750 lines) that may impact LLM context:
+
 ```bash
-# Check if available (mcp-coder integration)
-Bash("find . -name '*.py' -exec wc -l {} + | awk '$1 > 750 { print $2, $1 }' | head -10")
+mcp-coder check file-size --max-lines 750
+mcp-coder check branch-status --llm-truncate
 ```
 
 For guidance on splitting large files, consider breaking them into smaller, focused modules.

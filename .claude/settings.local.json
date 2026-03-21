@@ -1,10 +1,10 @@
 {
   "permissions": {
     "allow": [
-      "mcp__mcp-tools-py__run_all_checks",
-      "mcp__mcp-tools-py__run_pylint_check",
-      "mcp__mcp-tools-py__run_pytest_check",
-      "mcp__mcp-tools-py__run_mypy_check",
+      "mcp__tools-py__run_all_checks",
+      "mcp__tools-py__run_pylint_check",
+      "mcp__tools-py__run_pytest_check",
+      "mcp__tools-py__run_mypy_check",
       "mcp__filesystem__get_reference_projects",
       "mcp__filesystem__list_reference_directory",
       "mcp__filesystem__read_reference_file",
@@ -33,6 +33,8 @@
       "Skill(implementation_needs_rework)",
       "Skill(implementation_new_tasks)",
       "Skill(implementation_review)",
+      "Skill(implementation_review_supervisor)",
+      "Skill(check_branch_status)",
       "Skill(issue_analyse)",
       "Skill(issue_approve)",
       "Skill(issue_create)",
@@ -43,6 +45,10 @@
       "Skill(rebase)",
       "Bash(find:*)",
       "Bash(git mv:*)",
+      "Bash(git log:*)",
+      "Bash(git fetch:*)",
+      "Bash(mcp-coder check branch-status:*)",
+      "Bash(mcp-coder git-tool:*)",
       "Bash(git status:*)",
       "Bash(mcp-coder check file-size:*)",
       "WebFetch(domain:*)",
@@ -52,7 +58,7 @@
   },
   "enableAllProjectMcpServers": true,
   "enabledMcpjsonServers": [
-    "mcp-tools-py",
+    "tools-py",
     "filesystem"
   ]
 }

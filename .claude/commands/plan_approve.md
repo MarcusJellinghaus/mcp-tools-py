@@ -1,7 +1,7 @@
 ---
 allowed-tools: Bash(mcp-coder set-status:*)
 workflow-stage: plan-review
-suggested-next: (bot runs implement) -> /clear -> implementation_review
+suggested-next: (bot runs implement) -> /clear -> implementation_review or implementation_review_supervisor
 ---
 
 # Approve Implementation Plan
