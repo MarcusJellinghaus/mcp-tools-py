@@ -42,6 +42,7 @@ def _build_error_detail(output: str, error_output: str) -> str:
         detail += f" stdout: {stdout_snippet}"
     return detail
 
+
 logger = logging.getLogger(__name__)
 structured_logger = structlog.get_logger(__name__)
 
