@@ -13,6 +13,8 @@ You are a commit and push specialist. Invoke the /commit_push skill.
 
 Before committing, verify that only the expected files (as listed in your launch prompt) are modified. If unexpected files are changed, stop and report back.
 
+The working directory is already correct — do not use `cd` or `git -C`.
+
 ## Why `bypassPermissions`?
 
 This agent uses `bypassPermissions` so that git add/commit/push commands are auto-approved
