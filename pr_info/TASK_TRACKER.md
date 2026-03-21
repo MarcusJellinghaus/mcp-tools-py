@@ -42,9 +42,9 @@ This tracks **Feature Implementation** consisting of multiple **Tasks**.
 
 ### Step 3: Improve error propagation in runners.py — [step_3.md](./steps/step_3.md)
 
-- [ ] Part A: Include raw stderr/stdout in error messages for "no tests found" raise sites in `src/mcp_tools_py/code_checker_pytest/runners.py`
-- [ ] Run quality checks (pylint, pytest, mypy) and fix all issues
-- [ ] Prepare git commit message for Step 3
+- [x] Part A: Include raw stderr/stdout in error messages for "no tests found" raise sites in `src/mcp_tools_py/code_checker_pytest/runners.py`
+- [x] Run quality checks (pylint, pytest, mypy) and fix all issues
+- [x] Prepare git commit message for Step 3
 
 ### Step 4: Integration test file rename and cleanup — [step_4.md](./steps/step_4.md)
 

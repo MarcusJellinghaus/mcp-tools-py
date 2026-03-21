@@ -284,8 +284,21 @@ def run_tests(
             # Check specifically for 'no tests found' case
             if "collected 0 items" in combined_output or process.returncode == 5:
                 print("No tests found, raising specific exception")
+                stderr_snippet = (
+                    truncate_stderr(error_output.strip())
+                    if error_output and error_output.strip()
+                    else ""
+                )
+                stdout_snippet = (
+                    truncate_stderr(output.strip()) if output and output.strip() else ""
+                )
+                detail = ""
+                if stderr_snippet:
+                    detail += f" stderr: {stderr_snippet}"
+                if stdout_snippet:
+                    detail += f" stdout: {stdout_snippet}"
                 raise ValueError(
-                    "No Tests Found: Pytest did not find any tests to run."
+                    f"No Tests Found: Pytest did not find any tests to run.{detail}"
                 )
 
             # Create error context if needed
@@ -337,8 +350,23 @@ def run_tests(
             if not report_exists:
                 print(combined_output)
                 if "collected 0 items" in combined_output:
+                    stderr_snippet = (
+                        truncate_stderr(error_output.strip())
+                        if error_output and error_output.strip()
+                        else ""
+                    )
+                    stdout_snippet = (
+                        truncate_stderr(output.strip())
+                        if output and output.strip()
+                        else ""
+                    )
+                    detail = ""
+                    if stderr_snippet:
+                        detail += f" stderr: {stderr_snippet}"
+                    if stdout_snippet:
+                        detail += f" stdout: {stdout_snippet}"
                     raise ValueError(
-                        "No Tests Found: Pytest did not find any tests to run."
+                        f"No Tests Found: Pytest did not find any tests to run.{detail}"
                     )
                 else:
                     # Check for missing pytest module
