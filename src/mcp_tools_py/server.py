@@ -19,6 +19,7 @@ from mcp_tools_py.code_checker_pytest.reporting import (
     should_show_details,
 )
 from mcp_tools_py.code_checker_pytest.runners import check_code_with_pytest
+from mcp_tools_py.code_checker_pytest.utils import sanitize_extra_args
 from mcp_tools_py.log_utils import log_function_call
 from mcp_tools_py.utils.subprocess_runner import execute_command
 
@@ -159,7 +160,10 @@ class CodeCheckerServer:
                     f"Pytest found issues that need attention:\n\n{failed_tests_prompt}"
                 )
             else:
-                # Check if we should suggest show_details=True for small test runs
+                # NOTE: This branch is currently dead code -- show_details is
+                # always passed as True from run_pytest_check().  Retained for
+                # possible future use.  The hint below references the removed
+                # show_details parameter and would need updating if re-enabled.
                 hint = (
                     " Try show_details=True for more information."
                     if collected <= SMALL_TEST_RUN_THRESHOLD
@@ -249,29 +253,19 @@ class CodeCheckerServer:
         @log_function_call
         def run_pytest_check(
             markers: Optional[List[str]] = None,
-            verbosity: int = 2,
             extra_args: Optional[List[str]] = None,
             env_vars: Optional[Dict[str, str]] = None,
-            show_details: bool = False,
         ) -> str:
             """
             Run pytest on the project code and generate smart prompts for LLMs.
 
             Args:
                 markers: Optional list of pytest markers to filter tests. Examples: ['slow', 'integration']
-                verbosity: Integer for pytest verbosity level (0-3), default 2.
-                          Controls pytest's native -v/-vv/-vvv flags for test execution detail.
                 extra_args: Optional list of additional pytest arguments for flexible test selection.
                            Examples: ['tests/test_file.py::test_function']
+                           Use -v/-vv/-vvv in extra_args to control verbosity.
                            See "Flexible Test Selection" section below for common patterns.
                 env_vars: Optional dictionary of environment variables for the subprocess.
-                show_details: Show detailed output including print statements from tests (default: False).
-                             - False: Only show summary for large test runs, helpful hints for small runs
-                             - True: Show detailed output for up to 10 failing tests, or all details if ≤3 tests total
-                             - Automatically adds `-s` flag to enable print statement visibility
-                             - Collection errors always shown regardless of setting
-                             - Output limited to 300 lines total with truncation indicator
-                             Smart behavior: provides hints when show_details=True would be beneficial.
 
             Returns:
                 A string containing either pytest results or a prompt for an LLM to interpret
@@ -287,25 +281,22 @@ class CodeCheckerServer:
                 # Output control
                 extra_args=["-s"]  # Show print statements
                 extra_args=["--tb=short"]  # Short tracebacks
+                extra_args=["-vvv"]  # Maximum verbosity
 
                 # Execution control
                 extra_args=["-x"]  # Stop on first failure
 
             Examples:
-                # Standard CI run - minimal output
+                # Standard CI run
                 run_pytest_check()
 
-                # Debug specific test with full details
+                # Debug specific test with verbose output
                 run_pytest_check(
-                    extra_args=["tests/test_math.py::test_calculation"],
-                    show_details=True
+                    extra_args=["tests/test_math.py::test_calculation", "-vvv"]
                 )
 
-                # Integration test run with summary only
-                run_pytest_check(markers=["integration"], show_details=False)
-
-                # Get print statements with automatic -s flag
-                run_pytest_check(show_details=True)  # Automatically includes -s
+                # Integration test run
+                run_pytest_check(markers=["integration"])
             """
             if not self._tool_availability.get("pytest", False):
                 return (
@@ -324,14 +315,18 @@ class CodeCheckerServer:
                     project_dir=str(self.project_dir),
                     test_folder=self.test_folder,
                     markers=markers,
-                    verbosity=verbosity,
                     extra_args=extra_args,
                 )
 
-                # Automatically add -s flag when show_details=True
-                final_extra_args = list(extra_args) if extra_args else []
-                if show_details and "-s" not in final_extra_args:
-                    final_extra_args.append("-s")
+                # Sanitize extra_args: deduplicate flags, extract verbosity
+                sanitized = sanitize_extra_args(extra_args, markers)
+
+                # Always add -s for print statement capture
+                final_extra_args = sanitized.cleaned_args + ["-s"]
+
+                # Log any deduplication notes
+                for note in sanitized.notes:
+                    structured_logger.info("extra_args sanitized", note=note)
 
                 # Run pytest
                 test_results = check_code_with_pytest(
@@ -339,16 +334,22 @@ class CodeCheckerServer:
                     test_folder=self.test_folder,
                     python_executable=self._resolved_python,
                     markers=markers,
-                    verbosity=verbosity,
+                    verbosity=sanitized.verbosity,
                     extra_args=final_extra_args,
                     env_vars=env_vars,
                     venv_path=self.venv_path,
                     keep_temp_files=self.keep_temp_files,
                 )
 
+                # Always show detailed failure output
                 result = self._format_pytest_result_with_details(
-                    test_results, show_details
+                    test_results, show_details=True
                 )
+
+                # Prepend deduplication notes so LLM can self-correct
+                if sanitized.notes:
+                    notes_text = "\n".join(sanitized.notes)
+                    result = f"{notes_text}\n\n{result}"
 
                 if test_results.get("success"):
                     summary = test_results.get("summary", {})
@@ -368,14 +369,15 @@ class CodeCheckerServer:
                 return result
 
             except Exception as e:
-                logger.error(f"Error running pytest check: {str(e)}")
+                error_msg = f"Unexpected error running pytest: {type(e).__name__}: {e}"
+                logger.error(error_msg)
                 structured_logger.error(
                     "Pytest check failed",
                     error=str(e),
                     error_type=type(e).__name__,
                     project_dir=str(self.project_dir),
                 )
-                raise
+                return error_msg
 
         @self.mcp.tool()
         @log_function_call

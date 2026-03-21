@@ -13,6 +13,7 @@ from mcp_tools_py.code_checker_pytest.models import (
     Log,
     LogRecord,
     PytestReport,
+    SanitizedArgs,
     StageInfo,
     Summary,
     Test,
@@ -46,6 +47,7 @@ __all__ = [
     "Summary",
     "Warning",
     "PytestReport",
+    "SanitizedArgs",
     # Main functionality
     "run_tests",
     "parse_pytest_report",

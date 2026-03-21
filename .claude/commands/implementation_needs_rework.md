@@ -1,5 +1,5 @@
 ---
-allowed-tools: Bash(mcp-coder set-status:*)
+allowed-tools: Bash(mcp-coder set-status *)
 workflow-stage: code-review
 suggested-next: (bot runs implement) -> /clear -> implementation_review or implementation_review_supervisor
 ---

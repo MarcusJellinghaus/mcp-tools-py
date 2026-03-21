@@ -1,8 +1,9 @@
-"""End-to-end integration tests for show_details parameter functionality."""
+"""End-to-end integration tests for detailed output formatting functionality."""
 
 import json
 import shutil
 import tempfile
+import time
 from pathlib import Path
 from typing import Any, Dict, Generator, List, cast
 
@@ -19,8 +20,8 @@ from mcp_tools_py.code_checker_pytest.parsers import parse_pytest_report
 from mcp_tools_py.server import CodeCheckerServer
 
 
-class TestIntegrationShowDetails:
-    """Integration tests for show_details parameter end-to-end flow."""
+class TestIntegrationFormatting:
+    """Integration tests for detailed output formatting end-to-end flow."""
 
     @pytest.fixture
     def temp_project_dir(self) -> Generator[Path, None, None]:
@@ -336,62 +337,6 @@ def test_string_pass():
         assert "Debug:" in result  # Should include print output
         assert "AssertionError" in result
         assert len(result.split("\n")) > 20  # Should have substantial content
-
-    def test_standard_ci_run(
-        self, temp_project_dir: Path, server: CodeCheckerServer
-    ) -> None:
-        """Test standard CI run with show_details=False (default behavior)."""
-        self._create_large_project(temp_project_dir)
-
-        json_report = {
-            "created": 1518371686.7981803,
-            "duration": 0.5,
-            "exitcode": 1,
-            "root": str(temp_project_dir),
-            "environment": {},
-            "summary": {"collected": 23, "passed": 16, "failed": 7, "total": 23},
-            "collectors": [],
-            "tests": [
-                {
-                    "nodeid": "tests/test_module_b.py::test_b6_fail",
-                    "lineno": 10,
-                    "keywords": ["test_b6_fail"],
-                    "outcome": "failed",
-                    "call": {
-                        "duration": 0.001,
-                        "outcome": "failed",
-                        "longrepr": "AssertionError: assert False",
-                        "stdout": "Debug: b6 starting\n",
-                        "stderr": "",
-                        "crash": {
-                            "path": str(
-                                temp_project_dir / "tests" / "test_module_b.py"
-                            ),
-                            "lineno": 15,
-                            "message": "AssertionError: assert False",
-                        },
-                    },
-                }
-            ],
-            "warnings": [],
-        }
-
-        pytest_report = parse_pytest_report(json.dumps(json_report))
-
-        test_results = {
-            "success": True,
-            "summary": json_report["summary"],
-            "test_results": pytest_report,
-        }
-
-        # Test with show_details=False
-        result = server._format_pytest_result_with_details(
-            test_results, show_details=False
-        )
-
-        # Verify minimal output for CI
-        assert result.count("\n") < 5  # Compact output
-        assert "Pytest completed with failures" in result
 
     def test_specific_test_with_prints(self, temp_project_dir: Path) -> None:
         """Test specific test execution with prints (extra_args + show_details)."""
@@ -738,57 +683,6 @@ def test_fast_operation():
         assert "Debug line" in result
         # The exact truncation behavior depends on the implementation
 
-    def test_smart_hints_for_small_runs(self, temp_project_dir: Path) -> None:
-        """Test smart hints suggesting show_details=True for small test runs."""
-        server = CodeCheckerServer(project_dir=temp_project_dir)
-
-        # Create proper PytestReport structure for small run
-        json_report = {
-            "created": 1518371686.7981803,
-            "duration": 0.05,
-            "exitcode": 1,
-            "root": str(temp_project_dir),
-            "environment": {},
-            "summary": {"collected": 3, "passed": 2, "failed": 1, "total": 3},
-            "collectors": [],
-            "tests": [
-                {
-                    "nodeid": "tests/test_small.py::test_fail",
-                    "lineno": 10,
-                    "keywords": ["test_fail"],
-                    "outcome": "failed",
-                    "call": {
-                        "duration": 0.001,
-                        "outcome": "failed",
-                        "longrepr": "AssertionError: assert False",
-                        "stdout": "Debug: small test\n",
-                        "stderr": "",
-                        "crash": {
-                            "path": str(temp_project_dir / "tests" / "test_small.py"),
-                            "lineno": 10,
-                            "message": "AssertionError: assert False",
-                        },
-                    },
-                }
-            ],
-            "warnings": [],
-        }
-
-        pytest_report = parse_pytest_report(json.dumps(json_report))
-
-        test_results = {
-            "success": True,
-            "summary": json_report["summary"],
-            "test_results": pytest_report,
-        }
-
-        result = server._format_pytest_result_with_details(
-            test_results, show_details=False
-        )
-
-        # Should suggest show_details for small runs
-        assert "Try show_details=True for more information" in result
-
     def test_performance_validation(self, temp_project_dir: Path) -> None:
         """Test that integration has reasonable performance."""
         self._create_large_project(temp_project_dir)
@@ -839,8 +733,6 @@ def test_fast_operation():
             "summary": json_report["summary"],
             "test_results": pytest_report,
         }
-
-        import time
 
         start_time = time.time()
         result = server._format_pytest_result_with_details(
@@ -900,8 +792,8 @@ def test_fast_operation():
         }
 
         # Run several formatting operations
-        for show_details in [True, False, True]:
-            server._format_pytest_result_with_details(test_results, show_details)
+        for _ in range(3):
+            server._format_pytest_result_with_details(test_results, show_details=True)
 
         final_files = list(temp_project_dir.rglob("*"))
 
@@ -917,90 +809,3 @@ def test_fast_operation():
         # All new files should be our intentional test files
         for new_file in actual_new_files:
             assert any(expected in new_file for expected in expected_new_files)
-
-    def test_real_world_usage_patterns(self, temp_project_dir: Path) -> None:
-        """Test realistic usage patterns that LLMs would use."""
-        self._create_focused_project(temp_project_dir)
-        server = CodeCheckerServer(project_dir=temp_project_dir)
-
-        # Create proper PytestReport structure for real-world pattern
-        json_report = {
-            "created": 1518371686.7981803,
-            "duration": 0.1235666275024414,
-            "exitcode": 1,
-            "root": str(temp_project_dir),
-            "environment": {},
-            "summary": {"collected": 2, "passed": 1, "failed": 1, "total": 2},
-            "collectors": [],
-            "tests": [
-                {
-                    "nodeid": "tests/test_simple.py::test_failing_with_prints",
-                    "lineno": 10,
-                    "keywords": ["test_failing_with_prints"],
-                    "outcome": "failed",
-                    "call": {
-                        "duration": 0.001,
-                        "outcome": "failed",
-                        "longrepr": "AssertionError: assert 1 == 5",
-                        "stdout": "Debug: processing value\nDebug: data structure is {'key': 'value'}\n",
-                        "stderr": "",
-                        "crash": {
-                            "path": str(temp_project_dir / "tests" / "test_simple.py"),
-                            "lineno": 15,
-                            "message": "AssertionError: assert 1 == 5",
-                        },
-                    },
-                }
-            ],
-            "warnings": [],
-        }
-
-        pytest_report = parse_pytest_report(json.dumps(json_report))
-
-        test_results = {
-            "success": True,
-            "summary": json_report["summary"],
-            "test_results": pytest_report,
-        }
-
-        # First run - minimal output
-        result1 = server._format_pytest_result_with_details(
-            test_results, show_details=False
-        )
-        assert "Try show_details=True" in result1
-
-        # Pattern 2: Follow-up run with details (typical LLM workflow)
-        result2 = server._format_pytest_result_with_details(
-            test_results, show_details=True
-        )
-        assert "Debug: processing value" in result2
-        assert "Debug: data structure is" in result2
-        assert len(result2) > len(result1)  # More detailed output
-
-        # Pattern 3: Targeted debugging (specific test + show_details)
-        tests_list = cast(List[Dict[str, Any]], json_report.get("tests", []))
-        single_test_json_report = {
-            "created": 1518371686.7981803,
-            "duration": 0.05,
-            "exitcode": 1,
-            "root": str(temp_project_dir),
-            "environment": {},
-            "summary": {"collected": 1, "passed": 0, "failed": 1, "total": 1},
-            "collectors": [],
-            "tests": [tests_list[0]] if tests_list else [],  # Same test data
-            "warnings": [],
-        }
-
-        single_pytest_report = parse_pytest_report(json.dumps(single_test_json_report))
-
-        single_test_results = {
-            "success": True,
-            "summary": single_test_json_report["summary"],
-            "test_results": single_pytest_report,
-        }
-
-        result3 = server._format_pytest_result_with_details(
-            single_test_results, show_details=True
-        )
-        assert "Debug: processing value" in result3
-        assert "AssertionError" in result3

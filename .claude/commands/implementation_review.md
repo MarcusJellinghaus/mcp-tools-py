@@ -1,5 +1,5 @@
 ---
-allowed-tools: Bash(git fetch:*), Bash(git status:*), Bash(git diff:*), Read, Glob, Grep
+allowed-tools: Bash(git fetch *), Bash(git fetch), Bash(git status), Bash(git diff *), Read, Glob, Grep
 workflow-stage: code-review
 suggested-next:
   - discuss -> commit_push -> implementation_approve

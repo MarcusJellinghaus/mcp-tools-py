@@ -1,5 +1,5 @@
 ---
-allowed-tools: Bash(mcp-coder check branch-status:*)
+allowed-tools: Bash(mcp-coder check branch-status *)
 workflow-stage: quality-check
 suggested-next: commit_push, rebase
 ---

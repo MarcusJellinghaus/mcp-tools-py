@@ -149,3 +149,12 @@ class PytestReport:
     tests: Optional[List[Test]] = None
     warnings: Optional[List[Warning]] = None
     error_context: Optional[ErrorContext] = None
+
+
+@dataclass
+class SanitizedArgs:
+    """Result of sanitizing extra_args for pytest execution."""
+
+    cleaned_args: List[str]
+    verbosity: int
+    notes: List[str]
