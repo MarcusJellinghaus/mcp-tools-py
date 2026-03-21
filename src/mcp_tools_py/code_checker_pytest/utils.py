@@ -2,14 +2,14 @@
 Utility functions for code checker pytest operations.
 """
 
-from typing import Tuple
+from typing import List, Optional, Tuple
 
 from mcp_tools_py.code_checker_pytest.models import ErrorContext, SanitizedArgs
 
 
 def sanitize_extra_args(
-    extra_args: list[str] | None,
-    markers: list[str] | None,
+    extra_args: Optional[List[str]],
+    markers: Optional[List[str]],
 ) -> SanitizedArgs:
     """Sanitize and deduplicate extra_args before passing to pytest.
 
@@ -33,9 +33,9 @@ def sanitize_extra_args(
     if not extra_args:
         return SanitizedArgs(cleaned_args=[], verbosity=2, notes=[])
 
-    cleaned: list[str] = []
+    cleaned: List[str] = []
     verbosity = 2
-    notes: list[str] = []
+    notes: List[str] = []
     skip_next = False
 
     for arg in extra_args:

@@ -155,6 +155,6 @@ class PytestReport:
 class SanitizedArgs:
     """Result of sanitizing extra_args for pytest execution."""
 
-    cleaned_args: list[str]
+    cleaned_args: List[str]
     verbosity: int
-    notes: list[str]
+    notes: List[str]
