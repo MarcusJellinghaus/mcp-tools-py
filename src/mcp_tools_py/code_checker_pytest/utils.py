@@ -4,7 +4,70 @@ Utility functions for code checker pytest operations.
 
 from typing import Tuple
 
-from mcp_tools_py.code_checker_pytest.models import ErrorContext
+from mcp_tools_py.code_checker_pytest.models import ErrorContext, SanitizedArgs
+
+
+def sanitize_extra_args(
+    extra_args: list[str] | None,
+    markers: list[str] | None,
+) -> SanitizedArgs:
+    """Sanitize and deduplicate extra_args before passing to pytest.
+
+    Extracts verbosity flags, removes flags that are auto-added internally,
+    and handles conflicts between extra_args and the markers parameter.
+
+    Limitations:
+        - Only ``-m`` as two separate args (``["-m", "slow"]``) is handled,
+          not the combined ``-m=slow`` form.
+        - Combined short flags like ``-xvs`` pass through as-is
+          (not decomposed into individual flags).
+
+    Args:
+        extra_args: Optional list of extra arguments for pytest.
+        markers: Optional list of marker expressions passed via the
+            dedicated markers parameter.
+
+    Returns:
+        SanitizedArgs with cleaned_args, extracted verbosity, and notes.
+    """
+    if not extra_args:
+        return SanitizedArgs(cleaned_args=[], verbosity=2, notes=[])
+
+    cleaned: list[str] = []
+    verbosity = 2
+    notes: list[str] = []
+    skip_next = False
+
+    for i, arg in enumerate(extra_args):
+        if skip_next:
+            skip_next = False
+            continue
+
+        # Verbosity flags: extract and remove
+        if arg in ("-v", "-vv", "-vvv"):
+            verbosity = arg.count("v")
+            continue
+
+        # -s flag: always auto-added, remove silently
+        if arg == "-s":
+            continue
+
+        # Bare "tests" or "tests/" path: auto-appended, remove
+        if arg in ("tests", "tests/"):
+            continue
+
+        # -m flag: remove if markers parameter is provided
+        if arg == "-m" and markers is not None:
+            skip_next = True
+            notes.append(
+                "Note: -m flag in extra_args was ignored "
+                "because the markers parameter was used."
+            )
+            continue
+
+        cleaned.append(arg)
+
+    return SanitizedArgs(cleaned_args=cleaned, verbosity=verbosity, notes=notes)
 
 
 def read_file(file_path: str) -> str:

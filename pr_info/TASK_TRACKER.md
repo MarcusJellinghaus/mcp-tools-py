@@ -23,12 +23,12 @@ This tracks **Feature Implementation** consisting of multiple **Tasks**.
 
 ### Step 1: SanitizedArgs dataclass + sanitize_extra_args() with unit tests — [step_1.md](./steps/step_1.md)
 
-- [ ] Part A: Create unit tests for sanitize_extra_args() in `tests/test_code_checker_pytest/test_extra_args.py`
-- [ ] Part B: Add `SanitizedArgs` dataclass to `src/mcp_tools_py/code_checker_pytest/models.py`
-- [ ] Part C: Export `SanitizedArgs` from `src/mcp_tools_py/code_checker_pytest/__init__.py`
-- [ ] Part D: Implement `sanitize_extra_args()` in `src/mcp_tools_py/code_checker_pytest/utils.py`
-- [ ] Run quality checks (pylint, pytest, mypy) and fix all issues
-- [ ] Prepare git commit message for Step 1
+- [x] Part A: Create unit tests for sanitize_extra_args() in `tests/test_code_checker_pytest/test_extra_args.py`
+- [x] Part B: Add `SanitizedArgs` dataclass to `src/mcp_tools_py/code_checker_pytest/models.py`
+- [x] Part C: Export `SanitizedArgs` from `src/mcp_tools_py/code_checker_pytest/__init__.py`
+- [x] Part D: Implement `sanitize_extra_args()` in `src/mcp_tools_py/code_checker_pytest/utils.py`
+- [x] Run quality checks (pylint, pytest, mypy) and fix all issues
+- [x] Prepare git commit message for Step 1
 
 ### Step 2: Simplify server.py run_pytest_check + defensive error handling + test updates — [step_2.md](./steps/step_2.md)
 
