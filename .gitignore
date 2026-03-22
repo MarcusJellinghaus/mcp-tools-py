@@ -15,7 +15,9 @@ venv/
 # Local configuration
 .env
 
-# Package info
+# Build / distribution
+dist/
+build/
 *.egg-info/
 
 # default log folder used by mcp servers
