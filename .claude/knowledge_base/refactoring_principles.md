@@ -14,3 +14,7 @@
 2. Move source code (copy-paste, no modifications)
 3. Move tests to mirror new structure
 4. Run all checks (pytest, pylint, mypy, import linter, tach)
+
+## Full Guide
+
+For detailed process, checklists, and conflict resolution strategies, see [Safe Refactoring Guide](../../docs/processes-prompts/refactoring-guide.md).

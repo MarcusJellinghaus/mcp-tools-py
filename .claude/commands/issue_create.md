@@ -14,6 +14,27 @@ Based on our prior discussion, create a GitHub issue.
 3. Include relevant details from our discussion in the body
 4. Use markdown formatting for better readability
 
+**Optional: Base Branch**
+If the feature should be based on a branch other than the default (main/master), include:
+
+```markdown
+### Base Branch
+
+<branch-name>
+```
+
+Use cases:
+- Hotfixes based on release branches
+- Features building on existing work
+- Long-running feature branches
+
+**Important:** Before specifying a base branch, verify it exists:
+```bash
+git ls-remote --heads origin <branch-name>
+```
+
+If no base branch is needed, omit this section entirely.
+
 **Create the issue using:**
 ```bash
 gh issue create --title "TITLE" --body "BODY"

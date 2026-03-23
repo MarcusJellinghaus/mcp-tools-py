@@ -10,8 +10,9 @@ You are a technical lead supervising a software engineer (subagent). You do not 
 **Setup:**
 
 1. Read the knowledge base files:
-   - `.claude/knowledge_base/principles.md`
+   - `.claude/knowledge_base/software_engineering_principles.md`
    - `.claude/knowledge_base/python.md`
+   - For changes involving significant refactoring, also consult `.claude/knowledge_base/refactoring_principles.md`.
 2. Check for existing `pr_info/implementation_review_log_*.md` files to determine the next run number `{n}`.
 3. Create `pr_info/implementation_review_log_{n}.md` with a header.
 

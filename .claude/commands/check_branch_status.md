@@ -13,7 +13,7 @@ Check comprehensive branch readiness including CI status, rebase requirements, t
 Call the underlying CLI command with LLM-optimized output and CI waiting:
 
 ```bash
-mcp-coder check branch-status --ci-timeout 300 --llm-truncate
+mcp-coder check branch-status --ci-timeout 180 --llm-truncate
 ```
 
 ## What This Command Does
@@ -54,4 +54,4 @@ This slash command enables interactive workflow management:
 
 ## Rationale
 
-**Rationale**: LLM-driven context benefits from waiting for complete results. The 300-second timeout provides a balance between responsiveness and allowing typical CI runs to complete. No `--fix` by default to let LLM analyze failures and suggest targeted fixes.
+**Rationale**: LLM-driven context benefits from waiting for complete results. The 180-second timeout provides a balance between responsiveness and allowing typical CI runs to complete. No `--fix` by default to let LLM analyze failures and suggest targeted fixes.
