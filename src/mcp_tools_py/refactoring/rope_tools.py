@@ -134,8 +134,7 @@ def _ensure_parents(dest_path: Path, project_dir: Path) -> None:
     current = dest_path.parent
     while current != current.parent and current != project_dir:
         init_file = current / "__init__.py"
-        if not init_file.exists() and (current / "__init__.py").parent.exists():
-            # Only create __init__.py if there are .py files or it's needed
+        if not init_file.exists():
             init_file.write_text("")
         # Check if we've hit a dir that already has __init__.py
         if init_file.exists():
@@ -249,6 +248,8 @@ def _cleanup_empty_dirs(directory: Path, stop_at: Path) -> None:
             if contents == [init_file]:
                 init_file.unlink()
                 current.rmdir()
+            else:
+                break
         current = current.parent
 
 
