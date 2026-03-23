@@ -25,9 +25,9 @@ This tracks **Feature Implementation** consisting of multiple **Tasks**.
 **Commit:** `feat: add dependencies and scaffold refactoring module (#108)`
 
 #### Part A: Refactoring module skeleton
-- [ ] Implementation — create `refactoring/__init__.py` with `RefactoringTools` class, `jedi_tools.py` placeholder, `rope_tools.py` placeholder, `tests/test_refactoring/__init__.py`
-- [ ] Quality checks: pylint, pytest, mypy — fix all issues
-- [ ] Commit message prepared
+- [x] Implementation — create `refactoring/__init__.py` with `RefactoringTools` class, `jedi_tools.py` placeholder, `rope_tools.py` placeholder, `tests/test_refactoring/__init__.py`
+- [x] Quality checks: pylint, pytest, mypy — fix all issues
+- [x] Commit message prepared
 
 #### Part B: Architecture & config updates
 - [ ] Implementation — add rope/jedi to `pyproject.toml` dependencies, register `integration` marker, rename layer in `tach.toml` and `.importlinter`, add `.ropeproject/` to `.gitignore`
