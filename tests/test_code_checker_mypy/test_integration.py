@@ -18,9 +18,9 @@ def test_mypy_tool_registration() -> None:
     assert hasattr(server, "mcp")
     assert server.mcp is not None
 
-    # The tool should be callable through the server's registered methods
-    # We can't directly access the tools list, but we can verify the method exists
-    assert hasattr(server, "_register_tools")
+    # The server delegates tool registration to CheckerTools
+    # Verify the mcp instance exists (tools are registered via CheckerTools)
+    assert hasattr(server, "mcp")
 
 
 def test_mypy_with_test_files() -> None:

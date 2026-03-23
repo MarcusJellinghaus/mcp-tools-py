@@ -12,6 +12,7 @@ from typing import Generator
 
 import pytest
 
+from mcp_tools_py.checker_tools import CheckerTools
 from mcp_tools_py.server import CodeCheckerServer
 
 
@@ -119,7 +120,7 @@ class TestParameterCombinationsValidation:
             collectors=[],
         )
 
-        result = server._format_pytest_result_with_details(
+        result = CheckerTools(server)._format_pytest_result_with_details(
             {
                 "success": True,
                 "summary": {"failed": 1, "collected": 1, "passed": 0},
@@ -135,7 +136,7 @@ class TestParameterCombinationsValidation:
         """Test show_details=False with multiple tests provides summary."""
         server = CodeCheckerServer(temp_project)
 
-        result = server._format_pytest_result_with_details(
+        result = CheckerTools(server)._format_pytest_result_with_details(
             {
                 "success": True,
                 "summary": {"failed": 2, "collected": 10, "passed": 8},
@@ -170,7 +171,7 @@ class TestParameterCombinationsValidation:
             collectors=[],
         )
 
-        result = server._format_pytest_result_with_details(
+        result = CheckerTools(server)._format_pytest_result_with_details(
             {
                 "success": True,
                 "summary": {"failed": 1, "collected": 2, "passed": 1},
@@ -194,10 +195,10 @@ class TestParameterCombinationsValidation:
         }
 
         # Both should handle collection errors
-        result_false = server._format_pytest_result_with_details(
+        result_false = CheckerTools(server)._format_pytest_result_with_details(
             test_result, show_details=False
         )
-        result_true = server._format_pytest_result_with_details(
+        result_true = CheckerTools(server)._format_pytest_result_with_details(
             test_result, show_details=True
         )
 
@@ -219,10 +220,10 @@ class TestOutputFormatConsistency:
             "summary_text": "All tests passed",
         }
 
-        result_false = server._format_pytest_result_with_details(
+        result_false = CheckerTools(server)._format_pytest_result_with_details(
             success_result, show_details=False
         )
-        result_true = server._format_pytest_result_with_details(
+        result_true = CheckerTools(server)._format_pytest_result_with_details(
             success_result, show_details=True
         )
 
@@ -240,10 +241,10 @@ class TestOutputFormatConsistency:
 
         error_result = {"success": False, "error": "pytest execution failed"}
 
-        result_false = server._format_pytest_result_with_details(
+        result_false = CheckerTools(server)._format_pytest_result_with_details(
             error_result, show_details=False
         )
-        result_true = server._format_pytest_result_with_details(
+        result_true = CheckerTools(server)._format_pytest_result_with_details(
             error_result, show_details=True
         )
 
@@ -262,10 +263,10 @@ class TestOutputFormatConsistency:
             "summary": "invalid_summary_format",  # Should be dict
         }
 
-        result_false = server._format_pytest_result_with_details(
+        result_false = CheckerTools(server)._format_pytest_result_with_details(
             invalid_result, show_details=False
         )
-        result_true = server._format_pytest_result_with_details(
+        result_true = CheckerTools(server)._format_pytest_result_with_details(
             invalid_result, show_details=True
         )
 
@@ -290,10 +291,10 @@ class TestPerformanceBenchmarks:
         }
 
         # Both code paths should complete successfully and return valid strings
-        result_false = server._format_pytest_result_with_details(
+        result_false = CheckerTools(server)._format_pytest_result_with_details(
             test_result, show_details=False
         )
-        result_true = server._format_pytest_result_with_details(
+        result_true = CheckerTools(server)._format_pytest_result_with_details(
             test_result, show_details=True
         )
 
@@ -315,7 +316,7 @@ class TestPerformanceBenchmarks:
         }
 
         # Should complete without memory issues
-        result = server._format_pytest_result_with_details(
+        result = CheckerTools(server)._format_pytest_result_with_details(
             large_summary, show_details=True
         )
         assert isinstance(result, str)
@@ -335,7 +336,7 @@ class TestDocumentationAccuracy:
         # These should not raise TypeError due to missing/incorrect parameters
         try:
             # Standard CI run example
-            result = server._format_pytest_result_with_details(
+            result = CheckerTools(server)._format_pytest_result_with_details(
                 {
                     "success": True,
                     "summary": {"failed": 0, "passed": 5, "collected": 5},
@@ -345,7 +346,7 @@ class TestDocumentationAccuracy:
             assert isinstance(result, str)
 
             # Debug specific test example
-            result = server._format_pytest_result_with_details(
+            result = CheckerTools(server)._format_pytest_result_with_details(
                 {
                     "success": True,
                     "summary": {"failed": 1, "passed": 0, "collected": 1},
@@ -362,12 +363,12 @@ class TestDocumentationAccuracy:
         server = CodeCheckerServer(Path("/tmp"))
 
         # show_details should accept boolean
-        assert server._format_pytest_result_with_details(
+        assert CheckerTools(server)._format_pytest_result_with_details(
             {"success": True, "summary": {"passed": 1, "collected": 1}},
             show_details=True,
         )
 
-        assert server._format_pytest_result_with_details(
+        assert CheckerTools(server)._format_pytest_result_with_details(
             {"success": True, "summary": {"passed": 1, "collected": 1}},
             show_details=False,
         )
@@ -384,7 +385,7 @@ class TestDocumentationAccuracy:
 
         for test_case in test_cases:
             for show_details in [True, False]:
-                result = server._format_pytest_result_with_details(
+                result = CheckerTools(server)._format_pytest_result_with_details(
                     test_case, show_details
                 )
                 assert isinstance(result, str), f"Expected str, got {type(result)}"
@@ -398,7 +399,9 @@ def test_parameter_combinations_backward_compatible() -> None:
     # Should work with minimal parameters (existing usage)
     test_result = {"success": True, "summary": {"passed": 1, "collected": 1}}
 
-    result = server._format_pytest_result_with_details(test_result, show_details=False)
+    result = CheckerTools(server)._format_pytest_result_with_details(
+        test_result, show_details=False
+    )
     assert isinstance(result, str)
 
 
@@ -420,13 +423,13 @@ class TestEdgeCases:
         }
 
         # Should handle None values gracefully
-        result = server._format_pytest_result_with_details(
+        result = CheckerTools(server)._format_pytest_result_with_details(
             result_with_nones, show_details=True
         )
         assert isinstance(result, str)
 
         # Should not crash with None values
-        result = server._format_pytest_result_with_details(
+        result = CheckerTools(server)._format_pytest_result_with_details(
             result_with_nones, show_details=False
         )
         assert isinstance(result, str)
@@ -437,7 +440,7 @@ class TestEdgeCases:
 
         empty_result = {"success": True, "summary": {}}
 
-        result = server._format_pytest_result_with_details(
+        result = CheckerTools(server)._format_pytest_result_with_details(
             empty_result, show_details=True
         )
         assert isinstance(result, str)
@@ -448,7 +451,7 @@ class TestEdgeCases:
 
         no_summary_result = {"success": True}
 
-        result = server._format_pytest_result_with_details(
+        result = CheckerTools(server)._format_pytest_result_with_details(
             no_summary_result, show_details=True
         )
         assert isinstance(result, str)

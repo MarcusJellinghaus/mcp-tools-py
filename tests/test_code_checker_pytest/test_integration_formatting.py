@@ -9,6 +9,7 @@ from typing import Any, Dict, Generator, List, cast
 
 import pytest
 
+from mcp_tools_py.checker_tools import CheckerTools
 from mcp_tools_py.code_checker_pytest.models import (
     Crash,
     PytestReport,
@@ -264,7 +265,7 @@ def test_string_pass():
         }
 
         # Run with show_details=True
-        result = server._format_pytest_result_with_details(
+        result = CheckerTools(server)._format_pytest_result_with_details(
             test_results, show_details=True
         )
 
@@ -329,7 +330,7 @@ def test_string_pass():
             "test_results": pytest_report,
         }
 
-        result = server._format_pytest_result_with_details(
+        result = CheckerTools(server)._format_pytest_result_with_details(
             test_results, show_details=True
         )
 
@@ -384,7 +385,7 @@ def test_string_pass():
         }
 
         # Test with show_details=True (which would add -s automatically)
-        result = server._format_pytest_result_with_details(
+        result = CheckerTools(server)._format_pytest_result_with_details(
             test_results, show_details=True
         )
 
@@ -453,7 +454,7 @@ def test_fast_operation():
             "test_results": pytest_report,
         }
 
-        result = server._format_pytest_result_with_details(
+        result = CheckerTools(server)._format_pytest_result_with_details(
             test_results, show_details=True
         )
 
@@ -506,7 +507,7 @@ def test_fast_operation():
         }
 
         # Both verbosity and show_details should work together
-        result = server._format_pytest_result_with_details(
+        result = CheckerTools(server)._format_pytest_result_with_details(
             test_results, show_details=True
         )
 
@@ -538,7 +539,7 @@ def test_fast_operation():
             "test_results": pytest_report,
         }
 
-        result = server._format_pytest_result_with_details(
+        result = CheckerTools(server)._format_pytest_result_with_details(
             test_results, show_details=True
         )
 
@@ -571,7 +572,7 @@ def test_fast_operation():
             "test_results": pytest_report,
         }
 
-        result = server._format_pytest_result_with_details(
+        result = CheckerTools(server)._format_pytest_result_with_details(
             test_results, show_details=True
         )
 
@@ -622,7 +623,7 @@ def test_fast_operation():
             "test_results": pytest_report,
         }
 
-        result = server._format_pytest_result_with_details(
+        result = CheckerTools(server)._format_pytest_result_with_details(
             test_results, show_details=True
         )
 
@@ -675,7 +676,7 @@ def test_fast_operation():
             "test_results": pytest_report,
         }
 
-        result = server._format_pytest_result_with_details(
+        result = CheckerTools(server)._format_pytest_result_with_details(
             test_results, show_details=True
         )
 
@@ -735,7 +736,7 @@ def test_fast_operation():
         }
 
         start_time = time.time()
-        result = server._format_pytest_result_with_details(
+        result = CheckerTools(server)._format_pytest_result_with_details(
             test_results, show_details=True
         )
         end_time = time.time()
@@ -793,7 +794,9 @@ def test_fast_operation():
 
         # Run several formatting operations
         for _ in range(3):
-            server._format_pytest_result_with_details(test_results, show_details=True)
+            CheckerTools(server)._format_pytest_result_with_details(
+                test_results, show_details=True
+            )
 
         final_files = list(temp_project_dir.rglob("*"))
 

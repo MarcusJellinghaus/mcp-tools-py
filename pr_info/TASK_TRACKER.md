@@ -50,9 +50,9 @@ This tracks **Feature Implementation** consisting of multiple **Tasks**.
 - [x] Commit message prepared
 
 #### Part C: Wire into server.py and update architecture config
-- [ ] Implementation — replace `_register_tools()` with `CheckerTools(self).register(self.mcp)`, update `tach.toml` server dependencies, verify `.importlinter`
-- [ ] Quality checks: pylint, pytest, mypy — fix all issues
-- [ ] Commit message prepared
+- [x] Implementation — replace `_register_tools()` with `CheckerTools(self).register(self.mcp)`, update `tach.toml` server dependencies, verify `.importlinter`
+- [x] Quality checks: pylint, pytest, mypy — fix all issues
+- [x] Commit message prepared
 
 ---
 
