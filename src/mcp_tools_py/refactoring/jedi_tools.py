@@ -24,7 +24,7 @@ def list_symbols(project_dir: Path, file_path: str) -> str:
 
     source = abs_path.read_text(encoding="utf-8")
     project = jedi.Project(path=str(project_dir))
-    script = jedi.Script(source=source, path=str(abs_path), project=project)
+    script = jedi.Script(code=source, path=str(abs_path), project=project)
 
     try:
         names = script.get_names(all_scopes=False, definitions=True)
@@ -74,7 +74,7 @@ def find_references(project_dir: Path, file_path: str, symbol_name: str) -> str:
     project = jedi.Project(path=str(project_dir))
 
     # Find the symbol's position using get_names
-    script = jedi.Script(source=source, path=str(abs_path), project=project)
+    script = jedi.Script(code=source, path=str(abs_path), project=project)
     names = script.get_names(all_scopes=False, definitions=True)
     top_level = _filter_top_level(names)
 

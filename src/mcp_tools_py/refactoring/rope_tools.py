@@ -60,7 +60,14 @@ def _find_symbol_offset(source: str, symbol_name: str) -> int | None:
         if isinstance(node, (ast.FunctionDef, ast.AsyncFunctionDef, ast.ClassDef)):
             name = node.name
             line = node.lineno
-            col = node.col_offset
+            # col_offset points to the keyword (def/class/async), not the name.
+            # Advance past the keyword to point at the identifier.
+            if isinstance(node, ast.AsyncFunctionDef):
+                col = node.col_offset + len("async def ")
+            elif isinstance(node, ast.FunctionDef):
+                col = node.col_offset + len("def ")
+            else:
+                col = node.col_offset + len("class ")
         elif isinstance(node, ast.Assign):
             for target in node.targets:
                 if isinstance(target, ast.Name) and target.id == symbol_name:
