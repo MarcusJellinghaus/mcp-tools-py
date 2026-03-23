@@ -1,10 +1,10 @@
-# Step 3: Rope Tools — move_symbol, rename, move_module
+# Step 3: Jedi Tools — list_symbols + find_references
 
-**Commit:** `feat: add move_symbol, rename, and move_module tools (#108)`
+**Commit:** `feat: add list_symbols and find_references tools (#108)`
 
-**Context:** See `pr_info/steps/summary.md` for full issue context. Steps 1-2 must be completed first.
+**Context:** See `pr_info/steps/summary.md` for full issue context. Steps 1-2 must be completed first (CheckerTools extracted, refactoring skeleton exists).
 
-**Goal:** Implement the three rope-based refactoring tools, register them via `RefactoringTools`, and add tests. These tools modify files and support dry-run mode.
+**Goal:** Implement the two read-only jedi-based tools (`list_symbols`, `find_references`), register them via `RefactoringTools`, and add tests.
 
 ---
 
@@ -13,232 +13,154 @@
 > **Task:** Implement Step 3 of Issue #108 (Add Python refactoring tools).
 > Read `pr_info/steps/summary.md` for full context, then follow `pr_info/steps/step_3.md` exactly.
 >
-> Implement `move_symbol`, `rename_symbol`, and `move_module` in `rope_tools.py`.
-> Register all three via `RefactoringTools` in `refactoring/__init__.py`.
+> Implement `list_symbols` and `find_references` in `jedi_tools.py`.
+> Register both via `RefactoringTools` in `refactoring/__init__.py`.
 > Write tests first (TDD). All checks must pass.
 
 ---
 
-## Part A: Tests for rope tools
+## Part A: Tests for jedi tools
 
 ### WHERE
-- `tests/test_refactoring/test_rope_tools.py` (new)
+- `tests/test_refactoring/test_jedi_tools.py` (new)
 
 ### WHAT
 ```python
 import pytest
 from pathlib import Path
 
-from mcp_tools_py.refactoring.rope_tools import move_symbol, rename_symbol, move_module
+from mcp_tools_py.refactoring.jedi_tools import list_symbols, find_references
 
-# --- Shared fixture ---
+# --- list_symbols tests ---
 
-@pytest.fixture
-def sample_project(tmp_path: Path) -> Path:
-    """Create a minimal Python project with 2 modules."""
-    # src/foo.py: defines my_func, MyClass, MY_VAR
-    # src/bar.py: imports and uses my_func from foo
-    # src/__init__.py: empty
-    ...
-    return tmp_path
+# Note: Use @pytest.mark.parametrize where multiple similar test cases exist.
+# For example, list_symbols for functions/classes/variables can be one parameterized test.
 
-# --- move_symbol tests ---
+@pytest.mark.parametrize("symbol_type,code,expected", [
+    ("functions", "def foo(): ...\ndef bar(): ...", ["foo", "bar"]),
+    ("classes", "class Foo: ...\nclass Bar: ...", ["Foo", "Bar"]),
+    ("variables", "X = 1\nY = 'hello'", ["X", "Y"]),
+])
+def test_list_symbols_by_type(tmp_path: Path, symbol_type: str, code: str, expected: list) -> None:
+    """Lists top-level symbols of each type."""
 
-def test_move_symbol_function(sample_project: Path) -> None:
-    """Move a function to another module, verify imports updated."""
-    result = move_symbol(sample_project, "src/foo.py", "my_func", "src/baz.py")
-    assert "Modified:" in result or "Created:" in result
-    # Verify foo.py no longer defines my_func
-    # Verify baz.py defines my_func
-    # Verify bar.py imports from baz, not foo
+def test_list_symbols_ignores_nested(tmp_path: Path) -> None:
+    """Does not list nested functions or class methods."""
 
-def test_move_symbol_dry_run(sample_project: Path) -> None:
-    """Dry run reports changes without applying them."""
-    result = move_symbol(sample_project, "src/foo.py", "my_func", "src/baz.py", dry_run=True)
-    assert "[DRY RUN]" in result
-    # Verify foo.py still defines my_func (unchanged)
+def test_list_symbols_empty_file(tmp_path: Path) -> None:
+    """Returns empty list for empty file."""
 
-def test_move_symbol_creates_dest_file(sample_project: Path) -> None:
-    """Auto-creates destination file if it doesn't exist."""
-    result = move_symbol(sample_project, "src/foo.py", "my_func", "src/new_module.py")
-    assert (sample_project / "src" / "new_module.py").exists()
+def test_list_symbols_nonexistent_file(tmp_path: Path) -> None:
+    """Returns error string for missing file."""
 
-def test_move_symbol_creates_init_files(sample_project: Path) -> None:
-    """Auto-creates __init__.py files for new packages."""
-    result = move_symbol(sample_project, "src/foo.py", "my_func", "src/sub/new_module.py")
-    assert (sample_project / "src" / "sub" / "__init__.py").exists()
+def test_list_symbols_syntax_error(tmp_path: Path) -> None:
+    """Returns error for file with syntax errors."""
 
-def test_move_symbol_not_found(sample_project: Path) -> None:
-    """Error with available symbols when symbol not found."""
-    result = move_symbol(sample_project, "src/foo.py", "nonexistent", "src/baz.py")
-    assert "not found" in result.lower()
-    assert "my_func" in result  # hint: available symbols
+# --- find_references tests ---
 
-def test_move_symbol_name_collision(sample_project: Path) -> None:
-    """Error when destination already defines same symbol name."""
-    # bar.py already has something; create collision scenario
-    ...
+def test_find_references_function(tmp_path: Path) -> None:
+    """Finds references to a function across multiple files."""
+    # Create 2 files: one defines func, other imports and calls it
 
-# --- rename_symbol tests ---
+def test_find_references_class(tmp_path: Path) -> None:
+    """Finds references to a class."""
 
-def test_rename_function(sample_project: Path) -> None:
-    """Rename a function, verify all references updated."""
-    result = rename_symbol(sample_project, "src/foo.py", "my_func", "better_name")
-    assert "Modified:" in result
-    # Verify foo.py defines better_name, not my_func
-    # Verify bar.py imports better_name
+def test_find_references_not_found(tmp_path: Path) -> None:
+    """Returns error with available symbols when symbol not found."""
 
-def test_rename_dry_run(sample_project: Path) -> None:
-    """Dry run reports changes without applying."""
-    result = rename_symbol(sample_project, "src/foo.py", "my_func", "better_name", dry_run=True)
-    assert "[DRY RUN]" in result
-
-def test_rename_not_found(sample_project: Path) -> None:
-    """Error with available symbols when symbol not found."""
-    result = rename_symbol(sample_project, "src/foo.py", "nonexistent", "new_name")
-    assert "not found" in result.lower()
-
-# --- move_module tests ---
-
-def test_move_module(sample_project: Path) -> None:
-    """Move a module to a new package, verify imports updated."""
-    result = move_module(sample_project, "src/foo.py", "src/subpkg")
-    assert "Modified:" in result
-    # Verify src/subpkg/foo.py exists
-    # Verify bar.py imports from subpkg.foo
-
-def test_move_module_dry_run(sample_project: Path) -> None:
-    """Dry run reports changes without applying."""
-    result = move_module(sample_project, "src/foo.py", "src/subpkg", dry_run=True)
-    assert "[DRY RUN]" in result
+def test_find_references_import_usage(tmp_path: Path) -> None:
+    """Finds import statements as references."""
 ```
+
+### HOW
+- Each test creates a temp project with `.py` files in `tmp_path`
+- Calls the function directly (not through MCP) with paths relative to `tmp_path` as project root
+- Asserts on returned strings (the formatted output)
 
 ---
 
-## Part B: Implement rope_tools.py
+## Part B: Implement jedi_tools.py
 
 ### WHERE
-- `src/mcp_tools_py/refactoring/rope_tools.py`
+- `src/mcp_tools_py/refactoring/jedi_tools.py`
 
 ### WHAT
 ```python
-"""Rope-based refactoring operations (move, rename)."""
+"""Jedi-based symbol discovery and reference finding."""
 
 from pathlib import Path
-from typing import Optional
+from typing import List
 
-def move_symbol(
-    project_dir: Path,
-    source_file: str,
-    symbol_name: str,
-    dest_file: str,
-    dry_run: bool = False,
-) -> str:
-    """Move a top-level symbol to another module. Updates imports project-wide."""
+
+def list_symbols(project_dir: Path, file_path: str) -> str:
+    """List all top-level symbols in a file.
+
+    Args:
+        project_dir: Absolute path to project root.
+        file_path: File path relative to project root.
+
+    Returns:
+        Formatted string listing symbols, or error message.
+    """
     ...
 
-def rename_symbol(
-    project_dir: Path,
-    file_path: str,
-    symbol_name: str,
-    new_name: str,
-    dry_run: bool = False,
-) -> str:
-    """Rename a symbol and update all references project-wide."""
-    ...
 
-def move_module(
-    project_dir: Path,
-    source_module: str,
-    dest_package: str,
-    dry_run: bool = False,
-) -> str:
-    """Move an entire module to a new package. Updates all references."""
+def find_references(project_dir: Path, file_path: str, symbol_name: str) -> str:
+    """Find all references to a symbol across the project.
+
+    Args:
+        project_dir: Absolute path to project root.
+        file_path: File path relative to project root.
+        symbol_name: Name of the top-level symbol.
+
+    Returns:
+        Formatted string listing references, or error message.
+    """
     ...
 ```
 
-### ALGORITHM — shared helper `_with_rope_project`
-```python
-def _with_rope_project(project_dir: Path):
-    """Context manager: open fresh rope Project, yield, close."""
-    project = rope.base.project.Project(str(project_dir))
-    try:
-        yield project
-    finally:
-        project.close()
+### ALGORITHM — list_symbols
+```
+1. Resolve absolute path = project_dir / file_path
+2. Validate file exists, return error if not
+3. source = read file content
+4. script = jedi.Script(source=source, path=str(abs_path), project=jedi.Project(path=str(project_dir)))
+5. names = script.get_names(all_scopes=False, definitions=True)
+6. Filter to top-level only (names where .parent() is module)
+7. Format each as "{type}: {name} (line {line})" and join with newlines
 ```
 
-### ALGORITHM — move_symbol
+### ALGORITHM — find_references
 ```
-1. Ensure dest_file parent dirs and __init__.py files exist (if not dry_run, create them; if dry_run, note them)
-2. If dest_file doesn't exist and not dry_run, create empty file
-3. Open rope Project via _with_rope_project
-4. Get source Resource: project.root.get_child(source_file)
-5. Find symbol offset using rope's pyobjects: parse source, iterate top-level names, match symbol_name
-6. If not found: return error listing available top-level symbols
-7. If dest already defines symbol_name: return name collision error
-8. Create MoveGlobal mover: rope.refactor.move.create_move(project, source_resource, offset)
-9. changes = mover.get_changes(dest_resource)
-10. If dry_run: return formatted "[DRY RUN] Would modify: ..." from changes
-11. project.do(changes) — apply
-12. Return formatted "Modified: ..." / "Created: ..." change report
+1. Resolve absolute path, validate file exists
+2. source = read file content
+3. Use jedi's Script.get_names(all_scopes=False, definitions=True) to find the symbol's line/column — no manual scanning needed
+4. script = jedi.Script(source=source, path=str(abs_path), project=jedi.Project(path=str(project_dir)))
+5. refs = script.get_references(line=line, column=col)
+6. If no refs found, list available symbols as error hint
+7. Format each ref as "{relative_path}:{line}: {description}" with paths relative to project_dir
 ```
 
-### ALGORITHM — rename_symbol
+### DATA — list_symbols return format
 ```
-1. Open rope Project
-2. Get source Resource, find symbol offset (same as move_symbol)
-3. If not found: return error listing available symbols
-4. Create Rename: rope.refactor.rename.Rename(project, source_resource, offset)
-5. changes = renamer.get_changes(new_name)
-6. If dry_run: return "[DRY RUN]" report
-7. project.do(changes)
-8. Return change report
+Symbols in src/example.py:
+  function: my_function (line 5)
+  class: MyClass (line 12)
+  variable: MY_CONSTANT (line 1)
 ```
 
-### ALGORITHM — move_module
+### DATA — find_references return format
 ```
-1. Open rope Project
-2. Get source module Resource
-3. Get/create dest package Resource
-4. Create MoveModule: rope.refactor.move.create_move(project, source_resource)
-5. changes = mover.get_changes(dest_resource)
-6. If dry_run: return "[DRY RUN]" report
-7. project.do(changes)
-8. Return change report
-```
-
-### ALGORITHM — _format_changes (shared)
-```python
-def _format_changes(changes, project_dir: Path, dry_run: bool) -> str:
-    prefix = "[DRY RUN] Would modify" if dry_run else "Modified"
-    lines = []
-    for change in changes.changes:
-        rel_path = Path(change.resource.path)  # rope gives project-relative paths
-        lines.append(f"  {prefix}: {rel_path}")
-    return "\n".join(lines)
-```
-
-### DATA — change report format (apply mode)
-```
-move_symbol completed successfully.
-  Modified: src/foo.py
-  Modified: src/bar.py
-  Created: src/baz.py
-```
-
-### DATA — change report format (dry-run mode)
-```
-[DRY RUN] move_symbol preview:
-  Would modify: src/foo.py
-  Would modify: src/bar.py
-  Would create: src/baz.py
+References to 'my_function' (3 found):
+  src/example.py:5: definition
+  src/other.py:1: from src.example import my_function
+  src/other.py:10: my_function()
 ```
 
 ### DATA — error format (symbol not found)
 ```
-Symbol 'nonexistent' not found in src/foo.py.
-Available top-level symbols: my_func, MyClass, MY_VAR
+Symbol 'nonexistent' not found in src/example.py.
+Available top-level symbols: my_function, MyClass, MY_CONSTANT
 ```
 
 ---
@@ -246,79 +168,52 @@ Available top-level symbols: my_func, MyClass, MY_VAR
 ## Part C: Register in RefactoringTools
 
 ### WHERE
-- `src/mcp_tools_py/refactoring/__init__.py` (modify)
+- `src/mcp_tools_py/refactoring/__init__.py`
 
-### WHAT — add to `register()` method
+### WHAT
 ```python
-from mcp_tools_py.refactoring.rope_tools import (
-    move_symbol as rope_move_symbol,
-    rename_symbol as rope_rename_symbol,
-    move_module as rope_move_module,
-)
+from mcp_tools_py.refactoring.jedi_tools import list_symbols, find_references
+from mcp_tools_py.log_utils import log_function_call
 
-# Inside register():
+class RefactoringTools:
+    def __init__(self, project_dir: Path) -> None:
+        self._project_dir = project_dir
 
-@mcp.tool()
-@log_function_call
-def move_symbol(
-    source_file: str,
-    symbol_name: str,
-    dest_file: str,
-    dry_run: bool = False,
-) -> str:
-    """Move a top-level function, class, or variable to another module.
-    Updates all imports project-wide. Auto-creates destination file and
-    missing __init__.py files if needed.
+    def register(self, mcp: "FastMCPProtocol") -> None:
+        project_dir = self._project_dir
 
-    Args:
-        source_file: Source file path relative to project root.
-        symbol_name: Name of the top-level symbol to move.
-        dest_file: Destination file path relative to project root.
-        dry_run: Preview changes without applying (default: False).
-    """
-    return rope_move_symbol(project_dir, source_file, symbol_name, dest_file, dry_run)
+        @mcp.tool()
+        @log_function_call
+        def list_symbols(file: str) -> str:
+            """List all top-level symbols (functions, classes, variables) in a Python file.
 
-@mcp.tool()
-@log_function_call
-def rename(
-    file: str,
-    symbol_name: str,
-    new_name: str,
-    dry_run: bool = False,
-) -> str:
-    """Rename a module-level symbol and update all references project-wide.
+            Args:
+                file: File path relative to project root.
+            """
+            return jedi_list_symbols(project_dir, file)
 
-    Args:
-        file: File path relative to project root.
-        symbol_name: Current name of the symbol.
-        new_name: New name for the symbol.
-        dry_run: Preview changes without applying (default: False).
-    """
-    return rope_rename_symbol(project_dir, file, symbol_name, new_name, dry_run)
+        @mcp.tool()
+        @log_function_call
+        def find_references(file: str, symbol_name: str) -> str:
+            """Find all references to a symbol across the project.
 
-@mcp.tool()
-@log_function_call
-def move_module(
-    source_module: str,
-    dest_package: str,
-    dry_run: bool = False,
-) -> str:
-    """Move an entire module to a new package. Updates all references.
-
-    Args:
-        source_module: Source module path relative to project root.
-        dest_package: Destination package path relative to project root.
-        dry_run: Preview changes without applying (default: False).
-    """
-    return rope_move_module(project_dir, source_module, dest_package, dry_run)
+            Args:
+                file: File path relative to project root.
+                symbol_name: Name of the top-level symbol to find.
+            """
+            return jedi_find_references(project_dir, file, symbol_name)
 ```
+
+### HOW
+- Import jedi_tools functions with aliases to avoid name collision with the MCP tool closures
+- Decorate with `@mcp.tool()` and `@log_function_call` (same pattern as checker tools)
+- Pass `self._project_dir` into the jedi functions
 
 ---
 
 ## Verification Checklist
 
-1. `test_rope_tools.py` tests pass
-2. All existing tests + step 2 tests still pass
+1. `test_jedi_tools.py` tests pass
+2. All existing tests still pass
 3. pylint, mypy pass on new code
-4. Dry-run mode produces correct output format
-5. Applied changes actually modify files correctly
+4. Tools appear when MCP server starts (manual or integration test)

@@ -1,10 +1,10 @@
-# Step 4: Integration Tests
+# Step 4: Rope Tools — move_symbol, rename, move_module
 
-**Commit:** `test: add end-to-end refactoring integration tests (#108)`
+**Commit:** `feat: add move_symbol, rename, and move_module tools (#108)`
 
 **Context:** See `pr_info/steps/summary.md` for full issue context. Steps 1-3 must be completed first.
 
-**Goal:** Add end-to-end integration tests that exercise the full workflow: discover symbols, check references, move/rename, verify imports updated correctly. Also test MCP tool registration end-to-end.
+**Goal:** Implement the three rope-based refactoring tools, register them via `RefactoringTools`, and add tests. These tools modify files and support dry-run mode.
 
 ---
 
@@ -13,116 +13,315 @@
 > **Task:** Implement Step 4 of Issue #108 (Add Python refactoring tools).
 > Read `pr_info/steps/summary.md` for full context, then follow `pr_info/steps/step_4.md` exactly.
 >
-> Add end-to-end integration tests for the refactoring tools.
-> Test the full workflow: discover → analyze → refactor → verify.
-> All checks must pass. This is the final step.
+> Implement `move_symbol`, `rename_symbol`, and `move_module` in `rope_tools.py`.
+> Register all three via `RefactoringTools` in `refactoring/__init__.py`.
+> Write tests first (TDD). All checks must pass.
 
 ---
 
-## Part A: RefactoringTools registration tests
+## Part A: Tests for rope tools
 
 ### WHERE
-- `tests/test_refactoring/test_refactoring_tools.py` (new)
+- `tests/test_refactoring/test_rope_tools.py` (new)
 
 ### WHAT
+
+> **Note:** Use `@pytest.mark.parametrize` where multiple similar test cases exist. For example, move_symbol for function/class/variable or rename for different symbol types can be parameterized tests.
+
 ```python
-def test_refactoring_tools_registers_five_tools() -> None:
-    """RefactoringTools registers all 5 tools on an MCP server."""
-    # Create RefactoringTools with a tmp_path project_dir
-    # Create a mock/minimal FastMCP
-    # Call register()
-    # Verify 5 tools registered: list_symbols, find_references, move_symbol, rename, move_module
+import pytest
+from pathlib import Path
 
-def test_refactoring_tools_use_relative_paths(tmp_path: Path) -> None:
-    """All tool outputs use relative paths, never absolute."""
-    # Create sample project, call list_symbols and find_references through registration
-    # Assert no absolute paths in output
-```
+from mcp_tools_py.refactoring.rope_tools import move_symbol, rename_symbol, move_module
 
----
+# --- Shared fixture ---
 
-## Part B: End-to-end workflow tests
-
-### WHERE
-- `tests/test_refactoring/test_integration.py` (new)
-
-### WHAT
-```python
 @pytest.fixture
-def multi_module_project(tmp_path: Path) -> Path:
-    """Create a realistic multi-module project for integration testing.
-
-    Structure:
-        myproject/
-        ├── __init__.py
-        ├── models.py        # defines: User, Address, validate_email
-        ├── services.py      # imports and uses User, validate_email from models
-        └── utils.py          # imports Address from models
-    """
+def sample_project(tmp_path: Path) -> Path:
+    """Create a minimal Python project with 2 modules."""
+    # src/foo.py: defines my_func, MyClass, MY_VAR
+    # src/bar.py: imports and uses my_func from foo
+    # src/__init__.py: empty
     ...
     return tmp_path
 
-def test_full_workflow_split_large_file(multi_module_project: Path) -> None:
-    """End-to-end: discover symbols, move one to new module, verify imports."""
-    # 1. list_symbols on models.py → should show User, Address, validate_email
-    # 2. find_references for validate_email → should show models.py, services.py
-    # 3. move_symbol validate_email from models.py to validation.py (dry_run=True)
-    #    → verify [DRY RUN] output, files unchanged
-    # 4. move_symbol validate_email from models.py to validation.py (dry_run=False)
-    #    → verify validation.py exists and defines validate_email
-    #    → verify models.py no longer defines validate_email
-    #    → verify services.py imports from validation, not models
-    #    → verify utils.py unchanged (it imports Address, not validate_email)
+# --- move_symbol tests ---
 
-def test_rename_then_verify_references(multi_module_project: Path) -> None:
-    """End-to-end: rename a class, verify all references updated."""
-    # 1. find_references for User → should show models.py, services.py
-    # 2. rename User to AppUser (dry_run=True) → verify preview
-    # 3. rename User to AppUser (dry_run=False)
-    #    → verify models.py defines AppUser, not User
-    #    → verify services.py references AppUser
+def test_move_symbol_function(sample_project: Path) -> None:
+    """Move a function to another module, verify imports updated."""
+    result = move_symbol(sample_project, "src/foo.py", "my_func", "src/baz.py")
+    assert "Modified:" in result or "Created:" in result
+    # Verify foo.py no longer defines my_func
+    # Verify baz.py defines my_func
+    # Verify bar.py imports from baz, not foo
 
-def test_move_module_then_verify_imports(multi_module_project: Path) -> None:
-    """End-to-end: move a module to a subpackage, verify imports updated."""
-    # 1. move_module utils.py to subpkg/ (dry_run=False)
-    #    → verify subpkg/utils.py exists
-    #    → verify models.py imports unaffected (utils imports from models, not vice versa)
+def test_move_symbol_dry_run(sample_project: Path) -> None:
+    """Dry run reports changes without applying them."""
+    result = move_symbol(sample_project, "src/foo.py", "my_func", "src/baz.py", dry_run=True)
+    assert "[DRY RUN]" in result
+    # Verify foo.py still defines my_func (unchanged)
+
+def test_move_symbol_creates_dest_file(sample_project: Path) -> None:
+    """Auto-creates destination file if it doesn't exist."""
+    result = move_symbol(sample_project, "src/foo.py", "my_func", "src/new_module.py")
+    assert (sample_project / "src" / "new_module.py").exists()
+
+def test_move_symbol_creates_init_files(sample_project: Path) -> None:
+    """Auto-creates __init__.py files for new packages."""
+    result = move_symbol(sample_project, "src/foo.py", "my_func", "src/sub/new_module.py")
+    assert (sample_project / "src" / "sub" / "__init__.py").exists()
+
+def test_move_symbol_not_found(sample_project: Path) -> None:
+    """Error with available symbols when symbol not found."""
+    result = move_symbol(sample_project, "src/foo.py", "nonexistent", "src/baz.py")
+    assert "not found" in result.lower()
+    assert "my_func" in result  # hint: available symbols
+
+def test_move_symbol_name_collision(sample_project: Path) -> None:
+    """Error when destination already defines same symbol name."""
+    # bar.py already has something; create collision scenario
+    ...
+
+# --- rename_symbol tests ---
+
+def test_rename_function(sample_project: Path) -> None:
+    """Rename a function, verify all references updated."""
+    result = rename_symbol(sample_project, "src/foo.py", "my_func", "better_name")
+    assert "Modified:" in result
+    # Verify foo.py defines better_name, not my_func
+    # Verify bar.py imports better_name
+
+def test_rename_dry_run(sample_project: Path) -> None:
+    """Dry run reports changes without applying."""
+    result = rename_symbol(sample_project, "src/foo.py", "my_func", "better_name", dry_run=True)
+    assert "[DRY RUN]" in result
+
+def test_rename_not_found(sample_project: Path) -> None:
+    """Error with available symbols when symbol not found."""
+    result = rename_symbol(sample_project, "src/foo.py", "nonexistent", "new_name")
+    assert "not found" in result.lower()
+
+# --- move_module tests ---
+
+def test_move_module(sample_project: Path) -> None:
+    """Move a module to a new package, verify imports updated."""
+    result = move_module(sample_project, "src/foo.py", "src/subpkg")
+    assert "Modified:" in result
+    # Verify src/subpkg/foo.py exists
+    # Verify bar.py imports from subpkg.foo
+
+def test_move_module_dry_run(sample_project: Path) -> None:
+    """Dry run reports changes without applying."""
+    result = move_module(sample_project, "src/foo.py", "src/subpkg", dry_run=True)
+    assert "[DRY RUN]" in result
 ```
-
-### HOW
-- Use `tmp_path` fixture for isolated file system
-- Call `jedi_tools` and `rope_tools` functions directly (not through MCP transport)
-- Read files after refactoring to verify content changes
-- All paths relative to `tmp_path` project root
 
 ---
 
-## Part C: Pytest marker for refactoring tests
+## Part B: Implement rope_tools.py
 
 ### WHERE
-- `pyproject.toml` (modify)
+- `src/mcp_tools_py/refactoring/rope_tools.py`
 
-### WHAT — add marker
-```toml
-[tool.pytest.ini_options]
-markers = [
-    # ... existing markers ...
-    "refactoring_integration: Refactoring integration tests (rope + jedi)",
-]
+### WHAT
+```python
+"""Rope-based refactoring operations (move, rename)."""
+
+from pathlib import Path
+from typing import Optional
+
+def move_symbol(
+    project_dir: Path,
+    source_file: str,
+    symbol_name: str,
+    dest_file: str,
+    dry_run: bool = False,
+) -> str:
+    """Move a top-level symbol to another module. Updates imports project-wide."""
+    ...
+
+def rename_symbol(
+    project_dir: Path,
+    file_path: str,
+    symbol_name: str,
+    new_name: str,
+    dry_run: bool = False,
+) -> str:
+    """Rename a symbol and update all references project-wide."""
+    ...
+
+def move_module(
+    project_dir: Path,
+    source_module: str,
+    dest_package: str,
+    dry_run: bool = False,
+) -> str:
+    """Move an entire module to a new package. Updates all references."""
+    ...
 ```
 
-### HOW
-- Mark integration tests with `@pytest.mark.refactoring_integration`
-- These tests create temp projects and exercise rope/jedi, so they're slower than pure unit tests
-- Can be excluded from fast test runs: `-m "not refactoring_integration"`
+### ALGORITHM — shared helper `_with_rope_project`
+```python
+def _with_rope_project(project_dir: Path):
+    """Context manager: open fresh rope Project, yield, close."""
+    project = rope.base.project.Project(str(project_dir))
+    try:
+        yield project
+    finally:
+        project.close()
+```
+
+### ALGORITHM — move_symbol
+```
+1. Ensure dest_file parent dirs and __init__.py files exist (if not dry_run, create them; if dry_run, note them)
+2. If dest_file doesn't exist and not dry_run, create empty file
+3. Open rope Project via _with_rope_project
+4. Get source Resource: project.root.get_child(source_file)
+5. Find symbol offset using rope's pyobjects: parse source, iterate top-level names, match symbol_name
+6. If not found: return error listing available top-level symbols
+7. If dest already defines symbol_name: return name collision error
+8. Create MoveGlobal mover: rope.refactor.move.create_move(project, source_resource, offset)
+9. changes = mover.get_changes(dest_resource)
+10. If dry_run: return formatted "[DRY RUN] Would modify: ..." from changes
+11. project.do(changes) — apply
+12. Return formatted "Modified: ..." / "Created: ..." change report
+```
+
+### ALGORITHM — rename_symbol
+```
+1. Open rope Project
+2. Get source Resource, find symbol offset (same as move_symbol)
+3. If not found: return error listing available symbols
+4. Create Rename: rope.refactor.rename.Rename(project, source_resource, offset)
+5. changes = renamer.get_changes(new_name)
+6. If dry_run: return "[DRY RUN]" report
+7. project.do(changes)
+8. Return change report
+```
+
+### ALGORITHM — move_module
+```
+1. Open rope Project
+2. Get source module Resource
+3. Get/create dest package Resource
+4. Create MoveModule: rope.refactor.move.create_move(project, source_resource)
+5. changes = mover.get_changes(dest_resource)
+6. If dry_run: return "[DRY RUN]" report
+7. project.do(changes)
+8. Return change report
+```
+
+### ALGORITHM — _format_changes (shared)
+```python
+def _format_changes(changes, project_dir: Path, dry_run: bool) -> str:
+    prefix = "[DRY RUN] Would modify" if dry_run else "Modified"
+    lines = []
+    for change in changes.changes:
+        rel_path = Path(change.resource.path)  # rope gives project-relative paths
+        lines.append(f"  {prefix}: {rel_path}")
+    return "\n".join(lines)
+```
+
+### DATA — change report format (apply mode)
+```
+move_symbol completed successfully.
+  Modified: src/foo.py
+  Modified: src/bar.py
+  Created: src/baz.py
+```
+
+### DATA — change report format (dry-run mode)
+```
+[DRY RUN] move_symbol preview:
+  Would modify: src/foo.py
+  Would modify: src/bar.py
+  Would create: src/baz.py
+```
+
+### DATA — error format (symbol not found)
+```
+Symbol 'nonexistent' not found in src/foo.py.
+Available top-level symbols: my_func, MyClass, MY_VAR
+```
+
+---
+
+## Part C: Register in RefactoringTools
+
+### WHERE
+- `src/mcp_tools_py/refactoring/__init__.py` (modify)
+
+### WHAT — add to `register()` method
+```python
+from mcp_tools_py.refactoring.rope_tools import (
+    move_symbol as rope_move_symbol,
+    rename_symbol as rope_rename_symbol,
+    move_module as rope_move_module,
+)
+
+# Inside register():
+
+@mcp.tool()
+@log_function_call
+def move_symbol(
+    source_file: str,
+    symbol_name: str,
+    dest_file: str,
+    dry_run: bool = False,
+) -> str:
+    """Move a top-level function, class, or variable to another module.
+    Updates all imports project-wide. Auto-creates destination file and
+    missing __init__.py files if needed.
+
+    Args:
+        source_file: Source file path relative to project root.
+        symbol_name: Name of the top-level symbol to move.
+        dest_file: Destination file path relative to project root.
+        dry_run: Preview changes without applying (default: False).
+    """
+    return rope_move_symbol(project_dir, source_file, symbol_name, dest_file, dry_run)
+
+@mcp.tool()
+@log_function_call
+def rename(
+    file: str,
+    symbol_name: str,
+    new_name: str,
+    dry_run: bool = False,
+) -> str:
+    """Rename a module-level symbol and update all references project-wide.
+
+    Args:
+        file: File path relative to project root.
+        symbol_name: Current name of the symbol.
+        new_name: New name for the symbol.
+        dry_run: Preview changes without applying (default: False).
+    """
+    return rope_rename_symbol(project_dir, file, symbol_name, new_name, dry_run)
+
+@mcp.tool()
+@log_function_call
+def move_module(
+    source_module: str,
+    dest_package: str,
+    dry_run: bool = False,
+) -> str:
+    """Move an entire module to a new package. Updates all references.
+
+    Args:
+        source_module: Source module path relative to project root.
+        dest_package: Destination package path relative to project root.
+        dry_run: Preview changes without applying (default: False).
+    """
+    return rope_move_module(project_dir, source_module, dest_package, dry_run)
+```
 
 ---
 
 ## Verification Checklist
 
-1. All integration tests pass
-2. All unit tests from steps 1-3 still pass
-3. All existing tests still pass
-4. pylint, mypy pass on all new test files
-5. Architecture checks (tach, import-linter) pass
-6. Run full test suite: `pytest -n auto` — all green
+1. `test_rope_tools.py` tests pass
+2. All existing tests + step 3 tests still pass
+3. pylint, mypy pass on new code
+4. Dry-run mode produces correct output format
+5. Applied changes actually modify files correctly

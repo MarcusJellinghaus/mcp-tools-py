@@ -52,6 +52,23 @@ src/mcp_tools_py/refactoring/
 - **Rope's own API for offset resolution** — no cross-dependency between rope_tools and jedi_tools
 - **Descriptive errors with hints** — e.g., list available symbols when symbol not found
 - **Dry-run support** — `[DRY RUN] Would modify: ...` vs `Modified: ...`
+- **Windows compatibility** — use `Path` objects for all path operations; rope and jedi may require forward-slash paths internally
+
+---
+
+## `.importlinter` Layer Ordering
+
+The exact layer ordering for the layers contract:
+
+```
+mcp_tools_py.main
+mcp_tools_py.server
+mcp_tools_py.checker_tools | mcp_tools_py.refactoring | mcp_tools_py.code_checker_pytest | mcp_tools_py.code_checker_pylint | mcp_tools_py.code_checker_mypy
+mcp_tools_py.utils
+mcp_tools_py.log_utils
+```
+
+Both `checker_tools` and `refactoring` are included in the forbidden-imports contract.
 
 ---
 
@@ -76,20 +93,21 @@ src/mcp_tools_py/refactoring/
 | File | Change |
 |------|--------|
 | `pyproject.toml` | Add `rope` and `jedi` to core dependencies |
-| `tach.toml` | Rename layer `checker_implementation` → `tool_implementation`; add `mcp_tools_py.refactoring` module; add `mcp_tools_py.checker_tools` module |
-| `.importlinter` | Add `mcp_tools_py.refactoring` and `mcp_tools_py.checker_tools` to layer contract |
+| `tach.toml` | Rename layer `checker_implementation` → `tool_implementation`; add `mcp_tools_py.refactoring` module; add `mcp_tools_py.checker_tools` module; server LOSES three `code_checker_*` deps, GAINS `checker_tools` and `refactoring` |
+| `.importlinter` | Add `mcp_tools_py.refactoring` and `mcp_tools_py.checker_tools` to layer contract and forbidden-imports contract |
 | `.gitignore` | Add `.ropeproject/` |
 | `src/mcp_tools_py/server.py` | Slim down to thin orchestrator — delegate to `CheckerTools` and `RefactoringTools` |
 
 ---
 
-## Implementation Steps (4 Steps, 4 Commits)
+## Implementation Steps (5 Steps, 5 Commits)
 
 | Step | Scope | Risk | Commit |
 |------|-------|------|--------|
-| **1** | Scaffolding + server refactor: extract `CheckerTools`, rename architecture layer, add deps, create `refactoring/` skeleton, `.gitignore` | Medium (touches working code) | `feat: extract CheckerTools and scaffold refactoring module (#108)` |
-| **2** | Jedi tools: `list_symbols` + `find_references` in `jedi_tools.py`, register via `RefactoringTools` | Low (read-only) | `feat: add list_symbols and find_references tools (#108)` |
-| **3** | Rope tools: `move_symbol` + `rename` + `move_module` in `rope_tools.py`, register via `RefactoringTools` | Higher (writes files) | `feat: add move_symbol, rename, and move_module tools (#108)` |
-| **4** | Integration tests: end-to-end test moving a function between modules, verifying imports updated | Low (additive) | `test: add end-to-end refactoring integration tests (#108)` |
+| **1** | Scaffolding: add deps, create `refactoring/` skeleton, rename architecture layer, update `.gitignore` | Low (additive, no code changes) | `feat: add dependencies and scaffold refactoring module (#108)` |
+| **2** | Extract `CheckerTools` from `server.py`, wire into server, update tach/importlinter | Medium (touches working code) | `refactor: extract CheckerTools from server.py (#108)` |
+| **3** | Jedi tools: `list_symbols` + `find_references` in `jedi_tools.py`, register via `RefactoringTools` | Low (read-only) | `feat: add list_symbols and find_references tools (#108)` |
+| **4** | Rope tools: `move_symbol` + `rename` + `move_module` in `rope_tools.py`, register via `RefactoringTools` | Higher (writes files) | `feat: add move_symbol, rename, and move_module tools (#108)` |
+| **5** | Integration tests: end-to-end test moving a function between modules, verifying imports updated | Low (additive) | `test: add end-to-end refactoring integration tests (#108)` |
 
-See `step_1.md` through `step_4.md` for detailed implementation instructions.
+See `step_1.md` through `step_5.md` for detailed implementation instructions.
