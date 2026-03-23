@@ -80,9 +80,9 @@ This tracks **Feature Implementation** consisting of multiple **Tasks**.
 **Commit:** `feat: add move_symbol, rename, and move_module tools (#108)`
 
 #### Part A: Tests for rope tools
-- [ ] Implementation — create `tests/test_refactoring/test_rope_tools.py` with move_symbol, rename_symbol, and move_module tests
-- [ ] Quality checks: pylint, pytest, mypy — fix all issues
-- [ ] Commit message prepared
+- [x] Implementation — create `tests/test_refactoring/test_rope_tools.py` with move_symbol, rename_symbol, and move_module tests
+- [x] Quality checks: pylint, pytest, mypy — fix all issues
+- [x] Commit message prepared
 
 #### Part B: Implement rope_tools.py
 - [ ] Implementation — implement `move_symbol`, `rename_symbol`, `move_module`, and helpers in `src/mcp_tools_py/refactoring/rope_tools.py`
