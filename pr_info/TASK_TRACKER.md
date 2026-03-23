@@ -40,9 +40,9 @@ This tracks **Feature Implementation** consisting of multiple **Tasks**.
 **Commit:** `refactor: extract CheckerTools from server.py (#108)`
 
 #### Part A: Tests for CheckerTools extraction
-- [ ] Implementation — create `tests/test_checker_tools.py` with registration and formatting tests
-- [ ] Quality checks: pylint, pytest, mypy — fix all issues
-- [ ] Commit message prepared
+- [x] Implementation — create `tests/test_checker_tools.py` with registration and formatting tests
+- [x] Quality checks: pylint, pytest, mypy — fix all issues (import errors expected until Part B creates checker_tools.py)
+- [x] Commit message prepared
 
 #### Part B: Extract CheckerTools class
 - [ ] Implementation — create `src/mcp_tools_py/checker_tools.py` with `CheckerTools` class, move tool registrations and formatting methods from `server.py`
