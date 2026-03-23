@@ -102,6 +102,10 @@ ignore_missing_imports = true
 module = ["mcp.server.fastmcp"]
 ignore_missing_imports = true
 
+[[tool.mypy.overrides]]
+module = ["jedi", "jedi.*"]
+ignore_missing_imports = true
+
 [tool.pylint.messages_control]
 # W, C, R: disabled by design (warnings, conventions, refactoring)
 # W1203: logging-fstring-interpolation — redundant while W is disabled, but kept

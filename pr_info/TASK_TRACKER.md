@@ -65,9 +65,9 @@ This tracks **Feature Implementation** consisting of multiple **Tasks**.
 - [x] Commit message prepared
 
 #### Part B: Implement jedi_tools.py
-- [ ] Implementation — implement `list_symbols` and `find_references` in `src/mcp_tools_py/refactoring/jedi_tools.py`
-- [ ] Quality checks: pylint, pytest, mypy — fix all issues
-- [ ] Commit message prepared
+- [x] Implementation — implement `list_symbols` and `find_references` in `src/mcp_tools_py/refactoring/jedi_tools.py`
+- [x] Quality checks: pylint, pytest, mypy — fix all issues
+- [x] Commit message prepared
 
 #### Part C: Register in RefactoringTools
 - [ ] Implementation — register `list_symbols` and `find_references` as MCP tools in `refactoring/__init__.py`
