@@ -5,16 +5,16 @@
       "mcp__tools-py__run_pylint_check",
       "mcp__tools-py__run_pytest_check",
       "mcp__tools-py__run_mypy_check",
-      "mcp__filesystem__get_reference_projects",
-      "mcp__filesystem__list_reference_directory",
-      "mcp__filesystem__read_reference_file",
-      "mcp__filesystem__list_directory",
-      "mcp__filesystem__read_file",
-      "mcp__filesystem__save_file",
-      "mcp__filesystem__append_file",
-      "mcp__filesystem__delete_this_file",
-      "mcp__filesystem__move_file",
-      "mcp__filesystem__edit_file",
+      "mcp__workspace__get_reference_projects",
+      "mcp__workspace__list_reference_directory",
+      "mcp__workspace__read_reference_file",
+      "mcp__workspace__list_directory",
+      "mcp__workspace__read_file",
+      "mcp__workspace__save_file",
+      "mcp__workspace__append_file",
+      "mcp__workspace__delete_this_file",
+      "mcp__workspace__move_file",
+      "mcp__workspace__edit_file",
       "Bash(git diff:*)",
       "Bash(gh run view:*)",
       "Bash(gh issue view:*)",
@@ -60,6 +60,6 @@
   "enableAllProjectMcpServers": true,
   "enabledMcpjsonServers": [
     "tools-py",
-    "filesystem"
+    "workspace"
   ]
 }
