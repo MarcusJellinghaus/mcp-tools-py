@@ -1,12 +1,26 @@
 ---
-allowed-tools: Bash(git status), Bash(git status *), Bash(git log *), Bash(git branch *), Bash(git branch), Bash(git ls-files *), Bash(git fetch *), Bash(git fetch), Bash(git rebase *), Bash(git add *), Bash(git rm *), Bash(git commit *), Bash(git checkout --ours *), Bash(git remote get-url *), Bash(git checkout --theirs *), Bash(git restore *), Bash(git stash *), Bash(git stash), Bash(git push --force-with-lease *), Bash(git diff *), Bash(git rev-parse *), Bash(gh run view *), Bash(./tools/format_all.sh), Bash(tools/format_all.bat), Bash(gh issue view *), mcp__tools-py__run_pylint_check, mcp__tools-py__run_pytest_check, mcp__tools-py__run_mypy_check, mcp__filesystem__list_directory, mcp__filesystem__read_file, mcp__filesystem__save_file, mcp__filesystem__append_file, mcp__filesystem__delete_this_file, mcp__filesystem__move_file, mcp__filesystem__edit_file
+allowed-tools: Bash(git status *), Bash(git log *), Bash(git branch *), Bash(git ls-files *), Bash(git fetch *), Bash(git rebase *), Bash(git add *), Bash(git rm *), Bash(git commit *), Bash(git checkout --ours *), Bash(git remote get-url *), Bash(git checkout --theirs *), Bash(git restore *), Bash(git stash *), Bash(git push --force-with-lease *), Bash(git diff *), Bash(git rev-parse *), Bash(gh run view *), Bash(./tools/format_all.sh), Bash(tools/format_all.bat), Bash(gh issue view *), mcp__tools-py__run_pylint_check, mcp__tools-py__run_pytest_check, mcp__tools-py__run_mypy_check, mcp__workspace__get_reference_projects, mcp__workspace__list_reference_directory, mcp__workspace__read_reference_file, mcp__workspace__list_directory, mcp__workspace__read_file, mcp__workspace__save_file, mcp__workspace__append_file, mcp__workspace__delete_this_file, mcp__workspace__move_file, mcp__workspace__edit_file
 workflow-stage: utility
 suggested-next: (context-dependent)
 ---
 
-# Rebase Branch onto Main
+# Rebase Branch onto Base Branch
 
-Rebase the current feature branch onto `origin/main` and resolve conflicts.
+Rebase the current feature branch onto its base branch and resolve conflicts.
+
+**Core philosophy:** Main is the source of truth. The feature branch adapts to main. For source code conflicts, preserve main's improvements and rework the feature branch code to fit.
+
+**Note on `--ours`/`--theirs` during rebase:** `--ours` = main (the branch being rebased onto), `--theirs` = feature branch commits being replayed.
+
+If the rebase becomes complex, suggest switching to cherry-picking as an alternative approach.
+
+## Determine Base Branch
+
+First, detect the correct base branch:
+```bash
+BASE_BRANCH=$(mcp-coder gh-tool get-base-branch)
+echo "Rebasing onto: $BASE_BRANCH"
+```
 
 ## Pre-flight Checks (Abort if any fail)
 
@@ -14,15 +28,17 @@ Rebase the current feature branch onto `origin/main` and resolve conflicts.
 2. Not already in rebase/merge state
 3. Not on main/master branch
 4. Remote origin exists
+5. `pr_info/` does not exist on the base branch — if it does, abort with error: `"pr_info/ exists on <BASE_BRANCH>. This folder should only exist on feature branches. Check your branch setup."`
 
 ## Workflow
 
 1. `git fetch origin`
-2. `git rebase origin/main`
+2. `git rebase origin/${BASE_BRANCH}`
 3. For each conflict:
-   - Apply resolution strategy (see below)
+   - If file is under `pr_info/`: auto-resolve with `git checkout --theirs <file>` (keep feature branch version), then `git add <file>` — no user input needed
+   - For all other files: resolve manually, preserving main's improvements; rework feature branch changes to fit
    - Verify no conflict markers remain
-   - `git add <file>` or `git rm <file>`
+   - `git add <file>`
    - `git rebase --continue`
 4. Run code checks: `mcp__tools-py__run_pytest_check`, `mcp__tools-py__run_pylint_check`, `mcp__tools-py__run_mypy_check`
 5. Fix any issues from merge
@@ -33,6 +49,7 @@ Rebase the current feature branch onto `origin/main` and resolve conflicts.
 
 | File Type | Strategy |
 |-----------|----------|
+| `pr_info/` files | Auto-resolve with `--theirs` (keep feature branch version) |
 | Code files (`.py`, `.js`, etc.) | Keep both sides, merge imports |
 | Test files | Keep all tests from both sides |
 | Config files | Merge additively, prefer HEAD for same keys |
@@ -42,10 +59,9 @@ Rebase the current feature branch onto `origin/main` and resolve conflicts.
 
 1. Any unexpected error - abort, report full error
 2. Binary file conflict - abort, cannot auto-resolve
-3. Unknown file type - abort, no safe strategy
-4. Conflict markers remain after resolution - abort
-5. Same file conflicts 3+ times - abort
-6. Code quality fails after 2 fix attempts - abort
-7. Any other unexpected situation - abort, suggest manual intervention
+3. Conflict markers remain after resolution - abort
+4. Same file conflicts 3+ times - abort
+5. Code quality fails after 2 fix attempts - abort
+6. Any other unexpected situation - abort, suggest manual intervention
 
 On abort: run `git rebase --abort`, report which rule triggered, suggest next steps.

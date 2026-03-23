@@ -1,7 +1,8 @@
 ---
-allowed-tools: Bash(git fetch *), Bash(git fetch), Bash(git status), Bash(git diff *), Read, Glob, Grep
+allowed-tools: Bash(git fetch *), Bash(git status *), Bash(git diff *), Bash(mcp-coder git-tool compact-diff *), Bash(mcp-coder check branch-status *), Read, Glob, Grep
 workflow-stage: code-review
 suggested-next:
+  - if incomplete tasks found _> implementation_finalise
   - discuss -> commit_push -> implementation_approve
   - discuss -> implementation_new_tasks -> commit_push -> implementation_needs_rework
 ---
@@ -12,6 +13,7 @@ suggested-next:
 ```bash
 git fetch
 git status
+mcp-coder check branch-status --llm-truncate
 ```
 
 Confirm and display the current feature branch name.
@@ -24,7 +26,7 @@ Confirm and display the current feature branch name.
 
 Run this command to get the changes to review:
 ```bash
-git diff --unified=5 --no-prefix main...HEAD -- . ":(exclude)pr_info/.conversations/**"
+mcp-coder git-tool compact-diff
 ```
 
 No need to run all checks; do not use pylint warnings. Feel free to further analyse any mentioned files and/or the file structure.

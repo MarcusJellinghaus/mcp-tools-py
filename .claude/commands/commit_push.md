@@ -1,5 +1,5 @@
 ---
-allowed-tools: Bash(git status), Bash(git status *), Bash(git diff *), Bash(git add *), Bash(git commit *), Bash(git push *), Bash(git push), Bash(git log *), Bash(./tools/format_all.sh), Bash(tools/format_all.bat), Read, Glob, Grep
+allowed-tools: Bash(git status *), Bash(git diff *), Bash(git add *), Bash(git commit *), Bash(git push *), Bash(git log *), Bash(./tools/format_all.sh), Bash(tools/format_all.bat), Read, Glob, Grep
 workflow-stage: utility
 suggested-next: (context-dependent)
 ---
@@ -10,11 +10,7 @@ Follow this process to commit and push your changes:
 
 ## 1. Format Code
 ```bash
-# Linux/macOS
 ./tools/format_all.sh
-
-# Windows
-tools/format_all.bat
 ```
 
 ## 2. Review Changes
