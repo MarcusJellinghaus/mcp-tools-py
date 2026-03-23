@@ -18,16 +18,19 @@
 - Dry-run cleanup safe (checks empty content before removal, only removes truly empty dirs)
 - `move_module` dry-run limitation is reasonable and documented
 - Private attribute access in `CheckerTools` acceptable (tightly coupled by design)
+- **import-linter CI failure**: `checker_tools` and `refactoring` were on the same layer as the code checkers, but they import from them (peer imports not allowed). Also, `TYPE_CHECKING`-guarded imports from `server` flagged as upward violations.
 
 **Decisions:**
-- All findings: **Skip** — no issues found requiring changes. Implementation is clean, well-structured, follows codebase patterns, and all quality gates pass (pylint clean, mypy clean, 277/278 tests pass)
+- Code implementation findings: **Skip** — no issues found requiring changes
+- import-linter failure: **Accept** — fix `.importlinter` to place `checker_tools | refactoring` on their own layer above code checkers, add `ignore_imports` for TYPE_CHECKING-guarded server imports
 
-**Changes:** None required.
+**Changes:**
+- `.importlinter`: Split tool registration modules (`checker_tools`, `refactoring`) into their own layer above code checker implementations. Added `ignore_imports` for TYPE_CHECKING-guarded server imports.
 
-**Status:** No changes needed.
+**Status:** Committed.
 
 ## Final Status
 
 **Rounds:** 1
-**Commits produced:** 0
-**Outcome:** Implementation approved — no issues found. Code is clean, well-tested, and follows architectural conventions. All quality gates pass.
+**Commits produced:** 1 (import-linter fix)
+**Outcome:** Implementation approved. One CI issue fixed (import-linter layer config). All quality gates pass (pylint, mypy, pytest 277/278, import-linter).
