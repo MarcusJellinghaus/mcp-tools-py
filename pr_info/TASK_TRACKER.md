@@ -21,6 +21,97 @@ This tracks **Feature Implementation** consisting of multiple **Tasks**.
 
 ## Tasks
 
-<!-- Tasks populated from pr_info/steps/ by prepare_task_tracker -->
+### Step 1: Scaffolding + Dependencies ([step_1.md](./steps/step_1.md))
+**Commit:** `feat: add dependencies and scaffold refactoring module (#108)`
+
+#### Part A: Refactoring module skeleton
+- [ ] Implementation — create `refactoring/__init__.py` with `RefactoringTools` class, `jedi_tools.py` placeholder, `rope_tools.py` placeholder, `tests/test_refactoring/__init__.py`
+- [ ] Quality checks: pylint, pytest, mypy — fix all issues
+- [ ] Commit message prepared
+
+#### Part B: Architecture & config updates
+- [ ] Implementation — add rope/jedi to `pyproject.toml` dependencies, register `integration` marker, rename layer in `tach.toml` and `.importlinter`, add `.ropeproject/` to `.gitignore`
+- [ ] Quality checks: pylint, pytest, mypy — fix all issues
+- [ ] Commit message prepared
+
+---
+
+### Step 2: Extract CheckerTools from server.py ([step_2.md](./steps/step_2.md))
+**Commit:** `refactor: extract CheckerTools from server.py (#108)`
+
+#### Part A: Tests for CheckerTools extraction
+- [ ] Implementation — create `tests/test_checker_tools.py` with registration and formatting tests
+- [ ] Quality checks: pylint, pytest, mypy — fix all issues
+- [ ] Commit message prepared
+
+#### Part B: Extract CheckerTools class
+- [ ] Implementation — create `src/mcp_tools_py/checker_tools.py` with `CheckerTools` class, move tool registrations and formatting methods from `server.py`
+- [ ] Quality checks: pylint, pytest, mypy — fix all issues
+- [ ] Commit message prepared
+
+#### Part C: Wire into server.py and update architecture config
+- [ ] Implementation — replace `_register_tools()` with `CheckerTools(self).register(self.mcp)`, update `tach.toml` server dependencies, verify `.importlinter`
+- [ ] Quality checks: pylint, pytest, mypy — fix all issues
+- [ ] Commit message prepared
+
+---
+
+### Step 3: Jedi Tools — list_symbols + find_references ([step_3.md](./steps/step_3.md))
+**Commit:** `feat: add list_symbols and find_references tools (#108)`
+
+#### Part A: Tests for jedi tools
+- [ ] Implementation — create `tests/test_refactoring/test_jedi_tools.py` with list_symbols and find_references tests
+- [ ] Quality checks: pylint, pytest, mypy — fix all issues
+- [ ] Commit message prepared
+
+#### Part B: Implement jedi_tools.py
+- [ ] Implementation — implement `list_symbols` and `find_references` in `src/mcp_tools_py/refactoring/jedi_tools.py`
+- [ ] Quality checks: pylint, pytest, mypy — fix all issues
+- [ ] Commit message prepared
+
+#### Part C: Register in RefactoringTools
+- [ ] Implementation — register `list_symbols` and `find_references` as MCP tools in `refactoring/__init__.py`
+- [ ] Quality checks: pylint, pytest, mypy — fix all issues
+- [ ] Commit message prepared
+
+---
+
+### Step 4: Rope Tools — move_symbol, rename, move_module ([step_4.md](./steps/step_4.md))
+**Commit:** `feat: add move_symbol, rename, and move_module tools (#108)`
+
+#### Part A: Tests for rope tools
+- [ ] Implementation — create `tests/test_refactoring/test_rope_tools.py` with move_symbol, rename_symbol, and move_module tests
+- [ ] Quality checks: pylint, pytest, mypy — fix all issues
+- [ ] Commit message prepared
+
+#### Part B: Implement rope_tools.py
+- [ ] Implementation — implement `move_symbol`, `rename_symbol`, `move_module`, and helpers in `src/mcp_tools_py/refactoring/rope_tools.py`
+- [ ] Quality checks: pylint, pytest, mypy — fix all issues
+- [ ] Commit message prepared
+
+#### Part C: Register in RefactoringTools
+- [ ] Implementation — register `move_symbol`, `rename`, and `move_module` as MCP tools in `refactoring/__init__.py`
+- [ ] Quality checks: pylint, pytest, mypy — fix all issues
+- [ ] Commit message prepared
+
+---
+
+### Step 5: Integration Tests ([step_5.md](./steps/step_5.md))
+**Commit:** `test: add end-to-end refactoring integration tests (#108)`
+
+#### Part A: RefactoringTools registration tests
+- [ ] Implementation — create `tests/test_refactoring/test_refactoring_tools.py` with registration and relative-path tests
+- [ ] Quality checks: pylint, pytest, mypy — fix all issues
+- [ ] Commit message prepared
+
+#### Part B: End-to-end workflow tests
+- [ ] Implementation — create `tests/test_refactoring/test_integration.py` with full workflow tests (split file, rename, move module)
+- [ ] Quality checks: pylint, pytest, mypy — fix all issues
+- [ ] Commit message prepared
+
+---
 
 ## Pull Request
+
+- [ ] PR review — verify all steps complete, all checks green, architecture checks pass
+- [ ] PR summary prepared with description of changes
