@@ -45,9 +45,9 @@ This tracks **Feature Implementation** consisting of multiple **Tasks**.
 - [x] Commit message prepared
 
 #### Part B: Extract CheckerTools class
-- [ ] Implementation — create `src/mcp_tools_py/checker_tools.py` with `CheckerTools` class, move tool registrations and formatting methods from `server.py`
-- [ ] Quality checks: pylint, pytest, mypy — fix all issues
-- [ ] Commit message prepared
+- [x] Implementation — create `src/mcp_tools_py/checker_tools.py` with `CheckerTools` class, move tool registrations and formatting methods from `server.py`
+- [x] Quality checks: pylint, pytest, mypy — fix all issues
+- [x] Commit message prepared
 
 #### Part C: Wire into server.py and update architecture config
 - [ ] Implementation — replace `_register_tools()` with `CheckerTools(self).register(self.mcp)`, update `tach.toml` server dependencies, verify `.importlinter`
