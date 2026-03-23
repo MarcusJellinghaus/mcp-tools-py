@@ -52,7 +52,7 @@ def test_refactoring_tools_registers_expected_names(
         "list_symbols",
         "find_references",
         "move_symbol",
-        "rename",
+        "rename_symbol",
         "move_module",
     }
     assert names == expected

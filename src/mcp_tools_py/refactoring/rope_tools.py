@@ -151,6 +151,7 @@ def move_symbol(
         available_str = ", ".join(available) if available else "(none)"
         return (
             f"Symbol '{symbol_name}' not found in {source_file}.\n"
+            f"Only top-level symbols (functions, classes, variables) are supported.\n"
             f"Available top-level symbols: {available_str}"
         )
 
@@ -240,6 +241,7 @@ def rename_symbol(
         available_str = ", ".join(available) if available else "(none)"
         return (
             f"Symbol '{symbol_name}' not found in {file_path}.\n"
+            f"Only top-level symbols (functions, classes, variables) are supported.\n"
             f"Available top-level symbols: {available_str}"
         )
 

@@ -78,7 +78,7 @@ class RefactoringTools:
 
         @mcp.tool()
         @log_function_call
-        def rename(
+        def rename_symbol(
             file: str,
             symbol_name: str,
             new_name: str,
@@ -101,7 +101,7 @@ class RefactoringTools:
             dest_package: str,
             dry_run: bool = False,
         ) -> str:
-            """Move an entire module to a new package. Updates all references.
+            """Move an entire module inside a new package. Updates all references.
 
             Args:
                 source_module: Source module path relative to project root.
