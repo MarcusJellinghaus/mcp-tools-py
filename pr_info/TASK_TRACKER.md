@@ -30,9 +30,9 @@ This tracks **Feature Implementation** consisting of multiple **Tasks**.
 - [x] Commit message prepared
 
 #### Part B: Architecture & config updates
-- [ ] Implementation — add rope/jedi to `pyproject.toml` dependencies, register `integration` marker, rename layer in `tach.toml` and `.importlinter`, add `.ropeproject/` to `.gitignore`
-- [ ] Quality checks: pylint, pytest, mypy — fix all issues
-- [ ] Commit message prepared
+- [x] Implementation — add rope/jedi to `pyproject.toml` dependencies, register `integration` marker, rename layer in `tach.toml` and `.importlinter`, add `.ropeproject/` to `.gitignore`
+- [x] Quality checks: pylint, pytest, mypy — fix all issues
+- [x] Commit message prepared
 
 ---
 
