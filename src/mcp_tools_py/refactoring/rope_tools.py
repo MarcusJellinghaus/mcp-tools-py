@@ -134,11 +134,9 @@ def _ensure_parents(dest_path: Path, project_dir: Path) -> None:
     current = dest_path.parent
     while current != current.parent and current != project_dir:
         init_file = current / "__init__.py"
-        if not init_file.exists():
-            init_file.write_text("")
-        # Check if we've hit a dir that already has __init__.py
         if init_file.exists():
-            break
+            break  # reached an existing package boundary
+        init_file.write_text("")
         current = current.parent
 
 
