@@ -10,6 +10,7 @@ import structlog
 
 from mcp_tools_py.checker_tools import CheckerTools
 from mcp_tools_py.log_utils import log_function_call
+from mcp_tools_py.refactoring import RefactoringTools
 from mcp_tools_py.utils.subprocess_runner import execute_command
 
 # Type definitions for FastMCP
@@ -64,6 +65,7 @@ class CodeCheckerServer:
         self._resolved_python = self._resolve_python_executable()
         self._tool_availability = self._check_tool_availability()
         CheckerTools(self).register(self.mcp)
+        RefactoringTools(self.project_dir).register(self.mcp)
         structured_logger.debug(
             "Tool environment resolved",
             python_executable=self._resolved_python,

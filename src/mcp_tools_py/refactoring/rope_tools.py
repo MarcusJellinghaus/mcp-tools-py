@@ -90,8 +90,17 @@ def _find_symbol_offset(source: str, symbol_name: str) -> int | None:
     return None
 
 
-def _format_changes(changes: ChangeSet, dry_run: bool) -> str:
-    """Format a rope ChangeSet into a human-readable report."""
+def _format_changes(
+    changes: ChangeSet, dry_run: bool, pre_existing: Set[str] | None = None
+) -> str:
+    """Format a rope ChangeSet into a human-readable report.
+
+    Args:
+        changes: The rope ChangeSet to format.
+        dry_run: Whether this is a dry-run preview.
+        pre_existing: Paths that existed before the operation. Used in
+            non-dry-run mode to distinguish created vs modified files.
+    """
     prefix = "[DRY RUN] Would modify" if dry_run else "Modified"
     create_prefix = "[DRY RUN] Would create" if dry_run else "Created"
     lines: List[str] = []
@@ -102,22 +111,28 @@ def _format_changes(changes: ChangeSet, dry_run: bool) -> str:
         if rel_path in seen:
             continue
         seen.add(rel_path)
-        if hasattr(change, "new_contents") and change.resource.exists():
-            lines.append(f"  {prefix}: {rel_path}")
-        elif not change.resource.exists():
-            lines.append(f"  {create_prefix}: {rel_path}")
+        if dry_run:
+            # Before project.do(), exists() is accurate.
+            if change.resource.exists():
+                lines.append(f"  {prefix}: {rel_path}")
+            else:
+                lines.append(f"  {create_prefix}: {rel_path}")
         else:
-            lines.append(f"  {prefix}: {rel_path}")
+            # After project.do(), everything exists; use pre_existing set.
+            if pre_existing is not None and rel_path not in pre_existing:
+                lines.append(f"  {create_prefix}: {rel_path}")
+            else:
+                lines.append(f"  {prefix}: {rel_path}")
 
     return "\n".join(lines)
 
 
-def _ensure_parents(dest_path: Path) -> None:
+def _ensure_parents(dest_path: Path, project_dir: Path) -> None:
     """Create parent directories and __init__.py files for a destination."""
     dest_path.parent.mkdir(parents=True, exist_ok=True)
     # Walk up from the dest parent to find package dirs that need __init__.py
     current = dest_path.parent
-    while current != current.parent:
+    while current != current.parent and current != project_dir:
         init_file = current / "__init__.py"
         if not init_file.exists() and (current / "__init__.py").parent.exists():
             # Only create __init__.py if there are .py files or it's needed
@@ -167,9 +182,12 @@ def move_symbol(
 
     # Create destination file and parent dirs if needed
     if not dry_run:
-        _ensure_parents(abs_dest)
+        _ensure_parents(abs_dest, project_dir)
         if not abs_dest.exists():
             abs_dest.write_text("")
+
+    # Track files that exist before the operation for accurate reporting.
+    created_for_dry_run = False
 
     try:
         with _with_rope_project(project_dir) as project:
@@ -181,29 +199,43 @@ def move_symbol(
             else:
                 # For dry run, create temp file so rope can reference it
                 if not abs_dest.exists():
-                    _ensure_parents(abs_dest)
+                    _ensure_parents(abs_dest, project_dir)
                     abs_dest.write_text("")
-                    dest_resource = project.get_resource(dest_file)
-                else:
-                    dest_resource = project.get_resource(dest_file)
+                    created_for_dry_run = True
+                dest_resource = project.get_resource(dest_file)
 
             mover = rope.refactor.move.create_move(project, source_resource, offset)
             changes = mover.get_changes(dest_resource)
 
             if dry_run:
-                result = f"[DRY RUN] move_symbol preview:\n{_format_changes(changes, dry_run=True)}"
-                # Clean up temp files created for dry run
-                if abs_dest.exists() and abs_dest.read_text() == "":
-                    abs_dest.unlink()
-                    # Clean up empty __init__.py files created for dry run
-                    _cleanup_empty_dirs(abs_dest.parent, project_dir)
-                return result
+                try:
+                    result = f"[DRY RUN] move_symbol preview:\n{_format_changes(changes, dry_run=True)}"
+                    return result
+                finally:
+                    _cleanup_created_files(abs_dest, created_for_dry_run, project_dir)
 
+            pre_existing = _collect_existing_paths(changes)
             project.do(changes)
-            return f"move_symbol completed successfully.\n{_format_changes(changes, dry_run=False)}"
+            return f"move_symbol completed successfully.\n{_format_changes(changes, dry_run=False, pre_existing=pre_existing)}"
 
     except Exception as exc:  # pylint: disable=broad-exception-caught
         return f"Error moving '{symbol_name}': {exc}"
+
+
+def _collect_existing_paths(changes: ChangeSet) -> Set[str]:
+    """Return the set of resource paths that exist before project.do()."""
+    return {
+        change.resource.path for change in changes.changes if change.resource.exists()
+    }
+
+
+def _cleanup_created_files(
+    abs_dest: Path, created_for_dry_run: bool, project_dir: Path
+) -> None:
+    """Remove temporary files created during a dry-run move_symbol."""
+    if created_for_dry_run and abs_dest.exists() and abs_dest.read_text() == "":
+        abs_dest.unlink()
+        _cleanup_empty_dirs(abs_dest.parent, project_dir)
 
 
 def _cleanup_empty_dirs(directory: Path, stop_at: Path) -> None:
@@ -254,8 +286,9 @@ def rename_symbol(
             if dry_run:
                 return f"[DRY RUN] rename_symbol preview:\n{_format_changes(changes, dry_run=True)}"
 
+            pre_existing = _collect_existing_paths(changes)
             project.do(changes)
-            return f"rename_symbol completed successfully.\n{_format_changes(changes, dry_run=False)}"
+            return f"rename_symbol completed successfully.\n{_format_changes(changes, dry_run=False, pre_existing=pre_existing)}"
 
     except Exception as exc:  # pylint: disable=broad-exception-caught
         return f"Error renaming '{symbol_name}': {exc}"
@@ -295,8 +328,9 @@ def move_module(
             if dry_run:
                 return f"[DRY RUN] move_module preview:\n{_format_changes(changes, dry_run=True)}"
 
+            pre_existing = _collect_existing_paths(changes)
             project.do(changes)
-            return f"move_module completed successfully.\n{_format_changes(changes, dry_run=False)}"
+            return f"move_module completed successfully.\n{_format_changes(changes, dry_run=False, pre_existing=pre_existing)}"
 
     except Exception as exc:  # pylint: disable=broad-exception-caught
         return f"Error moving module '{source_module}': {exc}"
