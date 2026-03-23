@@ -1,0 +1,196 @@
+"""End-to-end integration tests for refactoring workflows."""
+
+from pathlib import Path
+
+import pytest
+
+from mcp_tools_py.refactoring.jedi_tools import find_references, list_symbols
+from mcp_tools_py.refactoring.rope_tools import move_module, move_symbol, rename_symbol
+
+
+@pytest.fixture
+def multi_module_project(tmp_path: Path) -> Path:
+    """Create a realistic multi-module project for integration testing.
+
+    Structure:
+        myproject/
+        ├── __init__.py
+        ├── models.py        # defines: User, Address, validate_email
+        ├── services.py      # imports and uses User, validate_email from models
+        └── utils.py          # imports Address from models
+    """
+    pkg = tmp_path / "myproject"
+    pkg.mkdir()
+    (pkg / "__init__.py").write_text("")
+
+    (pkg / "models.py").write_text(
+        "class User:\n"
+        '    """A user account."""\n'
+        "\n"
+        "    def __init__(self, name: str, email: str) -> None:\n"
+        "        self.name = name\n"
+        "        self.email = email\n"
+        "\n"
+        "\n"
+        "class Address:\n"
+        '    """A mailing address."""\n'
+        "\n"
+        "    def __init__(self, street: str, city: str) -> None:\n"
+        "        self.street = street\n"
+        "        self.city = city\n"
+        "\n"
+        "\n"
+        "def validate_email(email: str) -> bool:\n"
+        '    """Check if an email address is valid."""\n'
+        '    return "@" in email and "." in email\n'
+    )
+
+    (pkg / "services.py").write_text(
+        "from myproject.models import User, validate_email\n"
+        "\n"
+        "\n"
+        "def create_user(name: str, email: str) -> User:\n"
+        '    """Create a new user after validating email."""\n'
+        "    if not validate_email(email):\n"
+        '        raise ValueError("Invalid email")\n'
+        "    return User(name, email)\n"
+    )
+
+    (pkg / "utils.py").write_text(
+        "from myproject.models import Address\n"
+        "\n"
+        "\n"
+        "def format_address(addr: Address) -> str:\n"
+        '    """Format an address for display."""\n'
+        '    return f"{addr.street}, {addr.city}"\n'
+    )
+
+    return tmp_path
+
+
+@pytest.mark.integration
+def test_full_workflow_split_large_file(multi_module_project: Path) -> None:
+    """End-to-end: discover symbols, move one to new module, verify imports."""
+    project = multi_module_project
+
+    # 1. list_symbols on models.py -> should show User, Address, validate_email
+    symbols_output = list_symbols(project, "myproject/models.py")
+    assert "User" in symbols_output
+    assert "Address" in symbols_output
+    assert "validate_email" in symbols_output
+
+    # 2. find_references for validate_email -> should show models.py, services.py
+    refs_output = find_references(project, "myproject/models.py", "validate_email")
+    assert "models.py" in refs_output
+    assert "services.py" in refs_output
+
+    # 3. move_symbol validate_email (dry_run=True) -> files unchanged
+    dry_result = move_symbol(
+        project,
+        "myproject/models.py",
+        "validate_email",
+        "myproject/validation.py",
+        dry_run=True,
+    )
+    assert "[DRY RUN]" in dry_result
+    # Files should be unchanged after dry run
+    models_text = (project / "myproject" / "models.py").read_text()
+    assert "def validate_email" in models_text
+    assert not (project / "myproject" / "validation.py").exists()
+
+    # 4. move_symbol validate_email (dry_run=False) -> verify changes
+    result = move_symbol(
+        project,
+        "myproject/models.py",
+        "validate_email",
+        "myproject/validation.py",
+    )
+    assert "successfully" in result.lower() or "modified" in result.lower()
+
+    # validation.py exists and defines validate_email
+    validation_text = (project / "myproject" / "validation.py").read_text()
+    assert "def validate_email" in validation_text
+
+    # models.py no longer defines validate_email
+    models_after = (project / "myproject" / "models.py").read_text()
+    assert "def validate_email" not in models_after
+    # But still has User and Address
+    assert "class User" in models_after
+    assert "class Address" in models_after
+
+    # services.py imports from validation, not models
+    services_text = (project / "myproject" / "services.py").read_text()
+    assert "validate_email" in services_text
+    assert "validation" in services_text
+
+    # utils.py unchanged (it imports Address, not validate_email)
+    utils_text = (project / "myproject" / "utils.py").read_text()
+    assert "from myproject.models import Address" in utils_text
+
+
+@pytest.mark.integration
+def test_rename_then_verify_references(multi_module_project: Path) -> None:
+    """End-to-end: rename a class, verify all references updated."""
+    project = multi_module_project
+
+    # 1. find_references for User -> should show models.py, services.py
+    refs_output = find_references(project, "myproject/models.py", "User")
+    assert "models.py" in refs_output
+    assert "services.py" in refs_output
+
+    # 2. rename User to AppUser (dry_run=True) -> verify preview
+    dry_result = rename_symbol(
+        project,
+        "myproject/models.py",
+        "User",
+        "AppUser",
+        dry_run=True,
+    )
+    assert "[DRY RUN]" in dry_result
+    # Files should be unchanged
+    models_text = (project / "myproject" / "models.py").read_text()
+    assert "class User" in models_text
+
+    # 3. rename User to AppUser (dry_run=False)
+    result = rename_symbol(
+        project,
+        "myproject/models.py",
+        "User",
+        "AppUser",
+    )
+    assert "successfully" in result.lower() or "modified" in result.lower()
+
+    # models.py defines AppUser, not User
+    models_after = (project / "myproject" / "models.py").read_text()
+    assert "class AppUser" in models_after
+    assert "class User" not in models_after
+
+    # services.py references AppUser
+    services_text = (project / "myproject" / "services.py").read_text()
+    assert "AppUser" in services_text
+    assert "User" not in services_text or "AppUser" in services_text
+
+
+@pytest.mark.integration
+def test_move_module_then_verify_imports(multi_module_project: Path) -> None:
+    """End-to-end: move a module to a subpackage, verify imports updated."""
+    project = multi_module_project
+
+    # 1. move_module utils.py to subpkg/
+    result = move_module(
+        project,
+        "myproject/utils.py",
+        "myproject/subpkg",
+    )
+    assert "successfully" in result.lower() or "modified" in result.lower()
+
+    # subpkg/utils.py exists
+    assert (project / "myproject" / "subpkg" / "utils.py").exists()
+
+    # Original utils.py should be gone
+    assert not (project / "myproject" / "utils.py").exists()
+
+    # models.py imports should be unaffected (utils imports from models, not vice versa)
+    models_text = (project / "myproject" / "models.py").read_text()
+    assert "class User" in models_text
+    assert "class Address" in models_text

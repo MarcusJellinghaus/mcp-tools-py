@@ -105,9 +105,9 @@ This tracks **Feature Implementation** consisting of multiple **Tasks**.
 - [x] Commit message prepared
 
 #### Part B: End-to-end workflow tests
-- [ ] Implementation — create `tests/test_refactoring/test_integration.py` with full workflow tests (split file, rename, move module)
-- [ ] Quality checks: pylint, pytest, mypy — fix all issues
-- [ ] Commit message prepared
+- [x] Implementation — create `tests/test_refactoring/test_integration.py` with full workflow tests (split file, rename, move module)
+- [x] Quality checks: pylint, pytest, mypy — fix all issues
+- [x] Commit message prepared
 
 ---
 
