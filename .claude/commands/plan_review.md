@@ -31,4 +31,7 @@ We do not need to challenge them again unless absolutely necessary.
 - Appropriate level of detail
 - Opportunities for simplification (KISS principle)
 - Test coverage strategy
+- Step granularity — each step should produce exactly one commit. Flag steps with multiple independent parts (A, B, C) that should be split.
 - Potential risks or blockers
+
+For planning standards, see `.claude/knowledge_base/planning_principles.md`.

@@ -41,6 +41,7 @@
       "Skill(issue_update)",
       "Skill(plan_approve)",
       "Skill(plan_review)",
+      "Skill(plan_review_supervisor)",
       "Skill(plan_update)",
       "Skill(rebase)",
       "Bash(find:*)",
