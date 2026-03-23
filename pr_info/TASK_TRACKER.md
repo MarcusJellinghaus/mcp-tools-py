@@ -70,9 +70,9 @@ This tracks **Feature Implementation** consisting of multiple **Tasks**.
 - [x] Commit message prepared
 
 #### Part C: Register in RefactoringTools
-- [ ] Implementation — register `list_symbols` and `find_references` as MCP tools in `refactoring/__init__.py`
-- [ ] Quality checks: pylint, pytest, mypy — fix all issues
-- [ ] Commit message prepared
+- [x] Implementation — register `list_symbols` and `find_references` as MCP tools in `refactoring/__init__.py`
+- [x] Quality checks: pylint, pytest, mypy — fix all issues
+- [x] Commit message prepared
 
 ---
 
