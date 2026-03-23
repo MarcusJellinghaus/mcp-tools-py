@@ -60,9 +60,9 @@ This tracks **Feature Implementation** consisting of multiple **Tasks**.
 **Commit:** `feat: add list_symbols and find_references tools (#108)`
 
 #### Part A: Tests for jedi tools
-- [ ] Implementation — create `tests/test_refactoring/test_jedi_tools.py` with list_symbols and find_references tests
-- [ ] Quality checks: pylint, pytest, mypy — fix all issues
-- [ ] Commit message prepared
+- [x] Implementation — create `tests/test_refactoring/test_jedi_tools.py` with list_symbols and find_references tests
+- [x] Quality checks: pylint, pytest, mypy — fix all issues
+- [x] Commit message prepared
 
 #### Part B: Implement jedi_tools.py
 - [ ] Implementation — implement `list_symbols` and `find_references` in `src/mcp_tools_py/refactoring/jedi_tools.py`
