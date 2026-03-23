@@ -70,6 +70,14 @@ class RefactoringTools:
 "jedi>=0.19.0",
 ```
 
+**`pyproject.toml`** — register the `integration` marker to prevent `PytestUnknownMarkWarning` (required if `--strict-markers` is ever enabled):
+```toml
+[tool.pytest.ini_options]
+markers = [
+    "integration: Integration tests requiring external resources",
+]
+```
+
 **`tach.toml`** — changes:
 1. Rename layer `checker_implementation` → `tool_implementation`
 2. Add new modules:
@@ -92,18 +100,7 @@ depends_on = [
     { path = "mcp_tools_py.log_utils" }
 ]
 ```
-3. Update `mcp_tools_py.server` depends_on — server LOSES the three `code_checker_*` entries, and GAINS `checker_tools` and `refactoring`:
-```toml
-[[modules]]
-path = "mcp_tools_py.server"
-layer = "server"
-depends_on = [
-    { path = "mcp_tools_py.checker_tools" },
-    { path = "mcp_tools_py.refactoring" },
-    { path = "mcp_tools_py.utils" },
-    { path = "mcp_tools_py.log_utils" }
-]
-```
+3. **Do NOT change `mcp_tools_py.server` depends_on in this step.** Keep server's current dependencies on `code_checker_*` modules intact. The dependency swap (removing `code_checker_*` and adding `checker_tools` + `refactoring`) is deferred to Step 2, when `checker_tools.py` actually exists and `server.py` is modified. This ensures `tach_check` passes after Step 1.
 
 **`.importlinter`** — changes:
 1. Rename layer `checker_implementation` → `tool_implementation`
@@ -116,6 +113,8 @@ mcp_tools_py.utils
 mcp_tools_py.log_utils
 ```
 3. Add `mcp_tools_py.checker_tools` and `mcp_tools_py.refactoring` to the forbidden-imports contract (utils cannot import them)
+
+> **Note:** The pipe-separated format (`module_a | module_b`) declares modules at the same layer level. After editing `.importlinter`, immediately run `lint-imports` to verify the syntax works. If the pipe syntax isn't supported by the installed version, list each module on a separate line but note that import-linter treats adjacent entries as ordered layers — which would incorrectly constrain the checker/refactoring modules.
 
 **`.gitignore`** — add:
 ```

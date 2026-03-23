@@ -39,3 +39,27 @@ In find_references, use `jedi.Script.get_names(all_scopes=False, definitions=Tru
 ## 8. Windows path handling
 
 Use `Path` objects for all path operations. Rope and jedi may require forward-slash paths internally.
+
+## 9. Register `integration` marker in pyproject.toml
+
+Add `[tool.pytest.ini_options] markers = ["integration: ..."]` to prevent `PytestUnknownMarkWarning` and prepare for `--strict-markers`.
+
+## 10. Verify import-linter pipe syntax after editing
+
+The pipe-separated format (`module_a | module_b`) declares same-layer modules. Run `lint-imports` immediately after editing `.importlinter` to verify the syntax works with the installed version.
+
+## 11. Defer server tach.toml dependency swap to Step 2
+
+Step 1 only adds new module declarations (`checker_tools`, `refactoring`) without changing server's `depends_on`. The swap (removing `code_checker_*`, adding `checker_tools` + `refactoring`) happens in Step 2 when `checker_tools.py` exists. This ensures `tach_check` passes after each step.
+
+## 12. Reorder server __init__ before CheckerTools registration
+
+In Step 2, set `_resolved_python` and `_tool_availability` before calling `CheckerTools(self).register(self.mcp)`. Less fragile than relying on late-binding.
+
+## 13. Catch all rope exceptions and convert to user-friendly strings
+
+All rope exceptions (`BadIdentifierError`, `ModuleNotFoundError`, permission errors, etc.) must be caught in try/except blocks and returned as descriptive error strings. Never propagate raw rope exceptions to the MCP caller.
+
+## 14. Flesh out test_move_symbol_name_collision
+
+The test creates a destination file that already defines a symbol with the same name, calls `move_symbol`, and verifies a name collision error is returned.

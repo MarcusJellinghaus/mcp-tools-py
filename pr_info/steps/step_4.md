@@ -6,6 +6,8 @@
 
 **Goal:** Implement the three rope-based refactoring tools, register them via `RefactoringTools`, and add tests. These tools modify files and support dry-run mode.
 
+> **Exception handling:** All rope exceptions (e.g., `BadIdentifierError`, `ModuleNotFoundError`, permission errors) must be caught in try/except blocks and converted to descriptive user-friendly error strings. Never propagate raw rope exceptions to the MCP caller.
+
 ---
 
 ## LLM Prompt
@@ -79,8 +81,12 @@ def test_move_symbol_not_found(sample_project: Path) -> None:
 
 def test_move_symbol_name_collision(sample_project: Path) -> None:
     """Error when destination already defines same symbol name."""
-    # bar.py already has something; create collision scenario
-    ...
+    # Create a destination file that already defines a symbol with the same
+    # name as the one being moved. Call move_symbol and verify it returns
+    # a name collision error.
+    (sample_project / "src" / "baz.py").write_text("def my_func(): pass\n")
+    result = move_symbol(sample_project, "src/foo.py", "my_func", "src/baz.py")
+    assert "collision" in result.lower() or "already" in result.lower()
 
 # --- rename_symbol tests ---
 

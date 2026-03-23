@@ -37,4 +37,36 @@
 - Q3: CheckerTools extraction in this PR → Confirmed (option A)
 
 **Changes:** Split step 1, renumbered to 5 steps, updated all plan files with accepted improvements
+**Status:** Committed (fe706f8)
+
+## Round 2 — 2026-03-23
+
+**Findings:**
+- [High] `integration` marker not registered in pyproject.toml — will cause PytestUnknownMarkWarning
+- [High] Pipe-separated `.importlinter` syntax needs verification note
+- [High] tach.toml server deps changed in Step 1 before `checker_tools.py` exists in Step 2 — tach_check would fail
+- [Medium] Server __init__ should reorder resolution before registration
+- [Medium] No rope exception handling strategy documented
+- [Medium] `test_move_symbol_name_collision` body is empty
+- [Medium] Asymmetry between RefactoringTools and CheckerTools interfaces
+- [Medium] FastMCPProtocol location with TYPE_CHECKING guard
+- [Low] find_references output format over-specified
+- [Low] No `__all__` in refactoring __init__.py
+- [Low] Empty test directory in Steps 1-2
+- [Low] vulture_whitelist.py may need updates
+- [Low] sample_project fixture path consistency
+
+**Decisions:**
+- Accept H1: Add `integration` marker registration to pyproject.toml in Step 1
+- Accept H2: Add pipe syntax verification note for .importlinter
+- Accept H3: Defer server tach.toml dependency swap to Step 2
+- Accept M1: Reorder server __init__ — resolution before registration
+- Accept M3: Add rope exception handling note to Step 4
+- Accept M4: Flesh out test_move_symbol_name_collision
+- Skip M2: Asymmetry is acceptable for v1
+- Skip M5: TYPE_CHECKING guard is sufficient, pre-existing pattern
+- Skip L1-L5: Informational, no action needed
+
+**User decisions:** None required this round
+**Changes:** Applied 6 fixes across steps 1, 2, and 4
 **Status:** Committed (pending)

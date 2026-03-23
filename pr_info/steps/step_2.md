@@ -115,6 +115,8 @@ class CodeCheckerServer:
 
 > **Late-binding note:** The closures capture `self._server` (the server reference), not its current attribute values. Attributes like `_resolved_python` are resolved at call time, not definition time. This is correct behavior — no ordering issue.
 
+> **Init ordering:** When modifying `server.py`, reorder the `__init__` so that `_resolved_python` and `_tool_availability` are set BEFORE `CheckerTools(self).register(self.mcp)` is called. This makes the code less fragile than relying on late-binding.
+
 ### DATA
 - `CheckerTools` holds a reference to `CodeCheckerServer` instance
 - No new data structures — same inputs/outputs as before
@@ -132,6 +134,7 @@ class CodeCheckerServer:
 - In `server.py`, replace `self._register_tools()` call with `CheckerTools(self).register(self.mcp)`
 - Remove `_register_tools`, `_format_pylint_result`, `_format_pytest_result_with_details`, `_format_mypy_result` methods from `CodeCheckerServer`
 - Verify `tach.toml` and `.importlinter` already have `checker_tools` entries (added in Step 1)
+- **Update `tach.toml`:** Now that `checker_tools.py` exists and `server.py` imports it, swap server's dependencies — remove the three `code_checker_*` entries from `mcp_tools_py.server.depends_on` and add `checker_tools` and `refactoring`. This was deferred from Step 1 to ensure `tach_check` passes after each step.
 
 ---
 
