@@ -59,7 +59,9 @@
       "mcp__tools-py__find_references",
       "mcp__tools-py__rename_symbol",
       "mcp__tools-py__move_symbol",
-      "mcp__tools-py__move_module"
+      "mcp__tools-py__move_module",
+      "Bash(bash tools/get_duration.sh *)",
+      "Bash(bash tools/get_time.sh)"
     ]
   },
   "enableAllProjectMcpServers": true,
