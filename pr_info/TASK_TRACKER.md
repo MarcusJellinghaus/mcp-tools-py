@@ -24,9 +24,9 @@ This tracks **Feature Implementation** consisting of multiple **Tasks**.
 ### Step 1: Harden `_with_rope_project()` — disable cache + gitignore filtering
 > Disable rope's persistent cache (`ropefolder=None`) and add gitignore-aware file filtering via `igittigitt` to reduce rope's scan scope.
 
-- [ ] Implementation: add `igittigitt` dependency, `_build_ignored_resources()`, `read_gitignore_rules()`, `apply_gitignore_filter()`, update `_with_rope_project()`, and write tests ([step_1.md](./steps/step_1.md))
+- [x] Implementation: add `igittigitt` dependency, `_build_ignored_resources()`, `read_gitignore_rules()`, `apply_gitignore_filter()`, update `_with_rope_project()`, and write tests ([step_1.md](./steps/step_1.md))
 - [ ] Quality checks: pylint, pytest, mypy — fix all issues
-- [ ] Commit message prepared
+- [x] Commit message prepared
 
 ### Step 2: Multiprocessing timeout wrapper + CLI plumbing
 > Add `--refactoring-timeout` CLI arg, thread it through server to rope functions, and wrap each rope operation in a `multiprocessing.Process` for timeout protection.
