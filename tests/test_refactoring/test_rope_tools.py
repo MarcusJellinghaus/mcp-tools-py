@@ -230,6 +230,16 @@ def test_build_ignored_resources_includes_gitignore_patterns(tmp_path: Path) -> 
     assert "__pycache__" in result
 
 
+def test_build_ignored_resources_no_backslashes(tmp_path: Path) -> None:
+    """Patterns must use forward slashes — Rope compiles them as regex."""
+    (tmp_path / "sub").mkdir()
+    (tmp_path / "sub" / "deep").mkdir()
+    (tmp_path / ".gitignore").write_text("sub/deep/\n")
+    result = _build_ignored_resources(tmp_path)
+    for pattern in result:
+        assert "\\" not in pattern, f"Backslash in pattern: {pattern!r}"
+
+
 # --- Timeout tests ---
 
 

@@ -144,7 +144,8 @@ def _build_ignored_resources(project_dir: Path) -> list[str]:
         except OSError as exc:
             logger.warning("Error scanning project dir for gitignore: %s", exc)
 
-    return patterns
+    # Rope compiles patterns as regex — backslashes cause invalid escapes on Windows.
+    return [p.replace("\\", "/") for p in patterns]
 
 
 @contextmanager
