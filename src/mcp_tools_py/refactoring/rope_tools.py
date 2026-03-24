@@ -43,34 +43,76 @@ _DEFAULT_IGNORED = [
 # TODO: Refactor into shared mcp_utils package later.
 
 
-def _read_gitignore_rules(
+def read_gitignore_rules(
     gitignore_path: Path,
-) -> Callable[[str], bool] | None:
+) -> tuple[Callable[[str], bool] | None, str | None]:
     """Read and parse a .gitignore file to create a matcher function.
 
     Args:
         gitignore_path: Path to the .gitignore file
 
     Returns:
-        A matcher function, or None if file doesn't exist.
+        A tuple containing (matcher_function, gitignore_content),
+        or (None, None) if file doesn't exist.
     """
     if not gitignore_path.is_file():
-        logger.debug("No .gitignore file found at %s", gitignore_path)
-        return None
+        logger.info("No .gitignore file found at %s", gitignore_path)
+        return None, None
 
     try:
-        logger.debug("Found .gitignore at: %s", gitignore_path)
+        with open(gitignore_path, "r") as f:  # noqa: PTH123
+            gitignore_content = f.read()
+
+        logger.info("Gitignore content: %s", gitignore_content)
+
+        logger.info("Parsing gitignore file at %s", gitignore_path)
         parser = IgnoreParser()
         parser.parse_rule_file(gitignore_path)
 
         def matcher(path: str) -> bool:
             return bool(parser.match(path))
 
-        return matcher
+        return matcher, gitignore_content
 
     except Exception as exc:  # pylint: disable=broad-exception-caught
         logger.warning("Error reading/parsing gitignore: %s", str(exc))
-        return None
+        return None, None
+
+
+def apply_gitignore_filter(
+    file_paths: list[str],
+    matcher: Callable[[str], bool] | None,
+    project_dir: Path,
+) -> list[str]:
+    """Filter a list of file paths using a gitignore matcher function.
+
+    Args:
+        file_paths: List of file paths to filter
+        matcher: Function that takes a path and returns True if it should be ignored
+        project_dir: Base directory for resolving relative paths to absolute
+
+    Returns:
+        Filtered list of file paths that are not ignored
+    """
+    if matcher is None:
+        return file_paths
+
+    if project_dir is None:
+        raise ValueError("Project directory cannot be None")
+
+    filtered_files = []
+
+    for file_path in file_paths:
+        abs_file_path = str(project_dir / file_path)
+        if not matcher(abs_file_path):
+            filtered_files.append(file_path)
+
+    logger.info(
+        "Applied gitignore filtering: %s files found, %s after filtering",
+        len(file_paths),
+        len(filtered_files),
+    )
+    return filtered_files
 
 
 def _build_ignored_resources(project_dir: Path) -> list[str]:
@@ -78,14 +120,27 @@ def _build_ignored_resources(project_dir: Path) -> list[str]:
     patterns = list(_DEFAULT_IGNORED)
 
     gitignore_path = project_dir / ".gitignore"
-    matcher = _read_gitignore_rules(gitignore_path)
+    matcher, _ = read_gitignore_rules(gitignore_path)
 
     if matcher is not None:
         try:
-            for entry in os.listdir(project_dir):
-                abs_entry = str(project_dir / entry)
-                if matcher(abs_entry) and entry not in patterns:
-                    patterns.append(entry)
+            for root, dirs, _files in os.walk(project_dir):
+                root_path = Path(root)
+                surviving: list[str] = []
+                for d in dirs:
+                    if d in patterns:
+                        continue  # already ignored by defaults
+                    abs_dir = str(root_path / d)
+                    if matcher(abs_dir):
+                        try:
+                            rel_path = str((root_path / d).relative_to(project_dir))
+                        except ValueError:
+                            continue
+                        if rel_path not in patterns:
+                            patterns.append(rel_path)
+                    else:
+                        surviving.append(d)
+                dirs[:] = surviving  # only descend into non-ignored dirs
         except OSError as exc:
             logger.warning("Error scanning project dir for gitignore: %s", exc)
 
