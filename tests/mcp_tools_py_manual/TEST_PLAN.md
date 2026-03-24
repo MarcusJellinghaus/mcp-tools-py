@@ -64,9 +64,27 @@ File contents: see [SAMPLE_PROJECT_FILES.md](SAMPLE_PROJECT_FILES.md).
 
 ## Execution Workflow
 
+### Timing
+
+Use the timing utilities to measure each test:
+
+```bash
+# Before each test:
+T_START=$(bash tools/get_time.sh)
+
+# After each test:
+T_END=$(bash tools/get_time.sh)
+bash tools/get_duration.sh <start_epoch> <end_epoch>
+```
+
+Record in the progress tracker:
+- **Run start / Run end / Total duration** in the header
+- **Duration** column for each individual test
+
 ### During execution
 
-- **Before each test**: update the progress tracker — set status to ✅, ❌, or ⏭️
+- **Before each test**: record start time, then run the test
+- **After each test**: record duration, set status to ✅, ❌, or ⏭️
 - **On failure**: record the error in the Notes column immediately, then continue
 - **On unexpected behavior** (not a failure, but surprising): note it — these become Observations in the report
 
@@ -334,7 +352,7 @@ Delete `sample_project/` and recreate from [SAMPLE_PROJECT_FILES.md](SAMPLE_PROJ
 |-------|-------|-------------|
 | **0. Setup** | Create files, verify tests, copy tracker | Sample project on disk |
 | **1. Read-only** | 1a–1d, 2a–2e, 3a–3d, 4a–4d, 5a–5d | None — safe to run in any order |
-| **2. Dry-run mutations** | 6a, 7a, 8a | None — preview only, verify files unchanged |
+| **2. Dry-run mutations** | 6a, 7a, 8a | None — preview only, verify files unchanged. **Run sequentially, not in parallel.** |
 | **3. Apply + verify + recreate** | 6b→6c, 7b→7c, 8b→8c | One at a time. Delete + recreate before next. |
 | **4. Report** | Generate status report, update tracker | Files written |
 
@@ -355,8 +373,8 @@ Delete `sample_project/` and recreate from [SAMPLE_PROJECT_FILES.md](SAMPLE_PROJ
 
 After execution, generate `STATUS_REPORT_<YYYY-MM-DD>.md` covering:
 
-1. **Run info**: date, executor, mcp-tools-py version, branch, git SHA
-2. **Summary table**: total / passed / failed / skipped counts, broken down by phase
+1. **Run info**: date, executor, mcp-tools-py version, branch, git SHA, run start/end/duration
+2. **Summary table**: total / passed / failed / skipped counts, broken down by phase, with phase durations
 3. **Per-tool results**: one row per test with result and details
 4. **Issues found**: any ❌ from the tracker, with severity (blocker/major/minor) and resolution
 5. **Observations**: any `[OBS]` notes from the tracker — performance, output quality, edge cases
