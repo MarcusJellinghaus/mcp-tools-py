@@ -1,6 +1,6 @@
 # MCP Tools Py Architecture Documentation
 
-**Framework**: Arc42 Template | **Version**: 1.0 | **Last Updated**: 2026-03-07
+**Framework**: Arc42 Template | **Version**: 1.1 | **Last Updated**: 2026-03-23
 **Maintainer**: Marcus Jellinghaus | **Review Frequency**: On major changes
 
 ---
@@ -8,9 +8,9 @@
 ## 1. Introduction & Goals
 
 ### System Purpose
-MCP server providing automated code quality checking (pylint, pytest, mypy) for Python projects, with LLM-optimized output designed for AI-assisted development workflows.
+MCP server providing automated code quality checking (pylint, pytest, mypy) and Python refactoring tools (powered by jedi and rope) for Python projects, with LLM-optimized output designed for AI-assisted development workflows.
 
-**Scope:** This server covers Python projects only. Further Python-specific extensions are planned, including architecture and layering checks (vulture, tach, import-linter) and refactoring tools. Support for other languages can be provided through separate, dedicated MCP servers with similar functionality.
+**Scope:** This server covers Python projects only. Further Python-specific extensions are planned, including architecture and layering checks (vulture, tach, import-linter). Support for other languages can be provided through separate, dedicated MCP servers with similar functionality.
 
 Compared to a general-purpose bash MCP tool, this server offers a more controlled approach: only a defined set of tools can be executed, all operations are sandboxed within `project_dir`, output is size-limited to reduce context load, and behavior is transparent via open source code and detailed structured logging.
 
@@ -18,6 +18,7 @@ Compared to a general-purpose bash MCP tool, this server offers a more controlle
 - **Pylint Integration**: Static analysis with configurable rules and LLM-friendly prompts
 - **Pytest Integration**: Test execution with JSON report parsing, failure analysis, and smart detail control
 - **Mypy Integration**: Static type checking with strict mode and configurable error codes
+- **Refactoring Tools**: Symbol listing, reference finding, symbol/module moving, and renaming via jedi and rope
 - **LLM-Optimized Output**: Results formatted as actionable prompts for AI assistants
 - **Subprocess Isolation**: STDIO isolation preventing MCP transport conflicts with Python subprocesses
 
@@ -44,7 +45,7 @@ Compared to a general-purpose bash MCP tool, this server offers a more controlle
 
 ### Dependencies
 
-**Runtime**: `mcp[server,cli]`, `pylint`, `pytest` + `pytest-json-report` + `pytest-xdist`, `mypy`, `structlog` + `python-json-logger`, `mcp-config`
+**Runtime**: `mcp[server,cli]`, `pylint`, `pytest` + `pytest-json-report` + `pytest-xdist`, `mypy`, `jedi`, `rope`, `structlog` + `python-json-logger`, `mcp-config`
 
 **Development**: `mcp-coder`, `black` + `isort`, `import-linter` + `tach`, `pycycle`, `vulture`, `pydeps`
 
@@ -65,10 +66,14 @@ See `pyproject.toml` for version constraints.
 │   MCP Client    │◄────────────────►│  mcp-tools-py │───────────────►│  pylint     │
 │                 │                   │                   │               │  pytest     │
 │ • Claude Code   │                   │  (MCP Server)     │               │  mypy       │
-│ • Claude Desktop│                   │                   │               │             │
-│ • VSCode        │                   │                   │               │ (subprocess │
-│ • mcp-coder     │                   │                   │               │  execution) │
-└─────────────────┘                   └──────────────────┘               └─────────────┘
+│ • Claude Desktop│                   │  8 MCP tools:     │               │             │
+│ • VSCode        │                   │  3 checker +      │               │ (subprocess │
+│ • mcp-coder     │                   │  5 refactoring    │  in-process   │  execution) │
+└─────────────────┘                   └──────────────────┘◄─────────────►┌─────────────┐
+                                                                         │  jedi/rope  │
+                                                                         │ (refactoring│
+                                                                         │  library)   │
+                                                                         └─────────────┘
                                               │
                                               ▼
                                       ┌──────────────┐
@@ -115,7 +120,9 @@ See `pyproject.toml` for version constraints.
 │  Server Layer                                        │
 │  └── mcp_tools_py.server                        │
 ├─────────────────────────────────────────────────────┤
-│  Checker Implementation Layer                        │
+│  Tool Implementation Layer                           │
+│  ├── mcp_tools_py.checker_tools                 │
+│  ├── mcp_tools_py.refactoring                   │
 │  ├── mcp_tools_py.code_checker_pytest           │
 │  ├── mcp_tools_py.code_checker_pylint           │
 │  └── mcp_tools_py.code_checker_mypy             │
@@ -146,7 +153,9 @@ Each checker follows the same internal structure:
 ### Module Overview
 
 - **`main.py`** — CLI entry point: argument parsing (`argparse`), logging setup, server creation
-- **`server.py`** — `CodeCheckerServer`: MCP tool registration via FastMCP, 3 tools (`run_pylint_check`, `run_pytest_check`, `run_mypy_check`), result formatting
+- **`server.py`** — `CodeCheckerServer`: creates FastMCP instance and delegates tool registration to `CheckerTools` and `RefactoringTools`. Exposes 8 tools total (3 checker + 5 refactoring)
+- **`checker_tools.py`** — `CheckerTools`: registers the 3 checker MCP tools (`run_pylint_check`, `run_pytest_check`, `run_mypy_check`), extracted from server.py
+- **`refactoring/`** — `RefactoringTools`: registers 5 refactoring MCP tools (`list_symbols`, `find_references`, `move_symbol`, `rename_symbol`, `move_module`) powered by jedi and rope
 - **`code_checker_pytest`** — Most complex checker: JSON report parsing, `OutputBuilder`, `show_details` logic, `ProcessResult` adapter
 - **`code_checker_pylint`** — Pylint JSON output parsing and prompt generation
 - **`code_checker_mypy`** — Mypy text output parsing and prompt generation

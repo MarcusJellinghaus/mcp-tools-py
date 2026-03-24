@@ -28,6 +28,9 @@ build/
 .mypy_cache/
 .ruff_cache/
 
+# Rope project cache
+.ropeproject/
+
 # MCP coder session files
 .mcp-coder/
 

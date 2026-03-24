@@ -11,7 +11,7 @@ name = "entry_point"
 name = "server"
 
 [[layers]]
-name = "checker_implementation"
+name = "tool_implementation"
 
 [[layers]]
 name = "utilities"
@@ -19,7 +19,7 @@ name = "utilities"
 # Define architectural modules
 [[modules]]
 path = "mcp_tools_py.code_checker_pytest"
-layer = "checker_implementation"
+layer = "tool_implementation"
 depends_on = [
     { path = "mcp_tools_py.utils" },
     { path = "mcp_tools_py.log_utils" }
@@ -27,7 +27,7 @@ depends_on = [
 
 [[modules]]
 path = "mcp_tools_py.code_checker_pylint"
-layer = "checker_implementation"
+layer = "tool_implementation"
 depends_on = [
     { path = "mcp_tools_py.utils" },
     { path = "mcp_tools_py.log_utils" }
@@ -35,9 +35,27 @@ depends_on = [
 
 [[modules]]
 path = "mcp_tools_py.code_checker_mypy"
-layer = "checker_implementation"
+layer = "tool_implementation"
 depends_on = [
     { path = "mcp_tools_py.utils" },
+    { path = "mcp_tools_py.log_utils" }
+]
+
+[[modules]]
+path = "mcp_tools_py.checker_tools"
+layer = "tool_implementation"
+depends_on = [
+    { path = "mcp_tools_py.code_checker_pytest" },
+    { path = "mcp_tools_py.code_checker_pylint" },
+    { path = "mcp_tools_py.code_checker_mypy" },
+    { path = "mcp_tools_py.utils" },
+    { path = "mcp_tools_py.log_utils" }
+]
+
+[[modules]]
+path = "mcp_tools_py.refactoring"
+layer = "tool_implementation"
+depends_on = [
     { path = "mcp_tools_py.log_utils" }
 ]
 
@@ -45,9 +63,8 @@ depends_on = [
 path = "mcp_tools_py.server"
 layer = "server"
 depends_on = [
-    { path = "mcp_tools_py.code_checker_pytest" },
-    { path = "mcp_tools_py.code_checker_pylint" },
-    { path = "mcp_tools_py.code_checker_mypy" },
+    { path = "mcp_tools_py.checker_tools" },
+    { path = "mcp_tools_py.refactoring" },
     { path = "mcp_tools_py.utils" },
     { path = "mcp_tools_py.log_utils" }
 ]
