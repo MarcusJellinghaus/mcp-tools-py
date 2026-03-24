@@ -56,9 +56,9 @@ File contents: see [SAMPLE_PROJECT_FILES.md](SAMPLE_PROJECT_FILES.md).
    ```
 6. Copy [PROGRESS_TRACKER.md](PROGRESS_TRACKER.md) to `pr_info/PROGRESS_TRACKER_RUN_<date>.md` for this run
 
-> **Note:** The `sample_project/` directory is gitignored. It is created fresh
-> from SAMPLE_PROJECT_FILES.md at the start of each test run and cleaned up
-> via delete + recreate between mutation tests.
+> **Note:** The `sample_project/` directory is checked into git.
+> Between mutation tests, delete + recreate it from SAMPLE_PROJECT_FILES.md
+> to restore a clean state.
 
 ---
 
