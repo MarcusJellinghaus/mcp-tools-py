@@ -1,109 +1,121 @@
-# Step 1: Thread `refactoring_timeout` from CLI to RefactoringTools
+# Step 1: Harden `_with_rope_project()` — disable cache + gitignore filtering
 
 **Summary**: See `pr_info/steps/summary.md` for full context (Issue #112).
 
-This step adds the `--refactoring-timeout` CLI argument and threads it through the
-server → refactoring tools chain. No behavior change yet — just plumbing.
+Disable rope's persistent cache and add gitignore-aware file filtering to reduce
+rope's scan scope. Merges the cache-disable and gitignore-filtering fixes into one step.
 
 ## WHERE: Files to modify
 
 | File | Action |
 |------|--------|
-| `tests/test_refactoring/test_rope_tools.py` | Add test for timeout parameter acceptance |
-| `tests/test_server.py` (or equivalent) | Add test for `refactoring_timeout` param in `CodeCheckerServer` |
-| `src/mcp_tools_py/main.py` | Add `--refactoring-timeout` CLI argument |
-| `src/mcp_tools_py/server.py` | Add `refactoring_timeout` param to `CodeCheckerServer` and `create_server` |
-| `src/mcp_tools_py/refactoring/__init__.py` | Accept `timeout` in `RefactoringTools.__init__`, store as `self._timeout` |
+| `pyproject.toml` | Add `igittigitt` dependency |
+| `src/mcp_tools_py/refactoring/rope_tools.py` | Set `ropefolder=None`, add gitignore filtering |
+| `tests/test_refactoring/test_rope_tools.py` | Add tests for cache disable + gitignore filtering |
 
-## WHAT: Functions to modify
+## WHAT: Functions to add/modify
 
-### `main.py::parse_args()`
-Add argument:
+### Modified: `rope_tools.py::_with_rope_project()`
+
 ```python
-parser.add_argument(
-    "--refactoring-timeout",
-    type=int,
-    default=120,
-    help="Timeout in seconds for rope refactoring operations (default: 120)",
-)
+@contextmanager
+def _with_rope_project(project_dir: Path) -> Iterator[Project]:
+    """Context manager: open fresh rope Project, yield, close."""
+    ignored = _build_ignored_resources(project_dir)
+    project = Project(str(project_dir), ropefolder=None, ignored_resources=ignored)
+    try:
+        yield project
+    finally:
+        project.close()
 ```
 
-### `main.py::main()`
-Pass to `create_server`:
+Key changes:
+- `ropefolder=None` disables persistent `.ropeproject/` cache
+- `ignored_resources` from gitignore filtering reduces scan scope
+
+### New: `rope_tools.py::_build_ignored_resources()`
+
 ```python
-server = create_server(
-    ...,
-    refactoring_timeout=args.refactoring_timeout,
-)
+def _build_ignored_resources(project_dir: Path) -> list[str]:
+    """Build rope ignored_resources from .gitignore + hardcoded defaults."""
 ```
 
-### `server.py::CodeCheckerServer.__init__()`
-**Signature change**:
+### New: `rope_tools.py::read_gitignore_rules()` and `apply_gitignore_filter()`
+
+Copy ONE-TO-ONE from `p_workspace` reference project
+(`src/mcp_workspace/file_tools/directory_utils.py`). These functions use `igittigitt`
+(NOT `pathspec`).
+
+Add comment at top of copied section:
 ```python
-def __init__(
-    self,
-    project_dir: Path,
-    python_executable: Optional[str] = None,
-    venv_path: Optional[str] = None,
-    test_folder: str = "tests",
-    keep_temp_files: bool = False,
-    refactoring_timeout: int = 120,  # NEW
-) -> None:
-```
-Store `self.refactoring_timeout = refactoring_timeout` and pass to `RefactoringTools`:
-```python
-RefactoringTools(self.project_dir, timeout=self.refactoring_timeout).register(self.mcp)
+# Gitignore utilities copied from p_workspace (directory_utils.py).
+# TODO: Refactor into shared mcp_utils package later.
 ```
 
-### `server.py::create_server()`
-**Signature change**: Add `refactoring_timeout: int = 120` parameter, pass through.
+**`read_gitignore_rules()`** — reads `.gitignore`, returns `(matcher_fn, content)` tuple
+using `igittigitt.IgnoreParser`.
 
-### `refactoring/__init__.py::RefactoringTools.__init__()`
-**Signature change**:
-```python
-def __init__(self, project_dir: Path, timeout: int = 120) -> None:
-    self._project_dir = project_dir
-    self._timeout = timeout
-```
+**`apply_gitignore_filter()`** — filters file paths using the matcher function.
 
-### `refactoring/__init__.py::_register_rope_tools()`
-Capture `timeout = self._timeout` and pass to each rope function call:
-```python
-return rope_move_symbol(
-    project_dir, source_file, symbol_name, dest_file, dry_run, timeout=timeout
-)
-```
+### Strategy: gitignore → rope `ignored_resources`
 
-## HOW: Integration points
-
-- `main.py` → `server.py`: via `create_server()` keyword argument
-- `server.py` → `refactoring/__init__.py`: via `RefactoringTools(project_dir, timeout=...)` constructor
-- `refactoring/__init__.py` → `rope_tools.py`: via `timeout=` keyword on each public function
+Rope's `ignored_resources` accepts glob patterns matched against resource paths relative
+to project root. The approach:
+1. Use `read_gitignore_rules()` to get a matcher from `.gitignore`
+2. Walk project files, apply matcher to get ignored paths
+3. Convert ignored directory names to rope glob patterns
+4. Merge with hardcoded defaults, deduplicate
 
 ## ALGORITHM
 
 ```
-1. parse_args() adds --refactoring-timeout (int, default=120)
-2. main() passes args.refactoring_timeout to create_server()
-3. CodeCheckerServer stores self.refactoring_timeout
-4. CodeCheckerServer passes timeout to RefactoringTools(project_dir, timeout=...)
-5. RefactoringTools stores self._timeout
-6. Each registered rope tool closure passes timeout to rope_* function
+_build_ignored_resources(project_dir):
+  1. Start with hardcoded defaults:
+     [".ropeproject", "__pycache__", "*.pyc", ".git",
+      "node_modules", ".venv", "venv", ".tox",
+      "build", "dist", ".mypy_cache", ".pytest_cache",
+      ".eggs", "*.egg-info"]
+  2. Read .gitignore via read_gitignore_rules()
+  3. If matcher exists, scan top-level dirs and files:
+     - For each entry in project_dir, check if matcher says ignore
+     - Add ignored names to the pattern list
+  4. Deduplicate and return as list[str]
 ```
 
 ## DATA
 
-- `refactoring_timeout`: `int` (seconds), default `120`
-- No new return types or data structures
+- **Hardcoded defaults**:
+  ```python
+  _DEFAULT_IGNORED = [
+      ".ropeproject", "__pycache__", "*.pyc", ".git",
+      "node_modules", ".venv", "venv", ".tox",
+      "build", "dist", ".mypy_cache", ".pytest_cache",
+      ".eggs", "*.egg-info",
+  ]
+  ```
+- **New dependency**: `igittigitt` in `pyproject.toml`
+- `ropefolder=None`: rope `Project` constructor parameter (`Optional[str]`)
 
 ## Tests (TDD — write first)
 
-1. **Test CLI parsing**: Verify `parse_args()` returns `refactoring_timeout=120` by default
-   and accepts `--refactoring-timeout 60`.
-2. **Test server init**: Verify `CodeCheckerServer` stores `refactoring_timeout` attribute.
-3. **Test RefactoringTools init**: Verify `RefactoringTools(path, timeout=60)._timeout == 60`.
+1. **Test no `.ropeproject/` created**: After `rename_symbol`, assert no `.ropeproject/`
+   directory exists.
+   ```python
+   def test_rope_does_not_create_ropeproject_folder(sample_project: Path) -> None:
+       rename_symbol(sample_project, "src/foo.py", "my_func", "better_name")
+       assert not (sample_project / ".ropeproject").exists()
+   ```
+
+2. **Test defaults without gitignore**: Create project without `.gitignore`. Verify
+   `_build_ignored_resources()` returns the hardcoded defaults.
+
+3. **Test gitignore patterns applied**: Create project with `.gitignore` containing
+   `ignoreme/`. Verify `_build_ignored_resources()` includes `ignoreme` in output.
+
+4. **Test existing tests still pass**: All existing tests must pass with the new
+   `ropefolder=None` and `ignored_resources` changes.
 
 ## Commit message
 ```
-Add --refactoring-timeout CLI arg and thread through server to RefactoringTools
+Disable .ropeproject cache and add gitignore-aware filtering for rope
 ```
