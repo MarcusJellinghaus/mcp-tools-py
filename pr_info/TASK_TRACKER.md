@@ -31,9 +31,9 @@ This tracks **Feature Implementation** consisting of multiple **Tasks**.
 ### Step 2: Multiprocessing timeout wrapper + CLI plumbing
 > Add `--refactoring-timeout` CLI arg, thread it through server to rope functions, and wrap each rope operation in a `multiprocessing.Process` for timeout protection.
 
-- [ ] Implementation: add `_run_with_timeout()`, `_worker()`, split public functions into outer + `_*_impl`, add `timeout` param threading from CLI through server, and write tests ([step_2.md](./steps/step_2.md))
-- [ ] Quality checks: pylint, pytest, mypy — fix all issues
-- [ ] Commit message prepared
+- [x] Implementation: add `_run_with_timeout()`, `_worker()`, split public functions into outer + `_*_impl`, add `timeout` param threading from CLI through server, and write tests ([step_2.md](./steps/step_2.md))
+- [x] Quality checks: pylint, pytest, mypy — fix all issues
+- [x] Commit message prepared
 
 ## Pull Request
 
