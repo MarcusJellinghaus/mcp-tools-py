@@ -168,6 +168,7 @@ git ls-tree
 **⚠️ Bash discipline (applies to subagents too):**
 
 - No `cd` prefix, no `git -C` — the working directory is already correct. Just `git status`, never `git -C "/some/path" status`.
+- No redundant folder paths — MCP tools and git already operate from the project root. Use relative paths, don't prefix with absolute paths.
 - Stick to approved commands above. Avoid unapproved bash commands — they trigger user authorization prompts and interrupt the workflow.
 - Do not chain approved commands with unapproved ones (e.g. `git status && echo "---" && git diff`). The `echo` makes the whole command unapproved. Run approved commands separately instead.
 
