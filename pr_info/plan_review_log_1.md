@@ -35,3 +35,29 @@
 - Updated summary.md with new structure and `igittigitt` decision
 
 **Status**: Ready to commit
+
+## Round 2 — 2026-03-24
+
+**Findings**:
+- [Accept] `apply_gitignore_filter()` may not be used by `_build_ignored_resources()` algorithm — clarify both copied as a unit
+- [Accept] `pathspec` still in dependencies after adding `igittigitt` — clarify it stays
+- [Accept] `move_symbol` validation split needs clarification — what moves into `_impl`
+- [Accept] Error context from subprocess exceptions unclear — clarify `_*_impl` handles own context
+- [Accept] Missing mypy override for `igittigitt` — add to step 1
+- [Accept] Test sleep function must be module-level on Windows — add note to step 2
+
+**Decisions**: All 6 accepted as straightforward clarifications. No user escalation needed.
+
+**User decisions**: None required this round.
+
+**Changes**:
+- step_1.md: Added note about both functions copied as unit, pathspec stays, mypy override for igittigitt
+- step_2.md: Clarified move_symbol validation split, error context handling, Windows spawn note for tests
+
+**Status**: Committed
+
+## Final Status
+
+- **Rounds**: 2
+- **Commits**: 2 (round 1: plan restructure, round 2: clarifications)
+- **Plan status**: Ready for approval

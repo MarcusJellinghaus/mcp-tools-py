@@ -9,7 +9,7 @@ rope's scan scope. Merges the cache-disable and gitignore-filtering fixes into o
 
 | File | Action |
 |------|--------|
-| `pyproject.toml` | Add `igittigitt` dependency |
+| `pyproject.toml` | Add `igittigitt` dependency + mypy override for `igittigitt` |
 | `src/mcp_tools_py/refactoring/rope_tools.py` | Set `ropefolder=None`, add gitignore filtering |
 | `tests/test_refactoring/test_rope_tools.py` | Add tests for cache disable + gitignore filtering |
 
@@ -51,6 +51,9 @@ Add comment at top of copied section:
 # Gitignore utilities copied from p_workspace (directory_utils.py).
 # TODO: Refactor into shared mcp_utils package later.
 ```
+
+Both functions are copied as a unit for consistency with p_workspace, even though
+`_build_ignored_resources()` primarily uses the matcher from `read_gitignore_rules()`.
 
 **`read_gitignore_rules()`** — reads `.gitignore`, returns `(matcher_fn, content)` tuple
 using `igittigitt.IgnoreParser`.
@@ -94,6 +97,7 @@ _build_ignored_resources(project_dir):
   ]
   ```
 - **New dependency**: `igittigitt` in `pyproject.toml`
+- **Existing dependency**: `pathspec` remains in `pyproject.toml` (used by other project tooling)
 - `ropefolder=None`: rope `Project` constructor parameter (`Optional[str]`)
 
 ## Tests (TDD — write first)

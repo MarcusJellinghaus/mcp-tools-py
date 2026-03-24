@@ -66,6 +66,10 @@ def _worker(
 ) -> None:
 ```
 
+Each `_*_impl` function includes its own error context in exception handling
+(matching the current code pattern), so `_worker`'s generic `f"Error: {exc}"`
+wrapper only catches unexpected failures.
+
 ### Refactored public functions
 
 Each public function (`move_symbol`, `rename_symbol`, `move_module`) gains a
@@ -78,6 +82,11 @@ module-level `_*_impl` function:
 
 The outer function does fast validation (file exists, symbol found), then calls
 `_run_with_timeout(_*_impl, ...)`.
+
+For `move_symbol`, file creation (`_ensure_parents`, writing empty dest file) and
+collision checking all move inside `_move_symbol_impl` since they must happen in the
+same process that creates the rope `Project`. Only basic path existence checks stay
+in the outer function.
 
 ## HOW: Critical technical details
 
@@ -150,6 +159,8 @@ CLI (--refactoring-timeout)
 3. **Test timeout triggers**: Create a function that sleeps forever, pass to
    `_run_with_timeout()` with `timeout=3`. Assert returns error containing "timed out"
    and completes within ~5s. Use `finally` block with `process.kill()` for cleanup.
+   The sleep-forever function must be defined at module level (not as a closure)
+   for Windows `spawn` compatibility.
 
 4. **Test normal operation with timeout**: Run `rename_symbol()` with `timeout=30`.
    Assert it succeeds normally.
