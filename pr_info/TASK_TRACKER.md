@@ -25,7 +25,7 @@ This tracks **Feature Implementation** consisting of multiple **Tasks**.
 > Disable rope's persistent cache (`ropefolder=None`) and add gitignore-aware file filtering via `igittigitt` to reduce rope's scan scope.
 
 - [x] Implementation: add `igittigitt` dependency, `_build_ignored_resources()`, `read_gitignore_rules()`, `apply_gitignore_filter()`, update `_with_rope_project()`, and write tests ([step_1.md](./steps/step_1.md))
-- [ ] Quality checks: pylint, pytest, mypy — fix all issues
+- [x] Quality checks: pylint, pytest, mypy — fix all issues
 - [x] Commit message prepared
 
 ### Step 2: Multiprocessing timeout wrapper + CLI plumbing
