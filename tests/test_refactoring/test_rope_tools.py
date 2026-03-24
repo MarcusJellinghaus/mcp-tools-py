@@ -4,7 +4,12 @@ from pathlib import Path
 
 import pytest
 
-from mcp_tools_py.refactoring.rope_tools import move_module, move_symbol, rename_symbol
+from mcp_tools_py.refactoring.rope_tools import (
+    _build_ignored_resources,
+    move_module,
+    move_symbol,
+    rename_symbol,
+)
 
 # --- Shared fixture ---
 
@@ -175,3 +180,36 @@ def test_move_module_dry_run(sample_project: Path) -> None:
     assert "[DRY RUN]" in result
     # foo.py should still be in original location
     assert (sample_project / "src" / "foo.py").exists()
+
+
+# --- ropefolder=None and gitignore filtering tests ---
+
+
+def test_rope_does_not_create_ropeproject_folder(sample_project: Path) -> None:
+    """After rename_symbol, assert no .ropeproject/ directory exists."""
+    rename_symbol(sample_project, "src/foo.py", "my_func", "better_name")
+    assert not (sample_project / ".ropeproject").exists()
+
+
+def test_build_ignored_resources_defaults_without_gitignore(tmp_path: Path) -> None:
+    """Without .gitignore, returns hardcoded defaults."""
+    (tmp_path / "src").mkdir()
+    (tmp_path / "src" / "__init__.py").write_text("")
+    result = _build_ignored_resources(tmp_path)
+    assert ".ropeproject" in result
+    assert "__pycache__" in result
+    assert ".git" in result
+    assert "node_modules" in result
+
+
+def test_build_ignored_resources_includes_gitignore_patterns(tmp_path: Path) -> None:
+    """With .gitignore containing ignoreme/, the result includes ignoreme."""
+    (tmp_path / "src").mkdir()
+    (tmp_path / "src" / "__init__.py").write_text("")
+    (tmp_path / "ignoreme").mkdir()
+    (tmp_path / ".gitignore").write_text("ignoreme/\n")
+    result = _build_ignored_resources(tmp_path)
+    assert "ignoreme" in result
+    # Defaults should still be present
+    assert ".ropeproject" in result
+    assert "__pycache__" in result

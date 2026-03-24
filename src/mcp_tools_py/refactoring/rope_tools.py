@@ -3,21 +3,136 @@
 from __future__ import annotations
 
 import ast
+import logging
+import os
 from contextlib import contextmanager
 from pathlib import Path
-from typing import Iterator, List, Set
+from typing import Callable, Iterator, List, Optional, Set, Tuple
 
 import rope.base.project  # pylint: disable=import-error
 import rope.refactor.move  # pylint: disable=import-error
 import rope.refactor.rename  # pylint: disable=import-error
+from igittigitt import IgnoreParser  # pylint: disable=import-error
 from rope.base.change import ChangeSet  # pylint: disable=import-error
 from rope.base.project import Project  # pylint: disable=import-error
+
+logger = logging.getLogger(__name__)
+
+_DEFAULT_IGNORED = [
+    ".ropeproject",
+    "__pycache__",
+    "*.pyc",
+    ".git",
+    "node_modules",
+    ".venv",
+    "venv",
+    ".tox",
+    "build",
+    "dist",
+    ".mypy_cache",
+    ".pytest_cache",
+    ".eggs",
+    "*.egg-info",
+]
+
+
+# Gitignore utilities copied from p_workspace (directory_utils.py).
+# TODO: Refactor into shared mcp_utils package later.
+
+
+def read_gitignore_rules(
+    gitignore_path: Path,
+) -> Tuple[Optional[Callable[[str], bool]], Optional[str]]:
+    """Read and parse a .gitignore file to create a matcher function.
+
+    Args:
+        gitignore_path: Path to the .gitignore file
+
+    Returns:
+        A tuple containing (matcher_function, gitignore_content), or (None, None)
+        if file doesn't exist
+    """
+    if not gitignore_path.is_file():
+        logger.info("No .gitignore file found at %s", gitignore_path)
+        return None, None
+
+    try:
+        with open(gitignore_path, "r", encoding="utf-8") as f:
+            gitignore_content = f.read()
+
+        logger.info("Gitignore content: %s", gitignore_content)
+
+        logger.info("Parsing gitignore file at %s", gitignore_path)
+        parser = IgnoreParser()
+        parser.parse_rule_file(gitignore_path)
+
+        def matcher(path: str) -> bool:
+            return bool(parser.match(path))
+
+        return matcher, gitignore_content
+
+    except Exception as exc:  # pylint: disable=broad-exception-caught
+        logger.warning("Error reading/parsing gitignore: %s", str(exc))
+        return None, None
+
+
+def apply_gitignore_filter(
+    file_paths: List[str], matcher: Optional[Callable[[str], bool]], project_dir: Path
+) -> List[str]:
+    """Filter a list of file paths using a gitignore matcher function.
+
+    Args:
+        file_paths: List of file paths to filter
+        matcher: Function that takes a path and returns True if it should be ignored
+        project_dir: Base directory for resolving relative paths to absolute
+
+    Returns:
+        Filtered list of file paths that are not ignored
+    """
+    if matcher is None:
+        return file_paths
+
+    if project_dir is None:
+        raise ValueError("Project directory cannot be None")
+
+    filtered_files = []
+    for file_path in file_paths:
+        abs_file_path = str(project_dir / file_path)
+        if not matcher(abs_file_path):
+            filtered_files.append(file_path)
+
+    logger.info(
+        "Applied gitignore filtering: %s files found, %s after filtering",
+        len(file_paths),
+        len(filtered_files),
+    )
+    return filtered_files
+
+
+def _build_ignored_resources(project_dir: Path) -> list[str]:
+    """Build rope ignored_resources from .gitignore + hardcoded defaults."""
+    patterns = list(_DEFAULT_IGNORED)
+
+    gitignore_path = project_dir / ".gitignore"
+    matcher, _ = read_gitignore_rules(gitignore_path)
+
+    if matcher is not None:
+        try:
+            for entry in os.listdir(project_dir):
+                abs_entry = str(project_dir / entry)
+                if matcher(abs_entry) and entry not in patterns:
+                    patterns.append(entry)
+        except OSError as exc:
+            logger.warning("Error scanning project dir for gitignore: %s", exc)
+
+    return patterns
 
 
 @contextmanager
 def _with_rope_project(project_dir: Path) -> Iterator[Project]:
     """Context manager: open fresh rope Project, yield, close."""
-    project = Project(str(project_dir))
+    ignored = _build_ignored_resources(project_dir)
+    project = Project(str(project_dir), ropefolder=None, ignored_resources=ignored)
     try:
         yield project
     finally:
