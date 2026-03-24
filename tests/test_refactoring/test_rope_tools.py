@@ -1,6 +1,5 @@
 """Tests for rope-based refactoring operations (move, rename)."""
 
-import time
 from pathlib import Path
 
 import pytest
@@ -236,6 +235,8 @@ def test_build_ignored_resources_includes_gitignore_patterns(tmp_path: Path) -> 
 
 def test_run_with_timeout_triggers_on_slow_function() -> None:
     """A function that sleeps forever should be killed and return a timeout error."""
+    import time  # noqa: PLC0415
+
     start = time.monotonic()
     result = _run_with_timeout(
         _sleep_forever, (), timeout=3, operation_name="rename_symbol"

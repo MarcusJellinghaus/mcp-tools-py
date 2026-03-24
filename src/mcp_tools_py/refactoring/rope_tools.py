@@ -45,26 +45,20 @@ _DEFAULT_IGNORED = [
 
 def _read_gitignore_rules(
     gitignore_path: Path,
-) -> tuple[Callable[[str], bool] | None, str | None]:
+) -> Callable[[str], bool] | None:
     """Read and parse a .gitignore file to create a matcher function.
 
     Args:
         gitignore_path: Path to the .gitignore file
 
     Returns:
-        A tuple containing (matcher_function, gitignore_content), or (None, None)
-        if file doesn't exist
+        A matcher function, or None if file doesn't exist.
     """
     if not gitignore_path.is_file():
         logger.debug("No .gitignore file found at %s", gitignore_path)
-        return None, None
+        return None
 
     try:
-        with open(gitignore_path, "r", encoding="utf-8") as f:
-            gitignore_content = f.read()
-
-        logger.debug("Gitignore content: %s", gitignore_content)
-
         logger.debug("Found .gitignore at: %s", gitignore_path)
         parser = IgnoreParser()
         parser.parse_rule_file(gitignore_path)
@@ -72,11 +66,11 @@ def _read_gitignore_rules(
         def matcher(path: str) -> bool:
             return bool(parser.match(path))
 
-        return matcher, gitignore_content
+        return matcher
 
     except Exception as exc:  # pylint: disable=broad-exception-caught
         logger.warning("Error reading/parsing gitignore: %s", str(exc))
-        return None, None
+        return None
 
 
 def _build_ignored_resources(project_dir: Path) -> list[str]:
@@ -84,7 +78,7 @@ def _build_ignored_resources(project_dir: Path) -> list[str]:
     patterns = list(_DEFAULT_IGNORED)
 
     gitignore_path = project_dir / ".gitignore"
-    matcher, _ = _read_gitignore_rules(gitignore_path)
+    matcher = _read_gitignore_rules(gitignore_path)
 
     if matcher is not None:
         try:
@@ -153,6 +147,9 @@ def _run_with_timeout(
             process.kill()
             process.join()
         return result
+    finally:
+        result_queue.close()
+        result_queue.join_thread()
 
 
 def _get_top_level_symbols(source: str) -> list[str]:

@@ -36,3 +36,34 @@
 - Merged two duplicate timeout tests into one
 
 **Status:** Committed
+
+## Round 2 — 2026-03-24
+
+**Findings:**
+- C1. Queue resource leak — `result_queue` never closed in `_run_with_timeout`
+- C2. `_read_gitignore_rules` reads `.gitignore` file twice, second read unused
+- C3. Top-level-only gitignore filtering (same as R1-S2)
+- C4. Dry-run cleanup on subprocess crash/kill
+- S1. Unused `time` import in test file top-level
+- S2. pr_info/ and manual tests should be excluded from merge
+- S3. Test imports could be module-level / moved to test_main.py
+- S4. Explicit spawn context (same as R1-S5)
+- S5. Namespace package edge case in `_ensure_parents`
+
+**Decisions:**
+- C1: Accept — real resource leak on repeated invocations
+- C2: Accept — dead code, unnecessary I/O
+- C3: Skip — same as R1-S2, speculative
+- C4: Skip — significant redesign for low-risk edge case
+- S1: Accept — trivial cleanup, Boy Scout Rule
+- S2: Skip — pr_info/ removed later per process
+- S3: Skip — cosmetic, tests work fine
+- S4: Skip — same as R1-S5, speculative
+- S5: Skip — speculative edge case
+
+**Changes:**
+- Added `finally` block to `_run_with_timeout` with `result_queue.close()` and `result_queue.join_thread()`
+- Simplified `_read_gitignore_rules`: removed redundant manual file read, changed return type to just `Callable | None`
+- Removed unused top-level `import time` from test file, moved to local import where needed
+
+**Status:** Committed
