@@ -31,6 +31,7 @@ if not exist "!VENV_SCRIPTS!\activate.bat" (
     uv venv .venv
     echo Local virtual environment created at !VENV_DIR!
 )
+echo [OK] Target environment: !VENV_DIR!
 echo.
 
 echo [1/6] Uninstalling existing packages...
