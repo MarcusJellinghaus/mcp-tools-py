@@ -5,9 +5,9 @@ from __future__ import annotations
 import ast
 import logging
 import os
+from collections.abc import Callable, Iterator
 from contextlib import contextmanager
 from pathlib import Path
-from typing import Callable, Iterator, List, Optional, Set, Tuple
 
 import rope.base.project  # pylint: disable=import-error
 import rope.refactor.move  # pylint: disable=import-error
@@ -42,7 +42,7 @@ _DEFAULT_IGNORED = [
 
 def read_gitignore_rules(
     gitignore_path: Path,
-) -> Tuple[Optional[Callable[[str], bool]], Optional[str]]:
+) -> tuple[Callable[[str], bool] | None, str | None]:
     """Read and parse a .gitignore file to create a matcher function.
 
     Args:
@@ -77,8 +77,8 @@ def read_gitignore_rules(
 
 
 def apply_gitignore_filter(
-    file_paths: List[str], matcher: Optional[Callable[[str], bool]], project_dir: Path
-) -> List[str]:
+    file_paths: list[str], matcher: Callable[[str], bool] | None, project_dir: Path
+) -> list[str]:
     """Filter a list of file paths using a gitignore matcher function.
 
     Args:
@@ -91,9 +91,6 @@ def apply_gitignore_filter(
     """
     if matcher is None:
         return file_paths
-
-    if project_dir is None:
-        raise ValueError("Project directory cannot be None")
 
     filtered_files = []
     for file_path in file_paths:
@@ -139,14 +136,14 @@ def _with_rope_project(project_dir: Path) -> Iterator[Project]:
         project.close()
 
 
-def _get_top_level_symbols(source: str) -> List[str]:
+def _get_top_level_symbols(source: str) -> list[str]:
     """Parse source and return top-level symbol names."""
     try:
         tree = ast.parse(source)
     except SyntaxError:
         return []
 
-    symbols: List[str] = []
+    symbols: list[str] = []
     for node in ast.iter_child_nodes(tree):
         if isinstance(node, (ast.FunctionDef, ast.AsyncFunctionDef)):
             symbols.append(node.name)
@@ -206,7 +203,7 @@ def _find_symbol_offset(source: str, symbol_name: str) -> int | None:
 
 
 def _format_changes(
-    changes: ChangeSet, dry_run: bool, pre_existing: Set[str] | None = None
+    changes: ChangeSet, dry_run: bool, pre_existing: set[str] | None = None
 ) -> str:
     """Format a rope ChangeSet into a human-readable report.
 
@@ -218,8 +215,8 @@ def _format_changes(
     """
     prefix = "[DRY RUN] Would modify" if dry_run else "Modified"
     create_prefix = "[DRY RUN] Would create" if dry_run else "Created"
-    lines: List[str] = []
-    seen: Set[str] = set()
+    lines: list[str] = []
+    seen: set[str] = set()
 
     for change in changes.changes:
         rel_path = change.resource.path
@@ -334,7 +331,7 @@ def move_symbol(
         return f"Error moving '{symbol_name}': {exc}"
 
 
-def _collect_existing_paths(changes: ChangeSet) -> Set[str]:
+def _collect_existing_paths(changes: ChangeSet) -> set[str]:
     """Return the set of resource paths that exist before project.do()."""
     return {
         change.resource.path for change in changes.changes if change.resource.exists()
