@@ -54,8 +54,11 @@ File contents: see [SAMPLE_PROJECT_FILES.md](SAMPLE_PROJECT_FILES.md).
    ```
    run_pytest_check(extra_args=["tests/mcp_tools_py_manual/", "-v"])
    ```
-6. Stage and commit the sample project so `git checkout -- .` can restore it
-7. Copy [PROGRESS_TRACKER.md](PROGRESS_TRACKER.md) to `PROGRESS_TRACKER_RUN_<date>.md` for this run
+6. Copy [PROGRESS_TRACKER.md](PROGRESS_TRACKER.md) to `PROGRESS_TRACKER_RUN_<date>.md` for this run
+
+> **Note:** The `sample_project/` directory is gitignored. It is created fresh
+> from SAMPLE_PROJECT_FILES.md at the start of each test run and cleaned up
+> via delete + recreate between mutation tests.
 
 ---
 
@@ -69,20 +72,14 @@ File contents: see [SAMPLE_PROJECT_FILES.md](SAMPLE_PROJECT_FILES.md).
 
 ### After each mutation test (6c, 7c, 8c)
 
-```bash
-git checkout -- .
-```
-
-If `move_module` was applied, also clean new directories:
-
-```bash
-git clean -fd tests/mcp_tools_py_manual/sample_project/
-```
+Delete the entire `sample_project/` directory and recreate it from
+[SAMPLE_PROJECT_FILES.md](SAMPLE_PROJECT_FILES.md). This ensures a clean
+state without relying on git.
 
 ### After all tests
 
 1. Generate a status report (see [Status Report](#status-report) section)
-2. Clean up: remove sample project and run tracker, or keep for reference
+2. Clean up: delete `sample_project/` directory and run tracker, or keep for reference
 
 ---
 
@@ -263,7 +260,7 @@ git clean -fd tests/mcp_tools_py_manual/sample_project/
 |-------|-------|
 | **Call** | `rename_symbol(file="tests/mcp_tools_py_manual/sample_project/models.py", symbol_name="MAX_NAME_LENGTH", new_name="NAME_MAX_CHARS", dry_run=True)` |
 | **Expected** | Preview showing planned changes in: `models.py`, `utils.py`, `test_models.py`, `test_utils.py`. No files actually modified. |
-| **Verify** | `git diff` returns empty (no changes on disk). |
+| **Verify** | Re-read the file contents — they should be unchanged from SAMPLE_PROJECT_FILES.md. |
 
 ### 6b — Apply
 
@@ -271,13 +268,11 @@ git clean -fd tests/mcp_tools_py_manual/sample_project/
 |-------|-------|
 | **Call** | `rename_symbol(file="tests/mcp_tools_py_manual/sample_project/models.py", symbol_name="MAX_NAME_LENGTH", new_name="NAME_MAX_CHARS", dry_run=False)` |
 | **Expected** | All occurrences renamed across the project. |
-| **Verify** | 1. `git diff` shows changes in models.py, utils.py, test_models.py, test_utils.py. 2. `run_pytest_check(extra_args=["tests/mcp_tools_py_manual/", "-v"])` — all tests pass. 3. `list_symbols(file="tests/mcp_tools_py_manual/sample_project/models.py")` — shows `NAME_MAX_CHARS`, not `MAX_NAME_LENGTH`. |
+| **Verify** | 1. Check that models.py, utils.py, test_models.py, test_utils.py have changed (contain `NAME_MAX_CHARS`). 2. `run_pytest_check(extra_args=["tests/mcp_tools_py_manual/", "-v"])` — all tests pass. 3. `list_symbols(file="tests/mcp_tools_py_manual/sample_project/models.py")` — shows `NAME_MAX_CHARS`, not `MAX_NAME_LENGTH`. |
 
 ### 6c — Teardown
 
-```bash
-git checkout -- .
-```
+Delete `sample_project/` and recreate from [SAMPLE_PROJECT_FILES.md](SAMPLE_PROJECT_FILES.md).
 
 ---
 
@@ -291,7 +286,7 @@ git checkout -- .
 |-------|-------|
 | **Call** | `move_symbol(source_file="tests/mcp_tools_py_manual/sample_project/utils.py", symbol_name="format_user", dest_file="tests/mcp_tools_py_manual/sample_project/services.py", dry_run=True)` |
 | **Expected** | Preview showing: `format_user` removed from utils.py, added to services.py, imports updated in test_utils.py. No files modified. |
-| **Verify** | `git diff` returns empty. |
+| **Verify** | Re-read the file contents — they should be unchanged. |
 
 ### 7b — Apply
 
@@ -299,13 +294,11 @@ git checkout -- .
 |-------|-------|
 | **Call** | `move_symbol(source_file="tests/mcp_tools_py_manual/sample_project/utils.py", symbol_name="format_user", dest_file="tests/mcp_tools_py_manual/sample_project/services.py", dry_run=False)` |
 | **Expected** | Symbol moved, imports rewritten. |
-| **Verify** | 1. `git diff` shows changes in utils.py, services.py, test_utils.py. 2. `list_symbols(file="tests/mcp_tools_py_manual/sample_project/utils.py")` — no longer lists `format_user`. 3. `list_symbols(file="tests/mcp_tools_py_manual/sample_project/services.py")` — now lists `format_user`. 4. `run_pytest_check(extra_args=["tests/mcp_tools_py_manual/", "-v"])` — all tests pass. |
+| **Verify** | 1. Check that utils.py, services.py, test_utils.py have changed. 2. `list_symbols(file="tests/mcp_tools_py_manual/sample_project/utils.py")` — no longer lists `format_user`. 3. `list_symbols(file="tests/mcp_tools_py_manual/sample_project/services.py")` — now lists `format_user`. 4. `run_pytest_check(extra_args=["tests/mcp_tools_py_manual/", "-v"])` — all tests pass. |
 
 ### 7c — Teardown
 
-```bash
-git checkout -- .
-```
+Delete `sample_project/` and recreate from [SAMPLE_PROJECT_FILES.md](SAMPLE_PROJECT_FILES.md).
 
 ---
 
@@ -319,7 +312,7 @@ git checkout -- .
 |-------|-------|
 | **Call** | `move_module(source_module="tests/mcp_tools_py_manual/sample_project/utils.py", dest_package="tests/mcp_tools_py_manual/sample_project/helpers", dry_run=True)` |
 | **Expected** | Preview showing: `utils.py` moved to `helpers/utils.py`, `__init__.py` created in `helpers/`, all imports updated in `services.py`, `test_utils.py`. No files modified. |
-| **Verify** | `git diff` returns empty. |
+| **Verify** | Re-read the file contents — they should be unchanged. |
 
 ### 8b — Apply
 
@@ -327,14 +320,11 @@ git checkout -- .
 |-------|-------|
 | **Call** | `move_module(source_module="tests/mcp_tools_py_manual/sample_project/utils.py", dest_package="tests/mcp_tools_py_manual/sample_project/helpers", dry_run=False)` |
 | **Expected** | Module relocated, all imports rewritten. |
-| **Verify** | 1. `git diff` shows file deletions/additions and import changes. 2. `utils.py` no longer exists at original path. 3. `helpers/utils.py` exists with same content. 4. `services.py` imports from `...helpers.utils` instead of `...utils`. 5. `run_pytest_check(extra_args=["tests/mcp_tools_py_manual/", "-v"])` — all tests pass. |
+| **Verify** | 1. Check file moves and import changes. 2. `utils.py` no longer exists at original path. 3. `helpers/utils.py` exists with same content. 4. `services.py` imports from `...helpers.utils` instead of `...utils`. 5. `run_pytest_check(extra_args=["tests/mcp_tools_py_manual/", "-v"])` — all tests pass. |
 
 ### 8c — Teardown
 
-```bash
-git checkout -- .
-git clean -fd tests/mcp_tools_py_manual/sample_project/helpers/
-```
+Delete `sample_project/` and recreate from [SAMPLE_PROJECT_FILES.md](SAMPLE_PROJECT_FILES.md).
 
 ---
 
@@ -342,10 +332,10 @@ git clean -fd tests/mcp_tools_py_manual/sample_project/helpers/
 
 | Phase | Tests | Side effects |
 |-------|-------|-------------|
-| **0. Setup** | Create files, verify tests, commit, copy tracker | Sample project on disk |
+| **0. Setup** | Create files, verify tests, copy tracker | Sample project on disk |
 | **1. Read-only** | 1a–1d, 2a–2e, 3a–3d, 4a–4d, 5a–5d | None — safe to run in any order |
-| **2. Dry-run mutations** | 6a, 7a, 8a | None — preview only, verify with `git diff` |
-| **3. Apply + verify + revert** | 6b→6c, 7b→7c, 8b→8c | One at a time. Revert before next. |
+| **2. Dry-run mutations** | 6a, 7a, 8a | None — preview only, verify files unchanged |
+| **3. Apply + verify + recreate** | 6b→6c, 7b→7c, 8b→8c | One at a time. Delete + recreate before next. |
 | **4. Report** | Generate status report, update tracker | Files written |
 
 ---

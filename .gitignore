@@ -41,3 +41,6 @@ uv.lock
 .vscodeclaude_analysis.json
 .vscodeclaude_start.bat
 .vscodeclaude_start.sh
+
+# Manual test sample project (recreated from SAMPLE_PROJECT_FILES.md)
+tests/mcp_tools_py_manual/sample_project/
