@@ -161,7 +161,7 @@ def _run_with_timeout(
 
     Returns the string result on success, or an error message on timeout.
     """
-    queue: multiprocessing.Queue[str] = multiprocessing.Queue()
+    queue: "multiprocessing.Queue[str]" = multiprocessing.Queue()
     process = multiprocessing.Process(target=_worker, args=(queue, func, args))
     process.start()
     try:
