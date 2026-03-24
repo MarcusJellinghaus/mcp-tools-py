@@ -14,6 +14,7 @@
   2. **Accept** — worth fixing now, bounded effort (Boy Scout fixes)
   3. **Skip** — cosmetic, speculative, or pre-existing
 - **If a change only matters when someone makes a future mistake, it's speculative — skip it.**
+- **"Speculative" does not mean "untested."** If the code claims to do X (e.g., "copied from Y", "filters using Z") but the implementation only partially achieves it, that is a functional gap — not speculation. Ask: *does this code fulfill its stated purpose today?* If not, it's Critical, not Skip.
 
 ## Code Style
 
