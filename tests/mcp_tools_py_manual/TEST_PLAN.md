@@ -54,7 +54,7 @@ File contents: see [SAMPLE_PROJECT_FILES.md](SAMPLE_PROJECT_FILES.md).
    ```
    run_pytest_check(extra_args=["tests/mcp_tools_py_manual/", "-v"])
    ```
-6. Copy [PROGRESS_TRACKER.md](PROGRESS_TRACKER.md) to `PROGRESS_TRACKER_RUN_<date>.md` for this run
+6. Copy [PROGRESS_TRACKER.md](PROGRESS_TRACKER.md) to `pr_info/PROGRESS_TRACKER_RUN_<date>.md` for this run
 
 > **Note:** The `sample_project/` directory is gitignored. It is created fresh
 > from SAMPLE_PROJECT_FILES.md at the start of each test run and cleaned up
@@ -360,7 +360,7 @@ Delete `sample_project/` and recreate from [SAMPLE_PROJECT_FILES.md](SAMPLE_PROJ
 
 ## Progress Tracking
 
-1. Before starting, copy [PROGRESS_TRACKER.md](PROGRESS_TRACKER.md) → `PROGRESS_TRACKER_RUN_<YYYY-MM-DD>.md`
+1. Before starting, copy [PROGRESS_TRACKER.md](PROGRESS_TRACKER.md) → `pr_info/PROGRESS_TRACKER_RUN_<YYYY-MM-DD>.md`
 2. Update the run copy after each test:
    - Set status: ✅ Pass, ❌ Fail, ⏭️ Skipped
    - On **failure**: fill the Notes column with the error message or unexpected output
@@ -371,7 +371,7 @@ Delete `sample_project/` and recreate from [SAMPLE_PROJECT_FILES.md](SAMPLE_PROJ
 
 ## Status Report
 
-After execution, generate `STATUS_REPORT_<YYYY-MM-DD>.md` covering:
+After execution, generate `pr_info/STATUS_REPORT_<YYYY-MM-DD>.md` covering:
 
 1. **Run info**: date, executor, mcp-tools-py version, branch, git SHA, run start/end/duration
 2. **Summary table**: total / passed / failed / skipped counts, broken down by phase, with phase durations
