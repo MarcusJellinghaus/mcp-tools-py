@@ -6,6 +6,7 @@ import ast
 import logging
 import multiprocessing
 import os
+import queue
 from collections.abc import Callable, Iterator
 from contextlib import contextmanager
 from pathlib import Path
@@ -42,7 +43,7 @@ _DEFAULT_IGNORED = [
 # TODO: Refactor into shared mcp_utils package later.
 
 
-def read_gitignore_rules(
+def _read_gitignore_rules(
     gitignore_path: Path,
 ) -> tuple[Callable[[str], bool] | None, str | None]:
     """Read and parse a .gitignore file to create a matcher function.
@@ -55,16 +56,16 @@ def read_gitignore_rules(
         if file doesn't exist
     """
     if not gitignore_path.is_file():
-        logger.info("No .gitignore file found at %s", gitignore_path)
+        logger.debug("No .gitignore file found at %s", gitignore_path)
         return None, None
 
     try:
         with open(gitignore_path, "r", encoding="utf-8") as f:
             gitignore_content = f.read()
 
-        logger.info("Gitignore content: %s", gitignore_content)
+        logger.debug("Gitignore content: %s", gitignore_content)
 
-        logger.info("Parsing gitignore file at %s", gitignore_path)
+        logger.debug("Found .gitignore at: %s", gitignore_path)
         parser = IgnoreParser()
         parser.parse_rule_file(gitignore_path)
 
@@ -78,42 +79,12 @@ def read_gitignore_rules(
         return None, None
 
 
-def apply_gitignore_filter(
-    file_paths: list[str], matcher: Callable[[str], bool] | None, project_dir: Path
-) -> list[str]:
-    """Filter a list of file paths using a gitignore matcher function.
-
-    Args:
-        file_paths: List of file paths to filter
-        matcher: Function that takes a path and returns True if it should be ignored
-        project_dir: Base directory for resolving relative paths to absolute
-
-    Returns:
-        Filtered list of file paths that are not ignored
-    """
-    if matcher is None:
-        return file_paths
-
-    filtered_files = []
-    for file_path in file_paths:
-        abs_file_path = str(project_dir / file_path)
-        if not matcher(abs_file_path):
-            filtered_files.append(file_path)
-
-    logger.info(
-        "Applied gitignore filtering: %s files found, %s after filtering",
-        len(file_paths),
-        len(filtered_files),
-    )
-    return filtered_files
-
-
 def _build_ignored_resources(project_dir: Path) -> list[str]:
     """Build rope ignored_resources from .gitignore + hardcoded defaults."""
     patterns = list(_DEFAULT_IGNORED)
 
     gitignore_path = project_dir / ".gitignore"
-    matcher, _ = read_gitignore_rules(gitignore_path)
+    matcher, _ = _read_gitignore_rules(gitignore_path)
 
     if matcher is not None:
         try:
@@ -139,16 +110,16 @@ def _with_rope_project(project_dir: Path) -> Iterator[Project]:
 
 
 def _worker(
-    queue: multiprocessing.Queue,  # type: ignore[type-arg]
+    result_queue: multiprocessing.Queue,  # type: ignore[type-arg]
     func: Callable[..., str],
     args: tuple[Any, ...],
 ) -> None:
-    """Execute *func* in a subprocess and put the result on *queue*."""
+    """Execute *func* in a subprocess and put the result on *result_queue*."""
     try:
         result = func(*args)
     except Exception as exc:  # pylint: disable=broad-exception-caught
         result = f"Error: {exc}"
-    queue.put(result)
+    result_queue.put(result)
 
 
 def _run_with_timeout(
@@ -161,12 +132,12 @@ def _run_with_timeout(
 
     Returns the string result on success, or an error message on timeout.
     """
-    queue: "multiprocessing.Queue[str]" = multiprocessing.Queue()
-    process = multiprocessing.Process(target=_worker, args=(queue, func, args))
+    result_queue: "multiprocessing.Queue[str]" = multiprocessing.Queue()
+    process = multiprocessing.Process(target=_worker, args=(result_queue, func, args))
     process.start()
     try:
-        result: str = queue.get(timeout=timeout)
-    except Exception:  # pylint: disable=broad-exception-caught  # queue.Empty
+        result: str = result_queue.get(timeout=timeout)
+    except queue.Empty:
         # Timeout path
         process.join(timeout=5)
         if process.is_alive():

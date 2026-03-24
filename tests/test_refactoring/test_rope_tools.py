@@ -237,11 +237,14 @@ def test_build_ignored_resources_includes_gitignore_patterns(tmp_path: Path) -> 
 def test_run_with_timeout_triggers_on_slow_function() -> None:
     """A function that sleeps forever should be killed and return a timeout error."""
     start = time.monotonic()
-    result = _run_with_timeout(_sleep_forever, (), timeout=3, operation_name="test_op")
+    result = _run_with_timeout(
+        _sleep_forever, (), timeout=3, operation_name="rename_symbol"
+    )
     elapsed = time.monotonic() - start
     assert "timed out" in result
-    assert "test_op" in result
-    assert "3s" in result
+    assert "rename_symbol" in result
+    assert "timed out after 3s" in result
+    assert "Timeout: 3s" in result
     assert elapsed < 15  # generous upper bound
 
 
@@ -251,16 +254,6 @@ def test_run_with_timeout_normal_operation() -> None:
         _echo_args, ("hello",), timeout=10, operation_name="echo"
     )
     assert result == "OK: ('hello',)"
-
-
-def test_timeout_error_message_format() -> None:
-    """Verify the error message contains operation name and timeout value."""
-    result = _run_with_timeout(
-        _sleep_forever, (), timeout=3, operation_name="rename_symbol"
-    )
-    assert "rename_symbol" in result
-    assert "timed out after 3s" in result
-    assert "Timeout: 3s" in result
 
 
 def test_rename_symbol_with_timeout(sample_project: Path) -> None:
