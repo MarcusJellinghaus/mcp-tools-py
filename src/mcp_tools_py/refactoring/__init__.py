@@ -17,8 +17,9 @@ if TYPE_CHECKING:
 class RefactoringTools:
     """Registers refactoring tools on an MCP server."""
 
-    def __init__(self, project_dir: Path) -> None:
+    def __init__(self, project_dir: Path, timeout: int = 120) -> None:
         self._project_dir = project_dir
+        self._timeout = timeout
 
     def register(self, mcp: "FastMCPProtocol") -> None:
         """Register all refactoring tools."""
@@ -53,6 +54,7 @@ class RefactoringTools:
     def _register_rope_tools(self, mcp: "FastMCPProtocol") -> None:
         """Register rope-based refactoring tools."""
         project_dir = self._project_dir
+        timeout = self._timeout
 
         @mcp.tool()
         @log_function_call
@@ -73,7 +75,12 @@ class RefactoringTools:
                 dry_run: Preview changes without applying (default: False).
             """
             return rope_move_symbol(
-                project_dir, source_file, symbol_name, dest_file, dry_run
+                project_dir,
+                source_file,
+                symbol_name,
+                dest_file,
+                dry_run,
+                timeout=timeout,
             )
 
         @mcp.tool()
@@ -92,7 +99,14 @@ class RefactoringTools:
                 new_name: New name for the symbol.
                 dry_run: Preview changes without applying (default: False).
             """
-            return rope_rename_symbol(project_dir, file, symbol_name, new_name, dry_run)
+            return rope_rename_symbol(
+                project_dir,
+                file,
+                symbol_name,
+                new_name,
+                dry_run,
+                timeout=timeout,
+            )
 
         @mcp.tool()
         @log_function_call
@@ -108,4 +122,10 @@ class RefactoringTools:
                 dest_package: Destination package path relative to project root.
                 dry_run: Preview changes without applying (default: False).
             """
-            return rope_move_module(project_dir, source_module, dest_package, dry_run)
+            return rope_move_module(
+                project_dir,
+                source_module,
+                dest_package,
+                dry_run,
+                timeout=timeout,
+            )

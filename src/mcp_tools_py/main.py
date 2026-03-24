@@ -98,6 +98,12 @@ Examples:
         action="store_true",
         help="Log only to console, ignore --log-file parameter.",
     )
+    parser.add_argument(
+        "--refactoring-timeout",
+        type=int,
+        default=120,
+        help="Timeout in seconds for rope refactoring operations (default: 120)",
+    )
     return parser.parse_args()
 
 
@@ -157,6 +163,7 @@ def main() -> None:
         venv_path=args.venv_path,
         test_folder=args.test_folder,
         keep_temp_files=args.keep_temp_files,
+        refactoring_timeout=args.refactoring_timeout,
     )
 
     stdlogger.info("Starting MCP server")

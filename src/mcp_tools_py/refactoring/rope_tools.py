@@ -4,10 +4,12 @@ from __future__ import annotations
 
 import ast
 import logging
+import multiprocessing
 import os
 from collections.abc import Callable, Iterator
 from contextlib import contextmanager
 from pathlib import Path
+from typing import Any
 
 import rope.base.project  # pylint: disable=import-error
 import rope.refactor.move  # pylint: disable=import-error
@@ -136,6 +138,52 @@ def _with_rope_project(project_dir: Path) -> Iterator[Project]:
         project.close()
 
 
+def _worker(
+    queue: multiprocessing.Queue,  # type: ignore[type-arg]
+    func: Callable[..., str],
+    args: tuple[Any, ...],
+) -> None:
+    """Execute *func* in a subprocess and put the result on *queue*."""
+    try:
+        result = func(*args)
+    except Exception as exc:  # pylint: disable=broad-exception-caught
+        result = f"Error: {exc}"
+    queue.put(result)
+
+
+def _run_with_timeout(
+    func: Callable[..., str],
+    args: tuple[Any, ...],
+    timeout: int,
+    operation_name: str,
+) -> str:
+    """Run *func(*args)* in a child process with a timeout guard.
+
+    Returns the string result on success, or an error message on timeout.
+    """
+    queue: multiprocessing.Queue[str] = multiprocessing.Queue()
+    process = multiprocessing.Process(target=_worker, args=(queue, func, args))
+    process.start()
+    try:
+        result: str = queue.get(timeout=timeout)
+    except Exception:  # pylint: disable=broad-exception-caught  # queue.Empty
+        # Timeout path
+        process.join(timeout=5)
+        if process.is_alive():
+            process.kill()
+            process.join()
+        return (
+            f"Error: {operation_name} timed out after {timeout}s.\n"
+            f"Timeout: {timeout}s"
+        )
+    else:
+        process.join(timeout=10)
+        if process.is_alive():
+            process.kill()
+            process.join()
+        return result
+
+
 def _get_top_level_symbols(source: str) -> list[str]:
     """Parse source and return top-level symbol names."""
     try:
@@ -252,23 +300,18 @@ def _ensure_parents(dest_path: Path, project_dir: Path) -> None:
         current = current.parent
 
 
-def move_symbol(
+def _move_symbol_impl(
     project_dir: Path,
     source_file: str,
     symbol_name: str,
     dest_file: str,
-    dry_run: bool = False,
+    dry_run: bool,
 ) -> str:
-    """Move a top-level symbol to another module. Updates imports project-wide."""
+    """Inner implementation of move_symbol — runs inside a subprocess."""
     abs_source = project_dir / source_file
     abs_dest = project_dir / dest_file
 
-    if not abs_source.exists():
-        return f"Error: file not found: {source_file}"
-
     source_text = abs_source.read_text(encoding="utf-8")
-
-    # Find symbol offset
     offset = _find_symbol_offset(source_text, symbol_name)
     if offset is None:
         available = _get_top_level_symbols(source_text)
@@ -295,18 +338,15 @@ def move_symbol(
         if not abs_dest.exists():
             abs_dest.write_text("")
 
-    # Track files that exist before the operation for accurate reporting.
     created_for_dry_run = False
 
     try:
         with _with_rope_project(project_dir) as project:
             source_resource = project.get_resource(source_file)
 
-            # Ensure rope can see the dest file
             if not dry_run:
                 dest_resource = project.get_resource(dest_file)
             else:
-                # For dry run, create temp file so rope can reference it
                 if not abs_dest.exists():
                     _ensure_parents(abs_dest, project_dir)
                     abs_dest.write_text("")
@@ -318,8 +358,7 @@ def move_symbol(
 
             if dry_run:
                 try:
-                    result = f"[DRY RUN] move_symbol preview:\n{_format_changes(changes, dry_run=True)}"
-                    return result
+                    return f"[DRY RUN] move_symbol preview:\n{_format_changes(changes, dry_run=True)}"
                 finally:
                     _cleanup_created_files(abs_dest, created_for_dry_run, project_dir)
 
@@ -329,6 +368,27 @@ def move_symbol(
 
     except Exception as exc:  # pylint: disable=broad-exception-caught
         return f"Error moving '{symbol_name}': {exc}"
+
+
+def move_symbol(
+    project_dir: Path,
+    source_file: str,
+    symbol_name: str,
+    dest_file: str,
+    dry_run: bool = False,
+    timeout: int = 120,
+) -> str:
+    """Move a top-level symbol to another module. Updates imports project-wide."""
+    abs_source = project_dir / source_file
+    if not abs_source.exists():
+        return f"Error: file not found: {source_file}"
+
+    return _run_with_timeout(
+        _move_symbol_impl,
+        (project_dir, source_file, symbol_name, dest_file, dry_run),
+        timeout,
+        "move_symbol",
+    )
 
 
 def _collect_existing_paths(changes: ChangeSet) -> set[str]:
@@ -363,21 +423,17 @@ def _cleanup_empty_dirs(directory: Path, stop_at: Path) -> None:
         current = current.parent
 
 
-def rename_symbol(
+def _rename_symbol_impl(
     project_dir: Path,
     file_path: str,
     symbol_name: str,
     new_name: str,
-    dry_run: bool = False,
+    dry_run: bool,
 ) -> str:
-    """Rename a symbol and update all references project-wide."""
+    """Inner implementation of rename_symbol — runs inside a subprocess."""
     abs_path = project_dir / file_path
-    if not abs_path.exists():
-        return f"Error: file not found: {file_path}"
-
     source_text = abs_path.read_text(encoding="utf-8")
 
-    # Find symbol offset
     offset = _find_symbol_offset(source_text, symbol_name)
     if offset is None:
         available = _get_top_level_symbols(source_text)
@@ -405,18 +461,35 @@ def rename_symbol(
         return f"Error renaming '{symbol_name}': {exc}"
 
 
-def move_module(
+def rename_symbol(
+    project_dir: Path,
+    file_path: str,
+    symbol_name: str,
+    new_name: str,
+    dry_run: bool = False,
+    timeout: int = 120,
+) -> str:
+    """Rename a symbol and update all references project-wide."""
+    abs_path = project_dir / file_path
+    if not abs_path.exists():
+        return f"Error: file not found: {file_path}"
+
+    return _run_with_timeout(
+        _rename_symbol_impl,
+        (project_dir, file_path, symbol_name, new_name, dry_run),
+        timeout,
+        "rename_symbol",
+    )
+
+
+def _move_module_impl(
     project_dir: Path,
     source_module: str,
     dest_package: str,
-    dry_run: bool = False,
+    dry_run: bool,
 ) -> str:
-    """Move an entire module to a new package. Updates all references."""
-    abs_source = project_dir / source_module
+    """Inner implementation of move_module — runs inside a subprocess."""
     abs_dest_pkg = project_dir / dest_package
-
-    if not abs_source.exists():
-        return f"Error: file not found: {source_module}"
 
     if not abs_dest_pkg.exists():
         if not dry_run:
@@ -445,3 +518,23 @@ def move_module(
 
     except Exception as exc:  # pylint: disable=broad-exception-caught
         return f"Error moving module '{source_module}': {exc}"
+
+
+def move_module(
+    project_dir: Path,
+    source_module: str,
+    dest_package: str,
+    dry_run: bool = False,
+    timeout: int = 120,
+) -> str:
+    """Move an entire module to a new package. Updates all references."""
+    abs_source = project_dir / source_module
+    if not abs_source.exists():
+        return f"Error: file not found: {source_module}"
+
+    return _run_with_timeout(
+        _move_module_impl,
+        (project_dir, source_module, dest_package, dry_run),
+        timeout,
+        "move_module",
+    )

@@ -1,15 +1,31 @@
 """Tests for rope-based refactoring operations (move, rename)."""
 
+import time
 from pathlib import Path
 
 import pytest
 
 from mcp_tools_py.refactoring.rope_tools import (
     _build_ignored_resources,
+    _run_with_timeout,
     move_module,
     move_symbol,
     rename_symbol,
 )
+
+
+def _sleep_forever(*_args: object) -> str:
+    """Module-level function that sleeps forever — used for timeout tests."""
+    import time as _time  # noqa: PLC0415
+
+    _time.sleep(9999)
+    return "should not reach"  # pragma: no cover
+
+
+def _echo_args(*args: object) -> str:
+    """Module-level function that returns its args as a string."""
+    return f"OK: {args}"
+
 
 # --- Shared fixture ---
 
@@ -213,3 +229,81 @@ def test_build_ignored_resources_includes_gitignore_patterns(tmp_path: Path) -> 
     # Defaults should still be present
     assert ".ropeproject" in result
     assert "__pycache__" in result
+
+
+# --- Timeout tests ---
+
+
+def test_run_with_timeout_triggers_on_slow_function() -> None:
+    """A function that sleeps forever should be killed and return a timeout error."""
+    start = time.monotonic()
+    result = _run_with_timeout(_sleep_forever, (), timeout=3, operation_name="test_op")
+    elapsed = time.monotonic() - start
+    assert "timed out" in result
+    assert "test_op" in result
+    assert "3s" in result
+    assert elapsed < 15  # generous upper bound
+
+
+def test_run_with_timeout_normal_operation() -> None:
+    """A fast function should return its result normally."""
+    result = _run_with_timeout(
+        _echo_args, ("hello",), timeout=10, operation_name="echo"
+    )
+    assert result == "OK: ('hello',)"
+
+
+def test_timeout_error_message_format() -> None:
+    """Verify the error message contains operation name and timeout value."""
+    result = _run_with_timeout(
+        _sleep_forever, (), timeout=3, operation_name="rename_symbol"
+    )
+    assert "rename_symbol" in result
+    assert "timed out after 3s" in result
+    assert "Timeout: 3s" in result
+
+
+def test_rename_symbol_with_timeout(sample_project: Path) -> None:
+    """rename_symbol succeeds normally with an explicit timeout."""
+    result = rename_symbol(
+        sample_project, "src/foo.py", "my_func", "better_name", timeout=30
+    )
+    assert "modified" in result.lower()
+    foo_text = (sample_project / "src" / "foo.py").read_text()
+    assert "better_name" in foo_text
+
+
+def test_cli_parse_args_default_timeout() -> None:
+    """parse_args returns refactoring_timeout=120 by default."""
+    import sys
+    from unittest.mock import patch
+
+    from mcp_tools_py.main import parse_args
+
+    with patch.object(sys, "argv", ["prog", "--project-dir", "/tmp/proj"]):
+        args = parse_args()
+    assert args.refactoring_timeout == 120
+
+
+def test_cli_parse_args_custom_timeout() -> None:
+    """parse_args accepts --refactoring-timeout 60."""
+    import sys
+    from unittest.mock import patch
+
+    from mcp_tools_py.main import parse_args
+
+    with patch.object(
+        sys,
+        "argv",
+        ["prog", "--project-dir", "/tmp/proj", "--refactoring-timeout", "60"],
+    ):
+        args = parse_args()
+    assert args.refactoring_timeout == 60
+
+
+def test_refactoring_tools_init_stores_timeout(tmp_path: Path) -> None:
+    """RefactoringTools(path, timeout=60)._timeout == 60."""
+    from mcp_tools_py.refactoring import RefactoringTools
+
+    tools = RefactoringTools(tmp_path, timeout=60)
+    assert tools._timeout == 60  # noqa: SLF001
