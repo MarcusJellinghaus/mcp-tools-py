@@ -251,6 +251,112 @@ def test_move_module_does_not_hang(multi_module_project: Path) -> None:
 
 
 @pytest.mark.integration
+def test_move_module_dry_run_without_dest_package(multi_module_project: Path) -> None:
+    """Dry-run should preview changes even when dest package doesn't exist yet."""
+    project = multi_module_project
+
+    # dest package does NOT exist
+    assert not (project / "myproject" / "newpkg").exists()
+
+    result = move_module(
+        project,
+        "myproject/utils.py",
+        "myproject/newpkg",
+        dry_run=True,
+    )
+
+    # Should show a preview, not an error
+    assert "[DRY RUN]" in result, f"Expected dry-run preview, got: {result}"
+    assert "error" not in result.lower(), f"Unexpected error in dry run: {result}"
+
+    # No files should be created or modified
+    assert not (project / "myproject" / "newpkg").exists()
+    utils_text = (project / "myproject" / "utils.py").read_text()
+    assert "from myproject.models import Address" in utils_text
+
+
+@pytest.mark.integration
+def test_move_module_with_pre_existing_dest_package(
+    multi_module_project: Path,
+) -> None:
+    """move_module must move the file when dest package already exists."""
+    project = multi_module_project
+
+    # Pre-create the destination package (simulates manual creation)
+    subpkg = project / "myproject" / "subpkg"
+    subpkg.mkdir()
+    (subpkg / "__init__.py").write_text("")
+
+    result = move_module(
+        project,
+        "myproject/utils.py",
+        "myproject/subpkg",
+    )
+    assert "successfully" in result.lower() or "modified" in result.lower()
+
+    # File must be physically moved
+    assert (
+        project / "myproject" / "subpkg" / "utils.py"
+    ).exists(), "utils.py not found at destination"
+    assert not (
+        project / "myproject" / "utils.py"
+    ).exists(), "Original utils.py still exists — file was not moved"
+
+
+@pytest.mark.integration
+def test_move_module_nested_project_structure(tmp_path: Path) -> None:
+    """move_module with deeply nested packages (closer to real-world usage)."""
+    # Create a project with deeper nesting: tests/app/sample/
+    root = tmp_path
+    pkg = root / "tests" / "app" / "sample"
+    pkg.mkdir(parents=True)
+
+    # Create __init__.py at each level
+    for p in [root / "tests", root / "tests" / "app", pkg]:
+        (p / "__init__.py").write_text("")
+
+    (pkg / "models.py").write_text(
+        "class Item:\n"
+        "    def __init__(self, name: str) -> None:\n"
+        "        self.name = name\n"
+    )
+
+    (pkg / "utils.py").write_text(
+        "from tests.app.sample.models import Item\n"
+        "\n"
+        "\n"
+        "def format_item(item: Item) -> str:\n"
+        '    return f"Item: {item.name}"\n'
+    )
+
+    (pkg / "services.py").write_text(
+        "from tests.app.sample.utils import format_item\n"
+        "from tests.app.sample.models import Item\n"
+        "\n"
+        "\n"
+        "def display(name: str) -> str:\n"
+        "    return format_item(Item(name))\n"
+    )
+
+    result = move_module(
+        root,
+        "tests/app/sample/utils.py",
+        "tests/app/sample/helpers",
+    )
+    assert (
+        "successfully" in result.lower() or "modified" in result.lower()
+    ), f"move_module failed: {result}"
+
+    # File physically moved
+    assert (pkg / "helpers" / "utils.py").exists(), "utils.py not at destination"
+    assert not (pkg / "utils.py").exists(), "Original utils.py still exists"
+
+    # Imports rewritten in services.py
+    services_text = (pkg / "services.py").read_text()
+    assert "helpers" in services_text, f"Imports not rewritten: {services_text}"
+
+
+@pytest.mark.integration
 def test_rename_symbol_dry_run_does_not_hang(multi_module_project: Path) -> None:
     """rename_symbol dry_run must complete within _HANG_TIMEOUT seconds."""
     start = time.monotonic()

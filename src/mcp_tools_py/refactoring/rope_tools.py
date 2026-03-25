@@ -503,6 +503,17 @@ def rename_symbol(
     )
 
 
+def _cleanup_package(abs_pkg: Path, project_dir: Path) -> None:
+    """Remove a package directory created temporarily for dry-run preview."""
+    init_file = abs_pkg / "__init__.py"
+    if init_file.exists() and init_file.read_text(encoding="utf-8") == "":
+        contents = list(abs_pkg.iterdir())
+        if contents == [init_file]:
+            init_file.unlink()
+            abs_pkg.rmdir()
+            _cleanup_empty_dirs(abs_pkg.parent, project_dir)
+
+
 def _move_module_impl(
     project_dir: Path,
     source_module: str,
@@ -511,16 +522,14 @@ def _move_module_impl(
 ) -> str:
     """Inner implementation of move_module — runs inside a subprocess."""
     abs_dest_pkg = project_dir / dest_package
+    abs_source = project_dir / source_module
+    created_pkg_for_dry_run = False
 
     if not abs_dest_pkg.exists():
-        if not dry_run:
-            abs_dest_pkg.mkdir(parents=True, exist_ok=True)
-            (abs_dest_pkg / "__init__.py").write_text("", encoding="utf-8")
-        else:
-            return (
-                f"Error: destination package not found: {dest_package}. "
-                f"Create the package first."
-            )
+        abs_dest_pkg.mkdir(parents=True, exist_ok=True)
+        (abs_dest_pkg / "__init__.py").write_text("", encoding="utf-8")
+        if dry_run:
+            created_pkg_for_dry_run = True
 
     try:
         with _with_rope_project(project_dir) as project:
@@ -531,13 +540,43 @@ def _move_module_impl(
             changes = mover.get_changes(dest_resource)
 
             if dry_run:
-                return f"[DRY RUN] move_module preview:\n{_format_changes(changes, dry_run=True)}"
+                try:
+                    return (
+                        "[DRY RUN] move_module preview:\n"
+                        f"{_format_changes(changes, dry_run=True)}"
+                    )
+                finally:
+                    if created_pkg_for_dry_run:
+                        _cleanup_package(abs_dest_pkg, project_dir)
 
             pre_existing = _collect_existing_paths(changes)
             project.do(changes)
-            return f"move_module completed successfully.\n{_format_changes(changes, dry_run=False, pre_existing=pre_existing)}"
+
+            # Verify the file was actually moved
+            source_name = Path(source_module).name
+            expected_dest = abs_dest_pkg / source_name
+            warnings = ""
+            if abs_source.exists() and not expected_dest.exists():
+                logger.warning(
+                    "move_module: rope rewrote imports but did not move " "%s to %s",
+                    source_module,
+                    dest_package,
+                )
+                warnings = (
+                    f"\n  WARNING: Imports were rewritten but {source_module} "
+                    f"was not moved to {dest_package}/{source_name}. "
+                    f"Move the file manually and verify imports."
+                )
+
+            return (
+                f"move_module completed successfully.\n"
+                f"{_format_changes(changes, dry_run=False, pre_existing=pre_existing)}"
+                f"{warnings}"
+            )
 
     except Exception as exc:  # pylint: disable=broad-exception-caught
+        if created_pkg_for_dry_run:
+            _cleanup_package(abs_dest_pkg, project_dir)
         return f"Error moving module '{source_module}': {exc}"
 
 
