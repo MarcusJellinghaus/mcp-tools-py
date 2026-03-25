@@ -2,6 +2,7 @@
 Tests for the code_checker_pytest runner functionality.
 """
 
+import os
 import sys
 import tempfile
 from pathlib import Path
@@ -227,6 +228,7 @@ def test_check_code_with_pytest_with_custom_parameters(
         None,  # venv_path
         True,  # keep_temp_files
         300,  # timeout_seconds (default value)
+        skip_default_test_folder=False,
     )
 
     # Verify result is correct
@@ -309,3 +311,87 @@ def test_check_code_with_pytest_with_error(mock_run_tests: MagicMock) -> None:
     assert result["success"] is False
     assert "error" in result
     assert result["error"] == "Test execution error"
+
+
+@patch("mcp_tools_py.code_checker_pytest.runners.execute_command")
+def test_run_tests_skip_default_test_folder(mock_execute: MagicMock) -> None:
+    """When skip_default_test_folder=True, test_folder is NOT in the command."""
+    mock_result = MagicMock()
+    mock_result.return_code = 5
+    mock_result.stdout = "collected 0 items"
+    mock_result.stderr = ""
+    mock_result.execution_error = None
+    mock_result.timed_out = False
+    mock_execute.return_value = mock_result
+
+    with pytest.raises(ValueError, match="No Tests Found"):
+        run_tests(
+            "/test/project",
+            "tests",
+            python_executable=sys.executable,
+            skip_default_test_folder=True,
+        )
+
+    # Verify the command does NOT contain the default test folder path
+    called_command = mock_execute.call_args[1].get(
+        "command", mock_execute.call_args[0][0] if mock_execute.call_args[0] else []
+    )
+    test_folder_path = os.path.join("/test/project", "tests")
+    assert test_folder_path not in called_command
+
+
+@patch("mcp_tools_py.code_checker_pytest.runners.execute_command")
+def test_run_tests_default_test_folder_appended(mock_execute: MagicMock) -> None:
+    """Default behavior: test_folder IS appended to the command."""
+    mock_result = MagicMock()
+    mock_result.return_code = 5
+    mock_result.stdout = "collected 0 items"
+    mock_result.stderr = ""
+    mock_result.execution_error = None
+    mock_result.timed_out = False
+    mock_execute.return_value = mock_result
+
+    with pytest.raises(ValueError, match="No Tests Found"):
+        run_tests(
+            "/test/project",
+            "tests",
+            python_executable=sys.executable,
+        )
+
+    # Verify the command DOES contain the default test folder path
+    called_command = mock_execute.call_args[1].get(
+        "command", mock_execute.call_args[0][0] if mock_execute.call_args[0] else []
+    )
+    test_folder_path = os.path.join("/test/project", "tests")
+    assert test_folder_path in called_command
+
+
+@patch("mcp_tools_py.code_checker_pytest.runners.execute_command")
+def test_path_args_skip_default_folder_integration(mock_execute: MagicMock) -> None:
+    """Integration: skip_default_test_folder=True keeps user path, omits default."""
+    mock_result = MagicMock()
+    mock_result.return_code = 5
+    mock_result.stdout = "collected 0 items"
+    mock_result.stderr = ""
+    mock_result.execution_error = None
+    mock_result.timed_out = False
+    mock_execute.return_value = mock_result
+
+    user_path = "tests/test_specific.py::test_func"
+
+    with pytest.raises(ValueError, match="No Tests Found"):
+        check_code_with_pytest(
+            project_dir="/test/project",
+            python_executable=sys.executable,
+            extra_args=[user_path],
+            skip_default_test_folder=True,
+        )
+
+    called_command = mock_execute.call_args[1].get(
+        "command", mock_execute.call_args[0][0] if mock_execute.call_args[0] else []
+    )
+    # User path should be in command
+    assert user_path in called_command
+    # Default test folder should NOT be in command
+    test_folder_path = os.path.join("/test/project", "tests")
+    assert test_folder_path not in called_command

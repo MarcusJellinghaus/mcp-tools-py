@@ -91,6 +91,7 @@ def run_tests(
     venv_path: Optional[str] = None,
     keep_temp_files: bool = False,
     timeout_seconds: int = 300,
+    skip_default_test_folder: bool = False,
 ) -> PytestReport:
     """
     Run pytest tests in the specified project directory and test folder and returns the results.
@@ -178,8 +179,9 @@ def run_tests(
         if extra_args:
             command.extend(extra_args)
 
-        # Add the test folder path
-        command.append(os.path.join(project_dir, test_folder))
+        # Add the test folder path (unless caller provides explicit paths)
+        if not skip_default_test_folder:
+            command.append(os.path.join(project_dir, test_folder))
 
         logger.debug(f"Running command: {' '.join(command)}")
 
@@ -433,6 +435,7 @@ def check_code_with_pytest(
     venv_path: Optional[str] = None,
     keep_temp_files: bool = False,
     timeout_seconds: int = 300,
+    skip_default_test_folder: bool = False,
 ) -> Dict[str, Any]:
     """
     Run pytest on the specified project and return results.
@@ -478,6 +481,7 @@ def check_code_with_pytest(
             venv_path,
             keep_temp_files,
             timeout_seconds,
+            skip_default_test_folder=skip_default_test_folder,
         )
 
         # Get formatted summary text for display

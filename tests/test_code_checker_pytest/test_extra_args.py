@@ -1,5 +1,8 @@
 """Unit tests for sanitize_extra_args() function."""
 
+import os
+import tempfile
+
 import pytest
 
 from mcp_tools_py.code_checker_pytest.models import SanitizedArgs
@@ -99,3 +102,77 @@ class TestSanitizeExtraArgs:
         assert result.verbosity == 3
         assert len(result.notes) == 1
         assert "-m flag" in result.notes[0]
+
+
+class TestSanitizeExtraArgsPathDetection:
+    """Tests for path detection in sanitize_extra_args."""
+
+    def test_existing_file_sets_has_path_args(self) -> None:
+        """An existing file path sets has_path_args=True."""
+        with tempfile.TemporaryDirectory() as tmpdir:
+            test_file = os.path.join(tmpdir, "test_example.py")
+            with open(test_file, "w") as f:
+                f.write("")
+            result = sanitize_extra_args(["test_example.py"], None, project_dir=tmpdir)
+            assert result.has_path_args is True
+            assert any("Path argument" in n for n in result.notes)
+
+    def test_existing_directory_sets_has_path_args(self) -> None:
+        """An existing directory path sets has_path_args=True."""
+        with tempfile.TemporaryDirectory() as tmpdir:
+            sub = os.path.join(tmpdir, "subdir")
+            os.makedirs(sub)
+            result = sanitize_extra_args(["subdir"], None, project_dir=tmpdir)
+            assert result.has_path_args is True
+
+    def test_node_id_with_existing_file_sets_has_path_args(self) -> None:
+        """A node ID (file::test) with existing file sets has_path_args=True."""
+        with tempfile.TemporaryDirectory() as tmpdir:
+            test_file = os.path.join(tmpdir, "test_example.py")
+            with open(test_file, "w") as f:
+                f.write("")
+            result = sanitize_extra_args(
+                ["test_example.py::test_func"], None, project_dir=tmpdir
+            )
+            assert result.has_path_args is True
+
+    def test_nonexistent_path_keeps_has_path_args_false(self) -> None:
+        """A non-existent path keeps has_path_args=False and adds a note."""
+        with tempfile.TemporaryDirectory() as tmpdir:
+            result = sanitize_extra_args(["no_such_file.py"], None, project_dir=tmpdir)
+            assert result.has_path_args is False
+            assert any("not found" in n for n in result.notes)
+
+    def test_absolute_path_keeps_has_path_args_false(self) -> None:
+        """An absolute path keeps has_path_args=False and adds a note."""
+        with tempfile.TemporaryDirectory() as tmpdir:
+            abs_path = os.path.join(tmpdir, "test_example.py")
+            with open(abs_path, "w") as f:
+                f.write("")
+            result = sanitize_extra_args([abs_path], None, project_dir=tmpdir)
+            assert result.has_path_args is False
+            assert any("absolute path" in n.lower() for n in result.notes)
+
+    def test_mixed_args_detects_paths(self) -> None:
+        """Flags are skipped, only real paths trigger has_path_args."""
+        with tempfile.TemporaryDirectory() as tmpdir:
+            test_file = os.path.join(tmpdir, "test_example.py")
+            with open(test_file, "w") as f:
+                f.write("")
+            result = sanitize_extra_args(
+                ["-x", "test_example.py", "--tb=short"], None, project_dir=tmpdir
+            )
+            assert result.has_path_args is True
+            assert "-x" in result.cleaned_args
+            assert "--tb=short" in result.cleaned_args
+
+    def test_empty_project_dir_keeps_has_path_args_false(self) -> None:
+        """Default empty project_dir keeps has_path_args=False."""
+        result = sanitize_extra_args(["test_example.py"], None)
+        assert result.has_path_args is False
+
+    def test_existing_tests_unchanged_with_defaults(self) -> None:
+        """Backward compat: no project_dir means has_path_args defaults False."""
+        result = sanitize_extra_args(["-x", "--tb=short"], None)
+        assert result.has_path_args is False
+        assert result.cleaned_args == ["-x", "--tb=short"]

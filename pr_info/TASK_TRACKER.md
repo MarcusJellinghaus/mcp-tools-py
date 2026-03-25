@@ -23,9 +23,9 @@ This tracks **Feature Implementation** consisting of multiple **Tasks**.
 
 ### Step 1: Path Detection + Conditional Test Folder Append
 
-- [ ] Implementation: add `has_path_args` to `SanitizedArgs`, path detection in `sanitize_extra_args()`, `skip_default_test_folder` in runners, wiring in `checker_tools.py`, and all tests (TDD)
-- [ ] Quality checks: pylint, pytest, mypy — fix all issues
-- [ ] Commit message prepared
+- [x] Implementation: add `has_path_args` to `SanitizedArgs`, path detection in `sanitize_extra_args()`, `skip_default_test_folder` in runners, wiring in `checker_tools.py`, and all tests (TDD)
+- [ ] Quality checks: pylint, pytest, mypy — fix all issues (blocked: MCP tools-py check tools not available, sandbox blocking python execution)
+- [x] Commit message prepared
 
 ## Pull Request
 

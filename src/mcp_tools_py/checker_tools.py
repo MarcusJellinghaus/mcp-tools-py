@@ -176,7 +176,9 @@ class CheckerTools:
                 )
 
                 # Sanitize extra_args: deduplicate flags, extract verbosity
-                sanitized = sanitize_extra_args(extra_args, markers)
+                sanitized = sanitize_extra_args(
+                    extra_args, markers, project_dir=str(self._server.project_dir)
+                )
 
                 # Always add -s for print statement capture
                 final_extra_args = sanitized.cleaned_args + ["-s"]
@@ -196,6 +198,7 @@ class CheckerTools:
                     env_vars=env_vars,
                     venv_path=self._server.venv_path,
                     keep_temp_files=self._server.keep_temp_files,
+                    skip_default_test_folder=sanitized.has_path_args,
                 )
 
                 # Always show detailed failure output
