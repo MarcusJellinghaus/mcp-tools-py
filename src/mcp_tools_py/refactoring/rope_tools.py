@@ -51,38 +51,37 @@ _DEFAULT_IGNORED = [
 
 def read_gitignore_rules(
     gitignore_path: Path,
-) -> tuple[Callable[[str], bool] | None, str | None]:
+) -> Callable[[str], bool] | None:
     """Read and parse a .gitignore file to create a matcher function.
 
     Args:
         gitignore_path: Path to the .gitignore file
 
     Returns:
-        A tuple containing (matcher_function, gitignore_content),
-        or (None, None) if file doesn't exist.
+        A matcher function, or None if file doesn't exist.
     """
     if not gitignore_path.is_file():
-        logger.info("No .gitignore file found at %s", gitignore_path)
-        return None, None
+        logger.debug("No .gitignore file found at %s", gitignore_path)
+        return None
 
     try:
-        with open(gitignore_path, "r") as f:  # noqa: PTH123
+        with open(gitignore_path, "r", encoding="utf-8") as f:  # noqa: PTH123
             gitignore_content = f.read()
 
-        logger.info("Gitignore content: %s", gitignore_content)
+        logger.debug("Gitignore content: %s", gitignore_content)
 
-        logger.info("Parsing gitignore file at %s", gitignore_path)
+        logger.debug("Parsing gitignore file at %s", gitignore_path)
         parser = IgnoreParser()
         parser.parse_rule_file(gitignore_path)
 
         def matcher(path: str) -> bool:
             return bool(parser.match(path))
 
-        return matcher, gitignore_content
+        return matcher
 
     except Exception as exc:  # pylint: disable=broad-exception-caught
         logger.warning("Error reading/parsing gitignore: %s", str(exc))
-        return None, None
+        return None
 
 
 def _build_ignored_resources(project_dir: Path) -> list[str]:
@@ -90,7 +89,7 @@ def _build_ignored_resources(project_dir: Path) -> list[str]:
     patterns = list(_DEFAULT_IGNORED)
 
     gitignore_path = project_dir / ".gitignore"
-    matcher, _ = read_gitignore_rules(gitignore_path)
+    matcher = read_gitignore_rules(gitignore_path)
 
     if matcher is not None:
         try:
@@ -354,6 +353,13 @@ def _run_rope_subprocess(
         return f"Error running {operation}: {result.execution_error}"
 
     if result.return_code != 0:
+        # rope_cli outputs structured JSON errors to stdout
+        try:
+            output = json.loads(result.stdout)
+            if "error" in output:
+                return f"Error in {operation}: {output['error']}"
+        except (json.JSONDecodeError, ValueError):
+            pass
         stderr = result.stderr.strip()
         return f"Error running {operation} (exit {result.return_code}): {stderr}"
 
