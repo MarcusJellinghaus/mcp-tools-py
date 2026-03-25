@@ -28,12 +28,35 @@ This tracks **Feature Implementation** consisting of multiple **Tasks**.
 - [x] Quality checks: pylint, pytest, mypy — fix all issues
 - [x] Commit message prepared
 
-### Step 2: Multiprocessing timeout wrapper + CLI plumbing
-> Add `--refactoring-timeout` CLI arg, thread it through server to rope functions, and wrap each rope operation in a `multiprocessing.Process` for timeout protection.
+### Step 2: ~~Multiprocessing timeout wrapper~~ (superseded by Step 3)
+> Originally added `multiprocessing.Process` timeout wrapper. Failed in MCP server context due to Windows pipe inheritance.
 
-- [x] Implementation: add `_run_with_timeout()`, `_worker()`, split public functions into outer + `_*_impl`, add `timeout` param threading from CLI through server, and write tests ([step_2.md](./steps/step_2.md))
-- [x] Quality checks: pylint, pytest, mypy — fix all issues
-- [x] Commit message prepared
+- [x] Implementation ([step_2.md](./steps/step_2.md))
+- [x] Superseded by Step 3
+
+### Step 3: Replace multiprocessing with subprocess isolation
+> Run rope operations in isolated subprocesses via `rope_cli.py`, using the same `execute_command` pattern as pytest/pylint/mypy runners. Fixes the MCP hang.
+
+- [x] Implementation: add `rope_cli.py`, `_run_rope_subprocess()`, revert to sync tools with `@log_function_call` ([step_3.md](./steps/step_3.md))
+- [x] Quality checks: pylint, pytest, mypy — all pass
+- [x] Manual test plan: all 36 tests pass (see `pr_info/STATUS_REPORT_2026-03-25.md`)
+- [x] Commit: `925712b fix(refactoring): run rope in subprocess to prevent MCP hang`
+
+### Step 4: Cleanup
+> Remove dead code and fragile tests.
+
+- [ ] Remove "real project dir" integration tests (fragile, depend on sample_project state; tmp_path tests already cover the same)
+- [ ] Remove unused `import rope.base.project` (duplicate of `from rope.base.project import Project`)
+- [ ] Remove unused `apply_gitignore_filter()` function (copied from p_workspace but never called)
+- [ ] Quality checks: pylint, pytest, mypy
+
+### Step 5: Robustness improvements
+> Harden `rope_cli.py` error handling and subprocess result reporting.
+
+- [ ] Add `try/except` in `rope_cli.main()` to catch unhandled exceptions and return structured JSON errors instead of raw tracebacks
+- [ ] Add `try/except` around `json.dumps()` in `rope_cli.py` as safety net
+- [ ] Include truncated stderr in `_run_rope_subprocess()` successful results for debugging (rope warnings/logs go to stderr)
+- [ ] Quality checks: pylint, pytest, mypy
 
 ## Pull Request
 

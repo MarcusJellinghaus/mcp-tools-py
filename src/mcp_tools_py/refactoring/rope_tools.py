@@ -359,8 +359,17 @@ def _run_rope_subprocess(
 ) -> str:
     """Run a rope operation in an isolated subprocess.
 
-    Uses the same subprocess isolation pattern as pytest/pylint/mypy runners
-    to avoid blocking MCP server stdio pipes.
+    Why subprocess isolation is required:
+    The MCP server communicates via stdin/stdout JSON-RPC pipes. On Windows,
+    child processes inherit these handles, and rope's full-project scan
+    blocks the event loop — preventing the server from sending responses.
+    Neither multiprocessing.Process nor anyio.to_thread.run_sync() solved
+    this because the MCP SDK calls sync tools directly without threadpool
+    offloading (mcp.server.fastmcp.utilities.func_metadata lines 92-95).
+
+    The fix: run rope in a completely separate process with stdin=DEVNULL
+    and file-based stdout, using the same execute_command pattern that
+    already works for pytest/pylint/mypy in this project.
     """
     command = [
         sys.executable,

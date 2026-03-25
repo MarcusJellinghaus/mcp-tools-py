@@ -20,24 +20,31 @@ indefinitely. Read-only jedi-based tools work fine on the same symbols.
 |-----|------|-----|
 | Disable rope cache | Set `ropefolder=None` in `Project()` constructor | One-line change in `_with_rope_project()` |
 | Gitignore-aware filtering | Copy `read_gitignore_rules()` and `apply_gitignore_filter()` from `p_workspace` using `igittigitt` library, convert to rope's `ignored_resources` | ~40 lines in `rope_tools.py` |
-| Timeout via multiprocessing | Wrap each rope operation in `multiprocessing.Process` with configurable timeout (default: 120s) | New `_run_with_timeout()` wrapper |
+| ~~Timeout via multiprocessing~~ | ~~Wrap each rope operation in `multiprocessing.Process`~~ | Replaced by Step 3 |
+| **Subprocess isolation** | Run rope in isolated subprocess via `rope_cli.py` | Same pattern as pytest/pylint/mypy runners |
 
 ## Architectural / Design Changes
 
-### New data flow: timeout parameter
+### Data flow: subprocess isolation
 
 ```
-CLI (--refactoring-timeout)
-  → main.py (parse_args)
-    → server.py (CodeCheckerServer.__init__)
-      → refactoring/__init__.py (RefactoringTools.__init__)
-        → rope_tools.py (each public function receives timeout param)
-          → _run_with_timeout() (multiprocessing.Process wrapper)
+MCP tool call (sync function in __init__.py)
+  → rope_tools.py::rename_symbol()       # public API, validates inputs
+    → _run_rope_subprocess()              # builds command, calls execute_command
+      → subprocess_runner.py              # stdin=DEVNULL, file-based stdout
+        → rope_cli.py::main()             # isolated process, parses JSON args
+          → _rename_symbol_impl()         # actual rope work
+            → JSON result on stdout
 ```
+
+The subprocess approach was chosen because the MCP server uses stdin/stdout for
+JSON-RPC transport. Windows `spawn` causes child processes to inherit these
+pipes, breaking the transport. The `execute_command` pattern (used by
+pytest/pylint/mypy runners) provides complete process isolation with
+`stdin=DEVNULL` and file-based stdout capture.
 
 ### Modified component: `_with_rope_project()` context manager
 
-Currently creates a bare `Project(str(project_dir))`. After changes:
 - Sets `ropefolder=None` (disables persistent cache)
 - Accepts `ignored_resources` patterns derived from `.gitignore` via `igittigitt`
 
@@ -47,15 +54,16 @@ Currently creates a bare `Project(str(project_dir))`. After changes:
 `p_workspace/src/mcp_workspace/file_tools/directory_utils.py`. They use `igittigitt`
 (NOT `pathspec`). A TODO comment marks them for future extraction into shared `mcp_utils`.
 
-### New internal function: `_run_with_timeout()`
+### `rope_cli.py` — CLI entry point
 
-A `multiprocessing.Process` + `Queue` wrapper that:
-1. Spawns a child process running the rope operation
-2. Calls `queue.get(timeout=...)` before `process.join()` (avoids Windows pipe deadlock)
-3. Returns result string on success, or kills process and returns error on timeout
+Accepts `<operation> <json_args>`, dispatches to the appropriate `_*_impl`
+function, and outputs the result as `{"result": "..."}` JSON on stdout.
 
-Each `_*_impl` function creates its own rope `Project` inside the subprocess (not passed
-across process boundaries).
+### `_run_rope_subprocess()` — subprocess dispatcher
+
+Builds a command `[python, -m, mcp_tools_py.refactoring.rope_cli, op, json]`
+and calls `execute_command()` from `subprocess_runner.py`. Handles timeout,
+execution errors, and non-zero exit codes. Parses JSON output.
 
 ## New dependency
 
@@ -68,9 +76,11 @@ across process boundaries).
 | `pyproject.toml` | Add `igittigitt` dependency |
 | `src/mcp_tools_py/main.py` | Add `--refactoring-timeout` CLI argument |
 | `src/mcp_tools_py/server.py` | Add `refactoring_timeout` parameter to `CodeCheckerServer` and `create_server` |
-| `src/mcp_tools_py/refactoring/__init__.py` | Accept `timeout` in `RefactoringTools.__init__`, pass to rope functions |
-| `src/mcp_tools_py/refactoring/rope_tools.py` | `ropefolder=None`, gitignore filtering via `igittigitt`, `_run_with_timeout()` wrapper, `timeout` param on public functions |
-| `tests/test_refactoring/test_rope_tools.py` | Tests for timeout, ropefolder, gitignore filtering |
+| `src/mcp_tools_py/refactoring/__init__.py` | Sync tools with `@log_function_call`, pass `timeout` to rope functions |
+| `src/mcp_tools_py/refactoring/rope_tools.py` | `ropefolder=None`, gitignore filtering, `_run_rope_subprocess()`, `rope_cli.py` dispatch |
+| `src/mcp_tools_py/refactoring/rope_cli.py` | NEW — CLI entry point for isolated subprocess execution |
+| `tests/test_refactoring/test_rope_tools.py` | Tests for ropefolder, gitignore filtering |
+| `tests/test_refactoring/test_integration.py` | Hang-regression tests, end-to-end workflow tests |
 
 ## Files NOT Modified
 
@@ -84,4 +94,7 @@ across process boundaries).
 | Step | Description | Commit |
 |------|-------------|--------|
 | 1 | Disable `.ropeproject/` cache + gitignore-aware filtering via `igittigitt` | `step_1.md` |
-| 2 | Multiprocessing timeout wrapper + `--refactoring-timeout` CLI plumbing | `step_2.md` |
+| 2 | ~~Multiprocessing timeout wrapper~~ (replaced by Step 3) | `step_2.md` |
+| 3 | Replace multiprocessing with subprocess isolation via `rope_cli.py` | `step_3.md` |
+| 4 | Cleanup: remove dead code and fragile real-project-dir tests | `step_4.md` |
+| 5 | Robustness: structured error handling in `rope_cli.py` | `step_5.md` |
