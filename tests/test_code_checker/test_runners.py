@@ -379,13 +379,16 @@ def test_path_args_skip_default_folder_integration(mock_execute: MagicMock) -> N
 
     user_path = "tests/test_specific.py::test_func"
 
-    with pytest.raises(ValueError, match="No Tests Found"):
-        check_code_with_pytest(
-            project_dir="/test/project",
-            python_executable=sys.executable,
-            extra_args=[user_path],
-            skip_default_test_folder=True,
-        )
+    result = check_code_with_pytest(
+        project_dir="/test/project",
+        python_executable=sys.executable,
+        extra_args=[user_path],
+        skip_default_test_folder=True,
+    )
+
+    # check_code_with_pytest catches exceptions and returns an error dict
+    assert result["success"] is False
+    assert "No Tests Found" in result["error"]
 
     called_command = mock_execute.call_args[1].get(
         "command", mock_execute.call_args[0][0] if mock_execute.call_args[0] else []
