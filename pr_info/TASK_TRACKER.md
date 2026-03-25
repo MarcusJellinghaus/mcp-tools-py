@@ -21,6 +21,13 @@ This tracks **Feature Implementation** consisting of multiple **Tasks**.
 
 ## Tasks
 
-<!-- Tasks populated from pr_info/steps/ by prepare_task_tracker -->
+### Step 1: Path Detection + Conditional Test Folder Append
+
+- [ ] Implementation: add `has_path_args` to `SanitizedArgs`, path detection in `sanitize_extra_args()`, `skip_default_test_folder` in runners, wiring in `checker_tools.py`, and all tests (TDD)
+- [ ] Quality checks: pylint, pytest, mypy — fix all issues
+- [ ] Commit message prepared
 
 ## Pull Request
+
+- [ ] PR review: verify all steps complete and checks green
+- [ ] PR summary prepared
