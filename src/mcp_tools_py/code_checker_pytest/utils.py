@@ -2,6 +2,7 @@
 Utility functions for code checker pytest operations.
 """
 
+import os
 from typing import List, Optional, Tuple
 
 from mcp_tools_py.code_checker_pytest.models import ErrorContext, SanitizedArgs
@@ -10,6 +11,7 @@ from mcp_tools_py.code_checker_pytest.models import ErrorContext, SanitizedArgs
 def sanitize_extra_args(
     extra_args: Optional[List[str]],
     markers: Optional[List[str]],
+    project_dir: str = "",
 ) -> SanitizedArgs:
     """Sanitize and deduplicate extra_args before passing to pytest.
 
@@ -26,6 +28,10 @@ def sanitize_extra_args(
         extra_args: Optional list of extra arguments for pytest.
         markers: Optional list of marker expressions passed via the
             dedicated markers parameter.
+        project_dir: Project directory for resolving relative paths.
+            When provided, non-flag args are checked as paths relative
+            to this directory. If any valid path is found,
+            ``has_path_args`` is set to ``True``.
 
     Returns:
         SanitizedArgs with cleaned_args, extracted verbosity, and notes.
@@ -67,7 +73,32 @@ def sanitize_extra_args(
 
         cleaned.append(arg)
 
-    return SanitizedArgs(cleaned_args=cleaned, verbosity=verbosity, notes=notes)
+    # Path detection: check non-flag args for valid paths relative to project_dir
+    has_path_args = False
+    if project_dir:
+        for arg in cleaned:
+            if arg.startswith("-"):
+                continue
+            if os.path.isabs(arg):
+                notes.append(f"Absolute path '{arg}' ignored for path detection.")
+                continue
+            file_part = arg.split("::", 1)[0] if "::" in arg else arg
+            full_path = os.path.join(project_dir, file_part)
+            if os.path.exists(full_path):
+                has_path_args = True
+                notes.append(
+                    f"Path argument '{arg}' detected; "
+                    f"default test folder not appended."
+                )
+            else:
+                notes.append(f"Path '{arg}' not found relative to project_dir.")
+
+    return SanitizedArgs(
+        cleaned_args=cleaned,
+        verbosity=verbosity,
+        notes=notes,
+        has_path_args=has_path_args,
+    )
 
 
 def read_file(file_path: str) -> str:

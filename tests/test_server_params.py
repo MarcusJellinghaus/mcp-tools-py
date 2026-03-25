@@ -78,6 +78,7 @@ async def test_run_pytest_check_parameters(mock_project_dir: Path) -> None:
             env_vars={"TEST_ENV": "value"},
             venv_path=None,
             keep_temp_files=True,  # From server constructor
+            skip_default_test_folder=False,
         )
 
         # Verify the result is properly formatted
