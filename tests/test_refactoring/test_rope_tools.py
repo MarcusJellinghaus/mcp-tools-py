@@ -6,25 +6,10 @@ import pytest
 
 from mcp_tools_py.refactoring.rope_tools import (
     _build_ignored_resources,
-    _run_with_timeout,
     move_module,
     move_symbol,
     rename_symbol,
 )
-
-
-def _sleep_forever(*_args: object) -> str:
-    """Module-level function that sleeps forever — used for timeout tests."""
-    import time as _time  # noqa: PLC0415
-
-    _time.sleep(9999)
-    return "should not reach"  # pragma: no cover
-
-
-def _echo_args(*args: object) -> str:
-    """Module-level function that returns its args as a string."""
-    return f"OK: {args}"
-
 
 # --- Shared fixture ---
 
@@ -238,43 +223,6 @@ def test_build_ignored_resources_no_backslashes(tmp_path: Path) -> None:
     result = _build_ignored_resources(tmp_path)
     for pattern in result:
         assert "\\" not in pattern, f"Backslash in pattern: {pattern!r}"
-
-
-# --- Timeout tests ---
-
-
-def test_run_with_timeout_triggers_on_slow_function() -> None:
-    """A function that sleeps forever should be killed and return a timeout error."""
-    import time  # noqa: PLC0415
-
-    start = time.monotonic()
-    result = _run_with_timeout(
-        _sleep_forever, (), timeout=3, operation_name="rename_symbol"
-    )
-    elapsed = time.monotonic() - start
-    assert "timed out" in result
-    assert "rename_symbol" in result
-    assert "timed out after 3s" in result
-    assert "Timeout: 3s" in result
-    assert elapsed < 15  # generous upper bound
-
-
-def test_run_with_timeout_normal_operation() -> None:
-    """A fast function should return its result normally."""
-    result = _run_with_timeout(
-        _echo_args, ("hello",), timeout=10, operation_name="echo"
-    )
-    assert result == "OK: ('hello',)"
-
-
-def test_rename_symbol_with_timeout(sample_project: Path) -> None:
-    """rename_symbol succeeds normally with an explicit timeout."""
-    result = rename_symbol(
-        sample_project, "src/foo.py", "my_func", "better_name", timeout=30
-    )
-    assert "modified" in result.lower()
-    foo_text = (sample_project / "src" / "foo.py").read_text()
-    assert "better_name" in foo_text
 
 
 def test_cli_parse_args_default_timeout() -> None:

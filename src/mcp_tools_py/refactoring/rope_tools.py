@@ -1,16 +1,21 @@
-"""Rope-based refactoring operations (move, rename)."""
+"""Rope-based refactoring operations (move, rename).
+
+Public functions (rename_symbol, move_symbol, move_module) run rope in
+an isolated subprocess via rope_cli.py to avoid blocking MCP server
+stdio pipes.  The _*_impl helpers contain the actual rope logic and
+are called directly only from the CLI entry point or tests.
+"""
 
 from __future__ import annotations
 
 import ast
+import json
 import logging
-import multiprocessing
 import os
-import queue
+import sys
 from collections.abc import Callable, Iterator
 from contextlib import contextmanager
 from pathlib import Path
-from typing import Any
 
 import rope.base.project  # pylint: disable=import-error
 import rope.refactor.move  # pylint: disable=import-error
@@ -18,6 +23,8 @@ import rope.refactor.rename  # pylint: disable=import-error
 from igittigitt import IgnoreParser  # pylint: disable=import-error
 from rope.base.change import ChangeSet  # pylint: disable=import-error
 from rope.base.project import Project  # pylint: disable=import-error
+
+from mcp_tools_py.utils.subprocess_runner import execute_command
 
 logger = logging.getLogger(__name__)
 
@@ -157,55 +164,6 @@ def _with_rope_project(project_dir: Path) -> Iterator[Project]:
         yield project
     finally:
         project.close()
-
-
-def _worker(
-    result_queue: multiprocessing.Queue,  # type: ignore[type-arg]
-    func: Callable[..., str],
-    args: tuple[Any, ...],
-) -> None:
-    """Execute *func* in a subprocess and put the result on *result_queue*."""
-    try:
-        result = func(*args)
-    except Exception as exc:  # pylint: disable=broad-exception-caught
-        result = f"Error: {exc}"
-    result_queue.put(result)
-
-
-def _run_with_timeout(
-    func: Callable[..., str],
-    args: tuple[Any, ...],
-    timeout: int,
-    operation_name: str,
-) -> str:
-    """Run *func(*args)* in a child process with a timeout guard.
-
-    Returns the string result on success, or an error message on timeout.
-    """
-    result_queue: "multiprocessing.Queue[str]" = multiprocessing.Queue()
-    process = multiprocessing.Process(target=_worker, args=(result_queue, func, args))
-    process.start()
-    try:
-        result: str = result_queue.get(timeout=timeout)
-    except queue.Empty:
-        # Timeout path
-        process.join(timeout=5)
-        if process.is_alive():
-            process.kill()
-            process.join()
-        return (
-            f"Error: {operation_name} timed out after {timeout}s.\n"
-            f"Timeout: {timeout}s"
-        )
-    else:
-        process.join(timeout=10)
-        if process.is_alive():
-            process.kill()
-            process.join()
-        return result
-    finally:
-        result_queue.close()
-        result_queue.join_thread()
 
 
 def _get_top_level_symbols(source: str) -> list[str]:
@@ -394,6 +352,48 @@ def _move_symbol_impl(
         return f"Error moving '{symbol_name}': {exc}"
 
 
+def _run_rope_subprocess(
+    operation: str,
+    args_dict: dict[str, object],
+    timeout: int = 120,
+) -> str:
+    """Run a rope operation in an isolated subprocess.
+
+    Uses the same subprocess isolation pattern as pytest/pylint/mypy runners
+    to avoid blocking MCP server stdio pipes.
+    """
+    command = [
+        sys.executable,
+        "-m",
+        "mcp_tools_py.refactoring.rope_cli",
+        operation,
+        json.dumps(args_dict),
+    ]
+    result = execute_command(
+        command=command,
+        cwd=str(args_dict["project_dir"]),
+        timeout_seconds=timeout,
+    )
+
+    if result.timed_out:
+        return f"Error: {operation} timed out after {timeout}s"
+
+    if result.execution_error:
+        return f"Error running {operation}: {result.execution_error}"
+
+    if result.return_code != 0:
+        stderr = result.stderr.strip()
+        return f"Error running {operation} (exit {result.return_code}): {stderr}"
+
+    # Parse JSON output from rope_cli
+    try:
+        output = json.loads(result.stdout)
+        return str(output["result"])
+    except (json.JSONDecodeError, KeyError):
+        # Fall back to raw stdout if JSON parsing fails
+        return result.stdout.strip() if result.stdout.strip() else "No output from rope"
+
+
 def move_symbol(
     project_dir: Path,
     source_file: str,
@@ -407,11 +407,16 @@ def move_symbol(
     if not abs_source.exists():
         return f"Error: file not found: {source_file}"
 
-    return _run_with_timeout(
-        _move_symbol_impl,
-        (project_dir, source_file, symbol_name, dest_file, dry_run),
-        timeout,
+    return _run_rope_subprocess(
         "move_symbol",
+        {
+            "project_dir": str(project_dir),
+            "source_file": source_file,
+            "symbol_name": symbol_name,
+            "dest_file": dest_file,
+            "dry_run": dry_run,
+        },
+        timeout=timeout,
     )
 
 
@@ -498,11 +503,16 @@ def rename_symbol(
     if not abs_path.exists():
         return f"Error: file not found: {file_path}"
 
-    return _run_with_timeout(
-        _rename_symbol_impl,
-        (project_dir, file_path, symbol_name, new_name, dry_run),
-        timeout,
+    return _run_rope_subprocess(
         "rename_symbol",
+        {
+            "project_dir": str(project_dir),
+            "file_path": file_path,
+            "symbol_name": symbol_name,
+            "new_name": new_name,
+            "dry_run": dry_run,
+        },
+        timeout=timeout,
     )
 
 
@@ -556,9 +566,13 @@ def move_module(
     if not abs_source.exists():
         return f"Error: file not found: {source_module}"
 
-    return _run_with_timeout(
-        _move_module_impl,
-        (project_dir, source_module, dest_package, dry_run),
-        timeout,
+    return _run_rope_subprocess(
         "move_module",
+        {
+            "project_dir": str(project_dir),
+            "source_module": source_module,
+            "dest_package": dest_package,
+            "dry_run": dry_run,
+        },
+        timeout=timeout,
     )

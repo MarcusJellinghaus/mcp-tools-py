@@ -52,7 +52,12 @@ class RefactoringTools:
             return jedi_find_references(project_dir, file, symbol_name)
 
     def _register_rope_tools(self, mcp: "FastMCPProtocol") -> None:
-        """Register rope-based refactoring tools."""
+        """Register rope-based refactoring tools.
+
+        Rope operations run in isolated subprocesses via rope_cli.py,
+        using the same pattern as pytest/pylint/mypy runners. This
+        avoids blocking the MCP server's event loop and stdio pipes.
+        """
         project_dir = self._project_dir
         timeout = self._timeout
 
