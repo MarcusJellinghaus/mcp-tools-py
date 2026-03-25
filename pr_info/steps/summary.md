@@ -50,7 +50,7 @@ Add path detection to `sanitize_extra_args()` so that when the user provides exp
 | `src/mcp_tools_py/code_checker_pytest/runners.py` | Add `skip_default_test_folder` param, conditional append |
 | `src/mcp_tools_py/checker_tools.py` | Wire `project_dir` and `skip_default_test_folder` |
 | `tests/test_code_checker_pytest/test_extra_args.py` | New tests for path detection |
-| `tests/test_code_checker/test_runners.py` | New test for conditional test folder skip |
+| `tests/test_code_checker/test_runners.py` | New tests for conditional test folder skip + integration test |
 
 ## No New Files Created
 
@@ -58,5 +58,4 @@ All changes are modifications to existing files.
 
 ## Implementation Steps
 
-- **Step 1**: Model + path detection in `sanitize_extra_args()` (tests first, then implementation)
-- **Step 2**: Conditional test folder append in runners + wiring in checker_tools (tests first, then implementation)
+- **Step 1**: Path detection in `sanitize_extra_args()`, conditional test folder append in runners, wiring in checker_tools, and all tests (single commit)
