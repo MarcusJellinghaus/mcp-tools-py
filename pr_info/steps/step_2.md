@@ -1,4 +1,11 @@
-# Step 2: Multiprocessing timeout wrapper + CLI plumbing
+# Step 2: ~~Multiprocessing timeout wrapper~~ (SUPERSEDED)
+
+> **This step was superseded by [Step 3](step_3.md).** The multiprocessing
+> approach described here failed in the MCP server context because Windows
+> `spawn` inherits the parent's stdin/stdout pipes, breaking MCP's JSON-RPC
+> transport. The `_run_with_timeout()` and `_worker()` functions have been
+> removed. What survives from this step: the `--refactoring-timeout` CLI arg,
+> the `timeout` parameter threading, and the `_*_impl` function split.
 
 **Summary**: See `pr_info/steps/summary.md` for full context (Issue #112).
 
