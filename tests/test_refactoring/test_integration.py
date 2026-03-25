@@ -357,6 +357,120 @@ def test_move_module_nested_project_structure(tmp_path: Path) -> None:
 
 
 @pytest.mark.integration
+def test_move_module_in_git_repo_with_untracked_files(tmp_path: Path) -> None:
+    """move_module must work even when files are untracked in a git repo.
+
+    Rope uses 'git mv' when it detects a git repo. If the source file
+    is untracked, 'git mv' fails and rope silently skips the move.
+    """
+    import subprocess
+
+    root = tmp_path
+
+    # Initialize a git repo (this is the key condition)
+    subprocess.run(["git", "init"], cwd=str(root), capture_output=True, check=True)
+    subprocess.run(
+        ["git", "config", "user.email", "test@test.com"],
+        cwd=str(root),
+        capture_output=True,
+    )
+    subprocess.run(
+        ["git", "config", "user.name", "Test"],
+        cwd=str(root),
+        capture_output=True,
+    )
+
+    # Create a package with untracked files (never git-added)
+    pkg = root / "myproject"
+    pkg.mkdir()
+    (pkg / "__init__.py").write_text("")
+    (pkg / "models.py").write_text(
+        "class Item:\n"
+        "    def __init__(self, name: str) -> None:\n"
+        "        self.name = name\n"
+    )
+    (pkg / "utils.py").write_text(
+        "from myproject.models import Item\n"
+        "\n"
+        "def fmt(item: Item) -> str:\n"
+        '    return f"{item.name}"\n'
+    )
+    (pkg / "services.py").write_text(
+        "from myproject.utils import fmt\n"
+        "from myproject.models import Item\n"
+        "\n"
+        "def run(name: str) -> str:\n"
+        "    return fmt(Item(name))\n"
+    )
+
+    # Do NOT git add — files are untracked
+
+    result = move_module(
+        root,
+        "myproject/utils.py",
+        "myproject/helpers",
+    )
+
+    # Should get a clear error telling the user to git-add first
+    assert "not tracked by git" in result, f"Expected untracked error, got: {result}"
+    assert "git add" in result, f"Should suggest git add, got: {result}"
+
+    # No files should have been modified
+    assert (pkg / "utils.py").exists(), "Original should be untouched"
+    assert not (pkg / "helpers").exists(), "Dest should not be created"
+
+
+@pytest.mark.integration
+def test_move_module_with_gitignore(tmp_path: Path) -> None:
+    """move_module in a project with .gitignore (replicates real repo conditions)."""
+    root = tmp_path
+
+    # Add a .gitignore like real projects have
+    (root / ".gitignore").write_text(
+        "__pycache__/\n" "*.pyc\n" ".venv/\n" "build/\n" "dist/\n" "*.egg-info/\n"
+    )
+
+    # Nested package: tests/sample/pkg/
+    pkg = root / "tests" / "sample" / "pkg"
+    pkg.mkdir(parents=True)
+    for p in [root / "tests", root / "tests" / "sample", pkg]:
+        (p / "__init__.py").write_text("")
+
+    (pkg / "models.py").write_text(
+        "class Item:\n"
+        "    def __init__(self, name: str) -> None:\n"
+        "        self.name = name\n"
+    )
+    (pkg / "utils.py").write_text(
+        "from tests.sample.pkg.models import Item\n"
+        "\n"
+        "def fmt(item: Item) -> str:\n"
+        '    return f"{item.name}"\n'
+    )
+    (pkg / "services.py").write_text(
+        "from tests.sample.pkg.utils import fmt\n"
+        "from tests.sample.pkg.models import Item\n"
+        "\n"
+        "def run(name: str) -> str:\n"
+        "    return fmt(Item(name))\n"
+    )
+
+    result = move_module(
+        root,
+        "tests/sample/pkg/utils.py",
+        "tests/sample/pkg/helpers",
+    )
+    assert "successfully" in result.lower(), f"move_module failed: {result}"
+    assert "WARNING" not in result, f"File was not moved: {result}"
+
+    assert (pkg / "helpers" / "utils.py").exists(), "File not at destination"
+    assert not (pkg / "utils.py").exists(), "Original file still exists"
+
+    services_text = (pkg / "services.py").read_text()
+    assert "helpers" in services_text, f"Imports not rewritten: {services_text}"
+
+
+@pytest.mark.integration
 def test_rename_symbol_dry_run_does_not_hang(multi_module_project: Path) -> None:
     """rename_symbol dry_run must complete within _HANG_TIMEOUT seconds."""
     start = time.monotonic()

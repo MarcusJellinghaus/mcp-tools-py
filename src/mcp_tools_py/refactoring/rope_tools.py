@@ -12,6 +12,7 @@ import ast
 import json
 import logging
 import os
+import subprocess as _subprocess
 import sys
 from collections.abc import Callable, Iterator
 from contextlib import contextmanager
@@ -514,6 +515,34 @@ def _cleanup_package(abs_pkg: Path, project_dir: Path) -> None:
             _cleanup_empty_dirs(abs_pkg.parent, project_dir)
 
 
+def _is_git_repo(project_dir: Path) -> bool:
+    """Check if project_dir is inside a git repository."""
+    try:
+        result = _subprocess.run(
+            ["git", "rev-parse", "--git-dir"],
+            cwd=str(project_dir),
+            capture_output=True,
+            timeout=5,
+        )
+        return result.returncode == 0
+    except (OSError, _subprocess.TimeoutExpired):
+        return False
+
+
+def _is_git_tracked(project_dir: Path, file_path: str) -> bool:
+    """Check if a file is tracked by git (staged or committed)."""
+    try:
+        result = _subprocess.run(
+            ["git", "ls-files", "--error-unmatch", file_path],
+            cwd=str(project_dir),
+            capture_output=True,
+            timeout=5,
+        )
+        return result.returncode == 0
+    except (OSError, _subprocess.TimeoutExpired):
+        return True  # assume tracked if we can't check
+
+
 def _move_module_impl(
     project_dir: Path,
     source_module: str,
@@ -524,6 +553,25 @@ def _move_module_impl(
     abs_dest_pkg = project_dir / dest_package
     abs_source = project_dir / source_module
     created_pkg_for_dry_run = False
+
+    # Rope assumes all files are under version control when a VCS is detected.
+    # Inside git repos it delegates file moves to 'git mv', which fails
+    # silently on untracked files (rope.base.fscommands._execute ignores
+    # the return code). The result: imports are rewritten but the file
+    # stays in place. Pre-check here to give an actionable error.
+    # See: https://github.com/python-rope/rope/blob/master/docs/library.rst
+    #      ("File System Commands" section)
+    if (
+        not dry_run
+        and _is_git_repo(project_dir)
+        and not _is_git_tracked(project_dir, source_module)
+    ):
+        return (
+            f"Error: {source_module} is not tracked by git. "
+            f"Rope uses 'git mv' to move files in git repositories and "
+            f"cannot move untracked files. "
+            f"Run 'git add {source_module}' first, then retry move_module."
+        )
 
     if not abs_dest_pkg.exists():
         abs_dest_pkg.mkdir(parents=True, exist_ok=True)
