@@ -65,11 +65,6 @@ def read_gitignore_rules(
         return None
 
     try:
-        with open(gitignore_path, "r", encoding="utf-8") as f:  # noqa: PTH123
-            gitignore_content = f.read()
-
-        logger.debug("Gitignore content: %s", gitignore_content)
-
         logger.debug("Parsing gitignore file at %s", gitignore_path)
         parser = IgnoreParser()
         parser.parse_rule_file(gitignore_path)

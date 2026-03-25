@@ -56,3 +56,20 @@
 - Removed dead try/except in rope_cli.py
 
 **Status**: committed
+
+## Round 3 — 2026-03-25
+**Findings**:
+- #1 Architecture docs stale
+- #2 Two cleanup tracking variables in _move_symbol_impl
+- #3 Double JSON parse in _run_rope_subprocess
+- #4 Defensive empty result check in rope_cli
+- #5 read_gitignore_rules reads file twice (redundant after round 1 simplification)
+
+**Decisions**:
+- #1-4: Skip — cosmetic/speculative, no functional impact
+- #5: Accept — dead code after round 1 removed the content return value
+
+**Changes**:
+- Removed redundant open()+read() from read_gitignore_rules; parse_rule_file handles its own reading
+
+**Status**: committed
