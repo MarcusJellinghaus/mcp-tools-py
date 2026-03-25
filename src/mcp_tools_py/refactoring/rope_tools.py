@@ -17,7 +17,6 @@ from collections.abc import Callable, Iterator
 from contextlib import contextmanager
 from pathlib import Path
 
-import rope.base.project  # pylint: disable=import-error
 import rope.refactor.move  # pylint: disable=import-error
 import rope.refactor.rename  # pylint: disable=import-error
 from igittigitt import IgnoreParser  # pylint: disable=import-error
@@ -84,42 +83,6 @@ def read_gitignore_rules(
     except Exception as exc:  # pylint: disable=broad-exception-caught
         logger.warning("Error reading/parsing gitignore: %s", str(exc))
         return None, None
-
-
-def apply_gitignore_filter(
-    file_paths: list[str],
-    matcher: Callable[[str], bool] | None,
-    project_dir: Path,
-) -> list[str]:
-    """Filter a list of file paths using a gitignore matcher function.
-
-    Args:
-        file_paths: List of file paths to filter
-        matcher: Function that takes a path and returns True if it should be ignored
-        project_dir: Base directory for resolving relative paths to absolute
-
-    Returns:
-        Filtered list of file paths that are not ignored
-    """
-    if matcher is None:
-        return file_paths
-
-    if project_dir is None:
-        raise ValueError("Project directory cannot be None")
-
-    filtered_files = []
-
-    for file_path in file_paths:
-        abs_file_path = str(project_dir / file_path)
-        if not matcher(abs_file_path):
-            filtered_files.append(file_path)
-
-    logger.info(
-        "Applied gitignore filtering: %s files found, %s after filtering",
-        len(file_paths),
-        len(filtered_files),
-    )
-    return filtered_files
 
 
 def _build_ignored_resources(project_dir: Path) -> list[str]:

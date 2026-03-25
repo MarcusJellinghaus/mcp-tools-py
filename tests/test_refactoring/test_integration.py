@@ -204,9 +204,6 @@ def test_move_module_then_verify_imports(multi_module_project: Path) -> None:
 
 _HANG_TIMEOUT = 10  # seconds — rope completes in <1s on small projects
 
-# Real project dir — same as what the MCP server uses
-_REAL_PROJECT_DIR = Path(__file__).resolve().parent.parent.parent
-
 
 @pytest.mark.integration
 def test_rename_symbol_does_not_hang(multi_module_project: Path) -> None:
@@ -269,79 +266,3 @@ def test_rename_symbol_dry_run_does_not_hang(multi_module_project: Path) -> None
         elapsed < _HANG_TIMEOUT
     ), f"rename_symbol dry_run took {elapsed:.1f}s (limit {_HANG_TIMEOUT}s)"
     assert "[DRY RUN]" in result
-
-
-# --- Real project dir tests (issue #112) ---
-# These run against the actual project root, exactly like the MCP server does.
-# TODO: Consider reverting to tmp_path-based tests — testing from tmp is more
-# isolated and reproducible. These were added to diagnose a hang that only
-# reproduced with the real project dir.
-
-
-@pytest.mark.integration
-def test_rename_symbol_real_project_does_not_hang() -> None:
-    """rename_symbol on real project dir must not hang (dry_run)."""
-    start = time.monotonic()
-    result = rename_symbol(
-        _REAL_PROJECT_DIR,
-        "tests/mcp_tools_py_manual/sample_project/models.py",
-        "MAX_NAME_LENGTH",
-        "NAME_MAX_CHARS",
-        dry_run=True,
-    )
-    elapsed = time.monotonic() - start
-    assert (
-        elapsed < _HANG_TIMEOUT
-    ), f"rename_symbol took {elapsed:.1f}s (limit {_HANG_TIMEOUT}s)"
-    assert "[DRY RUN]" in result
-
-
-@pytest.mark.integration
-def test_move_symbol_real_project_does_not_hang() -> None:
-    """move_symbol on real project dir must not hang (dry_run)."""
-    start = time.monotonic()
-    result = move_symbol(
-        _REAL_PROJECT_DIR,
-        "tests/mcp_tools_py_manual/sample_project/utils.py",
-        "format_user",
-        "tests/mcp_tools_py_manual/sample_project/services.py",
-        dry_run=True,
-    )
-    elapsed = time.monotonic() - start
-    assert (
-        elapsed < _HANG_TIMEOUT
-    ), f"move_symbol took {elapsed:.1f}s (limit {_HANG_TIMEOUT}s)"
-    assert "[DRY RUN]" in result
-
-
-@pytest.mark.integration
-def test_move_module_real_project_does_not_hang(tmp_path: Path) -> None:
-    """move_module on real project dir must not hang (dry_run)."""
-    # move_module dry_run requires dest package to exist
-    # Use a temp subdir inside the sample_project for the dest
-    dest_pkg = (
-        _REAL_PROJECT_DIR
-        / "tests"
-        / "mcp_tools_py_manual"
-        / "sample_project"
-        / "_tmp_helpers"
-    )
-    dest_pkg.mkdir(exist_ok=True)
-    (dest_pkg / "__init__.py").write_text("")
-    try:
-        start = time.monotonic()
-        result = move_module(
-            _REAL_PROJECT_DIR,
-            "tests/mcp_tools_py_manual/sample_project/utils.py",
-            "tests/mcp_tools_py_manual/sample_project/_tmp_helpers",
-            dry_run=True,
-        )
-        elapsed = time.monotonic() - start
-        assert (
-            elapsed < _HANG_TIMEOUT
-        ), f"move_module took {elapsed:.1f}s (limit {_HANG_TIMEOUT}s)"
-        assert "[DRY RUN]" in result
-    finally:
-        # Clean up temp dest package
-        (dest_pkg / "__init__.py").unlink(missing_ok=True)
-        dest_pkg.rmdir()

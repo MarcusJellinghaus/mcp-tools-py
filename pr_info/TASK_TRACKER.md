@@ -45,10 +45,10 @@ This tracks **Feature Implementation** consisting of multiple **Tasks**.
 ### Step 4: Cleanup
 > Remove dead code and fragile tests.
 
-- [ ] Remove "real project dir" integration tests (fragile, depend on sample_project state; tmp_path tests already cover the same)
-- [ ] Remove unused `import rope.base.project` (duplicate of `from rope.base.project import Project`)
-- [ ] Remove unused `apply_gitignore_filter()` function (copied from p_workspace but never called)
-- [ ] Quality checks: pylint, pytest, mypy
+- [x] Remove "real project dir" integration tests (fragile, depend on sample_project state; tmp_path tests already cover the same)
+- [x] Remove unused `import rope.base.project` (duplicate of `from rope.base.project import Project`)
+- [x] Remove unused `apply_gitignore_filter()` function (copied from p_workspace but never called)
+- [ ] Quality checks: pylint, pytest, mypy (MCP tools-py server not available in session — run manually)
 
 ### Step 5: Robustness improvements
 > Harden `rope_cli.py` error handling and subprocess result reporting.
