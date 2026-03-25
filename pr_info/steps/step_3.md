@@ -69,6 +69,10 @@ ignore_imports =
     mcp_tools_py.inspect_library -> mcp_tools_py.server
 ```
 
+## WHAT — `.importlinter` Forbidden-Imports Update
+
+In the `[importlinter:contract:forbidden-imports]` section, add `mcp_tools_py.inspect_library` to the `forbidden_modules` list so that the new module is subject to the same import restrictions as other tool modules.
+
 ## DATA — No New Code
 
 This step is config-only. No Python code changes.

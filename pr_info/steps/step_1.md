@@ -68,7 +68,7 @@ class InspectTools:
      try importlib.import_module(".".join(parts[:i]))
      if success: module = result, remaining = parts[i:]; break
 4. if no module found: return "Module '{import_path}' not found"
-5. obj = module; for attr in remaining: obj = getattr(module_or_obj, attr)
+5. obj = module; for attr in remaining: obj = getattr(obj, attr)
    if AttributeError: return error listing available symbols (sorted, capped 50, type-annotated)
 6. try: source = inspect.getsource(obj)
    except (TypeError, OSError): return "Source not available for '...' (built-in/C extension)..."
@@ -101,7 +101,6 @@ In `tests/test_inspect_library.py`, mock `importlib.import_module` and `inspect.
 | `test_truncation_applied` | Source > max_lines → truncated with correct message |
 | `test_truncation_not_applied` | Source <= max_lines → full source returned |
 | `test_bad_module_error` | All import attempts fail → clear error message |
-| `test_bad_symbol_lists_available` | Module found but attr missing → sorted list with types, capped at 50 |
+| `test_bad_symbol_lists_available` | Module found but attr missing → sorted list with types; verify 50-symbol cap behavior |
 | `test_builtin_c_extension_error` | `getsource` raises `TypeError` → friendly message |
-| `test_max_lines_zero_returns_error` | `max_lines=0` → validation error |
-| `test_max_lines_negative_returns_error` | `max_lines=-5` → validation error |
+| `test_max_lines_invalid_returns_error` | `max_lines` in `[0, -5, -1]` → validation error (parameterized test) |
