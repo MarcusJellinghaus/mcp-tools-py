@@ -240,7 +240,7 @@ def _ensure_parents(dest_path: Path, project_dir: Path) -> None:
         init_file = current / "__init__.py"
         if init_file.exists():
             break  # reached an existing package boundary
-        init_file.write_text("")
+        init_file.write_text("", encoding="utf-8")
         current = current.parent
 
 
@@ -277,10 +277,12 @@ def _move_symbol_impl(
             )
 
     # Create destination file and parent dirs if needed
+    created_dest = False
     if not dry_run:
         _ensure_parents(abs_dest, project_dir)
         if not abs_dest.exists():
-            abs_dest.write_text("")
+            abs_dest.write_text("", encoding="utf-8")
+            created_dest = True
 
     created_for_dry_run = False
 
@@ -293,7 +295,7 @@ def _move_symbol_impl(
             else:
                 if not abs_dest.exists():
                     _ensure_parents(abs_dest, project_dir)
-                    abs_dest.write_text("")
+                    abs_dest.write_text("", encoding="utf-8")
                     created_for_dry_run = True
                 dest_resource = project.get_resource(dest_file)
 
@@ -311,6 +313,7 @@ def _move_symbol_impl(
             return f"move_symbol completed successfully.\n{_format_changes(changes, dry_run=False, pre_existing=pre_existing)}"
 
     except Exception as exc:  # pylint: disable=broad-exception-caught
+        _cleanup_created_files(abs_dest, created_dest, project_dir)
         return f"Error moving '{symbol_name}': {exc}"
 
 
@@ -416,7 +419,11 @@ def _cleanup_created_files(
     abs_dest: Path, created_for_dry_run: bool, project_dir: Path
 ) -> None:
     """Remove temporary files created during a dry-run move_symbol."""
-    if created_for_dry_run and abs_dest.exists() and abs_dest.read_text() == "":
+    if (
+        created_for_dry_run
+        and abs_dest.exists()
+        and abs_dest.read_text(encoding="utf-8") == ""
+    ):
         abs_dest.unlink()
         _cleanup_empty_dirs(abs_dest.parent, project_dir)
 
@@ -426,7 +433,7 @@ def _cleanup_empty_dirs(directory: Path, stop_at: Path) -> None:
     current = directory
     while current != stop_at and current.is_relative_to(stop_at):
         init_file = current / "__init__.py"
-        if init_file.exists() and init_file.read_text() == "":
+        if init_file.exists() and init_file.read_text(encoding="utf-8") == "":
             # Only remove if the directory has no other content
             contents = list(current.iterdir())
             if contents == [init_file]:
@@ -513,7 +520,7 @@ def _move_module_impl(
     if not abs_dest_pkg.exists():
         if not dry_run:
             abs_dest_pkg.mkdir(parents=True, exist_ok=True)
-            (abs_dest_pkg / "__init__.py").write_text("")
+            (abs_dest_pkg / "__init__.py").write_text("", encoding="utf-8")
         else:
             return (
                 f"Error: destination package not found: {dest_package}. "

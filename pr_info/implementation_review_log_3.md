@@ -31,3 +31,28 @@
 - Added encoding="utf-8" to open() call
 
 **Status**: committed
+
+## Round 2 — 2026-03-25
+**Findings**:
+- #1 [Critical] tach.toml missing `utils` dependency for refactoring module
+- #2 [Suggestion] _move_symbol_impl doesn't clean up created files on error
+- #3 [Suggestion] Architecture diagram stale after subprocess change
+- #4 [Suggestion] read_text()/write_text() missing encoding="utf-8"
+- #5 [Suggestion] Dead try/except in rope_cli.py
+- #6 [Suggestion] Duplicate hang-regression tests
+
+**Decisions**:
+- #1: Accept — would break tach check in CI
+- #2: Accept — functional gap: empty files persist on rope failure
+- #3: Skip — docs out of scope (already skipped round 1)
+- #4: Accept — consistency, bounded effort
+- #5: Accept — dead code removal
+- #6: Skip — hang tests are the regression safety net for this branch's core issue
+
+**Changes**:
+- Added `{ path = "mcp_tools_py.utils" }` to tach.toml refactoring module
+- Added created_dest flag + cleanup in _move_symbol_impl except block
+- Added encoding="utf-8" to all read_text()/write_text() calls
+- Removed dead try/except in rope_cli.py
+
+**Status**: committed

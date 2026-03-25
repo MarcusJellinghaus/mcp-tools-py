@@ -69,11 +69,7 @@ def main() -> None:
         sys.exit(1)
 
     # Output result as JSON for structured parsing
-    try:
-        print(json.dumps({"result": result}))
-    except (TypeError, ValueError):
-        print(result)
-        sys.exit(0)
+    print(json.dumps({"result": result}))
 
 
 if __name__ == "__main__":
