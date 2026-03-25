@@ -23,6 +23,11 @@ def main() -> None:
         sys.exit(1)
 
     operation = sys.argv[1]
+    valid_ops = {"rename_symbol", "move_symbol", "move_module"}
+    if operation not in valid_ops:
+        print(f"Unknown operation: {operation}", file=sys.stderr)
+        sys.exit(1)
+
     args = json.loads(sys.argv[2])
 
     # Import here to keep startup fast and isolated
@@ -33,36 +38,42 @@ def main() -> None:
     )
 
     project_dir = Path(args["project_dir"])
+    result = ""
 
-    if operation == "rename_symbol":
-        result = _rename_symbol_impl(
-            project_dir,
-            args["file_path"],
-            args["symbol_name"],
-            args["new_name"],
-            args["dry_run"],
-        )
-    elif operation == "move_symbol":
-        result = _move_symbol_impl(
-            project_dir,
-            args["source_file"],
-            args["symbol_name"],
-            args["dest_file"],
-            args["dry_run"],
-        )
-    elif operation == "move_module":
-        result = _move_module_impl(
-            project_dir,
-            args["source_module"],
-            args["dest_package"],
-            args["dry_run"],
-        )
-    else:
-        print(f"Unknown operation: {operation}", file=sys.stderr)
+    try:
+        if operation == "rename_symbol":
+            result = _rename_symbol_impl(
+                project_dir,
+                args["file_path"],
+                args["symbol_name"],
+                args["new_name"],
+                args["dry_run"],
+            )
+        elif operation == "move_symbol":
+            result = _move_symbol_impl(
+                project_dir,
+                args["source_file"],
+                args["symbol_name"],
+                args["dest_file"],
+                args["dry_run"],
+            )
+        elif operation == "move_module":
+            result = _move_module_impl(
+                project_dir,
+                args["source_module"],
+                args["dest_package"],
+                args["dry_run"],
+            )
+    except Exception as exc:  # pylint: disable=broad-exception-caught
+        print(json.dumps({"error": f"{type(exc).__name__}: {exc}"}))
         sys.exit(1)
 
     # Output result as JSON for structured parsing
-    print(json.dumps({"result": result}))
+    try:
+        print(json.dumps({"result": result}))
+    except (TypeError, ValueError):
+        print(result)
+        sys.exit(0)
 
 
 if __name__ == "__main__":

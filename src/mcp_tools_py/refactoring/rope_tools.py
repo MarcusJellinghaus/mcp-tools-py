@@ -357,9 +357,16 @@ def _run_rope_subprocess(
         stderr = result.stderr.strip()
         return f"Error running {operation} (exit {result.return_code}): {stderr}"
 
+    # Log stderr warnings/logs for debugging (rope emits to stderr)
+    if result.stderr and result.stderr.strip():
+        stderr_preview = result.stderr.strip()[:200]
+        logger.debug("rope subprocess stderr: %s", stderr_preview)
+
     # Parse JSON output from rope_cli
     try:
         output = json.loads(result.stdout)
+        if "error" in output:
+            return f"Error in {operation}: {output['error']}"
         return str(output["result"])
     except (json.JSONDecodeError, KeyError):
         # Fall back to raw stdout if JSON parsing fails

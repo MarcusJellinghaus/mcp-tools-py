@@ -55,10 +55,10 @@ This tracks **Feature Implementation** consisting of multiple **Tasks**.
 ### Step 5: Robustness improvements
 > Harden `rope_cli.py` error handling and subprocess result reporting.
 
-- [ ] Add `try/except` in `rope_cli.main()` to catch unhandled exceptions and return structured JSON errors instead of raw tracebacks
-- [ ] Add `try/except` around `json.dumps()` in `rope_cli.py` as safety net
-- [ ] Include truncated stderr in `_run_rope_subprocess()` successful results for debugging (rope warnings/logs go to stderr)
-- [ ] Quality checks: pylint, pytest, mypy
+- [x] Add `try/except` in `rope_cli.main()` to catch unhandled exceptions and return structured JSON errors instead of raw tracebacks
+- [x] Add `try/except` around `json.dumps()` in `rope_cli.py` as safety net
+- [x] Include truncated stderr in `_run_rope_subprocess()` successful results for debugging (rope warnings/logs go to stderr)
+- [x] Quality checks: pylint, pytest, mypy
 
 ## Pull Request
 

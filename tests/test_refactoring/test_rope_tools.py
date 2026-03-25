@@ -1,5 +1,6 @@
 """Tests for rope-based refactoring operations (move, rename)."""
 
+import json
 from pathlib import Path
 
 import pytest
@@ -251,6 +252,48 @@ def test_cli_parse_args_custom_timeout() -> None:
     ):
         args = parse_args()
     assert args.refactoring_timeout == 60
+
+
+def test_rope_cli_returns_json_error_on_exception() -> None:
+    """rope_cli returns structured JSON error, not raw traceback."""
+    import subprocess
+    import sys
+
+    # Pass valid operation but missing required args to trigger KeyError
+    proc = subprocess.run(
+        [
+            sys.executable,
+            "-m",
+            "mcp_tools_py.refactoring.rope_cli",
+            "rename_symbol",
+            '{"project_dir": "/nonexistent"}',
+        ],
+        capture_output=True,
+        text=True,
+    )
+    assert proc.returncode == 1
+    output = json.loads(proc.stdout)
+    assert "error" in output
+
+
+def test_rope_cli_unknown_operation() -> None:
+    """rope_cli exits 1 on unknown operation."""
+    import subprocess
+    import sys
+
+    proc = subprocess.run(
+        [
+            sys.executable,
+            "-m",
+            "mcp_tools_py.refactoring.rope_cli",
+            "unknown_op",
+            "{}",
+        ],
+        capture_output=True,
+        text=True,
+    )
+    assert proc.returncode == 1
+    assert "Unknown operation" in proc.stderr
 
 
 def test_refactoring_tools_init_stores_timeout(tmp_path: Path) -> None:
