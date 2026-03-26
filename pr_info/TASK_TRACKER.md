@@ -33,7 +33,7 @@ This tracks **Feature Implementation** consisting of multiple **Tasks**.
 
 ### Step 3: Architecture Config Updates
 - [x] Implementation: update `tach.toml` and `.importlinter` to include `inspect_library` module boundaries
-- [ ] Quality checks: pylint, pytest, mypy — fix all issues
+- [x] Quality checks: pylint, pytest, mypy — fix all issues
 - [ ] Commit: `chore: add inspect_library to architecture boundary configs`
 
 ## Pull Request
