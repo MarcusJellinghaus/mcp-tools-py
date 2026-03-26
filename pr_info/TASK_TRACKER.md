@@ -33,7 +33,7 @@ This tracks **Feature Implementation** consisting of multiple **Tasks**.
 
 - [x] Implementation: add `_register_lint_imports()` to `CheckerTools`, update registration count test, add tool handler tests
 - [x] Quality checks: pylint, pytest, mypy — fix all issues
-- [ ] Commit: `feat: add run_lint_imports_check MCP tool`
+- [x] Commit: `feat: add run_lint_imports_check MCP tool`
 
 ## Pull Request
 
