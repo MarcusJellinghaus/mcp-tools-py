@@ -31,7 +31,7 @@ This tracks **Feature Implementation** consisting of multiple **Tasks**.
 ### Step 2: Register UtilityTools in server + update architecture configs
 > Details: [step_2.md](./steps/step_2.md)
 
-- [ ] Implementation: wire up UtilityTools in `server.py`, update `tach.toml` and `.importlinter`
+- [x] Implementation: wire up UtilityTools in `server.py`, update `tach.toml` and `.importlinter`
 - [ ] Quality checks: pylint, pytest, mypy — fix all issues
 - [ ] Commit: `feat: register UtilityTools and update architecture configs`
 

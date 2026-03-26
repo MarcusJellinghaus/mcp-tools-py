@@ -61,11 +61,19 @@ depends_on = [
 ]
 
 [[modules]]
+path = "mcp_tools_py.utility_tools"
+layer = "tool_implementation"
+depends_on = [
+    { path = "mcp_tools_py.log_utils" }
+]
+
+[[modules]]
 path = "mcp_tools_py.server"
 layer = "server"
 depends_on = [
     { path = "mcp_tools_py.checker_tools" },
     { path = "mcp_tools_py.refactoring" },
+    { path = "mcp_tools_py.utility_tools" },
     { path = "mcp_tools_py.utils" },
     { path = "mcp_tools_py.log_utils" }
 ]
