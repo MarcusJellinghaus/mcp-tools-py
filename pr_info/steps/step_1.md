@@ -25,6 +25,8 @@ project.prefs["prefer_module_from_imports"] = True
 > **Note**: Rope's `from-global` preference is controlled by `prefer_module_from_imports`
 > on the project prefs object. This makes rope use `from X import Y` style.
 
+> **Implementation note**: Verify the exact rope API at implementation time — check rope source if `project.prefs["prefer_module_from_imports"] = True` doesn't work.
+
 ### Test
 
 ```python

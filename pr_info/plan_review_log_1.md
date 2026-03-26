@@ -38,5 +38,29 @@
 - Renumbered steps: 1 (unchanged), 2 (merged), 3 (was 4), 4 (was 5), 5 (was 6)
 - Deleted old step_6.md
 
+**Status**: Committed (c1a8170)
+
+## Round 2 — 2026-03-26
+
+**Findings**:
+- Step 1: rope preference name should note verification at implementation time
+- Step 2: dry-run batch logic underspecified (source unchanged between iterations in dry-run)
+- Step 2: error messages need to reference loop variable, not entire list
+- Step 2: large step needs justification note (atomic signature change)
+- Step 2: cleanup logic adaptation for batch mode not documented
+- Step 3: unconditional self-import removal deviates from issue wording (but is correct)
+- No Critical findings — plan structure is sound after Round 1
+
+**Decisions**:
+- Accept: All 6 findings — minor clarification notes for the implementing LLM
+- No design/requirements questions needed
+
+**User decisions**: None required.
+
+**Changes**:
+- Added rope API verification note to Step 1
+- Added dry-run batch clarification, error message guidance, size justification, and cleanup logic docs to Step 2
+- Added unconditional removal rationale to Step 3
+
 **Status**: Committing changes
 

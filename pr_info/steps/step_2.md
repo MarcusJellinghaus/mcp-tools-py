@@ -4,6 +4,8 @@
 
 ## Goal
 
+**Note**: This step is intentionally large because the signature change must be atomic across all layers and tests to keep checks green.
+
 Change `move_symbol` from single-symbol to batch: update the signature from
 `symbol_name: str` to `symbol_names: list[str]` across all layers, implement
 the batch loop with reverse-order iteration, and add all-or-nothing upfront
@@ -165,6 +167,8 @@ For dry-run mode: create the dest file once (if needed), loop through all
 symbols accumulating change previews, then clean up the temp dest file once
 at the end. This avoids creating/cleaning temp files per symbol.
 
+In dry-run mode, source is not modified between iterations since `project.do()` is not called. Each symbol still needs its own rope Project instance and `_find_symbol_offset` call on the unchanged source text. The preview for each symbol shows what would change independently.
+
 ### "All-or-nothing" scope
 
 The all-or-nothing guarantee applies to **validation only**: symbol existence,
@@ -174,6 +178,8 @@ after the 1st has been moved), there is no rollback — the moves that
 succeeded remain applied. This is acceptable because upfront validation
 already confirmed all symbols exist and no collisions are present, making
 runtime errors unlikely.
+
+The existing `_cleanup_created_files()` logic (which only deletes empty files) handles partial batch failures correctly — after successful moves, the dest file has content and won't be deleted. Move the `created_dest` flag and exception handling outside the per-symbol loop.
 
 **Key detail**: Each symbol move requires a fresh rope Project because rope caches file
 contents. Re-reading source text and re-opening the project ensures rope sees the
@@ -216,6 +222,9 @@ This step combines signature change + batch loop + validation into one commit:
 
 4. Add new tests: batch move, ordering, all-or-nothing validation (tests validation
    failures, not runtime errors), collision check.
+
+Note: Update error messages to reference the specific symbol name from the loop iteration
+variable, not the entire `symbol_names` list. E.g., `f"Error moving '{name}': {exc}"`.
 
 After making changes, run all three code quality checks (pylint, pytest unit tests, mypy).
 Fix any issues before committing. Commit message: "feat(move_symbol): batch move with signature change and validation"
