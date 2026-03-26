@@ -3,7 +3,7 @@
 import importlib
 import inspect
 import types
-from typing import TYPE_CHECKING
+from typing import TYPE_CHECKING, Any, Callable, Union, cast
 
 from mcp_tools_py.log_utils import log_function_call
 
@@ -72,7 +72,10 @@ def _get_library_source(import_path: str, max_lines: int = 200) -> str:
 
     # Try to get source
     try:
-        source = inspect.getsource(obj)
+        # obj is resolved via importlib/getattr so it's always an inspectable symbol
+        source = inspect.getsource(
+            cast(Union[types.ModuleType, type, Callable[..., Any]], obj)
+        )
     except (TypeError, OSError):
         name = import_path.split(".")[-1]
         return (
