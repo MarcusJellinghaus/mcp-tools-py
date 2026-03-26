@@ -21,6 +21,42 @@ This tracks **Feature Implementation** consisting of multiple **Tasks**.
 
 ## Tasks
 
-<!-- Tasks populated from pr_info/steps/ by prepare_task_tracker -->
+### Step 1: `from-global` import style preference
+> [Detail](./steps/step_1.md) — Set `prefer_module_from_imports` in `_with_rope_project()` + test
+
+- [ ] Implementation: set rope preference + add test for from-import style
+- [ ] Quality checks: pylint, pytest, mypy — fix all issues
+- [ ] Commit: `feat(refactoring): set from-global import style in rope project`
+
+### Step 2: Batch `move_symbol` — signature change, loop, and validation
+> [Detail](./steps/step_2.md) — `symbol_name` → `symbol_names` across all layers, batch loop, all-or-nothing validation
+
+- [ ] Implementation: signature change across rope_tools, rope_cli, __init__.py + batch loop with reverse-order iteration + upfront validation (duplicates, existence, collisions) + update all existing tests + add new batch tests
+- [ ] Quality checks: pylint, pytest, mypy — fix all issues
+- [ ] Commit: `feat(move_symbol): batch move with signature change and validation`
+
+### Step 3: Self-referencing import removal
+> [Detail](./steps/step_3.md) — Post-move cleanup of self-referencing imports in destination
+
+- [ ] Implementation: add `_remove_self_imports()` helper + integrate in `_move_symbol_impl()` + add test
+- [ ] Quality checks: pylint, pytest, mypy — fix all issues
+- [ ] Commit: `feat(move_symbol): remove self-referencing imports after move`
+
+### Step 4: Result output with review reminders
+> [Detail](./steps/step_4.md) — Structured result output with notes
+
+- [ ] Implementation: enhance `_move_symbol_impl()` result string + dry-run output + add test
+- [ ] Quality checks: pylint, pytest, mypy — fix all issues
+- [ ] Commit: `feat(move_symbol): structured result output with review reminders`
+
+### Step 5: Manual test plan update
+> [Detail](./steps/step_5.md) — Update TEST_PLAN.md for new signature + batch test cases
+
+- [ ] Implementation: update Tests 7a–7c to `symbol_names` + add Tests 7d–7f for batch moves + update PROGRESS_TRACKER.md
+- [ ] Quality checks: pylint, pytest, mypy — fix all issues
+- [ ] Commit: `docs(test-plan): update move_symbol tests for batch signature`
 
 ## Pull Request
+
+- [ ] PR review: verify all steps integrated correctly, no regressions
+- [ ] PR summary prepared
