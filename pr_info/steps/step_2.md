@@ -48,6 +48,11 @@ Add dependency in the `server` module:
 mcp_tools_py.checker_tools | mcp_tools_py.refactoring | mcp_tools_py.utility_tools
 ```
 
+Also add to `ignore_imports` in the layered contract (needed because `FastMCPProtocol` is imported under `TYPE_CHECKING`):
+```
+mcp_tools_py.utility_tools -> mcp_tools_py.server
+```
+
 **Forbidden imports contract** — add to the forbidden_modules list:
 ```
 mcp_tools_py.utility_tools

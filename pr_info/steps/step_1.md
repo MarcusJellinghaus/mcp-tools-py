@@ -35,13 +35,9 @@ def sleep(sleep_seconds: float = 5.0) -> str:
 ### `tests/test_utility_tools.py`
 
 Test functions:
-- `test_utility_tools_registers_one_tool()` — mock mcp, verify `.tool()` called once
-- `test_sleep_default_value()` — mock `time.sleep`, call with no args, assert slept 5.0
-- `test_sleep_custom_value()` — mock `time.sleep`, call with 10.0, assert slept 10.0
-- `test_sleep_zero()` — 0 is valid, returns confirmation
-- `test_sleep_negative_returns_error()` — returns error string, does NOT call `time.sleep`
-- `test_sleep_exceeds_max_returns_error()` — 301 returns error string
-- `test_sleep_return_format()` — asserts exact string `"Slept for X seconds."`
+- `test_utility_tools_registers_sleep_tool()` — mock mcp, verify `sleep` tool is registered
+- `test_sleep_valid_values(sleep_seconds, expected_message)` — parameterized: (default 5.0), (10.0), (0) — mock `time.sleep`, verify correct sleep call and return message
+- `test_sleep_invalid_values(sleep_seconds, expected_error)` — parameterized: (-1, error), (301, error) — verify error returned, `time.sleep` NOT called
 
 ## HOW
 
@@ -75,11 +71,11 @@ Implement Step 1 of issue #116 (see pr_info/steps/summary.md for context).
 
 Create two files using TDD:
 
-1. First write tests in `tests/test_utility_tools.py` — see step_1.md for the 7 test cases.
+1. First write tests in `tests/test_utility_tools.py` — see step_1.md for the 3 test cases (2 are parameterized).
    Mock `time.sleep` to avoid actual delays. Mock `mcp.tool()` for registration test.
 
 2. Then implement `src/mcp_tools_py/utility_tools.py`:
-   - UtilityTools class following RefactoringTools pattern (no server dependency)
+   - UtilityTools class following the same `register(mcp)` pattern as existing tool classes
    - Single `sleep` tool: validates 0 <= sleep_seconds <= 300, calls time.sleep(), returns confirmation
    - Use @mcp.tool() and @log_function_call decorators
 

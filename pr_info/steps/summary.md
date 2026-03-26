@@ -10,7 +10,7 @@ Add a `sleep` MCP tool via a new `UtilityTools` class. This is a minimal tool th
 
 - **Layer**: `tool_implementation` (same as `checker_tools`, `refactoring`)
 - **Dependencies**: Only `mcp_tools_py.log_utils` (for `@log_function_call` decorator)
-- **Pattern**: Follows `RefactoringTools` — standalone class, no server dependency needed
+- **Pattern**: Follows the same `register(mcp)` pattern as existing tool classes
 - **Registration**: `UtilityTools().register(self.mcp)` in `server.py`
 
 ### Architecture config updates
