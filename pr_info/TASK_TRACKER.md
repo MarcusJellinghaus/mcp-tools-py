@@ -22,9 +22,9 @@ This tracks **Feature Implementation** consisting of multiple **Tasks**.
 ## Tasks
 
 ### Step 1: Core Logic + Unit Tests (Mocked)
-- [ ] Implementation: create `inspect_library.py` with `_get_library_source()` + `InspectTools` class, and `tests/test_inspect_library.py` with mocked unit tests
-- [ ] Quality checks: pylint, pytest, mypy — fix all issues
-- [ ] Commit: `feat: add get_library_source core logic with mocked unit tests`
+- [x] Implementation: create `inspect_library.py` with `_get_library_source()` + `InspectTools` class, and `tests/test_inspect_library.py` with mocked unit tests
+- [x] Quality checks: pylint, pytest, mypy — fix all issues
+- [x] Commit: `feat: add get_library_source core logic with mocked unit tests`
 
 ### Step 2: Real-Import Tests + MCP Registration in `server.py`
 - [ ] Implementation: add real-import tests to `tests/test_inspect_library.py` and wire `InspectTools` into `server.py`
