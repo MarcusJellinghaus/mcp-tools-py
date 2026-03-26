@@ -63,6 +63,28 @@ def test_list_symbols_nonexistent_file(tmp_path: Path) -> None:
     assert "error" in result.lower() or "not found" in result.lower()
 
 
+def test_list_symbols_excludes_imports(tmp_path: Path) -> None:
+    """Does not list imported names, only locally-defined symbols."""
+    code = (
+        "from pathlib import Path\n"
+        "import os\n"
+        "\n"
+        "def my_func(): ...\n"
+        "\n"
+        "class MyClass: ...\n"
+        "\n"
+        "MAX = 10\n"
+    )
+    f = tmp_path / "mixed.py"
+    f.write_text(code)
+    result = list_symbols(tmp_path, "mixed.py")
+    assert "my_func" in result
+    assert "MyClass" in result
+    assert "MAX" in result
+    assert "Path" not in result
+    assert "os" not in result
+
+
 def test_list_symbols_syntax_error(tmp_path: Path) -> None:
     """Returns error for file with syntax errors."""
     f = tmp_path / "bad.py"
