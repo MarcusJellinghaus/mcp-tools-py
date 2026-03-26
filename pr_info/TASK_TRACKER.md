@@ -32,7 +32,7 @@ This tracks **Feature Implementation** consisting of multiple **Tasks**.
 - [x] Commit: `feat: wire get_library_source into MCP server with real-import tests`
 
 ### Step 3: Architecture Config Updates
-- [ ] Implementation: update `tach.toml` and `.importlinter` to include `inspect_library` module boundaries
+- [x] Implementation: update `tach.toml` and `.importlinter` to include `inspect_library` module boundaries
 - [ ] Quality checks: pylint, pytest, mypy — fix all issues
 - [ ] Commit: `chore: add inspect_library to architecture boundary configs`
 
