@@ -52,7 +52,7 @@ def sample_project(tmp_path: Path) -> Path:
 )
 def test_move_symbol(sample_project: Path, symbol_name: str) -> None:
     """Move various symbol types to another module."""
-    result = move_symbol(sample_project, "src/foo.py", symbol_name, "src/baz.py")
+    result = move_symbol(sample_project, "src/foo.py", [symbol_name], "src/baz.py")
     assert "modified" in result.lower() or "created" in result.lower()
     baz = sample_project / "src" / "baz.py"
     assert baz.exists()
@@ -68,7 +68,7 @@ def test_move_symbol(sample_project: Path, symbol_name: str) -> None:
 
 def test_move_symbol_updates_imports(sample_project: Path) -> None:
     """Move a function and verify imports are updated in consumers."""
-    move_symbol(sample_project, "src/foo.py", "my_func", "src/baz.py")
+    move_symbol(sample_project, "src/foo.py", ["my_func"], "src/baz.py")
     bar_text = (sample_project / "src" / "bar.py").read_text()
     assert "my_func" in bar_text
     # Import should now reference baz, not foo
@@ -78,7 +78,7 @@ def test_move_symbol_updates_imports(sample_project: Path) -> None:
 def test_move_symbol_dry_run(sample_project: Path) -> None:
     """Dry run reports changes without applying them."""
     result = move_symbol(
-        sample_project, "src/foo.py", "my_func", "src/baz.py", dry_run=True
+        sample_project, "src/foo.py", ["my_func"], "src/baz.py", dry_run=True
     )
     assert "[DRY RUN]" in result
     # foo.py should be unchanged
@@ -89,20 +89,20 @@ def test_move_symbol_dry_run(sample_project: Path) -> None:
 
 def test_move_symbol_creates_dest_file(sample_project: Path) -> None:
     """Auto-creates destination file if it doesn't exist."""
-    move_symbol(sample_project, "src/foo.py", "my_func", "src/new_module.py")
+    move_symbol(sample_project, "src/foo.py", ["my_func"], "src/new_module.py")
     assert (sample_project / "src" / "new_module.py").exists()
 
 
 def test_move_symbol_creates_init_files(sample_project: Path) -> None:
     """Auto-creates __init__.py files for new packages."""
-    move_symbol(sample_project, "src/foo.py", "my_func", "src/sub/new_module.py")
+    move_symbol(sample_project, "src/foo.py", ["my_func"], "src/sub/new_module.py")
     assert (sample_project / "src" / "sub" / "__init__.py").exists()
     assert (sample_project / "src" / "sub" / "new_module.py").exists()
 
 
 def test_move_symbol_not_found(sample_project: Path) -> None:
     """Error with available symbols when symbol not found."""
-    result = move_symbol(sample_project, "src/foo.py", "nonexistent", "src/baz.py")
+    result = move_symbol(sample_project, "src/foo.py", ["nonexistent"], "src/baz.py")
     assert "not found" in result.lower()
     assert "my_func" in result
 
@@ -110,8 +110,164 @@ def test_move_symbol_not_found(sample_project: Path) -> None:
 def test_move_symbol_name_collision(sample_project: Path) -> None:
     """Error when destination already defines same symbol name."""
     (sample_project / "src" / "baz.py").write_text("def my_func(): pass\n")
-    result = move_symbol(sample_project, "src/foo.py", "my_func", "src/baz.py")
+    result = move_symbol(sample_project, "src/foo.py", ["my_func"], "src/baz.py")
     assert "collision" in result.lower() or "already" in result.lower()
+
+
+def test_move_symbol_uses_from_import_style(sample_project: Path) -> None:
+    """move_symbol should produce 'from ... import' style, not 'import ...' style."""
+    move_symbol(sample_project, "src/foo.py", ["my_func"], "src/baz.py")
+    bar_text = (sample_project / "src" / "bar.py").read_text()
+    # prefer_module_from_imports=True makes rope use "from pkg import mod" style
+    # instead of "import pkg.mod" with fully-qualified usage
+    assert (
+        "from src import baz" in bar_text or "from src.baz import my_func" in bar_text
+    )
+    # Should NOT use "import src.baz" fully-qualified style
+    assert "import src.baz\n" not in bar_text
+
+
+# --- batch move_symbol tests ---
+
+
+def test_move_symbol_batch(sample_project: Path) -> None:
+    """Move multiple symbols in one call, verify all arrive in destination."""
+    result = move_symbol(
+        sample_project, "src/foo.py", ["my_func", "MyClass"], "src/baz.py"
+    )
+    assert "successfully" in result.lower()
+    baz_text = (sample_project / "src" / "baz.py").read_text()
+    assert "my_func" in baz_text
+    assert "MyClass" in baz_text
+    foo_text = (sample_project / "src" / "foo.py").read_text()
+    assert "def my_func" not in foo_text
+    assert "class MyClass" not in foo_text
+
+
+def test_move_symbol_batch_ordering(sample_project: Path) -> None:
+    """Batch move preserves symbol order in destination file."""
+    result = move_symbol(
+        sample_project,
+        "src/foo.py",
+        ["my_func", "MyClass", "MY_VAR"],
+        "src/baz.py",
+    )
+    assert "successfully" in result.lower()
+    baz_text = (sample_project / "src" / "baz.py").read_text()
+    # Symbols should appear in the order they were listed
+    pos_func = baz_text.index("my_func")
+    pos_class = baz_text.index("MyClass")
+    pos_var = baz_text.index("MY_VAR")
+    assert pos_func < pos_class < pos_var
+
+
+def test_move_symbol_batch_validation_all_or_nothing(sample_project: Path) -> None:
+    """If any symbol fails validation, no symbols are moved."""
+    result = move_symbol(
+        sample_project,
+        "src/foo.py",
+        ["my_func", "nonexistent"],
+        "src/baz.py",
+    )
+    assert "not found" in result.lower()
+    # No symbols should have been moved
+    foo_text = (sample_project / "src" / "foo.py").read_text()
+    assert "def my_func" in foo_text
+    assert not (sample_project / "src" / "baz.py").exists()
+
+
+def test_move_symbol_batch_collision_check(sample_project: Path) -> None:
+    """If any symbol collides with destination, entire batch fails."""
+    (sample_project / "src" / "baz.py").write_text("class MyClass: pass\n")
+    result = move_symbol(
+        sample_project,
+        "src/foo.py",
+        ["my_func", "MyClass"],
+        "src/baz.py",
+    )
+    assert "collision" in result.lower() or "already" in result.lower()
+    # No symbols should have been moved
+    foo_text = (sample_project / "src" / "foo.py").read_text()
+    assert "def my_func" in foo_text
+
+
+def test_move_symbol_batch_duplicate_names(sample_project: Path) -> None:
+    """Duplicate symbol names in the list are rejected."""
+    result = move_symbol(
+        sample_project,
+        "src/foo.py",
+        ["my_func", "my_func"],
+        "src/baz.py",
+    )
+    assert "duplicate" in result.lower()
+
+
+# --- result output tests ---
+
+
+def test_move_symbol_result_includes_review_notes(sample_project: Path) -> None:
+    """Result output includes import style note and review reminder."""
+    result = move_symbol(
+        sample_project, "src/foo.py", ["my_func", "MyClass"], "src/baz.py"
+    )
+    assert "successfully" in result
+    assert "Moved: my_func, MyClass (from src/foo.py" in result
+    assert "src/baz.py" in result
+    assert "Note: Imports are absolute" in result
+    assert "Note: Review symbol order and imports in all affected files." in result
+
+
+def test_move_symbol_dry_run_includes_review_notes(sample_project: Path) -> None:
+    """Dry-run output includes symbols line and review reminder notes."""
+    result = move_symbol(
+        sample_project,
+        "src/foo.py",
+        ["my_func", "MyClass"],
+        "src/baz.py",
+        dry_run=True,
+    )
+    assert "[DRY RUN] move_symbol preview:" in result
+    assert "Symbols: my_func, MyClass" in result
+    assert "Note: Imports are absolute" in result
+    assert "Note: Review symbol order and imports in all affected files." in result
+
+
+# --- self-import removal tests ---
+
+
+def test_move_symbol_removes_self_import(tmp_path: Path) -> None:
+    """After moving a symbol, self-referencing imports are removed from destination."""
+    # Create a project where rope will generate a self-import.
+    # This happens when module A imports from module B, and we move a symbol
+    # from B to A — rope adds "from A import ..." inside A itself.
+    pkg = tmp_path / "pkg"
+    pkg.mkdir()
+    (pkg / "__init__.py").write_text("")
+    (pkg / "source.py").write_text(
+        "from pkg.dest import helper\n"
+        "\n"
+        "\n"
+        "def mover():\n"
+        "    return helper()\n"
+    )
+    (pkg / "dest.py").write_text(
+        "def helper():\n"
+        "    return 1\n"
+        "\n"
+        "\n"
+        "def stay_here():\n"
+        "    return 2\n"
+    )
+    result = move_symbol(tmp_path, "pkg/source.py", ["mover"], "pkg/dest.py")
+    assert "successfully" in result.lower()
+    dest_text = (tmp_path / "pkg" / "dest.py").read_text()
+    # The destination should NOT contain a self-referencing import
+    assert "from pkg.dest import" not in dest_text
+    assert "import pkg.dest" not in dest_text
+    # The moved symbol should be present
+    assert "def mover" in dest_text
+    # helper should still be defined
+    assert "def helper" in dest_text
 
 
 # --- rename_symbol tests ---

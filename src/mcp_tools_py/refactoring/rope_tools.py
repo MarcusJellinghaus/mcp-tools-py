@@ -118,6 +118,7 @@ def _with_rope_project(project_dir: Path) -> Iterator[Project]:
     """Context manager: open fresh rope Project, yield, close."""
     ignored = _build_ignored_resources(project_dir)
     project = Project(str(project_dir), ropefolder=None, ignored_resources=ignored)
+    project.prefs["prefer_module_from_imports"] = True
     try:
         yield project
     finally:
@@ -243,7 +244,7 @@ def _ensure_parents(dest_path: Path, project_dir: Path) -> None:
 def _move_symbol_impl(
     project_dir: Path,
     source_file: str,
-    symbol_name: str,
+    symbol_names: list[str],
     dest_file: str,
     dry_run: bool,
 ) -> str:
@@ -251,66 +252,128 @@ def _move_symbol_impl(
     abs_source = project_dir / source_file
     abs_dest = project_dir / dest_file
 
-    source_text = abs_source.read_text(encoding="utf-8")
-    offset = _find_symbol_offset(source_text, symbol_name)
-    if offset is None:
-        available = _get_top_level_symbols(source_text)
-        available_str = ", ".join(available) if available else "(none)"
-        return (
-            f"Symbol '{symbol_name}' not found in {source_file}.\n"
-            f"Only top-level symbols (functions, classes, variables) are supported.\n"
-            f"Available top-level symbols: {available_str}"
-        )
+    # --- Upfront validation (all-or-nothing) ---
 
-    # Check for name collision in destination
+    # 1a. Duplicate check
+    if len(symbol_names) != len(set(symbol_names)):
+        seen: set[str] = set()
+        dupes: list[str] = []
+        for name in symbol_names:
+            if name in seen:
+                dupes.append(name)
+            seen.add(name)
+        return f"Duplicate symbol names: {', '.join(dupes)}"
+
+    source_text = abs_source.read_text(encoding="utf-8")
+
+    # 1b. Existence check
+    for name in symbol_names:
+        offset = _find_symbol_offset(source_text, name)
+        if offset is None:
+            available = _get_top_level_symbols(source_text)
+            available_str = ", ".join(available) if available else "(none)"
+            return (
+                f"Symbol '{name}' not found in {source_file}.\n"
+                f"Only top-level symbols (functions, classes, variables) are supported.\n"
+                f"Available top-level symbols: {available_str}"
+            )
+
+    # 1c. Collision check
     if abs_dest.exists():
         dest_text = abs_dest.read_text(encoding="utf-8")
         dest_symbols = _get_top_level_symbols(dest_text)
-        if symbol_name in dest_symbols:
-            return (
-                f"Name collision: '{symbol_name}' already exists in {dest_file}. "
-                f"Rename the symbol in the destination first."
-            )
+        for name in symbol_names:
+            if name in dest_symbols:
+                return (
+                    f"Name collision: '{name}' already exists in {dest_file}. "
+                    f"Rename the symbol in the destination first."
+                )
 
-    # Create destination file and parent dirs if needed
+    # --- Create destination if needed (once) ---
     created_dest = False
+    created_for_dry_run = False
+
     if not dry_run:
         _ensure_parents(abs_dest, project_dir)
         if not abs_dest.exists():
             abs_dest.write_text("", encoding="utf-8")
             created_dest = True
+    else:
+        if not abs_dest.exists():
+            _ensure_parents(abs_dest, project_dir)
+            abs_dest.write_text("", encoding="utf-8")
+            created_for_dry_run = True
 
-    created_for_dry_run = False
+    # --- Move each symbol in reverse order ---
+    all_change_lines: list[str] = []
+    moved_names: list[str] = []
 
     try:
-        with _with_rope_project(project_dir) as project:
-            source_resource = project.get_resource(source_file)
+        for name in reversed(symbol_names):
+            # Re-read source each iteration (rope modifies it)
+            source_text = abs_source.read_text(encoding="utf-8")
+            offset = _find_symbol_offset(source_text, name)
 
-            if not dry_run:
+            with _with_rope_project(project_dir) as project:
+                source_resource = project.get_resource(source_file)
                 dest_resource = project.get_resource(dest_file)
-            else:
-                if not abs_dest.exists():
-                    _ensure_parents(abs_dest, project_dir)
-                    abs_dest.write_text("", encoding="utf-8")
-                    created_for_dry_run = True
-                dest_resource = project.get_resource(dest_file)
+                mover = rope.refactor.move.create_move(project, source_resource, offset)
+                changes = mover.get_changes(dest_resource)
 
-            mover = rope.refactor.move.create_move(project, source_resource, offset)
-            changes = mover.get_changes(dest_resource)
+                if dry_run:
+                    all_change_lines.append(_format_changes(changes, dry_run=True))
+                else:
+                    pre_existing = _collect_existing_paths(changes)
+                    project.do(changes)
+                    all_change_lines.append(
+                        _format_changes(
+                            changes, dry_run=False, pre_existing=pre_existing
+                        )
+                    )
+            moved_names.append(name)
 
-            if dry_run:
-                try:
-                    return f"[DRY RUN] move_symbol preview:\n{_format_changes(changes, dry_run=True)}"
-                finally:
-                    _cleanup_created_files(abs_dest, created_for_dry_run, project_dir)
+        if dry_run:
+            _cleanup_created_files(abs_dest, created_for_dry_run, project_dir)
+            symbols_str = ", ".join(reversed(moved_names))
+            combined = "\n".join(line for line in all_change_lines if line)
+            dry_lines = [
+                "[DRY RUN] move_symbol preview:",
+                f"  Symbols: {symbols_str}",
+                combined,
+                "Note: Imports are absolute \u2014 review and convert to relative where applicable.",
+                "Note: Review symbol order and imports in all affected files.",
+            ]
+            return "\n".join(line for line in dry_lines if line)
 
-            pre_existing = _collect_existing_paths(changes)
-            project.do(changes)
-            return f"move_symbol completed successfully.\n{_format_changes(changes, dry_run=False, pre_existing=pre_existing)}"
+        # Remove self-referencing imports from destination
+        dest_module_dotted = dest_file.replace("/", ".").removesuffix(".py")
+        removed_imports = _remove_self_imports(abs_dest, dest_module_dotted)
+
+        moved_str = ", ".join(reversed(moved_names))
+        combined = "\n".join(line for line in all_change_lines if line)
+        result_lines = [
+            "move_symbol completed successfully.",
+            f"  Moved: {moved_str} (from {source_file} \u2192 {dest_file})",
+            combined,
+        ]
+        for imp in removed_imports:
+            result_lines.append(
+                f"  Self-referencing import removed from {dest_file}: {imp}"
+            )
+        result_lines.append(
+            "Note: Imports are absolute \u2014 review and convert to relative where applicable."
+        )
+        result_lines.append(
+            "Note: Review symbol order and imports in all affected files."
+        )
+        return "\n".join(line for line in result_lines if line)
 
     except Exception as exc:  # pylint: disable=broad-exception-caught
-        _cleanup_created_files(abs_dest, created_dest, project_dir)
-        return f"Error moving '{symbol_name}': {exc}"
+        if dry_run:
+            _cleanup_created_files(abs_dest, created_for_dry_run, project_dir)
+        else:
+            _cleanup_created_files(abs_dest, created_dest, project_dir)
+        return f"Error moving symbol: {exc}"
 
 
 def _run_rope_subprocess(
@@ -381,12 +444,12 @@ def _run_rope_subprocess(
 def move_symbol(
     project_dir: Path,
     source_file: str,
-    symbol_name: str,
+    symbol_names: list[str],
     dest_file: str,
     dry_run: bool = False,
     timeout: int = 120,
 ) -> str:
-    """Move a top-level symbol to another module. Updates imports project-wide."""
+    """Move top-level symbols to another module. Updates imports project-wide."""
     abs_source = project_dir / source_file
     if not abs_source.exists():
         return f"Error: file not found: {source_file}"
@@ -396,7 +459,7 @@ def move_symbol(
         {
             "project_dir": str(project_dir),
             "source_file": source_file,
-            "symbol_name": symbol_name,
+            "symbol_names": symbol_names,
             "dest_file": dest_file,
             "dry_run": dry_run,
         },
@@ -409,6 +472,36 @@ def _collect_existing_paths(changes: ChangeSet) -> set[str]:
     return {
         change.resource.path for change in changes.changes if change.resource.exists()
     }
+
+
+def _remove_self_imports(dest_path: Path, dest_module_dotted: str) -> list[str]:
+    """Remove import lines that reference the destination module itself.
+
+    After rope moves symbols, it may insert imports in the destination file
+    that reference the destination module itself. These are always invalid
+    Python and are rope artifacts.
+
+    Args:
+        dest_path: Absolute path to the destination file.
+        dest_module_dotted: Dotted module name (e.g. "pkg.sub.module").
+
+    Returns:
+        List of removed import lines (for reporting).
+    """
+    lines = dest_path.read_text(encoding="utf-8").splitlines(keepends=True)
+    removed: list[str] = []
+    kept: list[str] = []
+    for line in lines:
+        stripped = line.strip()
+        if stripped == f"import {dest_module_dotted}" or stripped.startswith(
+            f"from {dest_module_dotted} import "
+        ):
+            removed.append(stripped)
+        else:
+            kept.append(line)
+    if removed:
+        dest_path.write_text("".join(kept), encoding="utf-8")
+    return removed
 
 
 def _cleanup_created_files(

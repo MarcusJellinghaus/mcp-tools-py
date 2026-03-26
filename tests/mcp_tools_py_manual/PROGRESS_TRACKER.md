@@ -66,7 +66,8 @@
 | # | Test | Status | Duration | git diff clean? | Notes |
 |---|------|--------|----------|-----------------|-------|
 | 6a | rename_symbol dry run | ⬜ | | ⬜ | |
-| 7a | move_symbol dry run | ⬜ | | ⬜ | |
+| 7a | move_symbol single dry run | ⬜ | | ⬜ | |
+| 7d | move_symbol batch dry run | ⬜ | | ⬜ | |
 | 8a | move_module dry run | ⬜ | | ⬜ | |
 
 ---
@@ -83,16 +84,26 @@
 | 6b-v3 | list_symbols confirms rename | ⬜ | | |
 | 6c | Teardown (delete + recreate) | ⬜ | | |
 
-### Test 7: `move_symbol`
+### Test 7: `move_symbol` (single)
 
 | Step | Description | Status | Duration | Notes |
 |------|-------------|--------|----------|-------|
-| 7b | Apply move | ⬜ | | |
+| 7b | Apply single move | ⬜ | | |
 | 7b-v1 | git diff shows expected files | ⬜ | | |
 | 7b-v2 | Source no longer has symbol | ⬜ | | |
 | 7b-v3 | Dest now has symbol | ⬜ | | |
 | 7b-v4 | Tests pass | ⬜ | | |
 | 7c | Teardown (delete + recreate) | ⬜ | | |
+
+### Test 7: `move_symbol` (batch)
+
+| Step | Description | Status | Duration | Notes |
+|------|-------------|--------|----------|-------|
+| 7e | Apply batch move | ⬜ | | |
+| 7e-v1 | Dest has both symbols | ⬜ | | |
+| 7e-v2 | Source has only format_user | ⬜ | | |
+| 7e-v3 | Tests pass | ⬜ | | |
+| 7f | Teardown (delete + recreate) | ⬜ | | |
 
 ### Test 8: `move_module`
 

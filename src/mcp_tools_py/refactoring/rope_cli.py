@@ -53,7 +53,7 @@ def main() -> None:
             result = _move_symbol_impl(
                 project_dir,
                 args["source_file"],
-                args["symbol_name"],
+                args["symbol_names"],
                 args["dest_file"],
                 args["dry_run"],
             )
