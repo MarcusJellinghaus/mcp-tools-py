@@ -27,4 +27,35 @@
 - `pr_info/steps/step_1.md`: Fixed `test_all_tools_available` to expect `"lint-imports": True` with mocked binary; fixed Windows path to `lint-imports.exe`
 - `pr_info/steps/step_2.md`: Fixed Windows path to `lint-imports.exe`; added sections for updating `TestToolHandlerShortCircuit` and `mock_server` fixtures
 
+**Status**: committed (b0358d8)
+
+## Round 2 — 2026-03-26
+
+**Findings**:
+- (Critical) DRY: binary path resolved identically in server.py and checker_tools.py — should follow `_resolved_python` pattern
+- (Critical) `test_all_tools_available` needs explicit `venv_path` setup and dual `os.path.exists` mock
+- (Skip) Explicit expected `False` values — already stated in plan
+- (Accept) Short-circuit error message should include expected binary path for consistency
+- (Skip) `import os` callout — already in plan's HOW section
+- (Accept) Mock target path for `execute_command` should be specified as `mcp_tools_py.checker_tools.execute_command`
+- (Skip) `test_one_tool_missing` — won't break, minor
+- (Skip) Cosmetic: docstring updates, test overlap
+
+**Decisions**:
+- Accept C1: store `_lint_imports_binary` on server, consume in checker_tools (mirrors `_resolved_python`)
+- Accept C2: make test setup explicit with `venv_path` + dual mock
+- Skip C3: already explicit in plan
+- Accept A1: include binary path in error message
+- Skip A2: already noted
+- Accept A3: specify mock target
+- Skip A4, S1-S3: cosmetic/won't break
+
+**User decisions**: None — all straightforward
+
+**Changes**:
+- `pr_info/steps/summary.md`: updated "What changes" for both server.py and checker_tools.py
+- `pr_info/steps/step_1.md`: explicit test setup, `_lint_imports_binary` storage
+- `pr_info/steps/step_2.md`: use `_lint_imports_binary` from server, error message with path, mock targets
+- `pr_info/steps/Decisions.md`: appended decisions 5-8
+
 **Status**: committing

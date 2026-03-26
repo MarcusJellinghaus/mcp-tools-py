@@ -8,9 +8,9 @@ Add `run_lint_imports_check` as a new MCP tool alongside the existing pylint/pyt
 
 ### What changes
 
-1. **`server.py` — `_check_tool_availability()`**: Add a file-existence check for the `lint-imports` binary in the venv. Unlike pylint/pytest/mypy which use `python -m <tool> --version`, lint-imports cannot be invoked via `python -m importlinter`, so we check for the binary file directly.
+1. **`server.py` — `_check_tool_availability()`**: Add a file-existence check for the `lint-imports` binary in the venv. Unlike pylint/pytest/mypy which use `python -m <tool> --version`, lint-imports cannot be invoked via `python -m importlinter`, so we check for the binary file directly. Store the resolved path as `self._lint_imports_binary: Optional[str]` for use by `checker_tools.py`.
 
-2. **`checker_tools.py` — `CheckerTools` class**: Add `_register_lint_imports()` method called from `register()`. The tool handler resolves the binary path, runs it via `execute_command()`, and returns raw stdout+stderr as-is (no parsing/formatting layer needed).
+2. **`checker_tools.py` — `CheckerTools` class**: Add `_register_lint_imports()` method called from `register()`. The tool handler reads `_lint_imports_binary` from the server (no re-resolution), runs it via `execute_command()`, and returns raw stdout+stderr as-is (no parsing/formatting layer needed).
 
 ### What does NOT change
 

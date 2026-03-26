@@ -17,7 +17,7 @@ Add `lint-imports` to the startup availability check in `server.py`. Unlike pyli
 
 Every test that asserts `server._tool_availability == {"pytest": ..., "pylint": ..., "mypy": ...}` must now also include `"lint-imports"`. Specifically:
 
-- `test_all_tools_available` — mock `os.path.exists` to return `True` for the lint-imports binary path (in addition to setting `venv_path` on the server), and expect `"lint-imports": True`
+- `test_all_tools_available` — this test's **setup** must change: the `_create_server` (or equivalent) call needs `venv_path="/mock/venv"`, and `os.path.exists` must be mocked to return `True` for both the python executable and the lint-imports binary path. Then the assertion expects `"lint-imports": True`
 - `test_all_tools_missing` — expect `"lint-imports": False`
 - `test_timed_out_tool_marked_unavailable` — expect `"lint-imports": False`
 
@@ -78,6 +78,7 @@ if self.venv_path:
     else:
         binary = os.path.join(self.venv_path, "bin", "lint-imports")
     lint_imports_available = os.path.exists(binary)
+self._lint_imports_binary: Optional[str] = binary if lint_imports_available else None
 availability["lint-imports"] = lint_imports_available
 if not lint_imports_available:
     logger.warning("lint-imports not found...")
@@ -87,6 +88,10 @@ if not lint_imports_available:
 
 Before: `{"pytest": bool, "pylint": bool, "mypy": bool}`
 After: `{"pytest": bool, "pylint": bool, "mypy": bool, "lint-imports": bool}`
+
+### DATA — New attribute on `CodeCheckerServer`
+
+`self._lint_imports_binary: Optional[str]` — resolved path to the lint-imports binary, or `None` if unavailable. Consumed by `checker_tools.py` to avoid re-resolving the path.
 
 ## Commit message
 

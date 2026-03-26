@@ -28,7 +28,7 @@ def test_checker_tools_registers_three_tools(mock_server: MagicMock) -> None:
 def test_lint_imports_success_returns_raw_output(mock_server, checker_tools) -> None:
     """When lint-imports succeeds, return raw stdout."""
 ```
-- Mock `execute_command` to return exit 0 with the success output text
+- Mock `mcp_tools_py.checker_tools.execute_command` to return exit 0 with the success output text
 - Call `run_lint_imports_check` via the registered tool
 - Assert result contains "Contracts: 2 kept, 0 broken"
 
@@ -38,7 +38,7 @@ def test_lint_imports_success_returns_raw_output(mock_server, checker_tools) -> 
 def test_lint_imports_failure_returns_raw_output(mock_server, checker_tools) -> None:
     """When lint-imports fails, return raw stdout+stderr."""
 ```
-- Mock `execute_command` to return exit 1 with "Could not read any configuration."
+- Mock `mcp_tools_py.checker_tools.execute_command` to return exit 1 with "Could not read any configuration."
 - Assert result contains "Could not read any configuration."
 
 ### 4. Add unavailability short-circuit test (`test_tool_availability.py`)
@@ -49,7 +49,7 @@ def test_lint_imports_unavailable_returns_error(self) -> None:
 ```
 - Set `server._tool_availability["lint-imports"] = False`
 - Call registered `run_lint_imports_check()`
-- Assert "lint-imports is not available" in result
+- Assert result contains the binary path and "lint-imports is not available"
 
 ### 5. Update `TestToolHandlerShortCircuit` fixtures (`test_tool_availability.py`)
 
@@ -82,24 +82,18 @@ def run_lint_imports_check(
 ### HOW — Integration
 
 - Import `execute_command` (already imported in `checker_tools.py` indirectly via runners; add direct import from `mcp_tools_py.utils.subprocess_runner`)
-- Add `import os` for platform detection and path joining
 - Call from `register()`: `self._register_lint_imports(mcp)`
+- No `import os` needed — binary path is read from `self._server._lint_imports_binary` (resolved in step 1)
 
 ### ALGORITHM (pseudocode)
 
 ```
 # Availability short-circuit
 if not self._server._tool_availability.get("lint-imports", False):
-    return "lint-imports is not available..."
+    return f"lint-imports is not available at {self._server._lint_imports_binary or 'N/A'}..."
 
-# Resolve binary path
-if os.name == "nt":
-    binary = os.path.join(self._server.venv_path, "Scripts", "lint-imports.exe")
-else:
-    binary = os.path.join(self._server.venv_path, "bin", "lint-imports")
-
-# Build and execute command
-command = [binary] + (extra_args or [])
+# Build and execute command (binary path resolved once in server.py)
+command = [self._server._lint_imports_binary] + (extra_args or [])
 result = execute_command(command, cwd=str(self._server.project_dir))
 
 # Return raw output (stdout + stderr)
@@ -113,7 +107,7 @@ return output.strip() or "lint-imports produced no output."
 
 | Scenario | Return |
 |----------|--------|
-| Unavailable | `"lint-imports is not available in the configured Python environment..."` |
+| Unavailable | `"lint-imports is not available at <binary_path>..."` (includes resolved path for diagnostics) |
 | Success (exit 0) | Raw stdout (e.g., "Contracts: 2 kept, 0 broken.") |
 | Failure (exit 1) | Raw stdout+stderr (e.g., "Could not read any configuration.") |
 | No output | `"lint-imports produced no output."` |
