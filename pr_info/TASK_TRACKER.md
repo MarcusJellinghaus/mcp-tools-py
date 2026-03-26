@@ -27,9 +27,9 @@ This tracks **Feature Implementation** consisting of multiple **Tasks**.
 - [x] Commit: `feat: add get_library_source core logic with mocked unit tests`
 
 ### Step 2: Real-Import Tests + MCP Registration in `server.py`
-- [ ] Implementation: add real-import tests to `tests/test_inspect_library.py` and wire `InspectTools` into `server.py`
-- [ ] Quality checks: pylint, pytest, mypy — fix all issues
-- [ ] Commit: `feat: wire get_library_source into MCP server with real-import tests`
+- [x] Implementation: add real-import tests to `tests/test_inspect_library.py` and wire `InspectTools` into `server.py`
+- [x] Quality checks: pylint, pytest, mypy — fix all issues
+- [x] Commit: `feat: wire get_library_source into MCP server with real-import tests`
 
 ### Step 3: Architecture Config Updates
 - [ ] Implementation: update `tach.toml` and `.importlinter` to include `inspect_library` module boundaries
