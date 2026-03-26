@@ -21,6 +21,21 @@ This tracks **Feature Implementation** consisting of multiple **Tasks**.
 
 ## Tasks
 
-<!-- Tasks populated from pr_info/steps/ by prepare_task_tracker -->
+### Step 1: Create UtilityTools class with sleep tool + tests (TDD)
+> Details: [step_1.md](./steps/step_1.md)
+
+- [ ] Implementation: create `utility_tools.py` and `test_utility_tools.py` (tests first, then production code)
+- [ ] Quality checks: pylint, pytest, mypy — fix all issues
+- [ ] Commit: `feat: add sleep MCP tool via UtilityTools class`
+
+### Step 2: Register UtilityTools in server + update architecture configs
+> Details: [step_2.md](./steps/step_2.md)
+
+- [ ] Implementation: wire up UtilityTools in `server.py`, update `tach.toml` and `.importlinter`
+- [ ] Quality checks: pylint, pytest, mypy — fix all issues
+- [ ] Commit: `feat: register UtilityTools and update architecture configs`
 
 ## Pull Request
+
+- [ ] PR review: verify all steps complete, tests pass, architecture configs valid
+- [ ] PR summary prepared
