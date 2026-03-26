@@ -38,10 +38,17 @@ File contents: see [SAMPLE_PROJECT_FILES.md](SAMPLE_PROJECT_FILES.md).
 
 ## Setup
 
+### Entry conditions
+
 1. Ensure the `mcp-tools-py` MCP server is running and accessible
 2. Ensure the server's `--project-dir` points to the repository root
-3. Create `tests/mcp_tools_py_manual/__init__.py` (empty)
-4. Create all sample project files from [SAMPLE_PROJECT_FILES.md](SAMPLE_PROJECT_FILES.md):
+3. Verify `mcp-tools-py` is installed in **editable mode** so the server runs the current source.
+4. After any source code change, **restart the MCP server** for changes to take effect.
+
+### Create sample project
+
+1. Create `tests/mcp_tools_py_manual/__init__.py` (empty)
+2. Create all sample project files from [SAMPLE_PROJECT_FILES.md](SAMPLE_PROJECT_FILES.md):
    - `sample_project/__init__.py`
    - `sample_project/models.py`
    - `sample_project/utils.py`
@@ -50,11 +57,11 @@ File contents: see [SAMPLE_PROJECT_FILES.md](SAMPLE_PROJECT_FILES.md).
    - `sample_project/tests/test_models.py`
    - `sample_project/tests/test_utils.py`
    - `sample_project/tests/test_services.py`
-5. Verify tests pass:
+3. Verify tests pass:
    ```
    run_pytest_check(extra_args=["tests/mcp_tools_py_manual/", "-v"])
    ```
-6. Copy [PROGRESS_TRACKER.md](PROGRESS_TRACKER.md) to `pr_info/PROGRESS_TRACKER_RUN_<date>.md` for this run
+4. Copy [PROGRESS_TRACKER.md](PROGRESS_TRACKER.md) to `pr_info/PROGRESS_TRACKER_RUN_<date>.md` for this run
 
 > **Note:** The `sample_project/` directory is checked into git.
 > Between mutation tests, delete + recreate it from SAMPLE_PROJECT_FILES.md
@@ -64,22 +71,20 @@ File contents: see [SAMPLE_PROJECT_FILES.md](SAMPLE_PROJECT_FILES.md).
 
 ## Execution Workflow
 
+### Allowed tools
+
+Only use **MCP tools** and **pre-approved bash commands** (see CLAUDE.md).
+Arbitrary bash commands trigger user authorization prompts and interrupt
+the flow. When in doubt, prefer an MCP tool over a bash command.
+
 ### Timing
 
-Use the timing utilities to measure each test:
-
-```bash
-# Before each test:
-T_START=$(bash tools/get_time.sh)
-
-# After each test:
-T_END=$(bash tools/get_time.sh)
-bash tools/get_duration.sh <start_epoch> <end_epoch>
-```
+Use `tools/get_time.sh` and `tools/get_duration.sh` to measure each test.
+Fall back to approximate durations from MCP tool response times if unavailable.
 
 Record in the progress tracker:
 - **Run start / Run end / Total duration** in the header
-- **Duration** column for each individual test
+- **Duration** column for each individual test (approximate is fine)
 
 ### During execution
 
@@ -97,7 +102,10 @@ state without relying on git.
 ### After all tests
 
 1. Generate a status report (see [Status Report](#status-report) section)
-2. Clean up: delete `sample_project/` directory and run tracker, or keep for reference
+2. Clean up:
+   - Delete `sample_project/` directory (all files via MCP `delete_this_file`)
+   - Delete `tests/mcp_tools_py_manual/__init__.py` (created during setup)
+   - Keep run tracker and status report for reference
 
 ---
 
@@ -355,6 +363,7 @@ Delete `sample_project/` and recreate from [SAMPLE_PROJECT_FILES.md](SAMPLE_PROJ
 | **2. Dry-run mutations** | 6a, 7a, 8a | None — preview only, verify files unchanged. **Run sequentially, not in parallel.** |
 | **3. Apply + verify + recreate** | 6b→6c, 7b→7c, 8b→8c | One at a time. Delete + recreate before next. |
 | **4. Report** | Generate status report, update tracker | Files written |
+| **5. Cleanup** | Delete `sample_project/` + `__init__.py` | Test artifacts removed |
 
 ---
 
