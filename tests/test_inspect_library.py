@@ -125,7 +125,7 @@ class TestErrorHandling:
         for i in range(60):
             setattr(fake_module, f"symbol_{i:03d}", lambda: None)
 
-        mock_importlib.import_module.return_value = fake_module
+        mock_importlib.import_module.side_effect = [ImportError, fake_module]
         mock_inspect.getmembers.return_value = [
             (name, getattr(fake_module, name))
             for name in sorted(dir(fake_module))
