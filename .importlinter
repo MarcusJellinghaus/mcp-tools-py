@@ -8,7 +8,7 @@ type = layers
 layers =
     mcp_tools_py.main
     mcp_tools_py.server
-    mcp_tools_py.checker_tools | mcp_tools_py.refactoring | mcp_tools_py.utility_tools
+    mcp_tools_py.checker_tools | mcp_tools_py.refactoring | mcp_tools_py.utility_tools | mcp_tools_py.inspect_library
     mcp_tools_py.code_checker_pytest | mcp_tools_py.code_checker_pylint | mcp_tools_py.code_checker_mypy
     mcp_tools_py.utils
     mcp_tools_py.log_utils
@@ -16,6 +16,7 @@ ignore_imports =
     mcp_tools_py.checker_tools -> mcp_tools_py.server
     mcp_tools_py.refactoring -> mcp_tools_py.server
     mcp_tools_py.utility_tools -> mcp_tools_py.server
+    mcp_tools_py.inspect_library -> mcp_tools_py.server
 
 [importlinter:contract:forbidden-imports]
 name = Forbidden external imports
@@ -29,4 +30,5 @@ forbidden_modules =
     mcp_tools_py.checker_tools
     mcp_tools_py.refactoring
     mcp_tools_py.utility_tools
+    mcp_tools_py.inspect_library
     mcp_tools_py.server

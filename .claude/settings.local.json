@@ -60,6 +60,7 @@
       "mcp__tools-py__rename_symbol",
       "mcp__tools-py__move_symbol",
       "mcp__tools-py__move_module",
+      "mcp__tools-py__get_library_source",
       "Bash(bash tools/get_duration.sh *)",
       "Bash(bash tools/get_time.sh)"
     ]
