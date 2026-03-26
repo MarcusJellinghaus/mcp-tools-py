@@ -1,4 +1,4 @@
-"""Checker tools extracted from server.py for pylint, pytest, and mypy."""
+"""Checker tools extracted from server.py for pylint, pytest, mypy, and lint-imports."""
 
 import logging
 from typing import TYPE_CHECKING, Any, Dict, List, Optional
