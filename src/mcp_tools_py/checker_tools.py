@@ -17,6 +17,7 @@ from mcp_tools_py.code_checker_pytest.reporting import (
 from mcp_tools_py.code_checker_pytest.runners import check_code_with_pytest
 from mcp_tools_py.code_checker_pytest.utils import sanitize_extra_args
 from mcp_tools_py.log_utils import log_function_call
+from mcp_tools_py.utils.subprocess_runner import execute_command
 
 if TYPE_CHECKING:
     from mcp_tools_py.server import CodeCheckerServer, FastMCPProtocol
@@ -26,7 +27,7 @@ structured_logger = structlog.get_logger(__name__)
 
 
 class CheckerTools:
-    """Registers pylint, pytest, and mypy checker tools on an MCP server."""
+    """Registers pylint, pytest, mypy, and lint-imports checker tools on an MCP server."""
 
     def __init__(self, server: "CodeCheckerServer") -> None:
         self._server = server
@@ -36,6 +37,7 @@ class CheckerTools:
         self._register_pylint(mcp)
         self._register_pytest(mcp)
         self._register_mypy(mcp)
+        self._register_lint_imports(mcp)
 
     def _register_pylint(self, mcp: "FastMCPProtocol") -> None:
         """Register the pylint checker tool."""
@@ -336,6 +338,74 @@ class CheckerTools:
                     project_dir=str(self._server.project_dir),
                 )
                 raise
+
+    def _register_lint_imports(self, mcp: "FastMCPProtocol") -> None:
+        """Register the lint-imports checker tool."""
+
+        @mcp.tool()
+        @log_function_call
+        def run_lint_imports_check(
+            extra_args: Optional[List[str]] = None,
+        ) -> str:
+            """
+            Run lint-imports on the project to check import contracts.
+
+            Args:
+                extra_args: Additional lint-imports arguments.
+                    Examples: ["--contract", "layers"], ["--verbose"]
+
+            Returns:
+                Raw lint-imports output (stdout + stderr combined)
+            """
+            if not self._server._tool_availability.get("lint-imports", False):
+                binary_path = self._server._lint_imports_binary or "N/A"
+                return (
+                    f"lint-imports is not available at {binary_path}. "
+                    f"Ensure the virtual environment has import-linter installed "
+                    f"and --venv-path is configured. Restart the server after installing."
+                )
+
+            try:
+                logger.info(
+                    f"Running lint-imports check on project directory: "
+                    f"{self._server.project_dir}"
+                )
+                structured_logger.info(
+                    "Starting lint-imports check",
+                    project_dir=str(self._server.project_dir),
+                    extra_args=extra_args,
+                )
+
+                binary = self._server._lint_imports_binary
+                assert binary is not None  # guarded by availability check above
+                command = [binary] + (extra_args or [])
+                result = execute_command(command, cwd=str(self._server.project_dir))
+
+                output = result.stdout
+                if result.stderr:
+                    output = output + "\n" + result.stderr if output else result.stderr
+
+                structured_logger.info(
+                    "lint-imports check completed",
+                    return_code=result.return_code,
+                    output_length=len(output),
+                )
+
+                return output.strip() or "lint-imports produced no output."
+
+            except Exception as e:
+                error_msg = (
+                    f"Unexpected error running lint-imports: "
+                    f"{type(e).__name__}: {e}"
+                )
+                logger.error(error_msg)
+                structured_logger.error(
+                    "lint-imports check failed",
+                    error=str(e),
+                    error_type=type(e).__name__,
+                    project_dir=str(self._server.project_dir),
+                )
+                return error_msg
 
     def _format_pylint_result(self, pylint_prompt: Optional[str]) -> str:
         """Format pylint check result."""
