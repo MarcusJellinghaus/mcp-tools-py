@@ -114,6 +114,19 @@ def test_move_symbol_name_collision(sample_project: Path) -> None:
     assert "collision" in result.lower() or "already" in result.lower()
 
 
+def test_move_symbol_uses_from_import_style(sample_project: Path) -> None:
+    """move_symbol should produce 'from ... import' style, not 'import ...' style."""
+    move_symbol(sample_project, "src/foo.py", "my_func", "src/baz.py")
+    bar_text = (sample_project / "src" / "bar.py").read_text()
+    # prefer_module_from_imports=True makes rope use "from pkg import mod" style
+    # instead of "import pkg.mod" with fully-qualified usage
+    assert (
+        "from src import baz" in bar_text or "from src.baz import my_func" in bar_text
+    )
+    # Should NOT use "import src.baz" fully-qualified style
+    assert "import src.baz\n" not in bar_text
+
+
 # --- rename_symbol tests ---
 
 

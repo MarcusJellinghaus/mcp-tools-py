@@ -118,6 +118,7 @@ def _with_rope_project(project_dir: Path) -> Iterator[Project]:
     """Context manager: open fresh rope Project, yield, close."""
     ignored = _build_ignored_resources(project_dir)
     project = Project(str(project_dir), ropefolder=None, ignored_resources=ignored)
+    project.prefs["prefer_module_from_imports"] = True
     try:
         yield project
     finally:

@@ -24,9 +24,9 @@ This tracks **Feature Implementation** consisting of multiple **Tasks**.
 ### Step 1: `from-global` import style preference
 > [Detail](./steps/step_1.md) — Set `prefer_module_from_imports` in `_with_rope_project()` + test
 
-- [ ] Implementation: set rope preference + add test for from-import style
-- [ ] Quality checks: pylint, pytest, mypy — fix all issues
-- [ ] Commit: `feat(refactoring): set from-global import style in rope project`
+- [x] Implementation: set rope preference + add test for from-import style
+- [x] Quality checks: pylint, pytest, mypy — fix all issues
+- [x] Commit: `feat(refactoring): set from-global import style in rope project`
 
 ### Step 2: Batch `move_symbol` — signature change, loop, and validation
 > [Detail](./steps/step_2.md) — `symbol_name` → `symbol_names` across all layers, batch loop, all-or-nothing validation
