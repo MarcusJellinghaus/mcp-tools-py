@@ -1,118 +1,95 @@
-# Step 3: Batch move logic with all-or-nothing validation
+# Step 3: Self-referencing import removal
 
 > **Context**: See [summary.md](summary.md) for full issue overview.
 
 ## Goal
 
-Implement the actual batch move loop in `_move_symbol_impl`: upfront validation of all
-symbols, reverse-order iteration for correct ordering, and all-or-nothing failure semantics.
+After moving symbols, detect and remove import lines in the destination file that
+reference the destination module itself. These are always rope artifacts.
 
 ## WHERE
 
 | File | Function/Section |
 |------|-----------------|
-| `src/mcp_tools_py/refactoring/rope_tools.py` | `_move_symbol_impl()` |
-| `tests/test_refactoring/test_rope_tools.py` | New tests: batch move, ordering, validation |
+| `src/mcp_tools_py/refactoring/rope_tools.py` | New helper `_remove_self_imports()`, called from `_move_symbol_impl()` |
+| `tests/test_refactoring/test_rope_tools.py` | New test for self-import removal |
 
 ## WHAT
 
-### `_move_symbol_impl()` rewrite
-
-The function currently processes `symbol_names[0]`. Replace with a loop that:
-
-1. **Validates all symbols upfront** — before any rope operation
-2. **Moves in reverse order** — so rope's prepend produces correct final ordering
-3. **Collects results** — tracks what was moved and which files changed
+### New helper function
 
 ```python
-def _move_symbol_impl(
-    project_dir: Path,
-    source_file: str,
-    symbol_names: list[str],
-    dest_file: str,
-    dry_run: bool,
-) -> str:
+def _remove_self_imports(dest_path: Path, dest_module_dotted: str) -> list[str]:
+    """Remove import lines that reference the destination module itself.
+
+    Args:
+        dest_path: Absolute path to the destination file.
+        dest_module_dotted: Dotted module name (e.g. "pkg.sub.module").
+
+    Returns:
+        List of removed import lines (for reporting).
+    """
 ```
 
-### New tests
+### Integration in `_move_symbol_impl()`
+
+After all moves complete (after the loop from Step 2), call `_remove_self_imports()`
+on the destination file. Append removal notes to the result.
+
+### Deriving the dotted module name
+
+Convert `dest_file` (e.g. `"src/pkg/module.py"`) to dotted name (e.g. `"src.pkg.module"`):
+```python
+dest_module_dotted = dest_file.replace("/", ".").removesuffix(".py")
+```
+
+### New test
 
 ```python
-def test_move_symbol_batch(sample_project: Path) -> None:
-    """Move multiple symbols in one call, verify all arrive in destination."""
-
-def test_move_symbol_batch_ordering(sample_project: Path) -> None:
-    """Batch move preserves symbol order in destination file."""
-
-def test_move_symbol_batch_validation_all_or_nothing(sample_project: Path) -> None:
-    """If any symbol is invalid, no symbols are moved."""
-
-def test_move_symbol_batch_collision_check(sample_project: Path) -> None:
-    """If any symbol collides with destination, entire batch fails."""
+def test_move_symbol_removes_self_import(tmp_path: Path) -> None:
+    """After moving a symbol, self-referencing imports are removed from destination."""
 ```
+
+This test needs a project structure where rope would generate a self-import. This
+happens when moving a symbol to a module that is already imported by other modules —
+rope adds an import of the destination module inside itself.
 
 ## ALGORITHM
 
 ```python
-# 1. UPFRONT VALIDATION (all-or-nothing)
-source_text = read source file
-for name in symbol_names:
-    if _find_symbol_offset(source_text, name) is None:
-        return error listing available symbols
-if dest exists:
-    dest_symbols = _get_top_level_symbols(dest_text)
-    for name in symbol_names:
-        if name in dest_symbols:
-            return collision error
-
-# 2. CREATE DEST IF NEEDED (same as before, once)
-ensure_parents + create empty dest if not exists
-
-# 3. MOVE EACH SYMBOL IN REVERSE ORDER
-results = []
-for name in reversed(symbol_names):
-    # Re-read source each iteration (rope modifies it)
-    source_text = read source file
-    offset = _find_symbol_offset(source_text, name)
-    with _with_rope_project(project_dir) as project:
-        mover = create_move(project, source_resource, offset)
-        changes = mover.get_changes(dest_resource)
-        if not dry_run:
-            project.do(changes)
-        results.append((name, changes))
-
-# 4. RETURN combined result
+def _remove_self_imports(dest_path, dest_module_dotted):
+    lines = dest_path.read_text().splitlines(keepends=True)
+    removed = []
+    kept = []
+    for line in lines:
+        stripped = line.strip()
+        # Match: "import pkg.sub.module" or "from pkg.sub.module import ..."
+        if (stripped == f"import {dest_module_dotted}"
+            or stripped.startswith(f"from {dest_module_dotted} import ")):
+            removed.append(stripped)
+        else:
+            kept.append(line)
+    if removed:
+        dest_path.write_text("".join(kept))
+    return removed
 ```
-
-**Key detail**: Each symbol move requires a fresh rope Project because rope caches file
-contents. Re-reading source text and re-opening the project ensures rope sees the
-updated file after each move.
 
 ## DATA
 
-Return value is still `str`, but now includes per-symbol information:
-```
-move_symbol completed successfully.
-  Moved: my_func, MyClass, MY_VAR
-  Modified: src/foo.py
-  Modified: src/bar.py
-  Created: src/baz.py
-```
-
-For dry-run, each symbol's changes are previewed.
+- `_remove_self_imports()` returns `list[str]` — the removed import lines
+- These are included in the result string: `"Self-referencing import removed from [file]: [line]"`
 
 ## LLM PROMPT
 
 ```
 Implement Step 3 from pr_info/steps/step_3.md (see pr_info/steps/summary.md for context).
 
-Rewrite _move_symbol_impl() in rope_tools.py to support batch moves:
-1. Upfront validation: verify all symbols exist and no collisions (fail entire call if any check fails)
-2. Move symbols in reversed(symbol_names) order (rope prepends, so reverse gives correct order)
-3. Each iteration: re-read source, re-open rope project (rope caches file contents)
-4. Collect results across all moves
+Add _remove_self_imports() helper to rope_tools.py that removes import lines in the
+destination file that reference the destination module itself. Call it from _move_symbol_impl()
+after all moves complete (non-dry-run only). Include removed imports in the result output.
 
-Add tests: batch move, ordering verification, all-or-nothing validation, batch collision.
+Add a test that verifies self-referencing imports are cleaned up after a move.
 
 After making changes, run all three code quality checks (pylint, pytest unit tests, mypy).
-Fix any issues before committing. Commit message: "feat(move_symbol): batch move with all-or-nothing validation"
+Fix any issues before committing. Commit message: "feat(move_symbol): remove self-referencing imports after move"
 ```

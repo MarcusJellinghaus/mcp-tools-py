@@ -1,89 +1,88 @@
-# Step 5: Result output with review reminders
+# Step 5: Manual test plan update
 
 > **Context**: See [summary.md](summary.md) for full issue overview.
 
 ## Goal
 
-Enhance the result output from `_move_symbol_impl()` to include structured summary
-and review reminders as specified in the issue.
+Update the manual test plan to reflect the new `symbol_names` signature and add
+batch move test cases.
 
 ## WHERE
 
-| File | Function/Section |
-|------|-----------------|
-| `src/mcp_tools_py/refactoring/rope_tools.py` | `_move_symbol_impl()` — result string building |
-| `tests/test_refactoring/test_rope_tools.py` | New test for result output content |
+| File | Section |
+|------|---------|
+| `tests/mcp_tools_py_manual/TEST_PLAN.md` | Test 7 (move_symbol) |
 
 ## WHAT
 
-### Result string format (non-dry-run)
+### Update Test 7a–7c — use `symbol_names` parameter
 
+Change all `move_symbol` calls from `symbol_name="X"` to `symbol_names=["X"]`.
+
+**Test 7a (single symbol dry run):**
 ```
-move_symbol completed successfully.
-  Moved: my_func, MyClass, MY_VAR (from src/foo.py → src/baz.py)
-  Created: src/baz.py
-  Modified: src/foo.py
-  Modified: src/bar.py
-  Self-referencing import removed from src/baz.py: import src.baz
-Note: Imports are absolute — review and convert to relative where applicable.
-Note: Review symbol order and imports in all affected files.
+move_symbol(source_file="...", symbol_names=["format_user"], dest_file="...", dry_run=True)
 ```
 
-### Result string format (dry-run)
-
+**Test 7b (single symbol apply):**
 ```
-[DRY RUN] move_symbol preview:
-  Symbols: my_func, MyClass, MY_VAR
-  [DRY RUN] Would create: src/baz.py
-  [DRY RUN] Would modify: src/foo.py
-  [DRY RUN] Would modify: src/bar.py
-Note: Imports are absolute — review and convert to relative where applicable.
-Note: Review symbol order and imports in all affected files.
+move_symbol(source_file="...", symbol_names=["format_user"], dest_file="...", dry_run=False)
 ```
 
-### New test
+**Test 7c (single symbol teardown):** unchanged.
 
-```python
-def test_move_symbol_result_includes_review_notes(sample_project: Path) -> None:
-    """Result output includes import style note and review reminder."""
+### Add Tests 7d–7f — Batch move (new)
+
+**Target**: Move `create_user` and `is_active` from `utils.py` → new `user_ops.py`.
+
+**7d — Batch dry run:**
 ```
-
-## ALGORITHM
-
-```python
-# Build result lines list throughout _move_symbol_impl
-lines = []
-lines.append("move_symbol completed successfully.")
-lines.append(f"  Moved: {', '.join(symbol_names)} (from {source_file} → {dest_file})")
-# ... file change lines from _format_changes ...
-# ... self-import removal lines from step 4 ...
-lines.append("Note: Imports are absolute — review and convert to relative where applicable.")
-lines.append("Note: Review symbol order and imports in all affected files.")
-return "\n".join(lines)
+move_symbol(
+    source_file="tests/mcp_tools_py_manual/sample_project/utils.py",
+    symbol_names=["create_user", "is_active"],
+    dest_file="tests/mcp_tools_py_manual/sample_project/user_ops.py",
+    dry_run=True
+)
 ```
+Expected: Preview shows both symbols, no files modified.
 
-## DATA
+**7e — Batch apply:**
+```
+move_symbol(
+    source_file="tests/mcp_tools_py_manual/sample_project/utils.py",
+    symbol_names=["create_user", "is_active"],
+    dest_file="tests/mcp_tools_py_manual/sample_project/user_ops.py",
+    dry_run=False
+)
+```
+Expected:
+- Both symbols moved to `user_ops.py`
+- Order in destination: `create_user` appears before `is_active`
+- Imports updated in `services.py` and test files
+- Result includes review reminder notes
+- All tests pass after move
 
-Return value is still `str`. Content is enriched with:
-- Symbol list summary
-- Self-import removal notes (from Step 4)
-- Two standard review notes (always appended)
+**Verify:**
+1. `list_symbols(file="...user_ops.py")` — shows `create_user`, `is_active`
+2. `list_symbols(file="...utils.py")` — shows only `format_user`
+3. `run_pytest_check(extra_args=["tests/mcp_tools_py_manual/", "-v"])` — all 11 tests pass
+
+**7f — Batch teardown:** Delete `sample_project/` and recreate.
+
+### Update PROGRESS_TRACKER.md
+
+Add rows for Tests 7d, 7e, 7f (dry, apply, verify, teardown).
 
 ## LLM PROMPT
 
 ```
 Implement Step 5 from pr_info/steps/step_5.md (see pr_info/steps/summary.md for context).
 
-Update _move_symbol_impl() result output to include:
-1. Summary of moved symbols and source/dest
-2. File change details (created/modified)
-3. Self-import removal notes (if any, from step 4)
-4. Two review reminder notes (always):
-   - "Imports are absolute — review and convert to relative where applicable."
-   - "Review symbol order and imports in all affected files."
-
-Apply same pattern to dry-run output. Add test verifying the notes appear.
+Update tests/mcp_tools_py_manual/TEST_PLAN.md:
+1. Change all move_symbol calls in Test 7a/7b from symbol_name="X" to symbol_names=["X"]
+2. Add Tests 7d (batch dry run), 7e (batch apply), 7f (batch teardown)
+3. Update PROGRESS_TRACKER.md template with rows for Tests 7d–7f
 
 After making changes, run all three code quality checks (pylint, pytest unit tests, mypy).
-Fix any issues before committing. Commit message: "feat(move_symbol): structured result output with review reminders"
+Fix any issues before committing. Commit message: "docs(test-plan): update move_symbol tests for batch signature"
 ```

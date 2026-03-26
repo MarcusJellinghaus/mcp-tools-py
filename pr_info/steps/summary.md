@@ -35,10 +35,17 @@ changes the key from `"symbol_name"` to `"symbol_names"` (list).
 ### 3. Validation Strategy (all-or-nothing)
 
 Before any rope operation, validate **all** symbols upfront:
+- No duplicates within `symbol_names`
 - Each symbol exists in source (via `_find_symbol_offset`)
 - No name collisions in destination (via `_get_top_level_symbols`)
 
-If any check fails, the entire call fails with no partial moves.
+If any validation check fails, the entire call fails with no partial moves.
+
+**Scope**: The all-or-nothing guarantee applies to **validation only**. If a runtime
+rope error occurs during the actual move loop after validation passes (e.g., the 2nd
+symbol fails after the 1st has been moved), there is no rollback. This is acceptable
+because upfront validation already confirmed all symbols exist and no collisions are
+present, making runtime errors unlikely.
 
 ### 4. Move Ordering
 
@@ -69,7 +76,7 @@ Structured result string with:
 | `src/mcp_tools_py/refactoring/__init__.py` | Tool registration: `symbol_name` → `symbol_names` |
 | `tests/test_refactoring/test_rope_tools.py` | Update existing tests, add batch/self-import/from-global/validation tests |
 | `tests/test_refactoring/test_integration.py` | Update integration tests for new signature |
-| `tests/mcp_tools_py_manual/TEST_PLAN.md` | Update Test 7, add Test 7b |
+| `tests/mcp_tools_py_manual/TEST_PLAN.md` | Update Tests 7a–7c for new signature, add Tests 7d–7f for batch moves |
 
 ## Files NOT Modified
 
@@ -82,8 +89,7 @@ Structured result string with:
 | Step | Commit | Description |
 |------|--------|-------------|
 | 1 | `from-global` preference | Set `preferred_import_style` in `_with_rope_project()` + test |
-| 2 | Batch signature change | `symbol_name` → `symbol_names` across all layers + update all existing tests |
-| 3 | Batch move logic + validation | All-or-nothing validation, reverse-order iteration, batch tests |
-| 4 | Self-import removal | Post-move cleanup of self-referencing imports + test |
-| 5 | Result output + review reminders | Structured output with notes + test |
-| 6 | Manual test plan update | Update Test 7, add Test 7b in TEST_PLAN.md |
+| 2 | Batch move_symbol | Signature change (`symbol_name` → `symbol_names`), batch loop with reverse-order iteration, all-or-nothing validation (duplicates, existence, collisions), update all existing tests + new batch tests |
+| 3 | Self-import removal | Post-move cleanup of self-referencing imports + test |
+| 4 | Result output + review reminders | Structured output with notes + test |
+| 5 | Manual test plan update | Update Tests 7a–7c for new signature, add Tests 7d–7f for batch moves |
