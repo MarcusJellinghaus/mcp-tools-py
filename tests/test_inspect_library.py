@@ -1,4 +1,4 @@
-"""Mocked unit tests for inspect_library module."""
+"""Unit tests for inspect_library module (mocked + real-import)."""
 
 import types
 from unittest.mock import MagicMock, patch
@@ -165,3 +165,60 @@ class TestErrorHandling:
         assert (
             f"max_lines must be a positive integer (>= 1), got: {bad_value}" == result
         )
+
+
+class TestRealImports:
+    """Real-import tests against actual installed packages (no mocking)."""
+
+    def test_stdlib_class(self) -> None:
+        """json.encoder.JSONEncoder resolves to the real class source."""
+        result = _get_library_source("json.encoder.JSONEncoder")
+
+        assert "def encode" in result
+
+    def test_module_level(self) -> None:
+        """json.encoder resolves to the full module source."""
+        result = _get_library_source("json.encoder")
+
+        assert "class JSONEncoder" in result
+
+    def test_nested_attribute(self) -> None:
+        """json.encoder.JSONEncoder.encode resolves to just the method."""
+        method_source = _get_library_source("json.encoder.JSONEncoder.encode")
+        class_source = _get_library_source("json.encoder.JSONEncoder")
+
+        assert "def encode" in method_source
+        assert len(method_source) < len(class_source)
+
+    def test_custom_max_lines_truncation(self) -> None:
+        """JSONEncoder source is truncated when max_lines=50."""
+        result = _get_library_source("json.encoder.JSONEncoder", max_lines=50)
+
+        assert "truncated" in result
+        assert "showing 50 of" in result
+
+    def test_bad_module(self) -> None:
+        """Completely unknown package returns 'not found'."""
+        result = _get_library_source("nonexistent_package.Foo")
+
+        assert "not found" in result
+
+    def test_bad_symbol_lists_available(self) -> None:
+        """Known module + bad symbol lists available symbols with types."""
+        result = _get_library_source("json.NoSuchThing")
+
+        assert "not found in module" in result
+        assert "Available symbols:" in result
+
+    def test_third_party_dep(self) -> None:
+        """structlog.get_logger resolves (structlog is a project dependency)."""
+        result = _get_library_source("structlog.get_logger")
+
+        assert "def get_logger" in result
+
+    def test_builtin_type(self) -> None:
+        """builtins.dict is a C extension — no source available."""
+        result = _get_library_source("builtins.dict")
+
+        assert "Source not available" in result
+        assert "built-in/C extension" in result

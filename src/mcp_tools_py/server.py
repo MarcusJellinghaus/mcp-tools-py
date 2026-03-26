@@ -9,6 +9,7 @@ from typing import Callable, Optional, Protocol, TypeVar
 import structlog
 
 from mcp_tools_py.checker_tools import CheckerTools
+from mcp_tools_py.inspect_library import InspectTools
 from mcp_tools_py.log_utils import log_function_call
 from mcp_tools_py.refactoring import RefactoringTools
 from mcp_tools_py.utility_tools import UtilityTools
@@ -73,6 +74,7 @@ class CodeCheckerServer:
             self.mcp
         )
         UtilityTools().register(self.mcp)
+        InspectTools().register(self.mcp)
         structured_logger.debug(
             "Tool environment resolved",
             python_executable=self._resolved_python,
