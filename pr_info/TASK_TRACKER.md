@@ -24,9 +24,9 @@ This tracks **Feature Implementation** consisting of multiple **Tasks**.
 ### Step 1: Add lint-imports availability check to `server.py` + tests
 > Detail: [step_1.md](./steps/step_1.md)
 
-- [ ] Implementation: update `_check_tool_availability()` in `server.py` and tests in `test_tool_availability.py`
-- [ ] Quality checks: pylint, pytest, mypy — fix all issues
-- [ ] Commit: `feat: add lint-imports availability check via file existence`
+- [x] Implementation: update `_check_tool_availability()` in `server.py` and tests in `test_tool_availability.py`
+- [x] Quality checks: pylint, pytest, mypy — fix all issues
+- [x] Commit: `feat: add lint-imports availability check via file existence`
 
 ### Step 2: Add `run_lint_imports_check` tool to `checker_tools.py` + tests
 > Detail: [step_2.md](./steps/step_2.md)
