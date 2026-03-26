@@ -99,7 +99,7 @@ class CodeCheckerServer:
             return sys.executable
 
     def _check_tool_availability(self) -> dict[str, bool]:
-        """Check availability of pytest, pylint, and mypy in the resolved Python environment."""
+        """Check availability of pytest, pylint, mypy, and lint-imports."""
         availability: dict[str, bool] = {}
         for tool in ["pytest", "pylint", "mypy"]:
             result = execute_command(
@@ -114,6 +114,26 @@ class CodeCheckerServer:
                     f"Ensure --python-executable and --venv-path point to "
                     f"the environment where {tool} is installed."
                 )
+
+        # lint-imports: check via file existence (not subprocess)
+        lint_imports_available = False
+        binary: Optional[str] = None
+        if self.venv_path:
+            if os.name == "nt":
+                binary = os.path.join(self.venv_path, "Scripts", "lint-imports.exe")
+            else:
+                binary = os.path.join(self.venv_path, "bin", "lint-imports")
+            lint_imports_available = os.path.exists(binary)
+        self._lint_imports_binary: Optional[str] = (
+            binary if lint_imports_available else None
+        )
+        availability["lint-imports"] = lint_imports_available
+        if not lint_imports_available:
+            logger.warning(
+                "lint-imports not found. Ensure --venv-path points to "
+                "an environment where lint-imports is installed."
+            )
+
         return availability
 
     @log_function_call

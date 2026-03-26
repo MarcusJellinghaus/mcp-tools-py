@@ -7,6 +7,7 @@ from unittest.mock import MagicMock, patch
 import pytest
 
 from mcp_tools_py.checker_tools import CheckerTools
+from tests.conftest import make_command_result
 
 
 @pytest.fixture
@@ -16,9 +17,15 @@ def mock_server() -> MagicMock:
     server.project_dir = Path("/fake/project")
     server.test_folder = "tests"
     server.keep_temp_files = False
-    server.venv_path = None
+    server.venv_path = "/mock/venv"
     server._resolved_python = "/usr/bin/python3"
-    server._tool_availability = {"pylint": True, "pytest": True, "mypy": True}
+    server._lint_imports_binary = "/mock/venv/bin/lint-imports"
+    server._tool_availability = {
+        "pylint": True,
+        "pytest": True,
+        "mypy": True,
+        "lint-imports": True,
+    }
     return server
 
 
@@ -31,8 +38,8 @@ def checker_tools(mock_server: MagicMock) -> CheckerTools:
 # --- Registration tests ---
 
 
-def test_checker_tools_registers_three_tools(mock_server: MagicMock) -> None:
-    """Test that CheckerTools.register() registers exactly 3 tools on an MCP server."""
+def test_checker_tools_registers_four_tools(mock_server: MagicMock) -> None:
+    """Test that CheckerTools.register() registers exactly 4 tools on an MCP server."""
     mock_mcp = MagicMock()
     mock_decorator = MagicMock(side_effect=lambda fn: fn)
     mock_mcp.tool.return_value = mock_decorator
@@ -40,8 +47,8 @@ def test_checker_tools_registers_three_tools(mock_server: MagicMock) -> None:
     checker = CheckerTools(mock_server)
     checker.register(mock_mcp)
 
-    # 3 tools: run_pylint_check, run_pytest_check, run_mypy_check
-    assert mock_mcp.tool.call_count == 3
+    # 4 tools: run_pylint_check, run_pytest_check, run_mypy_check, run_lint_imports_check
+    assert mock_mcp.tool.call_count == 4
 
 
 # --- Pylint formatting tests ---
@@ -136,3 +143,65 @@ def test_format_pytest_result_execution_error(checker_tools: CheckerTools) -> No
     )
     assert "Error running pytest" in result
     assert "No module named 'pytest'" in result
+
+
+# --- Lint-imports handler tests ---
+
+
+def test_lint_imports_success_returns_raw_output(
+    mock_server: MagicMock, checker_tools: CheckerTools
+) -> None:
+    """When lint-imports succeeds, return raw stdout."""
+    mock_mcp = MagicMock()
+    mock_mcp.tool.return_value = lambda fn: fn
+
+    checker_tools.register(mock_mcp)
+
+    with patch(
+        "mcp_tools_py.checker_tools.execute_command",
+        return_value=make_command_result(
+            return_code=0, stdout="Contracts: 2 kept, 0 broken"
+        ),
+    ):
+        # Call the registered tool function directly via the instance's register
+        # We need to get the function - it was registered via @mcp.tool()
+        # Since mock_mcp.tool returns identity, the function is defined in scope
+        # Re-register to capture
+        captured_fns: dict[str, Any] = {}
+
+        def capture(fn: Any) -> Any:
+            captured_fns[fn.__name__] = fn
+            return fn
+
+        mock_mcp2 = MagicMock()
+        mock_mcp2.tool.return_value = capture
+        checker_tools.register(mock_mcp2)
+
+        result = captured_fns["run_lint_imports_check"]()
+
+    assert "Contracts: 2 kept, 0 broken" in result
+
+
+def test_lint_imports_failure_returns_raw_output(
+    mock_server: MagicMock, checker_tools: CheckerTools
+) -> None:
+    """When lint-imports fails, return raw stdout+stderr."""
+    captured_fns: dict[str, Any] = {}
+
+    def capture(fn: Any) -> Any:
+        captured_fns[fn.__name__] = fn
+        return fn
+
+    mock_mcp = MagicMock()
+    mock_mcp.tool.return_value = capture
+    checker_tools.register(mock_mcp)
+
+    with patch(
+        "mcp_tools_py.checker_tools.execute_command",
+        return_value=make_command_result(
+            return_code=1, stderr="Could not read any configuration."
+        ),
+    ):
+        result = captured_fns["run_lint_imports_check"]()
+
+    assert "Could not read any configuration." in result

@@ -117,18 +117,22 @@ class TestCheckToolAvailability:
         with (
             patch("mcp.server.fastmcp.FastMCP") as mock_fastmcp,
             patch("mcp_tools_py.server.execute_command") as mock_exec,
+            patch("mcp_tools_py.server.os.path.exists", return_value=True),
         ):
             mock_fastmcp.return_value.tool.return_value = MagicMock()
             mock_exec.return_value = make_command_result(
                 return_code=0, stdout="tool 1.0.0"
             )
 
-            server = _create_server(project_dir=Path("/project"))
+            server = _create_server(
+                project_dir=Path("/project"), venv_path="/mock/venv"
+            )
 
             assert server._tool_availability == {
                 "pytest": True,
                 "pylint": True,
                 "mypy": True,
+                "lint-imports": True,
             }
 
     def test_one_tool_missing(self) -> None:
@@ -174,6 +178,7 @@ class TestCheckToolAvailability:
                 "pytest": False,
                 "pylint": False,
                 "mypy": False,
+                "lint-imports": False,
             }
 
     def test_timed_out_tool_marked_unavailable(self) -> None:
@@ -191,7 +196,74 @@ class TestCheckToolAvailability:
                 "pytest": False,
                 "pylint": False,
                 "mypy": False,
+                "lint-imports": False,
             }
+
+    def test_lint_imports_available_when_binary_exists(self) -> None:
+        """When venv_path is set and lint-imports binary exists, mark available."""
+        project_dir = Path("/project")
+        with (
+            patch("mcp.server.fastmcp.FastMCP") as mock_fastmcp,
+            patch("mcp_tools_py.server.execute_command") as mock_exec,
+            patch("mcp_tools_py.server.os.name", "nt"),
+            patch("mcp_tools_py.server.os.path.exists", return_value=True),
+        ):
+            mock_fastmcp.return_value.tool.return_value = MagicMock()
+            mock_exec.return_value = make_command_result(
+                return_code=0, stdout="tool 1.0.0"
+            )
+
+            server = _create_server(project_dir=project_dir, venv_path="/mock/venv")
+
+            assert server._tool_availability["lint-imports"] is True
+            assert server._lint_imports_binary == os.path.join(
+                "/mock/venv", "Scripts", "lint-imports.exe"
+            )
+
+    def test_lint_imports_unavailable_when_no_venv(self) -> None:
+        """When no venv_path is configured, lint-imports is unavailable."""
+        with (
+            patch("mcp.server.fastmcp.FastMCP") as mock_fastmcp,
+            patch("mcp_tools_py.server.execute_command") as mock_exec,
+        ):
+            mock_fastmcp.return_value.tool.return_value = MagicMock()
+            mock_exec.return_value = make_command_result(
+                return_code=0, stdout="tool 1.0.0"
+            )
+
+            server = _create_server(project_dir=Path("/project"))
+
+            assert server._tool_availability["lint-imports"] is False
+            assert server._lint_imports_binary is None
+
+    def test_lint_imports_unavailable_when_binary_missing(self) -> None:
+        """When venv_path is set but binary doesn't exist, mark unavailable."""
+        project_dir = Path("/project")
+
+        def exists_side_effect(path: str) -> bool:
+            # Python executable exists, but lint-imports does not
+            if "python" in path.lower():
+                return True
+            return False
+
+        with (
+            patch("mcp.server.fastmcp.FastMCP") as mock_fastmcp,
+            patch("mcp_tools_py.server.execute_command") as mock_exec,
+            patch("mcp_tools_py.server.os.name", "nt"),
+            patch(
+                "mcp_tools_py.server.os.path.exists",
+                side_effect=exists_side_effect,
+            ),
+        ):
+            mock_fastmcp.return_value.tool.return_value = MagicMock()
+            mock_exec.return_value = make_command_result(
+                return_code=0, stdout="tool 1.0.0"
+            )
+
+            server = _create_server(project_dir=project_dir, venv_path="/mock/venv")
+
+            assert server._tool_availability["lint-imports"] is False
+            assert server._lint_imports_binary is None
 
 
 # ---------------------------------------------------------------------------
@@ -232,6 +304,7 @@ class TestToolHandlerShortCircuit:
                 "pytest": False,
                 "pylint": True,
                 "mypy": True,
+                "lint-imports": False,
             }
 
             result = registered_tools["run_pytest_check"]()
@@ -253,6 +326,7 @@ class TestToolHandlerShortCircuit:
                 "pytest": True,
                 "pylint": False,
                 "mypy": True,
+                "lint-imports": False,
             }
 
             result = registered_tools["run_pylint_check"]()
@@ -274,6 +348,7 @@ class TestToolHandlerShortCircuit:
                 "pytest": True,
                 "pylint": True,
                 "mypy": False,
+                "lint-imports": False,
             }
 
             result = registered_tools["run_mypy_check"]()
@@ -302,6 +377,7 @@ class TestToolHandlerShortCircuit:
                 "pytest": True,
                 "pylint": True,
                 "mypy": True,
+                "lint-imports": True,
             }
 
             result = registered_tools["run_pytest_check"]()
@@ -333,6 +409,7 @@ class TestToolHandlerShortCircuit:
                 "pytest": True,
                 "pylint": True,
                 "mypy": True,
+                "lint-imports": True,
             }
 
             registered_tools["run_pytest_check"]()
@@ -342,3 +419,26 @@ class TestToolHandlerShortCircuit:
             call_kwargs = mock_check.call_args
             assert call_kwargs.kwargs["python_executable"] == server._resolved_python
             assert call_kwargs.kwargs["python_executable"] == "/custom/python"
+
+    def test_lint_imports_unavailable_returns_error(self) -> None:
+        """When lint-imports is unavailable, tool handler returns error string."""
+        with (
+            patch("mcp.server.fastmcp.FastMCP") as mock_fastmcp,
+            patch("mcp_tools_py.server.execute_command") as mock_exec,
+        ):
+            registered_tools = _capture_tools(mock_fastmcp)
+            mock_exec.return_value = make_command_result(return_code=0, stdout="ok")
+
+            server = _create_server(project_dir=Path("/project"))
+            server._tool_availability = {
+                "pytest": True,
+                "pylint": True,
+                "mypy": True,
+                "lint-imports": False,
+            }
+            server._lint_imports_binary = "/mock/venv/bin/lint-imports"
+
+            result = registered_tools["run_lint_imports_check"]()
+
+            assert "/mock/venv/bin/lint-imports" in result
+            assert "lint-imports is not available" in result

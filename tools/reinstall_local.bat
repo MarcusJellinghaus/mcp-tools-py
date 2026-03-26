@@ -17,6 +17,20 @@ set "VENV_DIR=!PROJECT_DIR!\.venv"
 set "VENV_SCRIPTS=!VENV_DIR!\Scripts"
 echo [0/6] Checking Python environment...
 
+REM Guard: if a venv is active, it must be the project-local .venv
+if defined VIRTUAL_ENV (
+    if /I not "!VIRTUAL_ENV!"=="!VENV_DIR!" (
+        echo [FAIL] Wrong virtual environment is active!
+        echo.
+        echo   Active venv:   !VIRTUAL_ENV!
+        echo   Expected venv: !VENV_DIR!
+        echo.
+        echo   Deactivate the current venv first, or activate the correct one:
+        echo     !VENV_DIR!\Scripts\activate
+        exit /b 1
+    )
+)
+
 REM Check if uv is available
 where uv >nul 2>&1
 if !ERRORLEVEL! NEQ 0 (
@@ -35,26 +49,13 @@ echo [OK] Target environment: !VENV_DIR!
 echo.
 
 echo [1/6] Uninstalling existing packages...
-REM Note: mcp-config is uninstalled here but will be automatically reinstalled
-REM as a dependency when mcp-tools-py is installed (see pyproject.toml)
-uv pip uninstall mcp-tools-py mcp-config mcp-workspace --python "!VENV_SCRIPTS!\python.exe" 2>nul
+uv pip uninstall mcp-coder mcp-tools-py mcp-config mcp-workspace --python "!VENV_SCRIPTS!\python.exe" 2>nul
 echo [OK] Packages uninstalled
 
 echo.
-echo [2/6] Installing mcp-coder from git...
-REM Install mcp-coder FIRST so that its dependency on mcp-tools-py gets
-REM overridden by our local editable install in the next step.
-uv pip install "mcp-coder @ git+https://github.com/MarcusJellinghaus/mcp_coder.git" --python "!VENV_SCRIPTS!\python.exe"
-if !ERRORLEVEL! NEQ 0 (
-    echo [FAIL] mcp-coder installation failed!
-    exit /b 1
-)
-echo [OK] mcp-coder installed
-
-echo.
-echo [3/6] Installing mcp-tools-py in development mode (takes priority)...
-REM Editable install AFTER mcp-coder so this local project takes priority
-REM over whatever version mcp-coder pulled as a dependency.
+echo [2/6] Installing mcp-coder (this project) in development mode...
+REM Editable install pulls all deps (including mcp-tools-py, mcp-workspace,
+REM mcp-config) from PyPI first.
 pushd "!PROJECT_DIR!"
 uv pip install -e ".[dev]" --python "!VENV_SCRIPTS!\python.exe"
 if !ERRORLEVEL! NEQ 0 (
@@ -64,6 +65,17 @@ if !ERRORLEVEL! NEQ 0 (
 )
 popd
 echo [OK] Package and dev dependencies installed
+
+echo.
+echo [3/6] Overriding dependencies with GitHub versions...
+REM Reinstall mcp-tools-py, mcp-workspace, mcp-config from GitHub (no deps)
+REM to override the PyPI versions pulled in the previous step.
+uv pip install --no-deps "mcp-tools-py @ git+https://github.com/MarcusJellinghaus/mcp-tools-py.git" "mcp-workspace @ git+https://github.com/MarcusJellinghaus/mcp-workspace.git" "mcp-config @ git+https://github.com/MarcusJellinghaus/mcp-config.git" --python "!VENV_SCRIPTS!\python.exe"
+if !ERRORLEVEL! NEQ 0 (
+    echo [FAIL] GitHub dependency override failed!
+    exit /b 1
+)
+echo [OK] mcp-tools-py, mcp-workspace, mcp-config overridden from GitHub
 
 echo.
 echo [4/6] Installing LangChain and MLflow dependencies...
