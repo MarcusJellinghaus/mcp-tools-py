@@ -33,7 +33,7 @@ This tracks **Feature Implementation** consisting of multiple **Tasks**.
 
 - [x] Implementation: signature change across rope_tools, rope_cli, __init__.py + batch loop with reverse-order iteration + upfront validation (duplicates, existence, collisions) + update all existing tests + add new batch tests
 - [x] Quality checks: pylint, pytest, mypy — fix all issues
-- [ ] Commit: `feat(move_symbol): batch move with signature change and validation`
+- [x] Commit: `feat(move_symbol): batch move with signature change and validation`
 
 ### Step 3: Self-referencing import removal
 > [Detail](./steps/step_3.md) — Post-move cleanup of self-referencing imports in destination
