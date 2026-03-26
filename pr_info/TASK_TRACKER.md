@@ -47,7 +47,7 @@ This tracks **Feature Implementation** consisting of multiple **Tasks**.
 
 - [x] Implementation: enhance `_move_symbol_impl()` result string + dry-run output + add test
 - [x] Quality checks: pylint, pytest, mypy — fix all issues
-- [ ] Commit: `feat(move_symbol): structured result output with review reminders`
+- [x] Commit: `feat(move_symbol): structured result output with review reminders`
 
 ### Step 5: Manual test plan update
 > [Detail](./steps/step_5.md) — Update TEST_PLAN.md for new signature + batch test cases
