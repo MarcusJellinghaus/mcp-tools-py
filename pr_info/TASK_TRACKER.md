@@ -45,8 +45,8 @@ This tracks **Feature Implementation** consisting of multiple **Tasks**.
 ### Step 4: Result output with review reminders
 > [Detail](./steps/step_4.md) — Structured result output with notes
 
-- [ ] Implementation: enhance `_move_symbol_impl()` result string + dry-run output + add test
-- [ ] Quality checks: pylint, pytest, mypy — fix all issues
+- [x] Implementation: enhance `_move_symbol_impl()` result string + dry-run output + add test
+- [x] Quality checks: pylint, pytest, mypy — fix all issues
 - [ ] Commit: `feat(move_symbol): structured result output with review reminders`
 
 ### Step 5: Manual test plan update

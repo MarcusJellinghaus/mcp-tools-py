@@ -334,8 +334,16 @@ def _move_symbol_impl(
 
         if dry_run:
             _cleanup_created_files(abs_dest, created_for_dry_run, project_dir)
+            symbols_str = ", ".join(reversed(moved_names))
             combined = "\n".join(line for line in all_change_lines if line)
-            return f"[DRY RUN] move_symbol preview:\n{combined}"
+            dry_lines = [
+                "[DRY RUN] move_symbol preview:",
+                f"  Symbols: {symbols_str}",
+                combined,
+                "Note: Imports are absolute \u2014 review and convert to relative where applicable.",
+                "Note: Review symbol order and imports in all affected files.",
+            ]
+            return "\n".join(line for line in dry_lines if line)
 
         # Remove self-referencing imports from destination
         dest_module_dotted = dest_file.replace("/", ".").removesuffix(".py")
@@ -345,13 +353,19 @@ def _move_symbol_impl(
         combined = "\n".join(line for line in all_change_lines if line)
         result_lines = [
             "move_symbol completed successfully.",
-            f"  Moved: {moved_str}",
+            f"  Moved: {moved_str} (from {source_file} \u2192 {dest_file})",
             combined,
         ]
         for imp in removed_imports:
             result_lines.append(
                 f"  Self-referencing import removed from {dest_file}: {imp}"
             )
+        result_lines.append(
+            "Note: Imports are absolute \u2014 review and convert to relative where applicable."
+        )
+        result_lines.append(
+            "Note: Review symbol order and imports in all affected files."
+        )
         return "\n".join(line for line in result_lines if line)
 
     except Exception as exc:  # pylint: disable=broad-exception-caught

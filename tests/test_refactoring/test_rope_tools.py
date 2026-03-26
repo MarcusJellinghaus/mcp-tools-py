@@ -202,6 +202,36 @@ def test_move_symbol_batch_duplicate_names(sample_project: Path) -> None:
     assert "duplicate" in result.lower()
 
 
+# --- result output tests ---
+
+
+def test_move_symbol_result_includes_review_notes(sample_project: Path) -> None:
+    """Result output includes import style note and review reminder."""
+    result = move_symbol(
+        sample_project, "src/foo.py", ["my_func", "MyClass"], "src/baz.py"
+    )
+    assert "successfully" in result
+    assert "Moved: my_func, MyClass (from src/foo.py" in result
+    assert "src/baz.py" in result
+    assert "Note: Imports are absolute" in result
+    assert "Note: Review symbol order and imports in all affected files." in result
+
+
+def test_move_symbol_dry_run_includes_review_notes(sample_project: Path) -> None:
+    """Dry-run output includes symbols line and review reminder notes."""
+    result = move_symbol(
+        sample_project,
+        "src/foo.py",
+        ["my_func", "MyClass"],
+        "src/baz.py",
+        dry_run=True,
+    )
+    assert "[DRY RUN] move_symbol preview:" in result
+    assert "Symbols: my_func, MyClass" in result
+    assert "Note: Imports are absolute" in result
+    assert "Note: Review symbol order and imports in all affected files." in result
+
+
 # --- self-import removal tests ---
 
 
