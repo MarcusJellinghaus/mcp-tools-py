@@ -337,13 +337,22 @@ def _move_symbol_impl(
             combined = "\n".join(line for line in all_change_lines if line)
             return f"[DRY RUN] move_symbol preview:\n{combined}"
 
+        # Remove self-referencing imports from destination
+        dest_module_dotted = dest_file.replace("/", ".").removesuffix(".py")
+        removed_imports = _remove_self_imports(abs_dest, dest_module_dotted)
+
         moved_str = ", ".join(reversed(moved_names))
         combined = "\n".join(line for line in all_change_lines if line)
-        return (
-            f"move_symbol completed successfully.\n"
-            f"  Moved: {moved_str}\n"
-            f"{combined}"
-        )
+        result_lines = [
+            "move_symbol completed successfully.",
+            f"  Moved: {moved_str}",
+            combined,
+        ]
+        for imp in removed_imports:
+            result_lines.append(
+                f"  Self-referencing import removed from {dest_file}: {imp}"
+            )
+        return "\n".join(line for line in result_lines if line)
 
     except Exception as exc:  # pylint: disable=broad-exception-caught
         if dry_run:
@@ -449,6 +458,36 @@ def _collect_existing_paths(changes: ChangeSet) -> set[str]:
     return {
         change.resource.path for change in changes.changes if change.resource.exists()
     }
+
+
+def _remove_self_imports(dest_path: Path, dest_module_dotted: str) -> list[str]:
+    """Remove import lines that reference the destination module itself.
+
+    After rope moves symbols, it may insert imports in the destination file
+    that reference the destination module itself. These are always invalid
+    Python and are rope artifacts.
+
+    Args:
+        dest_path: Absolute path to the destination file.
+        dest_module_dotted: Dotted module name (e.g. "pkg.sub.module").
+
+    Returns:
+        List of removed import lines (for reporting).
+    """
+    lines = dest_path.read_text(encoding="utf-8").splitlines(keepends=True)
+    removed: list[str] = []
+    kept: list[str] = []
+    for line in lines:
+        stripped = line.strip()
+        if stripped == f"import {dest_module_dotted}" or stripped.startswith(
+            f"from {dest_module_dotted} import "
+        ):
+            removed.append(stripped)
+        else:
+            kept.append(line)
+    if removed:
+        dest_path.write_text("".join(kept), encoding="utf-8")
+    return removed
 
 
 def _cleanup_created_files(

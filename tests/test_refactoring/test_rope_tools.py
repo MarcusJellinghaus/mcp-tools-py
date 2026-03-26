@@ -202,6 +202,44 @@ def test_move_symbol_batch_duplicate_names(sample_project: Path) -> None:
     assert "duplicate" in result.lower()
 
 
+# --- self-import removal tests ---
+
+
+def test_move_symbol_removes_self_import(tmp_path: Path) -> None:
+    """After moving a symbol, self-referencing imports are removed from destination."""
+    # Create a project where rope will generate a self-import.
+    # This happens when module A imports from module B, and we move a symbol
+    # from B to A — rope adds "from A import ..." inside A itself.
+    pkg = tmp_path / "pkg"
+    pkg.mkdir()
+    (pkg / "__init__.py").write_text("")
+    (pkg / "source.py").write_text(
+        "from pkg.dest import helper\n"
+        "\n"
+        "\n"
+        "def mover():\n"
+        "    return helper()\n"
+    )
+    (pkg / "dest.py").write_text(
+        "def helper():\n"
+        "    return 1\n"
+        "\n"
+        "\n"
+        "def stay_here():\n"
+        "    return 2\n"
+    )
+    result = move_symbol(tmp_path, "pkg/source.py", ["mover"], "pkg/dest.py")
+    assert "successfully" in result.lower()
+    dest_text = (tmp_path / "pkg" / "dest.py").read_text()
+    # The destination should NOT contain a self-referencing import
+    assert "from pkg.dest import" not in dest_text
+    assert "import pkg.dest" not in dest_text
+    # The moved symbol should be present
+    assert "def mover" in dest_text
+    # helper should still be defined
+    assert "def helper" in dest_text
+
+
 # --- rename_symbol tests ---
 
 

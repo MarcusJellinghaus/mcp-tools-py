@@ -38,9 +38,9 @@ This tracks **Feature Implementation** consisting of multiple **Tasks**.
 ### Step 3: Self-referencing import removal
 > [Detail](./steps/step_3.md) — Post-move cleanup of self-referencing imports in destination
 
-- [ ] Implementation: add `_remove_self_imports()` helper + integrate in `_move_symbol_impl()` + add test
-- [ ] Quality checks: pylint, pytest, mypy — fix all issues
-- [ ] Commit: `feat(move_symbol): remove self-referencing imports after move`
+- [x] Implementation: add `_remove_self_imports()` helper + integrate in `_move_symbol_impl()` + add test
+- [x] Quality checks: pylint, pytest, mypy — fix all issues
+- [x] Commit: `feat(move_symbol): remove self-referencing imports after move`
 
 ### Step 4: Result output with review reminders
 > [Detail](./steps/step_4.md) — Structured result output with notes
