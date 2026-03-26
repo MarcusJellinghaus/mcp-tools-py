@@ -306,23 +306,45 @@ Delete `sample_project/` and recreate from [SAMPLE_PROJECT_FILES.md](SAMPLE_PROJ
 
 **Target**: Move `format_user` from `utils.py` → `services.py`.
 
-### 7a — Dry run
+### 7a — Single symbol dry run
 
 | Field | Value |
 |-------|-------|
-| **Call** | `move_symbol(source_file="tests/mcp_tools_py_manual/sample_project/utils.py", symbol_name="format_user", dest_file="tests/mcp_tools_py_manual/sample_project/services.py", dry_run=True)` |
+| **Call** | `move_symbol(source_file="tests/mcp_tools_py_manual/sample_project/utils.py", symbol_names=["format_user"], dest_file="tests/mcp_tools_py_manual/sample_project/services.py", dry_run=True)` |
 | **Expected** | Preview showing: `format_user` removed from utils.py, added to services.py, imports updated in test_utils.py. No files modified. |
 | **Verify** | Re-read the file contents — they should be unchanged. |
 
-### 7b — Apply
+### 7b — Single symbol apply
 
 | Field | Value |
 |-------|-------|
-| **Call** | `move_symbol(source_file="tests/mcp_tools_py_manual/sample_project/utils.py", symbol_name="format_user", dest_file="tests/mcp_tools_py_manual/sample_project/services.py", dry_run=False)` |
+| **Call** | `move_symbol(source_file="tests/mcp_tools_py_manual/sample_project/utils.py", symbol_names=["format_user"], dest_file="tests/mcp_tools_py_manual/sample_project/services.py", dry_run=False)` |
 | **Expected** | Symbol moved, imports rewritten. |
 | **Verify** | 1. Check that utils.py, services.py, test_utils.py have changed. 2. `list_symbols(file="tests/mcp_tools_py_manual/sample_project/utils.py")` — no longer lists `format_user`. 3. `list_symbols(file="tests/mcp_tools_py_manual/sample_project/services.py")` — now lists `format_user`. 4. `run_pytest_check(extra_args=["tests/mcp_tools_py_manual/", "-v"])` — all tests pass. |
 
-### 7c — Teardown
+### 7c — Single symbol teardown
+
+Delete `sample_project/` and recreate from [SAMPLE_PROJECT_FILES.md](SAMPLE_PROJECT_FILES.md).
+
+### 7d — Batch dry run
+
+**Target**: Move `create_user` and `is_active` from `utils.py` → new `user_ops.py`.
+
+| Field | Value |
+|-------|-------|
+| **Call** | `move_symbol(source_file="tests/mcp_tools_py_manual/sample_project/utils.py", symbol_names=["create_user", "is_active"], dest_file="tests/mcp_tools_py_manual/sample_project/user_ops.py", dry_run=True)` |
+| **Expected** | Preview shows both symbols, no files modified. |
+| **Verify** | Re-read the file contents — they should be unchanged. |
+
+### 7e — Batch apply
+
+| Field | Value |
+|-------|-------|
+| **Call** | `move_symbol(source_file="tests/mcp_tools_py_manual/sample_project/utils.py", symbol_names=["create_user", "is_active"], dest_file="tests/mcp_tools_py_manual/sample_project/user_ops.py", dry_run=False)` |
+| **Expected** | Both symbols moved to `user_ops.py`. Order in destination: `create_user` appears before `is_active`. Imports updated in `services.py` and test files. Result includes review reminder notes. All tests pass after move. |
+| **Verify** | 1. `list_symbols(file="tests/mcp_tools_py_manual/sample_project/user_ops.py")` — shows `create_user`, `is_active`. 2. `list_symbols(file="tests/mcp_tools_py_manual/sample_project/utils.py")` — shows only `format_user`. 3. `run_pytest_check(extra_args=["tests/mcp_tools_py_manual/", "-v"])` — all 11 tests pass. |
+
+### 7f — Batch teardown
 
 Delete `sample_project/` and recreate from [SAMPLE_PROJECT_FILES.md](SAMPLE_PROJECT_FILES.md).
 
@@ -360,8 +382,8 @@ Delete `sample_project/` and recreate from [SAMPLE_PROJECT_FILES.md](SAMPLE_PROJ
 |-------|-------|-------------|
 | **0. Setup** | Create files, verify tests, copy tracker | Sample project on disk |
 | **1. Read-only** | 1a–1d, 2a–2e, 3a–3d, 4a–4d, 5a–5d | None — safe to run in any order |
-| **2. Dry-run mutations** | 6a, 7a, 8a | None — preview only, verify files unchanged. **Run sequentially, not in parallel.** |
-| **3. Apply + verify + recreate** | 6b→6c, 7b→7c, 8b→8c | One at a time. Delete + recreate before next. |
+| **2. Dry-run mutations** | 6a, 7a, 7d, 8a | None — preview only, verify files unchanged. **Run sequentially, not in parallel.** |
+| **3. Apply + verify + recreate** | 6b→6c, 7b→7c, 7e→7f, 8b→8c | One at a time. Delete + recreate before next. |
 | **4. Report** | Generate status report, update tracker | Files written |
 | **5. Cleanup** | Delete `sample_project/` + `__init__.py` | Test artifacts removed |
 

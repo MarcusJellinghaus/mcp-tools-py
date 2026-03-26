@@ -52,9 +52,9 @@ This tracks **Feature Implementation** consisting of multiple **Tasks**.
 ### Step 5: Manual test plan update
 > [Detail](./steps/step_5.md) — Update TEST_PLAN.md for new signature + batch test cases
 
-- [ ] Implementation: update Tests 7a–7c to `symbol_names` + add Tests 7d–7f for batch moves + update PROGRESS_TRACKER.md
-- [ ] Quality checks: pylint, pytest, mypy — fix all issues
-- [ ] Commit: `docs(test-plan): update move_symbol tests for batch signature`
+- [x] Implementation: update Tests 7a–7c to `symbol_names` + add Tests 7d–7f for batch moves + update PROGRESS_TRACKER.md
+- [x] Quality checks: pylint, pytest, mypy — fix all issues
+- [x] Commit: `docs(test-plan): update move_symbol tests for batch signature`
 
 ## Pull Request
 
