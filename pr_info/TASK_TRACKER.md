@@ -21,6 +21,21 @@ This tracks **Feature Implementation** consisting of multiple **Tasks**.
 
 ## Tasks
 
-<!-- Tasks populated from pr_info/steps/ by prepare_task_tracker -->
+### Step 1: Core Logic + Unit Tests (Mocked)
+- [ ] Implementation: create `inspect_library.py` with `_get_library_source()` + `InspectTools` class, and `tests/test_inspect_library.py` with mocked unit tests
+- [ ] Quality checks: pylint, pytest, mypy — fix all issues
+- [ ] Commit: `feat: add get_library_source core logic with mocked unit tests`
+
+### Step 2: Real-Import Tests + MCP Registration in `server.py`
+- [ ] Implementation: add real-import tests to `tests/test_inspect_library.py` and wire `InspectTools` into `server.py`
+- [ ] Quality checks: pylint, pytest, mypy — fix all issues
+- [ ] Commit: `feat: wire get_library_source into MCP server with real-import tests`
+
+### Step 3: Architecture Config Updates
+- [ ] Implementation: update `tach.toml` and `.importlinter` to include `inspect_library` module boundaries
+- [ ] Quality checks: pylint, pytest, mypy — fix all issues
+- [ ] Commit: `chore: add inspect_library to architecture boundary configs`
 
 ## Pull Request
+- [ ] PR review: verify all steps complete, tests pass, no regressions
+- [ ] PR summary prepared
