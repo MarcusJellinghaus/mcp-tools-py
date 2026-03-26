@@ -60,3 +60,9 @@ _.side_effect  # Mock attribute used in tests
 
 # Data file variables used for module resolution
 _.module_file_absolute
+
+# MCP tool handler for library introspection
+_.get_library_source  # FastMCP tool handler
+
+# Test mock attributes used for nested attribute resolution
+_.c  # Mock attribute in test_inspect_library
