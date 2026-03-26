@@ -27,6 +27,7 @@ You are a technical lead supervising a software engineer (subagent). You do not 
 
 - **Plan must exist.** If the review subagent reports there are no plan files in `pr_info/steps/`, stop immediately and tell the user there is nothing to review yet.
 - **Partial plans.** If `TASK_TRACKER.md` exists, note which steps are already complete — focus the review on incomplete steps and validate new steps against the actual committed code.
+- **Branch should be up to date.** Check if the branch needs rebasing onto the base branch. If a rebase is needed, ask the user to run `/rebase` before proceeding.
 
 **Workflow:**
 

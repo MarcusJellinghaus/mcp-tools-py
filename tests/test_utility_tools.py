@@ -25,6 +25,7 @@ def test_utility_tools_registers_sleep_tool() -> None:
         (5.0, "Slept for 5.0 seconds."),
         (10.0, "Slept for 10.0 seconds."),
         (0, "Slept for 0 seconds."),
+        (300, "Slept for 300 seconds."),
     ],
 )
 def test_sleep_valid_values(sleep_seconds: float, expected_message: str) -> None:
