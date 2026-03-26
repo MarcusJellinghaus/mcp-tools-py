@@ -166,6 +166,13 @@ class TestErrorHandling:
             f"max_lines must be a positive integer (>= 1), got: {bad_value}" == result
         )
 
+    @pytest.mark.parametrize("bad_path", ["", ".", ".."])
+    def test_empty_or_malformed_import_path(self, bad_path: str) -> None:
+        """Empty or malformed import paths return error instead of raising."""
+        result = _get_library_source(bad_path)
+
+        assert "not found" in result.lower()
+
 
 class TestRealImports:
     """Real-import tests against actual installed packages (no mocking)."""

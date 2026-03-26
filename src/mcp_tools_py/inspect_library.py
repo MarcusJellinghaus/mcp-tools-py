@@ -14,6 +14,9 @@ if TYPE_CHECKING:
 def _get_library_source(import_path: str, max_lines: int = 200) -> str:
     """Retrieve source code for any importable Python symbol.
 
+    Note: Uses ``importlib.import_module``, which executes module-level code
+    as a side effect of importing the target module.
+
     Args:
         import_path: Dotted import path (e.g. "os.path.join" or "json.JSONEncoder").
         max_lines: Maximum number of source lines to return. Must be >= 1.
@@ -35,7 +38,7 @@ def _get_library_source(import_path: str, max_lines: int = 200) -> str:
             module = importlib.import_module(module_path)
             remaining = parts[i:]
             break
-        except (ImportError, ModuleNotFoundError):
+        except (ImportError, ModuleNotFoundError, ValueError, TypeError):
             continue
 
     if module is None:
