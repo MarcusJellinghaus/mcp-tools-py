@@ -57,7 +57,6 @@ Add to `tests/test_inspect_library.py` (no integration markers — stdlib + stru
 | `test_bad_module` | `nonexistent_package.Foo` | default | Contains `"not found"` |
 | `test_bad_symbol_lists_available` | `json.NoSuchThing` | default | Contains available symbols with types |
 | `test_third_party_dep` | `structlog.get_logger` | default | Contains `def get_logger` (structlog chosen because it's a direct project dependency, always installed in dev/test) |
-| `test_builtin_type` | `builtins.dict` | default | Contains `"source not available"` and `"built-in/C extension"` |
-| `test_invalid_max_lines_zero` | `json.encoder` | 0 | Contains `"positive integer"` |
+| `test_builtin_type` | `builtins.dict` | default | Contains `"Source not available"` and `"built-in/C extension"` |
 
-> **Note**: `test_bad_module` and `test_invalid_max_lines_zero` could use parameterized patterns where structurally similar (both verify error-string responses for invalid inputs).
+> **Note**: `test_bad_module` and `test_bad_symbol_lists_available` could use parameterized patterns where structurally similar (both verify error-string responses for invalid inputs). `test_invalid_max_lines_zero` was removed — already fully covered by Step 1's parameterized mock test (validation never reaches `importlib`).
