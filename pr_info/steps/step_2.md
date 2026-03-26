@@ -51,6 +51,16 @@ def test_lint_imports_unavailable_returns_error(self) -> None:
 - Call registered `run_lint_imports_check()`
 - Assert "lint-imports is not available" in result
 
+### 5. Update `TestToolHandlerShortCircuit` fixtures (`test_tool_availability.py`)
+
+The existing `TestToolHandlerShortCircuit` tests manually set `server._tool_availability` with only 3 keys (`pytest`, `pylint`, `mypy`). Add `"lint-imports": False` to each of these so the dict stays consistent with the new availability check.
+
+### 6. Update `mock_server` fixture (`test_checker_tools.py`)
+
+The `mock_server` fixture in `tests/test_checker_tools.py` sets `server._tool_availability` with only 3 keys. Update it:
+- Add `"lint-imports": True` to the fixture's `_tool_availability` dict
+- Set `server.venv_path` to a meaningful mock value (e.g. `"/mock/venv"`) so lint-imports tests can resolve a binary path
+
 ## WHAT — Implementation
 
 ### Method: `_register_lint_imports(self, mcp)` in `CheckerTools`
@@ -84,7 +94,7 @@ if not self._server._tool_availability.get("lint-imports", False):
 
 # Resolve binary path
 if os.name == "nt":
-    binary = os.path.join(self._server.venv_path, "Scripts", "lint-imports")
+    binary = os.path.join(self._server.venv_path, "Scripts", "lint-imports.exe")
 else:
     binary = os.path.join(self._server.venv_path, "bin", "lint-imports")
 

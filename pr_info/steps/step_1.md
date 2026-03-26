@@ -17,7 +17,7 @@ Add `lint-imports` to the startup availability check in `server.py`. Unlike pyli
 
 Every test that asserts `server._tool_availability == {"pytest": ..., "pylint": ..., "mypy": ...}` must now also include `"lint-imports"`. Specifically:
 
-- `test_all_tools_available` — expect `"lint-imports": False` (no venv configured in this test, so binary won't be found)
+- `test_all_tools_available` — mock `os.path.exists` to return `True` for the lint-imports binary path (in addition to setting `venv_path` on the server), and expect `"lint-imports": True`
 - `test_all_tools_missing` — expect `"lint-imports": False`
 - `test_timed_out_tool_marked_unavailable` — expect `"lint-imports": False`
 
@@ -74,7 +74,7 @@ The lint-imports check is appended after the existing loop (no changes to existi
 lint_imports_available = False
 if self.venv_path:
     if os.name == "nt":
-        binary = os.path.join(self.venv_path, "Scripts", "lint-imports")
+        binary = os.path.join(self.venv_path, "Scripts", "lint-imports.exe")
     else:
         binary = os.path.join(self.venv_path, "bin", "lint-imports")
     lint_imports_available = os.path.exists(binary)
