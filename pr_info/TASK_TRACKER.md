@@ -31,8 +31,8 @@ This tracks **Feature Implementation** consisting of multiple **Tasks**.
 ### Step 2: Batch `move_symbol` — signature change, loop, and validation
 > [Detail](./steps/step_2.md) — `symbol_name` → `symbol_names` across all layers, batch loop, all-or-nothing validation
 
-- [ ] Implementation: signature change across rope_tools, rope_cli, __init__.py + batch loop with reverse-order iteration + upfront validation (duplicates, existence, collisions) + update all existing tests + add new batch tests
-- [ ] Quality checks: pylint, pytest, mypy — fix all issues
+- [x] Implementation: signature change across rope_tools, rope_cli, __init__.py + batch loop with reverse-order iteration + upfront validation (duplicates, existence, collisions) + update all existing tests + add new batch tests
+- [x] Quality checks: pylint, pytest, mypy — fix all issues
 - [ ] Commit: `feat(move_symbol): batch move with signature change and validation`
 
 ### Step 3: Self-referencing import removal

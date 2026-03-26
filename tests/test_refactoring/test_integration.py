@@ -89,7 +89,7 @@ def test_full_workflow_split_large_file(multi_module_project: Path) -> None:
     dry_result = move_symbol(
         project,
         "myproject/models.py",
-        "validate_email",
+        ["validate_email"],
         "myproject/validation.py",
         dry_run=True,
     )
@@ -103,7 +103,7 @@ def test_full_workflow_split_large_file(multi_module_project: Path) -> None:
     result = move_symbol(
         project,
         "myproject/models.py",
-        "validate_email",
+        ["validate_email"],
         "myproject/validation.py",
     )
     assert "successfully" in result.lower() or "modified" in result.lower()
@@ -226,7 +226,7 @@ def test_move_symbol_does_not_hang(multi_module_project: Path) -> None:
     result = move_symbol(
         multi_module_project,
         "myproject/models.py",
-        "validate_email",
+        ["validate_email"],
         "myproject/validation.py",
     )
     elapsed = time.monotonic() - start

@@ -65,24 +65,24 @@ class RefactoringTools:
         @log_function_call
         def move_symbol(
             source_file: str,
-            symbol_name: str,
+            symbol_names: list[str],
             dest_file: str,
             dry_run: bool = False,
         ) -> str:
-            """Move a top-level function, class, or variable to another module.
+            """Move top-level functions, classes, or variables to another module.
             Updates all imports project-wide. Auto-creates destination file and
             missing __init__.py files if needed.
 
             Args:
                 source_file: Source file path relative to project root.
-                symbol_name: Name of the top-level symbol to move.
+                symbol_names: Names of top-level symbols to move.
                 dest_file: Destination file path relative to project root.
                 dry_run: Preview changes without applying (default: False).
             """
             return rope_move_symbol(
                 project_dir,
                 source_file,
-                symbol_name,
+                symbol_names,
                 dest_file,
                 dry_run,
                 timeout=timeout,
