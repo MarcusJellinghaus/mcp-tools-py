@@ -41,6 +41,7 @@ class CodeCheckerServer:
         venv_path: Optional[str] = None,
         test_folder: str = "tests",
         keep_temp_files: bool = False,
+        refactoring_timeout: int = 120,
     ) -> None:
         """
         Initialize the server with the project directory and Python configuration.
@@ -51,12 +52,14 @@ class CodeCheckerServer:
             venv_path: Optional path to a virtual environment to activate for running tests. When specified, the Python executable from this venv will be used instead of python_executable.
             test_folder: Path to the test folder (relative to project_dir). Defaults to 'tests'.
             keep_temp_files: Whether to keep temporary files after test execution. Useful for debugging when tests fail.
+            refactoring_timeout: Timeout in seconds for rope refactoring operations.
         """
         self.project_dir = project_dir
         self.python_executable = python_executable
         self.venv_path = venv_path
         self.test_folder = test_folder
         self.keep_temp_files = keep_temp_files
+        self.refactoring_timeout = refactoring_timeout
 
         # Import FastMCP
         from mcp.server.fastmcp import FastMCP
@@ -65,7 +68,9 @@ class CodeCheckerServer:
         self._resolved_python = self._resolve_python_executable()
         self._tool_availability = self._check_tool_availability()
         CheckerTools(self).register(self.mcp)
-        RefactoringTools(self.project_dir).register(self.mcp)
+        RefactoringTools(self.project_dir, timeout=self.refactoring_timeout).register(
+            self.mcp
+        )
         structured_logger.debug(
             "Tool environment resolved",
             python_executable=self._resolved_python,
@@ -122,6 +127,7 @@ def create_server(
     venv_path: Optional[str] = None,
     test_folder: str = "tests",
     keep_temp_files: bool = False,
+    refactoring_timeout: int = 120,
 ) -> CodeCheckerServer:
     """
     Create a new CodeCheckerServer instance.
@@ -132,6 +138,7 @@ def create_server(
         venv_path: Optional path to a virtual environment to activate for running tests. When specified, the Python executable from this venv will be used instead of python_executable.
         test_folder: Path to the test folder (relative to project_dir). Defaults to 'tests'.
         keep_temp_files: Whether to keep temporary files after test execution. Useful for debugging when tests fail.
+        refactoring_timeout: Timeout in seconds for rope refactoring operations.
 
     Returns:
         A new CodeCheckerServer instance
@@ -142,4 +149,5 @@ def create_server(
         venv_path=venv_path,
         test_folder=test_folder,
         keep_temp_files=keep_temp_files,
+        refactoring_timeout=refactoring_timeout,
     )

@@ -1,5 +1,6 @@
 """End-to-end integration tests for refactoring workflows."""
 
+import time
 from pathlib import Path
 
 import pytest
@@ -194,3 +195,294 @@ def test_move_module_then_verify_imports(multi_module_project: Path) -> None:
     models_text = (project / "myproject" / "models.py").read_text()
     assert "class User" in models_text
     assert "class Address" in models_text
+
+
+# --- Hang-regression tests (issue #112) ---
+# These verify that rope operations complete quickly without hanging.
+# The old multiprocessing-based timeout wrapper caused indefinite hangs
+# on Windows when running inside an MCP stdio server.
+
+_HANG_TIMEOUT = 10  # seconds — rope completes in <1s on small projects
+
+
+@pytest.mark.integration
+def test_rename_symbol_does_not_hang(multi_module_project: Path) -> None:
+    """rename_symbol must complete within _HANG_TIMEOUT seconds."""
+    start = time.monotonic()
+    result = rename_symbol(
+        multi_module_project, "myproject/models.py", "User", "AppUser"
+    )
+    elapsed = time.monotonic() - start
+    assert (
+        elapsed < _HANG_TIMEOUT
+    ), f"rename_symbol took {elapsed:.1f}s (limit {_HANG_TIMEOUT}s)"
+    assert "modified" in result.lower() or "successfully" in result.lower()
+
+
+@pytest.mark.integration
+def test_move_symbol_does_not_hang(multi_module_project: Path) -> None:
+    """move_symbol must complete within _HANG_TIMEOUT seconds."""
+    start = time.monotonic()
+    result = move_symbol(
+        multi_module_project,
+        "myproject/models.py",
+        "validate_email",
+        "myproject/validation.py",
+    )
+    elapsed = time.monotonic() - start
+    assert (
+        elapsed < _HANG_TIMEOUT
+    ), f"move_symbol took {elapsed:.1f}s (limit {_HANG_TIMEOUT}s)"
+    assert "modified" in result.lower() or "successfully" in result.lower()
+
+
+@pytest.mark.integration
+def test_move_module_does_not_hang(multi_module_project: Path) -> None:
+    """move_module must complete within _HANG_TIMEOUT seconds."""
+    (multi_module_project / "myproject" / "subpkg").mkdir()
+    (multi_module_project / "myproject" / "subpkg" / "__init__.py").write_text("")
+    start = time.monotonic()
+    result = move_module(multi_module_project, "myproject/utils.py", "myproject/subpkg")
+    elapsed = time.monotonic() - start
+    assert (
+        elapsed < _HANG_TIMEOUT
+    ), f"move_module took {elapsed:.1f}s (limit {_HANG_TIMEOUT}s)"
+    assert "modified" in result.lower() or "successfully" in result.lower()
+
+
+@pytest.mark.integration
+def test_move_module_dry_run_without_dest_package(multi_module_project: Path) -> None:
+    """Dry-run should preview changes even when dest package doesn't exist yet."""
+    project = multi_module_project
+
+    # dest package does NOT exist
+    assert not (project / "myproject" / "newpkg").exists()
+
+    result = move_module(
+        project,
+        "myproject/utils.py",
+        "myproject/newpkg",
+        dry_run=True,
+    )
+
+    # Should show a preview, not an error
+    assert "[DRY RUN]" in result, f"Expected dry-run preview, got: {result}"
+    assert "error" not in result.lower(), f"Unexpected error in dry run: {result}"
+
+    # No files should be created or modified
+    assert not (project / "myproject" / "newpkg").exists()
+    utils_text = (project / "myproject" / "utils.py").read_text()
+    assert "from myproject.models import Address" in utils_text
+
+
+@pytest.mark.integration
+def test_move_module_with_pre_existing_dest_package(
+    multi_module_project: Path,
+) -> None:
+    """move_module must move the file when dest package already exists."""
+    project = multi_module_project
+
+    # Pre-create the destination package (simulates manual creation)
+    subpkg = project / "myproject" / "subpkg"
+    subpkg.mkdir()
+    (subpkg / "__init__.py").write_text("")
+
+    result = move_module(
+        project,
+        "myproject/utils.py",
+        "myproject/subpkg",
+    )
+    assert "successfully" in result.lower() or "modified" in result.lower()
+
+    # File must be physically moved
+    assert (
+        project / "myproject" / "subpkg" / "utils.py"
+    ).exists(), "utils.py not found at destination"
+    assert not (
+        project / "myproject" / "utils.py"
+    ).exists(), "Original utils.py still exists — file was not moved"
+
+
+@pytest.mark.integration
+def test_move_module_nested_project_structure(tmp_path: Path) -> None:
+    """move_module with deeply nested packages (closer to real-world usage)."""
+    # Create a project with deeper nesting: tests/app/sample/
+    root = tmp_path
+    pkg = root / "tests" / "app" / "sample"
+    pkg.mkdir(parents=True)
+
+    # Create __init__.py at each level
+    for p in [root / "tests", root / "tests" / "app", pkg]:
+        (p / "__init__.py").write_text("")
+
+    (pkg / "models.py").write_text(
+        "class Item:\n"
+        "    def __init__(self, name: str) -> None:\n"
+        "        self.name = name\n"
+    )
+
+    (pkg / "utils.py").write_text(
+        "from tests.app.sample.models import Item\n"
+        "\n"
+        "\n"
+        "def format_item(item: Item) -> str:\n"
+        '    return f"Item: {item.name}"\n'
+    )
+
+    (pkg / "services.py").write_text(
+        "from tests.app.sample.utils import format_item\n"
+        "from tests.app.sample.models import Item\n"
+        "\n"
+        "\n"
+        "def display(name: str) -> str:\n"
+        "    return format_item(Item(name))\n"
+    )
+
+    result = move_module(
+        root,
+        "tests/app/sample/utils.py",
+        "tests/app/sample/helpers",
+    )
+    assert (
+        "successfully" in result.lower() or "modified" in result.lower()
+    ), f"move_module failed: {result}"
+
+    # File physically moved
+    assert (pkg / "helpers" / "utils.py").exists(), "utils.py not at destination"
+    assert not (pkg / "utils.py").exists(), "Original utils.py still exists"
+
+    # Imports rewritten in services.py
+    services_text = (pkg / "services.py").read_text()
+    assert "helpers" in services_text, f"Imports not rewritten: {services_text}"
+
+
+@pytest.mark.integration
+def test_move_module_in_git_repo_with_untracked_files(tmp_path: Path) -> None:
+    """move_module must work even when files are untracked in a git repo.
+
+    Rope uses 'git mv' when it detects a git repo. If the source file
+    is untracked, 'git mv' fails and rope silently skips the move.
+    """
+    import subprocess
+
+    root = tmp_path
+
+    # Initialize a git repo (this is the key condition)
+    subprocess.run(["git", "init"], cwd=str(root), capture_output=True, check=True)
+    subprocess.run(
+        ["git", "config", "user.email", "test@test.com"],
+        cwd=str(root),
+        capture_output=True,
+    )
+    subprocess.run(
+        ["git", "config", "user.name", "Test"],
+        cwd=str(root),
+        capture_output=True,
+    )
+
+    # Create a package with untracked files (never git-added)
+    pkg = root / "myproject"
+    pkg.mkdir()
+    (pkg / "__init__.py").write_text("")
+    (pkg / "models.py").write_text(
+        "class Item:\n"
+        "    def __init__(self, name: str) -> None:\n"
+        "        self.name = name\n"
+    )
+    (pkg / "utils.py").write_text(
+        "from myproject.models import Item\n"
+        "\n"
+        "def fmt(item: Item) -> str:\n"
+        '    return f"{item.name}"\n'
+    )
+    (pkg / "services.py").write_text(
+        "from myproject.utils import fmt\n"
+        "from myproject.models import Item\n"
+        "\n"
+        "def run(name: str) -> str:\n"
+        "    return fmt(Item(name))\n"
+    )
+
+    # Do NOT git add — files are untracked
+
+    result = move_module(
+        root,
+        "myproject/utils.py",
+        "myproject/helpers",
+    )
+
+    # Should get a clear error telling the user to git-add first
+    assert "not tracked by git" in result, f"Expected untracked error, got: {result}"
+    assert "git add" in result, f"Should suggest git add, got: {result}"
+
+    # No files should have been modified
+    assert (pkg / "utils.py").exists(), "Original should be untouched"
+    assert not (pkg / "helpers").exists(), "Dest should not be created"
+
+
+@pytest.mark.integration
+def test_move_module_with_gitignore(tmp_path: Path) -> None:
+    """move_module in a project with .gitignore (replicates real repo conditions)."""
+    root = tmp_path
+
+    # Add a .gitignore like real projects have
+    (root / ".gitignore").write_text(
+        "__pycache__/\n" "*.pyc\n" ".venv/\n" "build/\n" "dist/\n" "*.egg-info/\n"
+    )
+
+    # Nested package: tests/sample/pkg/
+    pkg = root / "tests" / "sample" / "pkg"
+    pkg.mkdir(parents=True)
+    for p in [root / "tests", root / "tests" / "sample", pkg]:
+        (p / "__init__.py").write_text("")
+
+    (pkg / "models.py").write_text(
+        "class Item:\n"
+        "    def __init__(self, name: str) -> None:\n"
+        "        self.name = name\n"
+    )
+    (pkg / "utils.py").write_text(
+        "from tests.sample.pkg.models import Item\n"
+        "\n"
+        "def fmt(item: Item) -> str:\n"
+        '    return f"{item.name}"\n'
+    )
+    (pkg / "services.py").write_text(
+        "from tests.sample.pkg.utils import fmt\n"
+        "from tests.sample.pkg.models import Item\n"
+        "\n"
+        "def run(name: str) -> str:\n"
+        "    return fmt(Item(name))\n"
+    )
+
+    result = move_module(
+        root,
+        "tests/sample/pkg/utils.py",
+        "tests/sample/pkg/helpers",
+    )
+    assert "successfully" in result.lower(), f"move_module failed: {result}"
+    assert "WARNING" not in result, f"File was not moved: {result}"
+
+    assert (pkg / "helpers" / "utils.py").exists(), "File not at destination"
+    assert not (pkg / "utils.py").exists(), "Original file still exists"
+
+    services_text = (pkg / "services.py").read_text()
+    assert "helpers" in services_text, f"Imports not rewritten: {services_text}"
+
+
+@pytest.mark.integration
+def test_rename_symbol_dry_run_does_not_hang(multi_module_project: Path) -> None:
+    """rename_symbol dry_run must complete within _HANG_TIMEOUT seconds."""
+    start = time.monotonic()
+    result = rename_symbol(
+        multi_module_project,
+        "myproject/models.py",
+        "User",
+        "AppUser",
+        dry_run=True,
+    )
+    elapsed = time.monotonic() - start
+    assert (
+        elapsed < _HANG_TIMEOUT
+    ), f"rename_symbol dry_run took {elapsed:.1f}s (limit {_HANG_TIMEOUT}s)"
+    assert "[DRY RUN]" in result

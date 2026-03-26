@@ -1,10 +1,16 @@
 """Tests for rope-based refactoring operations (move, rename)."""
 
+import json
 from pathlib import Path
 
 import pytest
 
-from mcp_tools_py.refactoring.rope_tools import move_module, move_symbol, rename_symbol
+from mcp_tools_py.refactoring.rope_tools import (
+    _build_ignored_resources,
+    move_module,
+    move_symbol,
+    rename_symbol,
+)
 
 # --- Shared fixture ---
 
@@ -175,3 +181,124 @@ def test_move_module_dry_run(sample_project: Path) -> None:
     assert "[DRY RUN]" in result
     # foo.py should still be in original location
     assert (sample_project / "src" / "foo.py").exists()
+
+
+# --- ropefolder=None and gitignore filtering tests ---
+
+
+def test_rope_does_not_create_ropeproject_folder(sample_project: Path) -> None:
+    """After rename_symbol, assert no .ropeproject/ directory exists."""
+    rename_symbol(sample_project, "src/foo.py", "my_func", "better_name")
+    assert not (sample_project / ".ropeproject").exists()
+
+
+def test_build_ignored_resources_defaults_without_gitignore(tmp_path: Path) -> None:
+    """Without .gitignore, returns hardcoded defaults."""
+    (tmp_path / "src").mkdir()
+    (tmp_path / "src" / "__init__.py").write_text("")
+    result = _build_ignored_resources(tmp_path)
+    assert ".ropeproject" in result
+    assert "__pycache__" in result
+    assert ".git" in result
+    assert "node_modules" in result
+
+
+def test_build_ignored_resources_includes_gitignore_patterns(tmp_path: Path) -> None:
+    """With .gitignore containing ignoreme/, the result includes ignoreme."""
+    (tmp_path / "src").mkdir()
+    (tmp_path / "src" / "__init__.py").write_text("")
+    (tmp_path / "ignoreme").mkdir()
+    (tmp_path / ".gitignore").write_text("ignoreme/\n")
+    result = _build_ignored_resources(tmp_path)
+    assert "ignoreme" in result
+    # Defaults should still be present
+    assert ".ropeproject" in result
+    assert "__pycache__" in result
+
+
+def test_build_ignored_resources_no_backslashes(tmp_path: Path) -> None:
+    """Patterns must use forward slashes — Rope compiles them as regex."""
+    (tmp_path / "sub").mkdir()
+    (tmp_path / "sub" / "deep").mkdir()
+    (tmp_path / ".gitignore").write_text("sub/deep/\n")
+    result = _build_ignored_resources(tmp_path)
+    for pattern in result:
+        assert "\\" not in pattern, f"Backslash in pattern: {pattern!r}"
+
+
+def test_cli_parse_args_default_timeout() -> None:
+    """parse_args returns refactoring_timeout=120 by default."""
+    import sys
+    from unittest.mock import patch
+
+    from mcp_tools_py.main import parse_args
+
+    with patch.object(sys, "argv", ["prog", "--project-dir", "/tmp/proj"]):
+        args = parse_args()
+    assert args.refactoring_timeout == 120
+
+
+def test_cli_parse_args_custom_timeout() -> None:
+    """parse_args accepts --refactoring-timeout 60."""
+    import sys
+    from unittest.mock import patch
+
+    from mcp_tools_py.main import parse_args
+
+    with patch.object(
+        sys,
+        "argv",
+        ["prog", "--project-dir", "/tmp/proj", "--refactoring-timeout", "60"],
+    ):
+        args = parse_args()
+    assert args.refactoring_timeout == 60
+
+
+def test_rope_cli_returns_json_error_on_exception() -> None:
+    """rope_cli returns structured JSON error, not raw traceback."""
+    import subprocess
+    import sys
+
+    # Pass valid operation but missing required args to trigger KeyError
+    proc = subprocess.run(
+        [
+            sys.executable,
+            "-m",
+            "mcp_tools_py.refactoring.rope_cli",
+            "rename_symbol",
+            '{"project_dir": "/nonexistent"}',
+        ],
+        capture_output=True,
+        text=True,
+    )
+    assert proc.returncode == 1
+    output = json.loads(proc.stdout)
+    assert "error" in output
+
+
+def test_rope_cli_unknown_operation() -> None:
+    """rope_cli exits 1 on unknown operation."""
+    import subprocess
+    import sys
+
+    proc = subprocess.run(
+        [
+            sys.executable,
+            "-m",
+            "mcp_tools_py.refactoring.rope_cli",
+            "unknown_op",
+            "{}",
+        ],
+        capture_output=True,
+        text=True,
+    )
+    assert proc.returncode == 1
+    assert "Unknown operation" in proc.stderr
+
+
+def test_refactoring_tools_init_stores_timeout(tmp_path: Path) -> None:
+    """RefactoringTools(path, timeout=60)._timeout == 60."""
+    from mcp_tools_py.refactoring import RefactoringTools
+
+    tools = RefactoringTools(tmp_path, timeout=60)
+    assert tools._timeout == 60  # noqa: SLF001

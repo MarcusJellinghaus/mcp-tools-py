@@ -57,4 +57,6 @@ You are a technical lead supervising a software engineer (subagent). You do not 
 
 **Additional context:** For changes involving significant refactoring, also consult `.claude/knowledge_base/refactoring_principles.md`.
 
+**Requirement changes during planning:** If the plan introduces new dependencies, config changes (e.g., `pyproject.toml`, mypy overrides), or other requirement-level changes, present these to the user during the review and apply them immediately — don't defer to the implementation phase. This allows to start the implementation with the updated python environment.
+
 **Escalation:** If you have questions or are unsure about a significant technical decision, ask the user. For borderline improvements, default to simpler plans rather than asking — only escalate when the change affects scope or architecture.

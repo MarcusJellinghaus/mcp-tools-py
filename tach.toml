@@ -56,7 +56,8 @@ depends_on = [
 path = "mcp_tools_py.refactoring"
 layer = "tool_implementation"
 depends_on = [
-    { path = "mcp_tools_py.log_utils" }
+    { path = "mcp_tools_py.log_utils" },
+    { path = "mcp_tools_py.utils" }
 ]
 
 [[modules]]

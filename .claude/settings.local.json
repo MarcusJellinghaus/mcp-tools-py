@@ -54,7 +54,14 @@
       "Bash(mcp-coder check file-size:*)",
       "WebFetch(domain:*)",
       "Bash(mcp-coder gh-tool get-base-branch)",
-      "Bash(git ls-tree:*)"
+      "Bash(git ls-tree:*)",
+      "mcp__tools-py__list_symbols",
+      "mcp__tools-py__find_references",
+      "mcp__tools-py__rename_symbol",
+      "mcp__tools-py__move_symbol",
+      "mcp__tools-py__move_module",
+      "Bash(bash tools/get_duration.sh *)",
+      "Bash(bash tools/get_time.sh)"
     ]
   },
   "enableAllProjectMcpServers": true,

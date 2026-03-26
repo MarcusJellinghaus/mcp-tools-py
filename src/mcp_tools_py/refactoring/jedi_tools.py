@@ -31,8 +31,8 @@ def list_symbols(project_dir: Path, file_path: str) -> str:
     except Exception as exc:  # pylint: disable=broad-exception-caught
         return f"Error analyzing {file_path}: {exc}"
 
-    # Filter to top-level only: parent must be the module
-    top_level = _filter_top_level(names)
+    # Filter to top-level definitions only (exclude imports)
+    top_level = _filter_top_level(names, exclude_imports=True)
 
     if not top_level:
         return f"No symbols found in {file_path}"
@@ -45,12 +45,27 @@ def list_symbols(project_dir: Path, file_path: str) -> str:
     return "\n".join(lines)
 
 
-def _filter_top_level(names: List[Any]) -> List[Any]:
+def _is_import(name: Any) -> bool:
+    """Check if a jedi Name originates from an import statement."""
+    tree_name = getattr(getattr(name, "_name", None), "tree_name", None)
+    if tree_name is None:
+        return False
+    node = tree_name.parent
+    while node is not None:
+        if node.type in ("import_name", "import_from"):
+            return True
+        node = node.parent
+    return False
+
+
+def _filter_top_level(names: List[Any], *, exclude_imports: bool = False) -> List[Any]:
     """Filter jedi names to top-level symbols only."""
     result: List[Any] = []
     for name in names:
         parent = name.parent()
         if parent is not None and parent.type == "module":
+            if exclude_imports and _is_import(name):
+                continue
             result.append(name)
     return result
 
