@@ -37,11 +37,26 @@
 
 **Status:** no changes needed
 
+## Round 3 — 2026-03-26 (CI fix)
+
+**Findings:**
+- CI failing: `test_lint_imports_available_when_binary_exists` and `test_lint_imports_unavailable_when_binary_missing` raise `NotImplementedError: cannot instantiate 'WindowsPath' on your system` on Linux CI
+- Root cause: `Path("/project")` constructed inside `os.name = "nt"` patch block, causing WindowsPath instantiation on Linux
+
+**Decisions:**
+- Critical (fix): Move `Path` construction before the `os.name` patch to avoid cross-platform failure
+
+**Changes:**
+- In `tests/test_tool_availability.py`, moved `Path("/project")` construction to before the `os.name` mock context manager in both tests
+
+**Status:** committed
+
 ## Final Status
 
-- **Rounds:** 2
-- **Commits:** 1 (docstring fix)
-- **Critical issues:** 0
+- **Rounds:** 3
+- **Commits:** 3 (docstring fix, review log, CI test fix)
+- **Critical issues:** 0 remaining (1 fixed — WindowsPath CI failure)
 - **Remaining issues:** 0
 - **Code quality:** All checks pass (pylint clean, mypy clean, 332 passed / 1 skipped)
-- **Verdict:** Ready for merge
+- **Branch:** 1 commit behind main — rebase needed
+- **Verdict:** Ready for merge after rebase

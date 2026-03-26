@@ -201,6 +201,7 @@ class TestCheckToolAvailability:
 
     def test_lint_imports_available_when_binary_exists(self) -> None:
         """When venv_path is set and lint-imports binary exists, mark available."""
+        project_dir = Path("/project")
         with (
             patch("mcp.server.fastmcp.FastMCP") as mock_fastmcp,
             patch("mcp_tools_py.server.execute_command") as mock_exec,
@@ -212,9 +213,7 @@ class TestCheckToolAvailability:
                 return_code=0, stdout="tool 1.0.0"
             )
 
-            server = _create_server(
-                project_dir=Path("/project"), venv_path="/mock/venv"
-            )
+            server = _create_server(project_dir=project_dir, venv_path="/mock/venv")
 
             assert server._tool_availability["lint-imports"] is True
             assert server._lint_imports_binary == os.path.join(
@@ -239,6 +238,7 @@ class TestCheckToolAvailability:
 
     def test_lint_imports_unavailable_when_binary_missing(self) -> None:
         """When venv_path is set but binary doesn't exist, mark unavailable."""
+        project_dir = Path("/project")
 
         def exists_side_effect(path: str) -> bool:
             # Python executable exists, but lint-imports does not
@@ -260,9 +260,7 @@ class TestCheckToolAvailability:
                 return_code=0, stdout="tool 1.0.0"
             )
 
-            server = _create_server(
-                project_dir=Path("/project"), venv_path="/mock/venv"
-            )
+            server = _create_server(project_dir=project_dir, venv_path="/mock/venv")
 
             assert server._tool_availability["lint-imports"] is False
             assert server._lint_imports_binary is None
