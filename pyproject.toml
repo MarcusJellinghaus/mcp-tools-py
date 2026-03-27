@@ -34,6 +34,8 @@ dependencies = [
     "rope>=1.13.0",
     "jedi>=0.19.0",
     "igittigitt>=2.1.0",
+    "import-linter>=2.0",
+    "vulture>=2.13",
 ]
 
 [project.optional-dependencies]
@@ -42,10 +44,8 @@ dev = [
     "isort>=5.13.2",
     "mcp-workspace",
     # Architecture and code quality tools
-    "import-linter>=2.0",
     "tach>=0.15.0",
     "pycycle>=0.0.8",
-    "vulture>=2.13",
     "pydeps>=1.12.0",
     ]
 

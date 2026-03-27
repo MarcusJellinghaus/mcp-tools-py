@@ -1,5 +1,5 @@
 ---
-allowed-tools: Bash(mcp-coder set-status *)
+allowed-tools: Bash(mcp-coder gh-tool set-status *)
 workflow-stage: code-review
 suggested-next: (bot runs create_pr) -> merge in GitHub
 ---
@@ -11,7 +11,7 @@ Approve the implementation and transition the issue to PR-ready state.
 **Instructions:**
 1. Run the set-status command to update the issue label:
 ```bash
-mcp-coder set-status status-08:ready-pr
+mcp-coder gh-tool set-status status-08:ready-pr
 ```
 
 2. Confirm the status change was successful.
