@@ -20,6 +20,8 @@
 | Run pytest | `Bash("pytest ...")` | `mcp__tools-py__run_pytest_check()` |
 | Run pylint | `Bash("pylint ...")` | `mcp__tools-py__run_pylint_check()` |
 | Run mypy | `Bash("mypy ...")` | `mcp__tools-py__run_mypy_check()` |
+| Run vulture | `Bash("vulture ...")` | `mcp__tools-py__run_vulture_check()` |
+| Run lint-imports | `Bash("lint-imports ...")` | `mcp__tools-py__run_lint_imports_check()` |
 | Git operations | ✅ `Bash("git ...")` | ✅ `Bash("git ...")` (allowed) |
 
 ## 🔴 CRITICAL: Code Quality Requirements

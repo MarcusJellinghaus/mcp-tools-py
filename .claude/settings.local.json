@@ -62,7 +62,8 @@
       "mcp__tools-py__move_module",
       "mcp__tools-py__get_library_source",
       "Bash(bash tools/get_duration.sh *)",
-      "Bash(bash tools/get_time.sh)"
+      "Bash(bash tools/get_time.sh)",
+      "mcp__tools-py__run_vulture_check"
     ]
   },
   "enableAllProjectMcpServers": true,

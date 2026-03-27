@@ -460,13 +460,16 @@ class CheckerTools:
                 dirs = target_directories or (
                     ["src"] + (["tests"] if os.path.isdir(tests_dir) else [])
                 )
-                command = [binary] + dirs + ["--min-confidence", str(min_confidence)]
-
                 whitelist_path = project_dir / self._server.vulture_whitelist
-                if whitelist_path.exists():
-                    command.append(str(whitelist_path))
-
-                command += extra_args or []
+                paths = dirs + (
+                    [str(whitelist_path)] if whitelist_path.exists() else []
+                )
+                command = (
+                    [binary]
+                    + paths
+                    + ["--min-confidence", str(min_confidence)]
+                    + (extra_args or [])
+                )
                 result = execute_command(command, cwd=str(project_dir))
 
                 output = result.stdout
