@@ -31,9 +31,9 @@ This tracks **Feature Implementation** consisting of multiple **Tasks**.
 ### Step 2: Register run_vulture_check tool in checker_tools.py
 > [step_2.md](./steps/step_2.md) — `checker_tools.py` + `tests/test_checker_tools.py`
 
-- [ ] Implementation: add `_register_vulture()` method, update `register()`, update fixture + add tests
-- [ ] Quality checks: pylint, pytest, mypy — fix all issues
-- [ ] Commit message prepared
+- [x] Implementation: add `_register_vulture()` method, update `register()`, update fixture + add tests
+- [x] Quality checks: pylint, pytest, mypy — fix all issues
+- [x] Commit message prepared
 
 ### Step 3: CLI wiring and vulture whitelist entry
 > [step_3.md](./steps/step_3.md) — `main.py` + `vulture_whitelist.py`

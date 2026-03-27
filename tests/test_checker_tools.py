@@ -25,7 +25,10 @@ def mock_server() -> MagicMock:
         "pytest": True,
         "mypy": True,
         "lint-imports": True,
+        "vulture": True,
     }
+    server._vulture_binary = "/mock/venv/bin/vulture"
+    server.vulture_whitelist = "vulture_whitelist.py"
     return server
 
 
@@ -38,8 +41,8 @@ def checker_tools(mock_server: MagicMock) -> CheckerTools:
 # --- Registration tests ---
 
 
-def test_checker_tools_registers_four_tools(mock_server: MagicMock) -> None:
-    """Test that CheckerTools.register() registers exactly 4 tools on an MCP server."""
+def test_checker_tools_registers_five_tools(mock_server: MagicMock) -> None:
+    """Test that CheckerTools.register() registers exactly 5 tools on an MCP server."""
     mock_mcp = MagicMock()
     mock_decorator = MagicMock(side_effect=lambda fn: fn)
     mock_mcp.tool.return_value = mock_decorator
@@ -47,8 +50,8 @@ def test_checker_tools_registers_four_tools(mock_server: MagicMock) -> None:
     checker = CheckerTools(mock_server)
     checker.register(mock_mcp)
 
-    # 4 tools: run_pylint_check, run_pytest_check, run_mypy_check, run_lint_imports_check
-    assert mock_mcp.tool.call_count == 4
+    # 5 tools: run_pylint_check, run_pytest_check, run_mypy_check, run_lint_imports_check, run_vulture_check
+    assert mock_mcp.tool.call_count == 5
 
 
 # --- Pylint formatting tests ---
@@ -205,3 +208,97 @@ def test_lint_imports_failure_returns_raw_output(
         result = captured_fns["run_lint_imports_check"]()
 
     assert "Could not read any configuration." in result
+
+
+# --- Vulture handler tests ---
+
+
+def _capture_vulture(
+    mock_server: MagicMock,
+) -> Any:
+    """Register checker tools and capture the run_vulture_check function."""
+    captured_fns: dict[str, Any] = {}
+
+    def capture(fn: Any) -> Any:
+        captured_fns[fn.__name__] = fn
+        return fn
+
+    mock_mcp = MagicMock()
+    mock_mcp.tool.return_value = capture
+    checker = CheckerTools(mock_server)
+    checker.register(mock_mcp)
+    return captured_fns["run_vulture_check"]
+
+
+def test_vulture_unavailable_returns_error(mock_server: MagicMock) -> None:
+    """When vulture is not available, return an error message."""
+    mock_server._tool_availability["vulture"] = False
+    run_vulture = _capture_vulture(mock_server)
+    result = run_vulture()
+    assert "vulture is not available" in result
+
+
+def test_vulture_success_returns_raw_output(mock_server: MagicMock) -> None:
+    """When vulture succeeds, return raw stdout."""
+    run_vulture = _capture_vulture(mock_server)
+
+    with patch(
+        "mcp_tools_py.checker_tools.execute_command",
+        return_value=make_command_result(return_code=0, stdout="No dead code found!"),
+    ):
+        result = run_vulture()
+
+    assert "No dead code found!" in result
+
+
+def test_vulture_failure_returns_raw_output(mock_server: MagicMock) -> None:
+    """When vulture fails, return raw stdout+stderr."""
+    run_vulture = _capture_vulture(mock_server)
+
+    with patch(
+        "mcp_tools_py.checker_tools.execute_command",
+        return_value=make_command_result(
+            return_code=1, stderr="vulture: error: invalid config"
+        ),
+    ):
+        result = run_vulture()
+
+    assert "vulture: error: invalid config" in result
+
+
+def test_vulture_whitelist_auto_included(mock_server: MagicMock) -> None:
+    """When whitelist file exists, it is appended to the command."""
+    run_vulture = _capture_vulture(mock_server)
+
+    with (
+        patch(
+            "mcp_tools_py.checker_tools.execute_command",
+            return_value=make_command_result(return_code=0, stdout="ok"),
+        ) as mock_exec,
+        patch.object(Path, "exists", return_value=True),
+    ):
+        run_vulture()
+
+    cmd = mock_exec.call_args[0][0]
+    whitelist_str = str(Path("/fake/project") / "vulture_whitelist.py")
+    assert whitelist_str in cmd
+
+
+def test_vulture_default_directories(mock_server: MagicMock) -> None:
+    """Verify default dirs are ["src"] (+ "tests" if exists)."""
+    run_vulture = _capture_vulture(mock_server)
+
+    with (
+        patch(
+            "mcp_tools_py.checker_tools.execute_command",
+            return_value=make_command_result(return_code=0, stdout="ok"),
+        ) as mock_exec,
+        patch("mcp_tools_py.checker_tools.os.path.isdir", return_value=False),
+        patch.object(Path, "exists", return_value=False),
+    ):
+        run_vulture()
+
+    cmd = mock_exec.call_args[0][0]
+    assert cmd[0] == "/mock/venv/bin/vulture"
+    assert "src" in cmd
+    assert "tests" not in cmd

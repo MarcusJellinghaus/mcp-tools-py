@@ -1,6 +1,7 @@
-"""Checker tools extracted from server.py for pylint, pytest, mypy, and lint-imports."""
+"""Checker tools extracted from server.py for pylint, pytest, mypy, lint-imports, and vulture."""
 
 import logging
+import os
 from typing import TYPE_CHECKING, Any, Dict, List, Optional
 
 import structlog
@@ -27,7 +28,7 @@ structured_logger = structlog.get_logger(__name__)
 
 
 class CheckerTools:
-    """Registers pylint, pytest, mypy, and lint-imports checker tools on an MCP server."""
+    """Registers pylint, pytest, mypy, lint-imports, and vulture checker tools on an MCP server."""
 
     def __init__(self, server: "CodeCheckerServer") -> None:
         self._server = server
@@ -38,6 +39,7 @@ class CheckerTools:
         self._register_pytest(mcp)
         self._register_mypy(mcp)
         self._register_lint_imports(mcp)
+        self._register_vulture(mcp)
 
     def _register_pylint(self, mcp: "FastMCPProtocol") -> None:
         """Register the pylint checker tool."""
@@ -401,6 +403,91 @@ class CheckerTools:
                 logger.error(error_msg)
                 structured_logger.error(
                     "lint-imports check failed",
+                    error=str(e),
+                    error_type=type(e).__name__,
+                    project_dir=str(self._server.project_dir),
+                )
+                return error_msg
+
+    def _register_vulture(self, mcp: "FastMCPProtocol") -> None:
+        """Register the vulture dead-code checker tool."""
+
+        @mcp.tool()
+        @log_function_call
+        def run_vulture_check(
+            target_directories: Optional[List[str]] = None,
+            min_confidence: int = 60,
+            extra_args: Optional[List[str]] = None,
+        ) -> str:
+            """
+            Run vulture on the project to find unused code.
+
+            Args:
+                target_directories: Directories to scan relative to project_dir.
+                    Defaults to ["src"] and "tests" if it exists.
+                extra_args: Additional vulture arguments.
+                min_confidence: Minimum confidence for reporting (default: 60).
+
+            Returns:
+                Raw vulture output (stdout + stderr combined)
+            """
+            if not self._server._tool_availability.get("vulture", False):
+                binary_path = self._server._vulture_binary or "N/A"
+                return (
+                    f"vulture is not available at {binary_path}. "
+                    f"Ensure the virtual environment has vulture installed "
+                    f"and --venv-path is configured. Restart the server after installing."
+                )
+
+            try:
+                logger.info(
+                    f"Running vulture check on project directory: "
+                    f"{self._server.project_dir}"
+                )
+                structured_logger.info(
+                    "Starting vulture check",
+                    project_dir=str(self._server.project_dir),
+                    target_directories=target_directories,
+                    min_confidence=min_confidence,
+                    extra_args=extra_args,
+                )
+
+                binary = self._server._vulture_binary
+                assert binary is not None  # guarded by availability check above
+
+                project_dir = self._server.project_dir
+                tests_dir = os.path.join(str(project_dir), "tests")
+                dirs = target_directories or (
+                    ["src"] + (["tests"] if os.path.isdir(tests_dir) else [])
+                )
+                command = [binary] + dirs + ["--min-confidence", str(min_confidence)]
+
+                whitelist_path = project_dir / self._server.vulture_whitelist
+                if whitelist_path.exists():
+                    command.append(str(whitelist_path))
+
+                command += extra_args or []
+                result = execute_command(command, cwd=str(project_dir))
+
+                output = result.stdout
+                if result.stderr:
+                    output = output + "\n" + result.stderr if output else result.stderr
+
+                structured_logger.info(
+                    "vulture check completed",
+                    return_code=result.return_code,
+                    output_length=len(output),
+                )
+
+                return output.strip() or "vulture produced no output."
+
+            except Exception as e:
+                error_msg = (
+                    f"Unexpected error running vulture: " f"{type(e).__name__}: {e}"
+                )
+                logger.error(error_msg)
+                structured_logger.error(
+                    "vulture check failed",
                     error=str(e),
                     error_type=type(e).__name__,
                     project_dir=str(self._server.project_dir),
