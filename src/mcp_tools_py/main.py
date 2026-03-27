@@ -104,6 +104,15 @@ Examples:
         default=120,
         help="Timeout in seconds for rope refactoring operations (default: 120)",
     )
+    parser.add_argument(
+        "--vulture-whitelist",
+        type=str,
+        default="vulture_whitelist.py",
+        help=(
+            "Path to vulture whitelist file relative to project_dir. "
+            "Auto-included when the file exists. Default: vulture_whitelist.py"
+        ),
+    )
     return parser.parse_args()
 
 
@@ -164,6 +173,7 @@ def main() -> None:
         test_folder=args.test_folder,
         keep_temp_files=args.keep_temp_files,
         refactoring_timeout=args.refactoring_timeout,
+        vulture_whitelist=args.vulture_whitelist,
     )
 
     stdlogger.info("Starting MCP server")

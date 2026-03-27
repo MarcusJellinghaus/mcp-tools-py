@@ -38,9 +38,9 @@ This tracks **Feature Implementation** consisting of multiple **Tasks**.
 ### Step 3: CLI wiring and vulture whitelist entry
 > [step_3.md](./steps/step_3.md) — `main.py` + `vulture_whitelist.py`
 
-- [ ] Implementation: add `--vulture-whitelist` CLI arg, wire to `create_server()`, add whitelist entry
-- [ ] Quality checks: pylint, pytest, mypy — fix all issues
-- [ ] Commit message prepared
+- [x] Implementation: add `--vulture-whitelist` CLI arg, wire to `create_server()`, add whitelist entry
+- [x] Quality checks: pylint, pytest, mypy — fix all issues
+- [x] Commit message prepared
 
 ## Pull Request
 
