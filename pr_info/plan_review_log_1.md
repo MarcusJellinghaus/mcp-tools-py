@@ -31,3 +31,30 @@
 - Added exists_side_effect note to new step 1 test instructions
 
 **Status**: committed
+
+## Round 2 — 2026-03-27
+
+**Findings**:
+- Step 2 HOW section incorrectly states `os` is already imported in `checker_tools.py` — it isn't
+- Step 1 algorithm pseudocode uses `/` operator instead of `os.path.join` — cosmetic, no change needed
+- Step 2 fixture note redundantly says to add `project_dir` which already exists — minor cleanup
+- All other aspects correct: step granularity, test coverage, cross-step dependencies
+
+**Decisions**:
+- Accept: Fix `import os` note in step 2 (real gap)
+- Accept: Remove redundant `project_dir` fixture note in step 2
+- Skip: Algorithm pseudocode style (implementer follows actual code, not pseudocode)
+
+**User decisions**: None needed this round
+
+**Changes**:
+- Updated step_2.md HOW section: "Import nothing new" → "Add `import os`"
+- Updated step_2.md fixture notes: removed redundant `project_dir` instruction
+
+**Status**: committed
+
+## Final Status
+
+- **Rounds**: 2
+- **Commits**: 3 (deps applied, plan renumbered, step 2 fix)
+- **Plan status**: Ready for approval — 3 clean steps, all review items resolved

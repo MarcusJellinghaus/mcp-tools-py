@@ -49,7 +49,7 @@ def run_vulture_check(
 ## HOW — Integration Points
 
 1. `@mcp.tool()` and `@log_function_call` decorators (same as lint-imports)
-2. Import nothing new — `execute_command` and `os` (for `os.path.exists`, `os.path.join`) already available or in scope
+2. Add `import os` — needed for `os.path.isdir()` (tests dir check). `execute_command` is already imported.
 3. Access `self._server._vulture_binary`, `self._server.project_dir`, `self._server.vulture_whitelist`
 
 ## ALGORITHM — run_vulture_check core logic
@@ -80,7 +80,7 @@ return combined stdout+stderr or "no output" fallback
 
 ### Fixture updates
 - `mock_server`: add `"vulture": True` to `_tool_availability`, add `_vulture_binary = "/mock/venv/bin/vulture"`
-- `mock_server`: add `vulture_whitelist = "vulture_whitelist.py"`, `project_dir = Path("/fake/project")`
+- `mock_server`: add `vulture_whitelist = "vulture_whitelist.py"` (`project_dir` already exists in fixture)
 
 ### New tests (follow lint-imports test pattern with `capture` helper)
 1. **`test_checker_tools_registers_five_tools`** — update existing test, assert `mock_mcp.tool.call_count == 5`
