@@ -133,6 +133,7 @@ class TestCheckToolAvailability:
                 "pylint": True,
                 "mypy": True,
                 "lint-imports": True,
+                "vulture": True,
             }
 
     def test_one_tool_missing(self) -> None:
@@ -160,6 +161,7 @@ class TestCheckToolAvailability:
             assert server._tool_availability["pytest"] is False
             assert server._tool_availability["pylint"] is True
             assert server._tool_availability["mypy"] is True
+            assert "vulture" in server._tool_availability
 
     def test_all_tools_missing(self) -> None:
         """When all tools fail, all should be False."""
@@ -179,6 +181,7 @@ class TestCheckToolAvailability:
                 "pylint": False,
                 "mypy": False,
                 "lint-imports": False,
+                "vulture": False,
             }
 
     def test_timed_out_tool_marked_unavailable(self) -> None:
@@ -197,6 +200,7 @@ class TestCheckToolAvailability:
                 "pylint": False,
                 "mypy": False,
                 "lint-imports": False,
+                "vulture": False,
             }
 
     def test_lint_imports_available_when_binary_exists(self) -> None:
@@ -219,6 +223,7 @@ class TestCheckToolAvailability:
             assert server._lint_imports_binary == os.path.join(
                 "/mock/venv", "Scripts", "lint-imports.exe"
             )
+            assert "vulture" in server._tool_availability
 
     def test_lint_imports_unavailable_when_no_venv(self) -> None:
         """When no venv_path is configured, lint-imports is unavailable."""
@@ -235,13 +240,14 @@ class TestCheckToolAvailability:
 
             assert server._tool_availability["lint-imports"] is False
             assert server._lint_imports_binary is None
+            assert server._tool_availability["vulture"] is False
 
     def test_lint_imports_unavailable_when_binary_missing(self) -> None:
         """When venv_path is set but binary doesn't exist, mark unavailable."""
         project_dir = Path("/project")
 
         def exists_side_effect(path: str) -> bool:
-            # Python executable exists, but lint-imports does not
+            # Python executable exists, but lint-imports and vulture do not
             if "python" in path.lower():
                 return True
             return False
@@ -264,6 +270,45 @@ class TestCheckToolAvailability:
 
             assert server._tool_availability["lint-imports"] is False
             assert server._lint_imports_binary is None
+            assert server._tool_availability["vulture"] is False
+            assert server._vulture_binary is None
+
+    def test_vulture_available_when_binary_exists(self) -> None:
+        """When venv_path is set and vulture binary exists, mark available."""
+        project_dir = Path("/project")
+        with (
+            patch("mcp.server.fastmcp.FastMCP") as mock_fastmcp,
+            patch("mcp_tools_py.server.execute_command") as mock_exec,
+            patch("mcp_tools_py.server.os.name", "nt"),
+            patch("mcp_tools_py.server.os.path.exists", return_value=True),
+        ):
+            mock_fastmcp.return_value.tool.return_value = MagicMock()
+            mock_exec.return_value = make_command_result(
+                return_code=0, stdout="tool 1.0.0"
+            )
+
+            server = _create_server(project_dir=project_dir, venv_path="/mock/venv")
+
+            assert server._tool_availability["vulture"] is True
+            assert server._vulture_binary == os.path.join(
+                "/mock/venv", "Scripts", "vulture.exe"
+            )
+
+    def test_vulture_unavailable_when_no_venv(self) -> None:
+        """When no venv_path is configured, vulture is unavailable."""
+        with (
+            patch("mcp.server.fastmcp.FastMCP") as mock_fastmcp,
+            patch("mcp_tools_py.server.execute_command") as mock_exec,
+        ):
+            mock_fastmcp.return_value.tool.return_value = MagicMock()
+            mock_exec.return_value = make_command_result(
+                return_code=0, stdout="tool 1.0.0"
+            )
+
+            server = _create_server(project_dir=Path("/project"))
+
+            assert server._tool_availability["vulture"] is False
+            assert server._vulture_binary is None
 
 
 # ---------------------------------------------------------------------------

@@ -24,9 +24,9 @@ This tracks **Feature Implementation** consisting of multiple **Tasks**.
 ### Step 1: Server-level vulture support (binary, availability, whitelist param)
 > [step_1.md](./steps/step_1.md) — `server.py` + `tests/test_tool_availability.py`
 
-- [ ] Implementation: add `vulture_whitelist` param, `_vulture_binary` resolution, availability check + update tests
-- [ ] Quality checks: pylint, pytest, mypy — fix all issues
-- [ ] Commit message prepared
+- [x] Implementation: add `vulture_whitelist` param, `_vulture_binary` resolution, availability check + update tests
+- [x] Quality checks: pylint, pytest, mypy — fix all issues
+- [x] Commit message prepared
 
 ### Step 2: Register run_vulture_check tool in checker_tools.py
 > [step_2.md](./steps/step_2.md) — `checker_tools.py` + `tests/test_checker_tools.py`

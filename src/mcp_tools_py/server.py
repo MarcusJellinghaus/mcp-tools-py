@@ -44,6 +44,7 @@ class CodeCheckerServer:
         test_folder: str = "tests",
         keep_temp_files: bool = False,
         refactoring_timeout: int = 120,
+        vulture_whitelist: str = "vulture_whitelist.py",
     ) -> None:
         """
         Initialize the server with the project directory and Python configuration.
@@ -55,6 +56,7 @@ class CodeCheckerServer:
             test_folder: Path to the test folder (relative to project_dir). Defaults to 'tests'.
             keep_temp_files: Whether to keep temporary files after test execution. Useful for debugging when tests fail.
             refactoring_timeout: Timeout in seconds for rope refactoring operations.
+            vulture_whitelist: Filename for vulture whitelist file. Defaults to 'vulture_whitelist.py'.
         """
         self.project_dir = project_dir
         self.python_executable = python_executable
@@ -62,6 +64,7 @@ class CodeCheckerServer:
         self.test_folder = test_folder
         self.keep_temp_files = keep_temp_files
         self.refactoring_timeout = refactoring_timeout
+        self.vulture_whitelist = vulture_whitelist
 
         # Import FastMCP
         from mcp.server.fastmcp import FastMCP
@@ -134,6 +137,25 @@ class CodeCheckerServer:
                 "an environment where lint-imports is installed."
             )
 
+        # vulture: check via file existence (not subprocess)
+        vulture_available = False
+        vulture_binary: Optional[str] = None
+        if self.venv_path:
+            if os.name == "nt":
+                vulture_binary = os.path.join(self.venv_path, "Scripts", "vulture.exe")
+            else:
+                vulture_binary = os.path.join(self.venv_path, "bin", "vulture")
+            vulture_available = os.path.exists(vulture_binary)
+        self._vulture_binary: Optional[str] = (
+            vulture_binary if vulture_available else None
+        )
+        availability["vulture"] = vulture_available
+        if not vulture_available:
+            logger.warning(
+                "vulture not found. Ensure --venv-path points to "
+                "an environment where vulture is installed."
+            )
+
         return availability
 
     @log_function_call
@@ -152,6 +174,7 @@ def create_server(
     test_folder: str = "tests",
     keep_temp_files: bool = False,
     refactoring_timeout: int = 120,
+    vulture_whitelist: str = "vulture_whitelist.py",
 ) -> CodeCheckerServer:
     """
     Create a new CodeCheckerServer instance.
@@ -163,6 +186,7 @@ def create_server(
         test_folder: Path to the test folder (relative to project_dir). Defaults to 'tests'.
         keep_temp_files: Whether to keep temporary files after test execution. Useful for debugging when tests fail.
         refactoring_timeout: Timeout in seconds for rope refactoring operations.
+        vulture_whitelist: Filename for vulture whitelist file. Defaults to 'vulture_whitelist.py'.
 
     Returns:
         A new CodeCheckerServer instance
@@ -174,4 +198,5 @@ def create_server(
         test_folder=test_folder,
         keep_temp_files=keep_temp_files,
         refactoring_timeout=refactoring_timeout,
+        vulture_whitelist=vulture_whitelist,
     )
