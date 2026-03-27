@@ -1,5 +1,5 @@
 ---
-allowed-tools: Bash(mcp-coder set-status *)
+allowed-tools: Bash(mcp-coder gh-tool set-status *)
 workflow-stage: code-review
 suggested-next: (bot runs implement) -> /clear -> implementation_review or implementation_review_supervisor
 ---
@@ -24,7 +24,7 @@ Transitions the issue back to `plan-ready` status for re-implementation when cod
 ## Instructions
 
 ```bash
-mcp-coder set-status status-05:plan-ready
+mcp-coder gh-tool set-status status-05:plan-ready
 ```
 
 Confirm the status change was successful. If it fails, report the error. Do not use `--force` unless explicitly asked.
