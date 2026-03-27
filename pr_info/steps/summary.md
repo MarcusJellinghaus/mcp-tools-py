@@ -20,7 +20,7 @@ Add a `run_vulture_check` MCP tool for dead-code detection. The tool follows the
 - **New CLI arg**: `--vulture-whitelist` passed through `create_server()` to `CodeCheckerServer.__init__()`.
 
 ### Dependencies (`pyproject.toml`)
-- `vulture>=2.13` and `import-linter>=2.0` moved from `[dev]` extras to core `dependencies`.
+- ✅ **Already applied**: `vulture>=2.13` and `import-linter>=2.0` moved from `[dev]` extras to core `dependencies`.
 
 ### No New Modules Created
 The issue explicitly requires inline implementation. No `code_checker_vulture/` package.
@@ -29,7 +29,7 @@ The issue explicitly requires inline implementation. No `code_checker_vulture/` 
 
 | File | Change |
 |------|--------|
-| `pyproject.toml` | Move `vulture` and `import-linter` to core dependencies |
+| `pyproject.toml` | ✅ Done — moved `vulture` and `import-linter` to core dependencies |
 | `src/mcp_tools_py/server.py` | Add `vulture_whitelist` param, `_vulture_binary` resolution, availability check |
 | `src/mcp_tools_py/checker_tools.py` | Add `_register_vulture()` method, call from `register()` |
 | `src/mcp_tools_py/main.py` | Add `--vulture-whitelist` CLI arg, wire to `create_server()` |
@@ -39,7 +39,6 @@ The issue explicitly requires inline implementation. No `code_checker_vulture/` 
 
 ## Implementation Steps
 
-- **Step 1**: `pyproject.toml` — move dependencies (no tests needed)
-- **Step 2**: `server.py` + `tests/test_tool_availability.py` — vulture binary resolution, availability check, whitelist param
-- **Step 3**: `checker_tools.py` + `tests/test_checker_tools.py` — register vulture tool, test execution paths
-- **Step 4**: `main.py` + `vulture_whitelist.py` — CLI wiring and whitelist entry
+- **Step 1**: `server.py` + `tests/test_tool_availability.py` — vulture binary resolution, availability check, whitelist param
+- **Step 2**: `checker_tools.py` + `tests/test_checker_tools.py` — register vulture tool, test execution paths
+- **Step 3**: `main.py` + `vulture_whitelist.py` — CLI wiring and whitelist entry

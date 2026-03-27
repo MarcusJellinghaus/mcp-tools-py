@@ -1,4 +1,4 @@
-# Step 2: Server-level vulture support (binary, availability, whitelist param)
+# Step 2: Register run_vulture_check tool in checker_tools.py
 
 > **Context**: See [summary.md](summary.md) for full architecture overview.
 
@@ -7,105 +7,94 @@
 ```
 Implement Step 2 of Issue #124 (see pr_info/steps/summary.md for context).
 
-Add vulture support to server.py and create_server():
-- Add `vulture_whitelist` init param (default "vulture_whitelist.py"), store as self.vulture_whitelist
-- Add vulture binary resolution in _check_tool_availability() following the lint-imports pattern
-- Store resolved binary as self._vulture_binary
+Add _register_vulture() to CheckerTools in checker_tools.py, following the
+lint-imports pattern exactly. The tool returns raw output — no formatter method.
 
-Update tests in tests/test_tool_availability.py:
-- All expected availability dicts must include "vulture": True/False
-- Add test for vulture binary available/unavailable (mirror lint-imports tests)
+Update tests in tests/test_checker_tools.py:
+- Update mock_server fixture: add "vulture": True to _tool_availability, add _vulture_binary
+- Update registration count test from 4 to 5
+- Add tests: vulture unavailable message, successful execution, whitelist auto-detection
+
+Read the lint-imports registration (_register_lint_imports) and its tests
+(test_lint_imports_success_returns_raw_output, test_lint_imports_failure_returns_raw_output)
+as the pattern to follow.
 
 Run all three code quality checks after editing. Fix any issues before committing.
 ```
 
 ## WHERE
 
-- `src/mcp_tools_py/server.py`
-- `tests/test_tool_availability.py`
+- `src/mcp_tools_py/checker_tools.py`
+- `tests/test_checker_tools.py`
 
 ## WHAT — Functions & Signatures
 
-### server.py
+### checker_tools.py
 
-**`CodeCheckerServer.__init__`** — add parameter:
+**`_register_vulture(self, mcp: "FastMCPProtocol") -> None`** — new method
+
+Inner tool function signature:
 ```python
-def __init__(
-    self,
-    project_dir: Path,
-    python_executable: Optional[str] = None,
-    venv_path: Optional[str] = None,
-    test_folder: str = "tests",
-    keep_temp_files: bool = False,
-    refactoring_timeout: int = 120,
-    vulture_whitelist: str = "vulture_whitelist.py",  # NEW
-) -> None:
+def run_vulture_check(
+    target_directories: Optional[List[str]] = None,
+    min_confidence: int = 60,
+    extra_args: Optional[List[str]] = None,
+) -> str:
 ```
 
-**`create_server`** — add parameter:
-```python
-def create_server(
-    project_dir: Path,
-    ...
-    vulture_whitelist: str = "vulture_whitelist.py",  # NEW
-) -> CodeCheckerServer:
-```
+**`register(self, mcp)`** — add `self._register_vulture(mcp)` call.
 
-**`_check_tool_availability`** — extend with vulture block (no signature change):
-```python
-def _check_tool_availability(self) -> dict[str, bool]:
-```
-
-### New attributes set in __init__ / _check_tool_availability
-
-- `self.vulture_whitelist: str` — raw whitelist filename
-- `self._vulture_binary: Optional[str]` — resolved binary path or None
+**Class docstring** — update to mention vulture.
 
 ## HOW — Integration Points
 
-1. Store `self.vulture_whitelist = vulture_whitelist` in `__init__` before `_check_tool_availability()` call
-2. In `_check_tool_availability()`, after the lint-imports block, add an identical block for vulture:
-   - If `self.venv_path` is set, resolve binary path (`Scripts/vulture.exe` on Windows, `bin/vulture` on Unix)
-   - Check `os.path.exists(binary)`
-   - Set `self._vulture_binary` and `availability["vulture"]`
-3. Pass `vulture_whitelist` through `create_server()` to `CodeCheckerServer()`
+1. `@mcp.tool()` and `@log_function_call` decorators (same as lint-imports)
+2. Import nothing new — `execute_command` and `os` (for `os.path.exists`, `os.path.join`) already available or in scope
+3. Access `self._server._vulture_binary`, `self._server.project_dir`, `self._server.vulture_whitelist`
 
-## ALGORITHM — _check_tool_availability vulture block
+## ALGORITHM — run_vulture_check core logic
 
 ```
-if self.venv_path:
-    binary = venv_path / ("Scripts/vulture.exe" if nt else "bin/vulture")
-    vulture_available = os.path.exists(binary)
-else:
-    vulture_available = False
-    binary = None
-self._vulture_binary = binary if vulture_available else None
-availability["vulture"] = vulture_available
+if not self._server._tool_availability.get("vulture", False):
+    return unavailable message with binary path
+
+binary = self._server._vulture_binary
+dirs = target_directories or ["src"] + (["tests"] if tests_dir_exists else [])
+command = [binary] + dirs + ["--min-confidence", str(min_confidence)]
+
+whitelist_path = project_dir / self._server.vulture_whitelist
+if whitelist_path.exists():
+    command.append(str(whitelist_path))
+
+command += (extra_args or [])
+result = execute_command(command, cwd=str(project_dir))
+return combined stdout+stderr or "no output" fallback
 ```
 
 ## DATA
 
-- `self._vulture_binary`: `Optional[str]` — full path to vulture binary, or None
-- `availability["vulture"]`: `bool` — whether vulture is available
-- `self.vulture_whitelist`: `str` — whitelist filename (e.g. `"vulture_whitelist.py"`)
+- **Input**: `target_directories: Optional[List[str]]`, `min_confidence: int`, `extra_args: Optional[List[str]]`
+- **Output**: `str` — raw vulture CLI output (stdout + stderr combined)
 
-## Tests to update
+## Tests to add in test_checker_tools.py
 
-In `tests/test_tool_availability.py`:
-- `TestCheckToolAvailability.test_all_tools_available` — expected dict gets `"vulture": True`
-- `TestCheckToolAvailability.test_all_tools_missing` — expected dict gets `"vulture": False`
-- `TestCheckToolAvailability.test_one_tool_missing` — assert `"vulture"` key exists
-- `TestCheckToolAvailability.test_timed_out_tool_marked_unavailable` — expected dict gets `"vulture": False`
-- `TestCheckToolAvailability.test_lint_imports_available_when_binary_exists` — also assert `"vulture"` key
-- `TestCheckToolAvailability.test_lint_imports_unavailable_when_no_venv` — also assert `"vulture": False`
-- `TestCheckToolAvailability.test_lint_imports_unavailable_when_binary_missing` — also assert `"vulture"` key
-- Add new `test_vulture_available_when_binary_exists` and `test_vulture_unavailable_when_no_venv`
+### Fixture updates
+- `mock_server`: add `"vulture": True` to `_tool_availability`, add `_vulture_binary = "/mock/venv/bin/vulture"`
+- `mock_server`: add `vulture_whitelist = "vulture_whitelist.py"`, `project_dir = Path("/fake/project")`
+
+### New tests (follow lint-imports test pattern with `capture` helper)
+1. **`test_checker_tools_registers_five_tools`** — update existing test, assert `mock_mcp.tool.call_count == 5`
+2. **`test_vulture_unavailable_returns_error`** — set `"vulture": False`, call tool, assert "vulture is not available" in result
+3. **`test_vulture_success_returns_raw_output`** — mock `execute_command` returning stdout, assert output returned
+4. **`test_vulture_failure_returns_raw_output`** — mock `execute_command` returning stderr, assert stderr in output
+5. **`test_vulture_whitelist_auto_included`** — mock `Path.exists` to return True for whitelist, assert whitelist path in command args
+6. **`test_vulture_default_directories`** — verify default dirs are `["src"]` (+ `"tests"` if exists)
 
 ## Commit
 
 ```
-feat(server): add vulture binary resolution and availability check
+feat(checker_tools): add run_vulture_check MCP tool
 
-Part of #124. Adds vulture_whitelist init param, binary lookup in venv
-(mirroring lint-imports), and availability tracking.
+Part of #124. Registers vulture dead-code detection tool following the
+lint-imports pattern: binary lookup, execute_command, raw output.
 ```
