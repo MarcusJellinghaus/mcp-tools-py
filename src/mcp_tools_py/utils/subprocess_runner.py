@@ -11,9 +11,13 @@ import signal
 import subprocess
 import sys
 import tempfile
+import threading
 import time
 from dataclasses import dataclass, field
 from pathlib import Path
+
+# Re-export subprocess exceptions for callers
+from subprocess import CalledProcessError, SubprocessError, TimeoutExpired
 from typing import Any, Callable
 
 import structlog
@@ -23,7 +27,59 @@ from mcp_tools_py.log_utils import log_function_call
 logger = logging.getLogger(__name__)
 structured_logger = structlog.get_logger(__name__)
 
+__all__ = [
+    "CommandResult",
+    "CommandOptions",
+    "MAX_STDERR_IN_ERROR",
+    "check_tool_missing_error",
+    "execute_command",
+    "execute_subprocess",
+    "launch_process",
+    "truncate_stderr",
+    "CalledProcessError",
+    "SubprocessError",
+    "TimeoutExpired",
+]
+
+
 MAX_STDERR_IN_ERROR: int = 500
+
+
+def check_tool_missing_error(
+    stderr: str, tool_name: str, python_path: str
+) -> str | None:
+    """Check if stderr indicates the tool is not installed.
+
+    Args:
+        stderr: The stderr output from the subprocess.
+        tool_name: The name of the tool (e.g., 'pytest', 'pylint', 'mypy').
+        python_path: The path to the Python executable used.
+
+    Returns:
+        An actionable error message if the tool is missing, or None.
+    """
+    if f"No module named {tool_name}" in stderr:
+        return (
+            f"{tool_name} is not installed in the configured Python environment "
+            f"({python_path}). Ensure --python-executable and --venv-path point "
+            f"to the environment where {tool_name} is installed."
+        )
+    return None
+
+
+def truncate_stderr(stderr: str, max_len: int = MAX_STDERR_IN_ERROR) -> str:
+    """Truncate stderr to a maximum length.
+
+    Args:
+        stderr: The stderr string to truncate.
+        max_len: Maximum length before truncation.
+
+    Returns:
+        The stderr string, truncated with '...' if it exceeds max_len.
+    """
+    if len(stderr) > max_len:
+        return stderr[:max_len] + "..."
+    return stderr
 
 
 @dataclass
@@ -50,6 +106,7 @@ class CommandOptions:
         env: Environment variables for the subprocess. May contain internal
              testing flags prefixed with underscore (e.g., _DISABLE_STDIO_ISOLATION)
              that should NEVER be used in production code.
+        env_remove: List of environment variable names to remove
         capture_output: Whether to capture stdout and stderr
         text: Whether to decode output as text
         check: Whether to raise exception on non-zero exit code
@@ -69,6 +126,7 @@ class CommandOptions:
     check: bool = False
     shell: bool = False
     input_data: str | None = None
+    env_remove: list[str] | None = None
 
 
 def is_python_command(command: list[str]) -> bool:
@@ -104,6 +162,55 @@ def get_python_isolation_env() -> dict[str, str]:
         env.pop(var, None)
 
     return env
+
+
+def get_utf8_env() -> dict[str, str]:
+    """Get base environment with UTF-8 encoding for non-Python commands.
+
+    Returns:
+        A copy of the current environment with UTF-8 encoding variables set.
+    """
+    env = os.environ.copy()
+    env["PYTHONIOENCODING"] = "utf-8"
+    env["PYTHONUTF8"] = "1"
+    if sys.platform == "win32":
+        env["PYTHONLEGACYWINDOWSFSENCODING"] = "utf-8"
+    else:
+        env["LC_ALL"] = "C.UTF-8"
+    return env
+
+
+def prepare_env(
+    command: list[str] | str,
+    env: dict[str, str] | None = None,
+    env_remove: list[str] | None = None,
+) -> dict[str, str]:
+    """Prepare consolidated environment for subprocess execution.
+
+    Always starts from os.environ.copy() (via helper), then merges caller env
+    on top. This fixes the bug where caller env would replace the entire
+    parent environment.
+
+    Args:
+        command: The command to execute (used to detect Python commands).
+        env: Optional caller-provided environment variables to merge.
+        env_remove: Optional list of environment variable names to remove.
+
+    Returns:
+        A dict with the full inherited environment plus caller overrides.
+    """
+    if isinstance(command, list) and is_python_command(command):
+        base = get_python_isolation_env()
+    else:
+        base = get_utf8_env()
+    if env:
+        base.update(env)
+    if env_remove:
+        for key in env_remove:
+            base.pop(key, None)
+    # Unconditionally remove CLAUDECODE recursion guard
+    base.pop("CLAUDECODE", None)
+    return base
 
 
 def _safe_preexec_fn() -> None:
@@ -592,41 +699,55 @@ def execute_subprocess(
         )
 
 
-def check_tool_missing_error(
-    stderr: str, tool_name: str, python_path: str
-) -> str | None:
-    """Check if stderr indicates the tool is not installed.
+def _run_heartbeat(
+    stop_event: threading.Event,
+    interval: int,
+    message: str,
+    start_time: float,
+) -> None:
+    """Daemon thread target for periodic logging during long-running subprocesses.
 
     Args:
-        stderr: The stderr output from the subprocess.
-        tool_name: The name of the tool (e.g., 'pytest', 'pylint', 'mypy').
-        python_path: The path to the Python executable used.
-
-    Returns:
-        An actionable error message if the tool is missing, or None.
+        stop_event: Event to signal the heartbeat to stop.
+        interval: Seconds between heartbeat log messages.
+        message: Message to include in each heartbeat log.
+        start_time: The time.time() when the subprocess started.
     """
-    if f"No module named {tool_name}" in stderr:
-        return (
-            f"{tool_name} is not installed in the configured Python environment "
-            f"({python_path}). Ensure --python-executable and --venv-path point "
-            f"to the environment where {tool_name} is installed."
-        )
-    return None
+    while not stop_event.wait(interval):
+        elapsed = time.time() - start_time
+        minutes, seconds = divmod(int(elapsed), 60)
+        logger.info("%s (elapsed: %dm %ds)", message, minutes, seconds)
 
 
-def truncate_stderr(stderr: str, max_len: int = MAX_STDERR_IN_ERROR) -> str:
-    """Truncate stderr to a maximum length.
+def launch_process(
+    command: list[str] | str,
+    cwd: str | Path | None = None,
+    shell: bool = False,
+    env: dict[str, str] | None = None,
+    env_remove: list[str] | None = None,
+) -> int:
+    """Fire-and-forget process launcher using prepare_env().
 
     Args:
-        stderr: The stderr string to truncate.
-        max_len: Maximum length before truncation.
+        command: The command to execute.
+        cwd: Working directory for the subprocess.
+        shell: Whether to execute through shell.
+        env: Optional caller-provided environment variables to merge.
+        env_remove: Optional list of environment variable names to remove.
 
     Returns:
-        The stderr string, truncated with '...' if it exceeds max_len.
+        The PID of the launched process.
     """
-    if len(stderr) > max_len:
-        return stderr[:max_len] + "..."
-    return stderr
+    merged_env = prepare_env(command, env, env_remove)
+    process = subprocess.Popen(
+        command,
+        cwd=cwd,
+        shell=shell,
+        env=merged_env,
+        stdout=subprocess.DEVNULL,
+        stderr=subprocess.DEVNULL,
+    )
+    return process.pid
 
 
 def execute_command(

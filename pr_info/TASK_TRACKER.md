@@ -24,9 +24,9 @@ This tracks **Feature Implementation** consisting of multiple **Tasks**.
 ### Step 1: Add new functions (additive, non-breaking) + tests
 > Details: [step_1.md](./steps/step_1.md)
 
-- [ ] Implementation: add `threading` import, `__all__`, re-exported exceptions, move `check_tool_missing_error`/`truncate_stderr` above dataclasses, add `env_remove` field to `CommandOptions`, add `get_utf8_env()`, `prepare_env()`, `_run_heartbeat()`, `launch_process()` to `subprocess_runner.py`; add test classes `TestPrepareEnv`, `TestCommandOptionsEnvRemove`, `TestMergedUtilities`, `TestLaunchProcess`, `TestHeartbeat` to `test_subprocess_runner.py`
+- [x] Implementation: add `threading` import, `__all__`, re-exported exceptions, move `check_tool_missing_error`/`truncate_stderr` above dataclasses, add `env_remove` field to `CommandOptions`, add `get_utf8_env()`, `prepare_env()`, `_run_heartbeat()`, `launch_process()` to `subprocess_runner.py`; add test classes `TestPrepareEnv`, `TestCommandOptionsEnvRemove`, `TestMergedUtilities`, `TestLaunchProcess`, `TestHeartbeat` to `test_subprocess_runner.py`
 - [ ] Quality checks: pylint, pytest, mypy — fix all issues
-- [ ] Commit message prepared
+- [x] Commit message prepared
 
 ### Step 2: Refactor existing functions to use new code + test cleanup
 > Details: [step_2.md](./steps/step_2.md)
