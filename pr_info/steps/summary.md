@@ -45,7 +45,7 @@ log_utils.py (only place structlog lives):
 
 ## Scope
 
-### Phase A: Module cleanup (this PR)
+### Phase A: Module cleanup (this PR, 6 steps)
 
 **Files modified (10 — remove structlog + consolidate log calls):**
 - `src/mcp_tools_py/main.py`
@@ -62,6 +62,9 @@ log_utils.py (only place structlog lives):
 **Files modified (2 — dead import removal only):**
 - `src/mcp_tools_py/code_checker_pytest/reporting.py`
 - `src/mcp_tools_py/code_checker_mypy/reporting.py`
+
+**Files modified (1 — doc update):**
+- `docs/architecture/architecture.md` (Section 8 "Logging" updated in step 6)
 
 **Files not affected (already stdlib-only):**
 - `refactoring/rope_tools.py`, `inspect_library.py`, `utility_tools.py`, all model files, all utils files

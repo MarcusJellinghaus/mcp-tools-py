@@ -76,13 +76,48 @@ logger.info("Pytest code check completed", extra={"passed": ..., "failed": ..., 
 logger.error("Pytest code check failed", extra={"error": str(e), "error_type": type(e).__name__, "project_dir": project_dir, "test_folder": test_folder})
 ```
 
-Also fix any f-string log calls (e.g., `logger.debug(f"Running command: {' '.join(command)}")` → `logger.debug("Running command: %s", " ".join(command))`).
+Fix f-string log calls in pytest/runners.py:
+
+```python
+# BEFORE (line ~327 in run_tests):
+logger.debug(f"Running command: {' '.join(command)}")
+# AFTER:
+logger.debug("Running command: %s", " ".join(command))
+
+# BEFORE (line ~387 in run_tests):
+logger.warning(
+    f"Test collection error occurred (code {process.returncode}), "
+    f"but continuing execution: {error_details}"
+)
+# AFTER:
+logger.warning(
+    "Test collection error occurred (code %s), but continuing execution: %s",
+    process.returncode, error_details,
+)
+
+# BEFORE (line ~422 in run_tests finally block):
+logger.warning(f"Failed to clean up temporary directory: {cleanup_error}")
+# AFTER:
+logger.warning("Failed to clean up temporary directory: %s", cleanup_error)
+```
+
+## HOW — architecture doc update
+
+In `docs/architecture/architecture.md`, Section 8 "Logging", update to reflect the new stdlib-only pattern:
+```markdown
+### Logging
+- All modules use stdlib `logging.getLogger(__name__)` exclusively
+- Structured fields passed via `extra={}` dict on stdlib log calls
+- `log_utils.py` configures structlog internally for JSON file logging pipeline
+- `@log_function_call` decorator captures parameters, timing, and results
+- Default log location: `{project_dir}/logs/mcp_tools_py_{timestamp}.log`
+```
 
 ## VERIFICATION
 
 - Run pylint, pytest (unit), mypy — all must pass
-- Grep for `structlog` across all source files except `log_utils.py` — should return zero matches
-- This is the final module cleanup step
+- Grep for `structlog` across all source files except `log_utils.py` — should return zero matches. This is the final cleanup step.
+- Grep for f-string log calls (`logger.*(f"`) across all source files — should return zero matches
 
 ## LLM Prompt
 
@@ -97,9 +132,11 @@ Migrate the last 3 files to stdlib-only logging:
 For each file:
 1. Remove `import structlog` and `structured_logger = ...`
 2. Convert all structured_logger calls to logger calls with extra={} dicts
-3. Fix any f-string log calls to use lazy %s formatting
-4. This is the last cleanup step — after this, verify no module except log_utils.py imports structlog
+3. Fix f-string log calls in pytest/runners.py to use lazy %s formatting (see BEFORE/AFTER examples above)
+4. Update docs/architecture/architecture.md Section 8 "Logging" to reflect stdlib-only pattern
+5. Verify no module except log_utils.py imports structlog (grep check)
+6. Verify no f-string log calls remain (grep check)
 
 After editing, run all three code quality checks (pylint, pytest unit tests, mypy).
-Commit with a message like: "chore: migrate mypy and pytest modules to stdlib-only logging"
+Commit with a message like: "chore: migrate mypy and pytest modules to stdlib-only logging, update docs"
 ```

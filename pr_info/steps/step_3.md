@@ -26,7 +26,7 @@ Convert all `structured_logger.*` calls to `logger.*` with `extra={}`:
 
 ```python
 # BEFORE:
-structured_logger.warning("Killing timed out process", pid=popen_proc.pid, command=command[:3])
+structured_logger.warning("Killing timed out process", pid=popen_proc.pid, command=command[:3] if command else None)
 # AFTER:
 logger.warning("Killing timed out process", extra={"pid": popen_proc.pid, "command": command[:3] if command else None})
 

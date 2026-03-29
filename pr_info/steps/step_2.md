@@ -57,8 +57,6 @@ structured_logger.debug("About to call server.run()", project_dir=str(project_di
 logger.debug("About to call server.run()", extra={"project_dir": str(project_dir)})
 ```
 
-Also remove `from mcp_tools_py.log_utils import setup_logging` import of structlog (setup_logging import stays).
-
 ## HOW — server.py
 
 Remove:
@@ -80,6 +78,23 @@ logger.info("Starting MCP server")
 structured_logger.info("Starting MCP server")
 # AFTER:
 logger.info("Starting MCP server")
+```
+
+Fix f-string log call in `_check_tool_availability`:
+```python
+# BEFORE:
+logger.warning(
+    f"{tool} not found in {self._resolved_python}. "
+    f"Ensure --python-executable and --venv-path point to "
+    f"the environment where {tool} is installed."
+)
+# AFTER:
+logger.warning(
+    "%s not found in %s. "
+    "Ensure --python-executable and --venv-path point to "
+    "the environment where %s is installed.",
+    tool, self._resolved_python, tool,
+)
 ```
 
 ## DATA
