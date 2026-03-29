@@ -21,6 +21,36 @@ This tracks **Feature Implementation** consisting of multiple **Tasks**.
 
 ## Tasks
 
-<!-- Tasks populated from pr_info/steps/ by prepare_task_tracker -->
+### Step 1: Remove dead structlog imports from reporting modules
+- [ ] Implementation: remove unused `import structlog` and `structured_logger` from `code_checker_pytest/reporting.py` and `code_checker_mypy/reporting.py`
+- [ ] Quality checks: pylint, pytest, mypy — fix all issues
+- [ ] Commit message prepared
+
+### Step 2: Migrate main.py and server.py to stdlib-only logging
+- [ ] Implementation: remove structlog, rename `stdlogger` → `logger` in main.py, consolidate dual log calls using `extra={}`, fix f-string log calls in server.py
+- [ ] Quality checks: pylint, pytest, mypy — fix all issues
+- [ ] Commit message prepared
+
+### Step 3: Migrate subprocess_runner.py to stdlib-only logging
+- [ ] Implementation: remove structlog, convert all 8 `structured_logger` calls to `logger` with `extra={}` dicts
+- [ ] Quality checks: pylint, pytest, mypy — fix all issues
+- [ ] Commit message prepared
+
+### Step 4: Migrate checker_tools.py to stdlib-only logging
+- [ ] Implementation: remove structlog, merge 17 dual log calls across 5 checker methods, replace f-strings with lazy `%s` formatting
+- [ ] Quality checks: pylint, pytest, mypy — fix all issues
+- [ ] Commit message prepared
+
+### Step 5: Migrate pylint modules to stdlib-only logging
+- [ ] Implementation: remove structlog from `code_checker_pylint/parsers.py` (5 calls), `runners.py` (5 calls), `reporting.py` (4 calls) — convert to `logger` with `extra={}`
+- [ ] Quality checks: pylint, pytest, mypy — fix all issues
+- [ ] Commit message prepared
+
+### Step 6: Migrate mypy and pytest runner modules to stdlib-only logging, update docs
+- [ ] Implementation: remove structlog from `code_checker_mypy/parsers.py` (2 calls), `runners.py` (4 calls), `code_checker_pytest/runners.py` (7 calls) — convert to `logger` with `extra={}`, fix f-string log calls, update `docs/architecture/architecture.md` Section 8
+- [ ] Quality checks: pylint, pytest, mypy — fix all issues
+- [ ] Commit message prepared
 
 ## Pull Request
+- [ ] PR review: verify no module except `log_utils.py` imports structlog, no f-string log calls remain
+- [ ] PR summary prepared
