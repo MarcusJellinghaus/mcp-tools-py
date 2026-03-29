@@ -17,7 +17,7 @@ tests.
 
 ```python
 # REMOVE these:
-from typing import Any, Callable       # → keep only: from typing import Any (if needed, or remove entirely)
+from typing import Any, Callable       # → remove entirely (upstream has no typing imports)
 import structlog                        # → remove
 from mcp_tools_py.log_utils import log_function_call  # → remove
 ```
@@ -113,6 +113,15 @@ except (FileNotFoundError, PermissionError, OSError) as e:
 
 This means `RuntimeError` and other unexpected exceptions now **propagate** instead of
 being silently caught.
+
+**Remove `_DISABLE_STDIO_ISOLATION` comment block:**
+
+Remove the large comment block documenting `_DISABLE_STDIO_ISOLATION` inside
+`execute_subprocess()`. Upstream has just the one-liner assignment. Keep only:
+
+```python
+_DISABLE_STDIO_ISOLATION = False
+```
 
 **Add heartbeat parameters:**
 

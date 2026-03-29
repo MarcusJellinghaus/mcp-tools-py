@@ -29,3 +29,26 @@
 **Changes:** Updated `summary.md`, `step_1.md`, `step_2.md` to match upstream signatures, types, exports, and behavior. Created `Decisions.md` log.
 
 **Status:** Committed
+
+## Round 2 — 2026-03-29
+
+**Findings:**
+- Critical: `launch_process` command param should be `list[str] | str`, not `list[str]`
+- Critical: `launch_process` adds `start_new_session` not present in upstream
+- Critical: `get_utf8_env` omits `PYTHONIOENCODING`/`PYTHONUTF8` as common (all-platform) vars
+- Accept: Plan doesn't mention removing `_DISABLE_STDIO_ISOLATION` comment block
+- Accept: `from typing import Any, Callable` removal should be definitive, not conditional
+- Accept: `_run_heartbeat` algorithm description more complex than upstream's one-liner pattern
+- Skip: `TestMergedUtilities` tests pre-existing functions (harmless)
+- Skip: `test_heartbeat_handles_exception` is speculative (YAGNI)
+
+**Decisions:**
+- All 3 Critical: Accept — upstream alignment
+- All 3 Accept: Accept — clarity and completeness improvements
+- 2 Skip: Skip (removed speculative test from plan)
+
+**User decisions:** None needed
+
+**Changes:** Updated `step_1.md` (5 edits) and `step_2.md` (2 edits) to fix launch_process signature/behavior, get_utf8_env algorithm, heartbeat algorithm, comment block removal, typing imports.
+
+**Status:** Committed

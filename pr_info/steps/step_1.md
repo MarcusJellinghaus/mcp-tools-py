@@ -60,10 +60,11 @@ New function — base environment for non-Python commands.
 ```
 ALGORITHM:
 1. Copy os.environ
-2. Set PYTHONIOENCODING=utf-8
-3. If Windows: set PYTHONUTF8=1, PYTHONLEGACYWINDOWSFSENCODING=utf-8
-4. If Unix: set LC_ALL=C.UTF-8, PYTHONUTF8=1
-5. Return env dict
+2. Set PYTHONIOENCODING=utf-8 (all platforms)
+3. Set PYTHONUTF8=1 (all platforms)
+4. If Windows: set PYTHONLEGACYWINDOWSFSENCODING=utf-8
+5. If Unix: set LC_ALL=C.UTF-8
+6. Return env dict
 ```
 
 #### WHAT: `prepare_env(command, env, env_remove) -> dict[str, str]`
@@ -107,12 +108,10 @@ def _run_heartbeat(
 
 ```
 ALGORITHM:
-1. Loop while not stop_event.is_set():
-2.   stop_event.wait(interval)
-3.   If stop_event.is_set(): break
-4.   elapsed = time.time() - start_time
-5.   minutes, seconds = divmod(int(elapsed), 60)
-6.   logger.info("%s (elapsed: %dm %ds)", message, minutes, seconds)
+1. while not stop_event.wait(interval):
+2.   elapsed = time.time() - start_time
+3.   minutes, seconds = divmod(int(elapsed), 60)
+4.   logger.info("%s (elapsed: %dm %ds)", message, minutes, seconds)
 ```
 
 #### WHAT: `launch_process(command, cwd, shell, env, env_remove) -> int`
@@ -121,7 +120,7 @@ Fire-and-forget process launcher using `prepare_env()`. Returns the PID.
 
 ```python
 def launch_process(
-    command: list[str],
+    command: list[str] | str,
     cwd: str | Path | None = None,
     shell: bool = False,
     env: dict[str, str] | None = None,
@@ -132,10 +131,9 @@ def launch_process(
 ```
 ALGORITHM:
 1. merged_env = prepare_env(command, env, env_remove)
-2. start_new_session = (os.name != "nt")
-3. process = subprocess.Popen(command, cwd=cwd, shell=shell, env=merged_env,
-       start_new_session=start_new_session, stdout=DEVNULL, stderr=DEVNULL)
-4. Return process.pid
+2. process = subprocess.Popen(command, cwd=cwd, shell=shell, env=merged_env,
+       stdout=DEVNULL, stderr=DEVNULL)
+3. Return process.pid
 ```
 
 ### WHERE: `tests/test_subprocess_runner.py`
@@ -188,7 +186,6 @@ from mcp_tools_py.utils.subprocess_runner import (
 - `test_heartbeat_stops_on_event` — verify thread stops when event set
 - `test_heartbeat_logs_at_interval` — verify logger.info called with `"%s (elapsed: %dm %ds)"` format
 - `test_heartbeat_interval_is_int` — verify interval parameter is `int` type
-- `test_heartbeat_handles_exception` — no crash on logger error (if applicable)
 
 ## Verification
 
