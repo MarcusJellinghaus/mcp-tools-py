@@ -28,12 +28,15 @@ base env (`os.environ.copy()`), then merges caller-provided env vars on top.
 - Broad `except Exception` catch-all in `execute_subprocess()`
 
 ### After (synced)
-- **`prepare_env(command, env, env_remove)`** — single consolidated function handles
-  both Python and non-Python env setup. Always inherits parent env. Unconditionally
+- **`prepare_env(command: list[str] | str, env, env_remove)`** — single consolidated
+  function handles both Python and non-Python env setup. Uses `isinstance(command, list)`
+  check before calling `is_python_command()`. Always inherits parent env. Unconditionally
   removes `CLAUDECODE` var (recursion guard for this repo).
-- **`get_utf8_env()`** — base env for non-Python commands with UTF-8 encoding and
-  platform-specific locale settings
-- **`launch_process()`** — fire-and-forget process launcher using `prepare_env()`
+- **`get_utf8_env()`** — base env for non-Python commands with UTF-8 encoding.
+  Windows: `PYTHONUTF8=1`, `PYTHONLEGACYWINDOWSFSENCODING=utf-8`.
+  Unix: `LC_ALL=C.UTF-8`, `PYTHONUTF8=1`
+- **`launch_process()`** — fire-and-forget process launcher using `prepare_env()`.
+  Returns `int` (PID), uses `DEVNULL` for stdout/stderr
 - **`_run_heartbeat()`** — daemon thread for periodic logging during long-running
   subprocesses
 - **`start_new_session=True`** replaces `_safe_preexec_fn()` (thread-safe)

@@ -66,10 +66,14 @@ start_new_session = os.name != "nt"
 
 Remove `preexec_fn=preexec_fn` from all `Popen()` and `subprocess.run()` calls.
 
-**Add `encoding="utf-8"` and `errors="replace"`** to all `Popen()` calls.
+**Add `encoding="utf-8"` and `errors="replace"`** to all `Popen()` calls and to the
+`subprocess.run()` call in the no-capture-output branch.
 
 **Add `check=False`** to taskkill `subprocess.run()` calls (don't raise if process
 already dead).
+
+**Narrow taskkill exception handler** from `except Exception` to `except OSError` to
+match upstream.
 
 **Simplify exception blocks** — the outer try/except around the STDIO isolation branch:
 
@@ -116,30 +120,19 @@ being silently caught.
 def execute_subprocess(
     command: list[str],
     options: CommandOptions | None = None,
-    heartbeat_interval_seconds: float = 0,
-    heartbeat_message: str = "Subprocess still running",
+    heartbeat_interval_seconds: int | None = None,
+    heartbeat_message: str = "",
 ) -> CommandResult:
 ```
 
 ```
 ALGORITHM (heartbeat integration):
-1. If heartbeat_interval_seconds > 0:
+1. If heartbeat_interval_seconds is not None and heartbeat_interval_seconds > 0:
 2.   stop_event = threading.Event()
 3.   heartbeat_thread = Thread(target=_run_heartbeat, args=(...), daemon=True)
 4.   heartbeat_thread.start()
 5. ... existing subprocess execution ...
 6. In finally block: stop_event.set() to stop heartbeat
-```
-
-**Improve timeout logging:**
-
-```python
-# BEFORE:
-execution_error=f"Process timed out after {options.timeout_seconds} seconds"
-
-# AFTER:
-elapsed = time.time() - start_time
-execution_error=f"Process timed out after {elapsed:.1f}s (limit: {options.timeout_seconds}s): {command[:3]}"
 ```
 
 ### WHERE: `src/mcp_tools_py/utils/__init__.py`
@@ -152,11 +145,12 @@ from .subprocess_runner import (
     CalledProcessError,
     SubprocessError,
     TimeoutExpired,
-    get_utf8_env,
     launch_process,
-    prepare_env,
 )
 ```
+
+Only add `launch_process`, `CalledProcessError`, `SubprocessError`, `TimeoutExpired`.
+Do NOT add `prepare_env` or `get_utf8_env` (they're not in upstream's `__all__`).
 
 Update `__all__` list accordingly.
 
@@ -198,7 +192,6 @@ def test_execute_command_unexpected_error(self) -> None:
 Remove these classes/functions entirely:
 - `TestCommandResult` — trivial dataclass assertions
 - `TestCommandOptions` — trivial dataclass assertions
-- `TestConvenienceFunctions` — thin wrapper, tested implicitly
 - `test_sample_command_with_fixture` — fixture smoke test
 - `test_command_options_with_fixture` — fixture smoke test
 - `test_command_result_creation_with_fixture` — fixture smoke test
@@ -237,7 +230,7 @@ Key points:
 - Remove structlog import, log_function_call import, Callable import
 - Update test_execute_command_unexpected_error: RuntimeError now propagates (pytest.raises)
 - Add TestRunSubprocessUsesPrepareEnv, TestPrepareEnvIntegration
-- Drop TestCommandResult, TestCommandOptions, TestConvenienceFunctions, fixture smoke tests
+- Drop TestCommandResult, TestCommandOptions, fixture smoke tests (keep TestConvenienceFunctions)
 - Update utils/__init__.py with new exports
 - Run format_all.sh, then pylint, pytest (with -m exclusions), mypy
 ```

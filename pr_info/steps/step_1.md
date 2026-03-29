@@ -25,27 +25,14 @@ existing code and will be removed in step 2.
 
 ```python
 __all__ = [
-    "CalledProcessError",
-    "CommandOptions",
-    "CommandResult",
-    "MAX_STDERR_IN_ERROR",
-    "SubprocessError",
-    "TimeoutExpired",
-    "check_tool_missing_error",
-    "execute_command",
-    "execute_subprocess",
-    "get_python_isolation_env",
-    "get_utf8_env",
-    "is_python_command",
-    "launch_process",
-    "prepare_env",
-    "truncate_stderr",
+    "CommandResult", "CommandOptions", "MAX_STDERR_IN_ERROR",
+    "check_tool_missing_error", "execute_command", "execute_subprocess",
+    "launch_process", "truncate_stderr",
+    "CalledProcessError", "SubprocessError", "TimeoutExpired",
 ]
 
 # Re-export subprocess exceptions for callers
-CalledProcessError = subprocess.CalledProcessError
-SubprocessError = subprocess.SubprocessError
-TimeoutExpired = subprocess.TimeoutExpired
+from subprocess import CalledProcessError, SubprocessError, TimeoutExpired
 ```
 
 #### WHAT: Move `check_tool_missing_error()` and `truncate_stderr()` above dataclasses
@@ -74,8 +61,8 @@ New function — base environment for non-Python commands.
 ALGORITHM:
 1. Copy os.environ
 2. Set PYTHONIOENCODING=utf-8
-3. If Windows: set PYTHONUTF8=1
-4. If Unix: set LC_ALL=C.UTF-8, LANG=C.UTF-8
+3. If Windows: set PYTHONUTF8=1, PYTHONLEGACYWINDOWSFSENCODING=utf-8
+4. If Unix: set LC_ALL=C.UTF-8, PYTHONUTF8=1
 5. Return env dict
 ```
 
@@ -85,7 +72,7 @@ Consolidated env setup. This is the **core fix** for the inheritance bug.
 
 ```python
 def prepare_env(
-    command: list[str],
+    command: list[str] | str,
     env: dict[str, str] | None = None,
     env_remove: list[str] | None = None,
 ) -> dict[str, str]:
@@ -93,7 +80,7 @@ def prepare_env(
 
 ```
 ALGORITHM:
-1. If is_python_command(command): base = get_python_isolation_env()
+1. If isinstance(command, list) and is_python_command(command): base = get_python_isolation_env()
 2. Else: base = get_utf8_env()
 3. If env provided: base.update(env)  # merge on top
 4. If env_remove: for key in env_remove: base.pop(key, None)
@@ -112,7 +99,7 @@ Daemon thread target for periodic logging during long-running subprocesses.
 ```python
 def _run_heartbeat(
     stop_event: threading.Event,
-    interval: float,
+    interval: int,
     message: str,
     start_time: float,
 ) -> None:
@@ -124,30 +111,31 @@ ALGORITHM:
 2.   stop_event.wait(interval)
 3.   If stop_event.is_set(): break
 4.   elapsed = time.time() - start_time
-5.   logger.info(message, elapsed_seconds=elapsed)
+5.   minutes, seconds = divmod(int(elapsed), 60)
+6.   logger.info("%s (elapsed: %dm %ds)", message, minutes, seconds)
 ```
 
-#### WHAT: `launch_process(command, cwd, shell, env, env_remove) -> subprocess.Popen`
+#### WHAT: `launch_process(command, cwd, shell, env, env_remove) -> int`
 
-Fire-and-forget process launcher using `prepare_env()`.
+Fire-and-forget process launcher using `prepare_env()`. Returns the PID.
 
 ```python
 def launch_process(
     command: list[str],
-    cwd: str | None = None,
+    cwd: str | Path | None = None,
     shell: bool = False,
     env: dict[str, str] | None = None,
     env_remove: list[str] | None = None,
-) -> subprocess.Popen[str]:
+) -> int:
 ```
 
 ```
 ALGORITHM:
 1. merged_env = prepare_env(command, env, env_remove)
 2. start_new_session = (os.name != "nt")
-3. Return subprocess.Popen(command, cwd=cwd, shell=shell, env=merged_env,
-       start_new_session=start_new_session, stdout=PIPE, stderr=PIPE,
-       encoding="utf-8", errors="replace")
+3. process = subprocess.Popen(command, cwd=cwd, shell=shell, env=merged_env,
+       start_new_session=start_new_session, stdout=DEVNULL, stderr=DEVNULL)
+4. Return process.pid
 ```
 
 ### WHERE: `tests/test_subprocess_runner.py`
@@ -191,13 +179,15 @@ from mcp_tools_py.utils.subprocess_runner import (
 - `test_truncate_stderr_exact` — exact boundary
 
 **`TestLaunchProcess`** — mock-based:
-- `test_launch_process_returns_popen` — verify return type
+- `test_launch_process_returns_pid` — verify return type is `int` (PID)
+- `test_launch_process_uses_devnull` — verify stdout/stderr use DEVNULL
 - `test_launch_process_uses_prepare_env` — mock prepare_env, verify called
 - `test_launch_process_passes_cwd_and_shell` — verify args forwarded
 
 **`TestHeartbeat`** — heartbeat thread:
 - `test_heartbeat_stops_on_event` — verify thread stops when event set
-- `test_heartbeat_logs_at_interval` — verify logger.info called with elapsed time
+- `test_heartbeat_logs_at_interval` — verify logger.info called with `"%s (elapsed: %dm %ds)"` format
+- `test_heartbeat_interval_is_int` — verify interval parameter is `int` type
 - `test_heartbeat_handles_exception` — no crash on logger error (if applicable)
 
 ## Verification
