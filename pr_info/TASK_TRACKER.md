@@ -21,6 +21,21 @@ This tracks **Feature Implementation** consisting of multiple **Tasks**.
 
 ## Tasks
 
-<!-- Tasks populated from pr_info/steps/ by prepare_task_tracker -->
+### Step 1: Add new functions (additive, non-breaking) + tests
+> Details: [step_1.md](./steps/step_1.md)
+
+- [ ] Implementation: add `threading` import, `__all__`, re-exported exceptions, move `check_tool_missing_error`/`truncate_stderr` above dataclasses, add `env_remove` field to `CommandOptions`, add `get_utf8_env()`, `prepare_env()`, `_run_heartbeat()`, `launch_process()` to `subprocess_runner.py`; add test classes `TestPrepareEnv`, `TestCommandOptionsEnvRemove`, `TestMergedUtilities`, `TestLaunchProcess`, `TestHeartbeat` to `test_subprocess_runner.py`
+- [ ] Quality checks: pylint, pytest, mypy — fix all issues
+- [ ] Commit message prepared
+
+### Step 2: Refactor existing functions to use new code + test cleanup
+> Details: [step_2.md](./steps/step_2.md)
+
+- [ ] Implementation: wire `prepare_env()` into `_run_subprocess()`, remove `_safe_preexec_fn()`, remove `structlog` dependency, replace with stdlib `logging`, narrow exception handling in `execute_subprocess()`, add heartbeat params to `execute_subprocess()`, add `encoding="utf-8"` + `errors="replace"` to `Popen` calls, add `check=False` to taskkill calls, narrow taskkill handler to `OSError`, update `utils/__init__.py` exports; update `test_execute_command_unexpected_error`, add `TestRunSubprocessUsesPrepareEnv` + `TestPrepareEnvIntegration`, drop low-value test classes and fixtures
+- [ ] Quality checks: pylint, pytest, mypy — fix all issues
+- [ ] Commit message prepared
 
 ## Pull Request
+
+- [ ] PR review: verify `subprocess_runner.py` matches upstream (allowed diffs: import paths, hardcoded `CLAUDECODE` removal)
+- [ ] PR summary prepared
