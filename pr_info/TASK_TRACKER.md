@@ -22,7 +22,7 @@ This tracks **Feature Implementation** consisting of multiple **Tasks**.
 ## Tasks
 
 ### Step 1: Remove dead structlog imports from reporting modules
-- [ ] Implementation: remove unused `import structlog` and `structured_logger` from `code_checker_pytest/reporting.py` and `code_checker_mypy/reporting.py`
+- [x] Implementation: remove unused `import structlog` and `structured_logger` from `code_checker_pytest/reporting.py` and `code_checker_mypy/reporting.py`
 - [ ] Quality checks: pylint, pytest, mypy — fix all issues
 - [ ] Commit message prepared
 
