@@ -216,7 +216,9 @@ See [README.md](../../README.md) for installation, CLI parameters, and MCP clien
 ## 8. Cross-cutting Concepts
 
 ### Logging
-- Dual mode: console (human-readable) or JSON file (structured), configurable via CLI
+- All modules use stdlib `logging.getLogger(__name__)` exclusively
+- Structured fields passed via `extra={}` dict on stdlib log calls
+- `log_utils.py` configures structlog internally for JSON file logging pipeline
 - `@log_function_call` decorator captures parameters, timing, and results
 - Default log location: `{project_dir}/logs/mcp_tools_py_{timestamp}.log`
 
