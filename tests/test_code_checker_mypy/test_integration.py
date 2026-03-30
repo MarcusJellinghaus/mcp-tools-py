@@ -7,12 +7,12 @@ from pathlib import Path
 import pytest
 
 from mcp_tools_py.code_checker_mypy import run_mypy_check
-from mcp_tools_py.server import CodeCheckerServer
+from mcp_tools_py.server import ToolServer
 
 
 def test_mypy_tool_registration() -> None:
     """Test that mypy tool is registered in the server."""
-    server = CodeCheckerServer(project_dir=Path("."), python_executable=None)
+    server = ToolServer(project_dir=Path("."), python_executable=None)
 
     # Check that the server has an mcp instance
     assert hasattr(server, "mcp")

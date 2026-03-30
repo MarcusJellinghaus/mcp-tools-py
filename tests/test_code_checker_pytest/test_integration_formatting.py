@@ -18,7 +18,7 @@ from mcp_tools_py.code_checker_pytest.models import (
     Test,
 )
 from mcp_tools_py.code_checker_pytest.parsers import parse_pytest_report
-from mcp_tools_py.server import CodeCheckerServer
+from mcp_tools_py.server import ToolServer
 
 
 class TestIntegrationFormatting:
@@ -33,9 +33,9 @@ class TestIntegrationFormatting:
         shutil.rmtree(temp_dir, ignore_errors=True)
 
     @pytest.fixture
-    def server(self, temp_project_dir: Path) -> CodeCheckerServer:
+    def server(self, temp_project_dir: Path) -> ToolServer:
         """Create a CodeCheckerServer instance for testing."""
-        return CodeCheckerServer(project_dir=temp_project_dir)
+        return ToolServer(project_dir=temp_project_dir)
 
     def _create_focused_project(self, project_dir: Path) -> None:
         """Create a small focused project with 1 passing test and 1 failing test with prints."""
@@ -217,7 +217,7 @@ def test_string_pass():
 """)
 
     def test_focused_debugging_session(
-        self, temp_project_dir: Path, server: CodeCheckerServer
+        self, temp_project_dir: Path, server: ToolServer
     ) -> None:
         """Test focused debugging session with ≤3 tests and show_details=True."""
         self._create_focused_project(temp_project_dir)
@@ -277,7 +277,7 @@ def test_string_pass():
         assert len(result.split("\n")) > 10  # Substantial detail
 
     def test_large_test_suite_with_failures(
-        self, temp_project_dir: Path, server: CodeCheckerServer
+        self, temp_project_dir: Path, server: ToolServer
     ) -> None:
         """Test large test suite with >10 failures and show_details=True."""
         self._create_large_project(temp_project_dir)
@@ -342,7 +342,7 @@ def test_string_pass():
     def test_specific_test_with_prints(self, temp_project_dir: Path) -> None:
         """Test specific test execution with prints (extra_args + show_details)."""
         self._create_focused_project(temp_project_dir)
-        server = CodeCheckerServer(project_dir=temp_project_dir)
+        server = ToolServer(project_dir=temp_project_dir)
 
         # Create proper PytestReport structure
         json_report = {
@@ -412,7 +412,7 @@ def test_fast_operation():
     assert True
 """)
 
-        server = CodeCheckerServer(project_dir=temp_project_dir)
+        server = ToolServer(project_dir=temp_project_dir)
 
         # Create proper PytestReport structure
         json_report = {
@@ -464,7 +464,7 @@ def test_fast_operation():
     def test_verbose_pytest_with_show_details(self, temp_project_dir: Path) -> None:
         """Test verbosity interaction with show_details."""
         self._create_focused_project(temp_project_dir)
-        server = CodeCheckerServer(project_dir=temp_project_dir)
+        server = ToolServer(project_dir=temp_project_dir)
 
         # Create proper PytestReport structure
         json_report = {
@@ -516,7 +516,7 @@ def test_fast_operation():
 
     def test_no_tests_found_with_show_details(self, temp_project_dir: Path) -> None:
         """Test edge case: no tests found with show_details=True."""
-        server = CodeCheckerServer(project_dir=temp_project_dir)
+        server = ToolServer(project_dir=temp_project_dir)
 
         # Create proper PytestReport structure for no tests
         json_report = {
@@ -549,7 +549,7 @@ def test_fast_operation():
     def test_all_tests_pass_with_show_details(self, temp_project_dir: Path) -> None:
         """Test edge case: all tests pass with show_details=True."""
         self._create_edge_case_project(temp_project_dir)
-        server = CodeCheckerServer(project_dir=temp_project_dir)
+        server = ToolServer(project_dir=temp_project_dir)
 
         # Create proper PytestReport structure for all passing tests
         json_report = {
@@ -581,7 +581,7 @@ def test_fast_operation():
 
     def test_collection_errors_with_show_details(self, temp_project_dir: Path) -> None:
         """Test collection errors with show_details=True."""
-        server = CodeCheckerServer(project_dir=temp_project_dir)
+        server = ToolServer(project_dir=temp_project_dir)
 
         # Create proper PytestReport structure for collection errors
         json_report = {
@@ -632,7 +632,7 @@ def test_fast_operation():
 
     def test_output_length_management(self, temp_project_dir: Path) -> None:
         """Test output length management and truncation."""
-        server = CodeCheckerServer(project_dir=temp_project_dir)
+        server = ToolServer(project_dir=temp_project_dir)
 
         # Create test results with very long output
         long_output = "Debug line\n" * 400  # More than 300 line limit
@@ -687,7 +687,7 @@ def test_fast_operation():
     def test_performance_validation(self, temp_project_dir: Path) -> None:
         """Test that integration has reasonable performance."""
         self._create_large_project(temp_project_dir)
-        server = CodeCheckerServer(project_dir=temp_project_dir)
+        server = ToolServer(project_dir=temp_project_dir)
 
         # Create proper PytestReport structure for performance test
         test_entries = []
@@ -750,7 +750,7 @@ def test_fast_operation():
         initial_files = list(temp_project_dir.rglob("*"))
 
         self._create_focused_project(temp_project_dir)
-        server = CodeCheckerServer(project_dir=temp_project_dir)
+        server = ToolServer(project_dir=temp_project_dir)
 
         # Create proper PytestReport structure
         json_report = {

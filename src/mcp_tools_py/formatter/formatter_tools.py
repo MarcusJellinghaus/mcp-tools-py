@@ -12,7 +12,7 @@ from mcp_tools_py.log_utils import log_function_call
 from mcp_tools_py.utils.project_config import get_target_directories
 
 if TYPE_CHECKING:
-    from mcp_tools_py.server import CodeCheckerServer, FastMCPProtocol
+    from mcp_tools_py.server import FastMCPProtocol, ToolServer
 
 logger = logging.getLogger(__name__)
 structured_logger = structlog.get_logger(__name__)
@@ -28,7 +28,7 @@ _STEP_RUNNERS: dict[str, Callable[..., tuple[str, bool]]] = {
 class FormatterTools:
     """Registers formatting tools on an MCP server."""
 
-    def __init__(self, server: "CodeCheckerServer") -> None:
+    def __init__(self, server: "ToolServer") -> None:
         self._server = server
 
     def register(self, mcp: "FastMCPProtocol") -> None:

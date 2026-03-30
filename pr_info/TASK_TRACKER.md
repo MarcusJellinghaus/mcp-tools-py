@@ -37,9 +37,9 @@ This tracks **Feature Implementation** consisting of multiple **Tasks**.
 - [x] Commit message prepared
 
 ### Step 4: Server rename + wiring (all integration changes)
-- [ ] Implementation: rename `CodeCheckerServer` → `ToolServer`, wire `FormatterTools`, add black/isort availability, move deps to main, update `tach.toml`, `.importlinter`, and all affected tests
-- [ ] Quality checks: pylint, pytest, mypy — fix all issues
-- [ ] Commit message prepared
+- [x] Implementation: rename `CodeCheckerServer` → `ToolServer`, wire `FormatterTools`, add black/isort availability, move deps to main, update `tach.toml`, `.importlinter`, and all affected tests
+- [x] Quality checks: pylint, pytest, mypy — fix all issues
+- [x] Commit message prepared
 
 ## Pull Request
 - [ ] PR review: verify all steps integrated correctly

@@ -41,15 +41,15 @@ async def test_run_pytest_check_parameters(mock_project_dir: Path) -> None:
         }
 
         # Import after patching to ensure mocks are in place
-        from mcp_tools_py.server import CodeCheckerServer
+        from mcp_tools_py.server import ToolServer
 
         # Create server with the static parameters
         with patch.object(
-            CodeCheckerServer,
+            ToolServer,
             "_check_tool_availability",
             return_value={"pytest": True, "pylint": True, "mypy": True},
         ):
-            _server = CodeCheckerServer(
+            _server = ToolServer(
                 mock_project_dir, test_folder="custom_tests", keep_temp_files=True
             )
 
@@ -92,14 +92,14 @@ async def test_run_pylint_check_signature() -> None:
         mock_tool = MagicMock()
         mock_fastmcp.return_value.tool.return_value = mock_tool
 
-        from mcp_tools_py.server import CodeCheckerServer
+        from mcp_tools_py.server import ToolServer
 
         with patch.object(
-            CodeCheckerServer,
+            ToolServer,
             "_check_tool_availability",
             return_value={"pytest": True, "pylint": True, "mypy": True},
         ):
-            _server = CodeCheckerServer(project_dir=Path("/test/project"))
+            _server = ToolServer(project_dir=Path("/test/project"))
 
         # Look up run_pylint_check by name to avoid fragile index assumptions
         tools = {
@@ -123,19 +123,19 @@ async def test_run_pylint_check_signature() -> None:
 
 @pytest.fixture
 def mock_server() -> Tuple[Any, MagicMock]:
-    """Create CodeCheckerServer for testing."""
+    """Create ToolServer for testing."""
     with patch("mcp.server.fastmcp.FastMCP") as mock_fastmcp:
         mock_tool = MagicMock()
         mock_fastmcp.return_value.tool.return_value = mock_tool
 
-        from mcp_tools_py.server import CodeCheckerServer
+        from mcp_tools_py.server import ToolServer
 
         with patch.object(
-            CodeCheckerServer,
+            ToolServer,
             "_check_tool_availability",
             return_value={"pytest": True, "pylint": True, "mypy": True},
         ):
-            server = CodeCheckerServer(project_dir=Path("/test/project"))
+            server = ToolServer(project_dir=Path("/test/project"))
 
         # Return server and the mock tool for test access
         return server, mock_tool
@@ -385,14 +385,14 @@ async def test_mcp_tool_decorator_compatibility() -> None:
         mock_tool = MagicMock()
         mock_fastmcp.return_value.tool.return_value = mock_tool
 
-        from mcp_tools_py.server import CodeCheckerServer
+        from mcp_tools_py.server import ToolServer
 
         with patch.object(
-            CodeCheckerServer,
+            ToolServer,
             "_check_tool_availability",
             return_value={"pytest": True, "pylint": True, "mypy": True},
         ):
-            server = CodeCheckerServer(project_dir=Path("/test/project"))
+            server = ToolServer(project_dir=Path("/test/project"))
 
         # Verify that tools were registered correctly
         assert (
@@ -468,9 +468,9 @@ class TestServerPylintMaxIssues:
             mock_fastmcp.return_value.tool.return_value = mock_tool
             mock_get_pylint_prompt.return_value = "some issues"
 
-            from mcp_tools_py.server import CodeCheckerServer
+            from mcp_tools_py.server import ToolServer
 
-            _server = CodeCheckerServer(project_dir=Path("/test/project"))
+            _server = ToolServer(project_dir=Path("/test/project"))
             run_pylint_check = _get_tool(mock_tool, "run_pylint_check")
 
             run_pylint_check(max_issues=3)
@@ -490,9 +490,9 @@ class TestServerPylintMaxIssues:
             mock_fastmcp.return_value.tool.return_value = mock_tool
             mock_get_pylint_prompt.return_value = None
 
-            from mcp_tools_py.server import CodeCheckerServer
+            from mcp_tools_py.server import ToolServer
 
-            _server = CodeCheckerServer(project_dir=Path("/test/project"))
+            _server = ToolServer(project_dir=Path("/test/project"))
             run_pylint_check = _get_tool(mock_tool, "run_pylint_check")
 
             run_pylint_check()
@@ -507,9 +507,9 @@ class TestServerPylintMaxIssues:
             mock_fastmcp.return_value.tool.return_value = mock_tool
 
             from mcp_tools_py.checker_tools import CheckerTools
-            from mcp_tools_py.server import CodeCheckerServer
+            from mcp_tools_py.server import ToolServer
 
-            server = CodeCheckerServer(project_dir=Path("/test/project"))
+            server = ToolServer(project_dir=Path("/test/project"))
             checker = CheckerTools(server)
 
             prompt = "pylint found some issues related to code W0612."
@@ -527,9 +527,9 @@ class TestServerPylintMaxIssues:
             mock_tool = MagicMock()
             mock_fastmcp.return_value.tool.return_value = mock_tool
 
-            from mcp_tools_py.server import CodeCheckerServer
+            from mcp_tools_py.server import ToolServer
 
-            _server = CodeCheckerServer(project_dir=Path("/test/project"))
+            _server = ToolServer(project_dir=Path("/test/project"))
             run_pylint_check = _get_tool(mock_tool, "run_pylint_check")
             signature = inspect.signature(run_pylint_check)
 

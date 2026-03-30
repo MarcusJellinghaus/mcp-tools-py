@@ -1,4 +1,4 @@
-"""MCP server implementation for code checking functionality."""
+"""MCP server implementation for code checking and formatting tools."""
 
 import logging
 import os
@@ -7,6 +7,7 @@ from pathlib import Path
 from typing import Callable, Optional, Protocol, TypeVar
 
 from mcp_tools_py.checker_tools import CheckerTools
+from mcp_tools_py.formatter import FormatterTools
 from mcp_tools_py.inspect_library import InspectTools
 from mcp_tools_py.log_utils import log_function_call
 from mcp_tools_py.refactoring import RefactoringTools
@@ -30,8 +31,8 @@ class FastMCPProtocol(Protocol):
 logger = logging.getLogger(__name__)
 
 
-class CodeCheckerServer:
-    """MCP server for code checking functionality."""
+class ToolServer:
+    """MCP server for code checking and formatting tools."""
 
     def __init__(
         self,
@@ -66,10 +67,11 @@ class CodeCheckerServer:
         # Import FastMCP
         from mcp.server.fastmcp import FastMCP
 
-        self.mcp: FastMCPProtocol = FastMCP("Code Checker Service")
+        self.mcp: FastMCPProtocol = FastMCP("MCP Tools Service")
         self._resolved_python = self._resolve_python_executable()
         self._tool_availability = self._check_tool_availability()
         CheckerTools(self).register(self.mcp)
+        FormatterTools(self).register(self.mcp)
         RefactoringTools(self.project_dir, timeout=self.refactoring_timeout).register(
             self.mcp
         )
@@ -101,9 +103,9 @@ class CodeCheckerServer:
             return sys.executable
 
     def _check_tool_availability(self) -> dict[str, bool]:
-        """Check availability of pytest, pylint, mypy, and lint-imports."""
+        """Check availability of pytest, pylint, mypy, black, isort, and lint-imports."""
         availability: dict[str, bool] = {}
-        for tool in ["pytest", "pylint", "mypy"]:
+        for tool in ["pytest", "pylint", "mypy", "black", "isort"]:
             result = execute_command(
                 [self._resolved_python, "-m", tool, "--version"],
                 timeout_seconds=10,
@@ -176,9 +178,9 @@ def create_server(
     keep_temp_files: bool = False,
     refactoring_timeout: int = 120,
     vulture_whitelist: str = "vulture_whitelist.py",
-) -> CodeCheckerServer:
+) -> ToolServer:
     """
-    Create a new CodeCheckerServer instance.
+    Create a new ToolServer instance.
 
     Args:
         project_dir: Path to the project directory to check
@@ -190,9 +192,9 @@ def create_server(
         vulture_whitelist: Filename for vulture whitelist file. Defaults to 'vulture_whitelist.py'.
 
     Returns:
-        A new CodeCheckerServer instance
+        A new ToolServer instance
     """
-    return CodeCheckerServer(
+    return ToolServer(
         project_dir,
         python_executable=python_executable,
         venv_path=venv_path,

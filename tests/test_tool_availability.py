@@ -13,10 +13,10 @@ from tests.conftest import make_command_result
 
 
 def _create_server(**kwargs: Any) -> Any:
-    """Create a CodeCheckerServer with mocked FastMCP and execute_command."""
-    from mcp_tools_py.server import CodeCheckerServer
+    """Create a ToolServer with mocked FastMCP and execute_command."""
+    from mcp_tools_py.server import ToolServer
 
-    return CodeCheckerServer(**kwargs)
+    return ToolServer(**kwargs)
 
 
 # ---------------------------------------------------------------------------
@@ -132,6 +132,8 @@ class TestCheckToolAvailability:
                 "pytest": True,
                 "pylint": True,
                 "mypy": True,
+                "black": True,
+                "isort": True,
                 "lint-imports": True,
                 "vulture": True,
             }
@@ -180,6 +182,8 @@ class TestCheckToolAvailability:
                 "pytest": False,
                 "pylint": False,
                 "mypy": False,
+                "black": False,
+                "isort": False,
                 "lint-imports": False,
                 "vulture": False,
             }
@@ -199,6 +203,8 @@ class TestCheckToolAvailability:
                 "pytest": False,
                 "pylint": False,
                 "mypy": False,
+                "black": False,
+                "isort": False,
                 "lint-imports": False,
                 "vulture": False,
             }
@@ -310,6 +316,36 @@ class TestCheckToolAvailability:
             assert server._tool_availability["vulture"] is False
             assert server._vulture_binary is None
 
+    def test_black_available(self) -> None:
+        """When black returns success, it should be marked available."""
+        with (
+            patch("mcp.server.fastmcp.FastMCP") as mock_fastmcp,
+            patch("mcp_tools_py.server.execute_command") as mock_exec,
+        ):
+            mock_fastmcp.return_value.tool.return_value = MagicMock()
+            mock_exec.return_value = make_command_result(
+                return_code=0, stdout="black, 24.10.0"
+            )
+
+            server = _create_server(project_dir=Path("/project"))
+
+            assert server._tool_availability["black"] is True
+
+    def test_isort_available(self) -> None:
+        """When isort returns success, it should be marked available."""
+        with (
+            patch("mcp.server.fastmcp.FastMCP") as mock_fastmcp,
+            patch("mcp_tools_py.server.execute_command") as mock_exec,
+        ):
+            mock_fastmcp.return_value.tool.return_value = MagicMock()
+            mock_exec.return_value = make_command_result(
+                return_code=0, stdout="isort, 5.13.2"
+            )
+
+            server = _create_server(project_dir=Path("/project"))
+
+            assert server._tool_availability["isort"] is True
+
 
 # ---------------------------------------------------------------------------
 # Tool handler short-circuit tests
@@ -349,6 +385,8 @@ class TestToolHandlerShortCircuit:
                 "pytest": False,
                 "pylint": True,
                 "mypy": True,
+                "black": True,
+                "isort": True,
                 "lint-imports": False,
             }
 
@@ -371,6 +409,8 @@ class TestToolHandlerShortCircuit:
                 "pytest": True,
                 "pylint": False,
                 "mypy": True,
+                "black": True,
+                "isort": True,
                 "lint-imports": False,
             }
 
@@ -393,6 +433,8 @@ class TestToolHandlerShortCircuit:
                 "pytest": True,
                 "pylint": True,
                 "mypy": False,
+                "black": True,
+                "isort": True,
                 "lint-imports": False,
             }
 
@@ -422,6 +464,8 @@ class TestToolHandlerShortCircuit:
                 "pytest": True,
                 "pylint": True,
                 "mypy": True,
+                "black": True,
+                "isort": True,
                 "lint-imports": True,
             }
 
@@ -454,6 +498,8 @@ class TestToolHandlerShortCircuit:
                 "pytest": True,
                 "pylint": True,
                 "mypy": True,
+                "black": True,
+                "isort": True,
                 "lint-imports": True,
             }
 
@@ -479,6 +525,8 @@ class TestToolHandlerShortCircuit:
                 "pytest": True,
                 "pylint": True,
                 "mypy": True,
+                "black": True,
+                "isort": True,
                 "lint-imports": False,
             }
             server._lint_imports_binary = "/mock/venv/bin/lint-imports"
