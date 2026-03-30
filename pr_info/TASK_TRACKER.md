@@ -23,8 +23,8 @@ This tracks **Feature Implementation** consisting of multiple **Tasks**.
 
 ### Step 1: Remove dead structlog imports from reporting modules
 - [x] Implementation: remove unused `import structlog` and `structured_logger` from `code_checker_pytest/reporting.py` and `code_checker_mypy/reporting.py`
-- [ ] Quality checks: pylint, pytest, mypy — fix all issues
-- [ ] Commit message prepared
+- [x] Quality checks: pylint, pytest, mypy — fix all issues
+- [x] Commit message prepared
 
 ### Step 2: Migrate main.py and server.py to stdlib-only logging
 - [ ] Implementation: remove structlog, rename `stdlogger` → `logger` in main.py, consolidate dual log calls using `extra={}`, fix f-string log calls in server.py
