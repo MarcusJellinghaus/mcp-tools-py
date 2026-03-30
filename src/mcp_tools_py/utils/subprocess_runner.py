@@ -600,6 +600,9 @@ def execute_subprocess(
     if command is None:
         raise TypeError("Command cannot be None")
 
+    if not command:
+        raise ValueError("Command cannot be empty")
+
     if options is None:
         options = CommandOptions()
 

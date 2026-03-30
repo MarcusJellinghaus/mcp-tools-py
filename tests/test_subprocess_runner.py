@@ -720,11 +720,8 @@ class TestErrorHandling:
 
     def test_empty_command_list(self) -> None:
         """Test handling of empty command list."""
-        result = execute_subprocess([])
-
-        assert result.return_code == 1
-        assert result.execution_error is not None
-        assert result.runner_type == "subprocess"
+        with pytest.raises(ValueError, match="Command cannot be empty"):
+            execute_subprocess([])
 
     def test_execution_time_tracking(self) -> None:
         """Test that execution time is tracked."""
