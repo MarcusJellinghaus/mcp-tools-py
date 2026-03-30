@@ -6,8 +6,6 @@ import sys
 from pathlib import Path
 from typing import Callable, Optional, Protocol, TypeVar
 
-import structlog
-
 from mcp_tools_py.checker_tools import CheckerTools
 from mcp_tools_py.inspect_library import InspectTools
 from mcp_tools_py.log_utils import log_function_call
@@ -28,9 +26,8 @@ class FastMCPProtocol(Protocol):
     def run(self) -> None: ...
 
 
-# Initialize loggers
+# Initialize logger
 logger = logging.getLogger(__name__)
-structured_logger = structlog.get_logger(__name__)
 
 
 class CodeCheckerServer:
@@ -78,10 +75,12 @@ class CodeCheckerServer:
         )
         UtilityTools().register(self.mcp)
         InspectTools().register(self.mcp)
-        structured_logger.debug(
+        logger.debug(
             "Tool environment resolved",
-            python_executable=self._resolved_python,
-            tool_availability=self._tool_availability,
+            extra={
+                "python_executable": self._resolved_python,
+                "tool_availability": self._tool_availability,
+            },
         )
 
     def _resolve_python_executable(self) -> str:
@@ -113,9 +112,12 @@ class CodeCheckerServer:
             availability[tool] = available
             if not available:
                 logger.warning(
-                    f"{tool} not found in {self._resolved_python}. "
-                    f"Ensure --python-executable and --venv-path point to "
-                    f"the environment where {tool} is installed."
+                    "%s not found in %s. "
+                    "Ensure --python-executable and --venv-path point to "
+                    "the environment where %s is installed.",
+                    tool,
+                    self._resolved_python,
+                    tool,
                 )
 
         # lint-imports: check via file existence (not subprocess)
@@ -162,7 +164,6 @@ class CodeCheckerServer:
     def run(self) -> None:
         """Run the MCP server."""
         logger.info("Starting MCP server")
-        structured_logger.info("Starting MCP server")
         self.mcp.run()
 
 

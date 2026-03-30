@@ -27,7 +27,7 @@ This tracks **Feature Implementation** consisting of multiple **Tasks**.
 - [x] Commit message prepared
 
 ### Step 2: Migrate main.py and server.py to stdlib-only logging
-- [ ] Implementation: remove structlog, rename `stdlogger` → `logger` in main.py, consolidate dual log calls using `extra={}`, fix f-string log calls in server.py
+- [x] Implementation: remove structlog, rename `stdlogger` → `logger` in main.py, consolidate dual log calls using `extra={}`, fix f-string log calls in server.py
 - [ ] Quality checks: pylint, pytest, mypy — fix all issues
 - [ ] Commit message prepared
 

@@ -6,16 +6,13 @@ import sys
 from datetime import datetime
 from pathlib import Path
 
-import structlog
-
 # Import logging utilities and version
 from mcp_tools_py import __version__  # pylint: disable=no-name-in-module
 from mcp_tools_py.log_utils import setup_logging
 from mcp_tools_py.server import create_server
 
-# Create loggers
-stdlogger = logging.getLogger(__name__)
-structured_logger = structlog.get_logger(__name__)
+# Create logger
+logger = logging.getLogger(__name__)
 
 
 def parse_args() -> argparse.Namespace:
@@ -149,21 +146,16 @@ def main() -> None:
     setup_logging(args.log_level, log_file)
 
     # Add debug logging after logger is initialized
-    stdlogger.debug("Logger initialized in main")
-    structured_logger.debug(
-        "Structured logger initialized in main", log_level=args.log_level
-    )
+    logger.debug("Logger initialized", extra={"log_level": args.log_level})
 
-    stdlogger.info(
-        "Starting MCP Tools Py server with project directory: %s", project_dir
+    logger.info(
+        "Starting MCP Tools Py server",
+        extra={
+            "project_dir": str(project_dir),
+            "log_level": args.log_level,
+            "log_file": log_file,
+        },
     )
-    if log_file:
-        structured_logger.info(
-            "Starting MCP Tools Py server",
-            project_dir=str(project_dir),
-            log_level=args.log_level,
-            log_file=log_file,
-        )
 
     # Create and run the server
     server = create_server(
@@ -176,12 +168,10 @@ def main() -> None:
         vulture_whitelist=args.vulture_whitelist,
     )
 
-    stdlogger.info("Starting MCP server")
-    structured_logger.info("Starting MCP server")
-    stdlogger.debug("About to call server.run()")
-    structured_logger.debug("About to call server.run()", project_dir=str(project_dir))
+    logger.info("Starting MCP server")
+    logger.debug("About to call server.run()", extra={"project_dir": str(project_dir)})
     server.run()
-    stdlogger.debug(
+    logger.debug(
         "After server.run() call - this line will only execute if server.run() returns"
     )
 
