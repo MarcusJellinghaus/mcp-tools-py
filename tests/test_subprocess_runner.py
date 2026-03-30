@@ -243,16 +243,16 @@ class TestExecuteSubprocess:
             assert result.runner_type == "subprocess"
 
     def test_execute_command_unexpected_error(self) -> None:
-        """Test handling unexpected errors."""
+        """Test handling OS-level errors."""
         with patch("subprocess.Popen") as mock_popen:
-            mock_popen.side_effect = RuntimeError("Unexpected error")
+            mock_popen.side_effect = OSError("Unexpected OS error")
 
             result = execute_subprocess(["test_command"])
 
             assert result.return_code == 1
             assert not result.timed_out
             assert result.execution_error is not None
-            assert "Unexpected error" in result.execution_error
+            assert "Unexpected OS error" in result.execution_error
             assert result.runner_type == "subprocess"
 
     def test_execute_command_with_check_option(self) -> None:
@@ -809,20 +809,20 @@ class TestPrepareEnv:
 
     def test_python_command_uses_isolation_env(self) -> None:
         """Verify Python commands get isolation env."""
-        env = prepare_env([sys.executable, "-c", "pass"])
+        env = prepare_env([sys.executable, "-c", "pass"], None, None)
         # Python isolation env sets these
         assert env["PYTHONUNBUFFERED"] == "1"
         assert env["PYTHONDONTWRITEBYTECODE"] == "1"
 
     def test_non_python_command_uses_utf8_env(self) -> None:
         """Verify non-Python commands get UTF-8 base env."""
-        env = prepare_env(["echo", "hello"])
+        env = prepare_env(["echo", "hello"], None, None)
         assert env["PYTHONIOENCODING"] == "utf-8"
         assert env["PYTHONUTF8"] == "1"
 
     def test_caller_env_merged_on_top(self) -> None:
         """Verify env dict is merged, not replaced."""
-        env = prepare_env(["echo", "hi"], env={"MY_CUSTOM": "val"})
+        env = prepare_env(["echo", "hi"], {"MY_CUSTOM": "val"}, None)
         assert env["MY_CUSTOM"] == "val"
         # Should still have base env keys
         assert "PATH" in env or "Path" in env
@@ -830,7 +830,7 @@ class TestPrepareEnv:
     def test_env_inherits_parent_path(self) -> None:
         """Verify PATH from parent env is preserved (the bug fix)."""
         original_path = os.environ.get("PATH", os.environ.get("Path", ""))
-        env = prepare_env(["echo", "hi"], env={"MY_VAR": "test"})
+        env = prepare_env(["echo", "hi"], {"MY_VAR": "test"}, None)
         # PATH should be inherited from os.environ, not lost
         env_path = env.get("PATH", env.get("Path", ""))
         assert env_path == original_path
@@ -845,20 +845,20 @@ class TestPrepareEnv:
         assert env["KEEP"] == "yes"
         assert "REMOVE_ME" not in env
 
-    def test_claudecode_always_removed(self) -> None:
-        """Verify CLAUDECODE is unconditionally removed."""
+    def test_claudecode_inherited_from_parent(self) -> None:
+        """Verify CLAUDECODE is inherited from parent env (not stripped)."""
         original_env = os.environ.copy()
         try:
             os.environ["CLAUDECODE"] = "1"
-            env = prepare_env(["echo", "hi"])
-            assert "CLAUDECODE" not in env
+            env = prepare_env(["echo", "hi"], None, None)
+            assert env.get("CLAUDECODE") == "1"
         finally:
             os.environ.clear()
             os.environ.update(original_env)
 
     def test_env_remove_none_is_noop(self) -> None:
         """Verify None env_remove doesn't error."""
-        env = prepare_env(["echo", "hi"], env_remove=None)
+        env = prepare_env(["echo", "hi"], None, None)
         assert isinstance(env, dict)
 
 
