@@ -27,9 +27,9 @@ This tracks **Feature Implementation** consisting of multiple **Tasks**.
 - [x] Commit message prepared
 
 ### Step 2: Formatter runners (`black_runner.py` + `isort_runner.py`) + tests
-- [ ] Implementation: `formatter/__init__.py`, `black_runner.py` with `run_black()`, `isort_runner.py` with `run_isort()`, tests in `tests/test_black_runner.py` and `tests/test_isort_runner.py`
-- [ ] Quality checks: pylint, pytest, mypy — fix all issues
-- [ ] Commit message prepared
+- [x] Implementation: `formatter/__init__.py`, `black_runner.py` with `run_black()`, `isort_runner.py` with `run_isort()`, tests in `tests/test_black_runner.py` and `tests/test_isort_runner.py`
+- [x] Quality checks: pylint, pytest, mypy — fix all issues
+- [x] Commit message prepared
 
 ### Step 3: `FormatterTools` class + MCP tool registration + tests
 - [ ] Implementation: `formatter/formatter_tools.py` with `FormatterTools` class, update `formatter/__init__.py` re-export, tests in `tests/test_formatter_tools.py`
