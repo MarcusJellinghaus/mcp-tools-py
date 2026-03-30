@@ -33,5 +33,35 @@
 - Renumbered items
 - Updated LLM Prompt section
 
+**Status**: Committed (e305aba)
+
+---
+
+## Round 2 — 2026-03-30
+
+**Findings**:
+- (Low) Availability check pattern diverges from lint-imports/vulture — intentional, better approach
+- (High) Step 3 uses `ToolServer` before step 4 renames it — would fail mypy/pylint
+- (Low) FormatterTools follows CheckerTools pattern — appropriate
+- (Low) Summary return type outdated vs step 1's `TargetDirs`
+- (Low) Duplicate `_truncate_output` — acceptable per KISS
+- (Medium) check_only cannot distinguish formatting-needed from crash
+- (Medium) Step 4 test update scope underspecified
+- (Low) Step 1 doesn't specify both exports for `utils/__init__.py`
+- (Low) Empty `__init__.py` then modified next step — fine
+- (Low) Dependency move timing — acceptable since dev deps installed
+
+**Decisions**:
+- Finding 2 (High): Accept — fixed step 3 to use `CodeCheckerServer`, step 4 will rename
+- Finding 4 (Low): Accept — updated summary.md return type to `TargetDirs`
+- Finding 6 (Medium): Accept — simplified check_only to always continue regardless of exit code
+- Finding 7 (Medium): Accept — added note about ~8-10 dict literals needing updates in step 4
+- Finding 8 (Low): Accept — step 1 now explicitly lists both exports
+- Findings 1, 3, 5, 9, 10: Skip — no changes needed
+
+**User decisions**: None required — all findings were straightforward
+
+**Changes**: Updated `pr_info/steps/step_3.md`, `step_4.md`, `step_1.md`, `summary.md`
+
 **Status**: Ready to commit
 

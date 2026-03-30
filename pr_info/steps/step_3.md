@@ -22,7 +22,7 @@ Create the `FormatterTools` class that registers the `run_format_code` MCP tool.
 from typing import TYPE_CHECKING
 
 if TYPE_CHECKING:
-    from mcp_tools_py.server import FastMCPProtocol, ToolServer
+    from mcp_tools_py.server import CodeCheckerServer, FastMCPProtocol
 
 
 _VALID_STEPS = {"isort", "black"}
@@ -36,7 +36,7 @@ _STEP_RUNNERS: dict[str, Callable] = {
 class FormatterTools:
     """Registers formatting tools on an MCP server."""
 
-    def __init__(self, server: "ToolServer") -> None:
+    def __init__(self, server: "CodeCheckerServer") -> None:
         self._server = server
 
     def register(self, mcp: "FastMCPProtocol") -> None:
@@ -75,8 +75,7 @@ class FormatterTools:
    c. (output, success) = runner(python_executable, dirs, project_dir, check_only)
    d. Append "## {step}\n{output}" to sections
    e. Normal mode + not success → stop, return collected output + error note
-   f. check_only mode + not success → continue (non-zero = "needs formatting", not error)
-      BUT if execution_error (crash/missing tool) → stop
+   f. check_only mode + not success → continue (non-zero just means "needs formatting"; the availability pre-check already handles missing tools)
 5. Return joined sections
 ```
 

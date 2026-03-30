@@ -71,6 +71,7 @@ Rename `CodeCheckerServer` → `ToolServer`, wire up `FormatterTools`, add `blac
 
 14. **Update** `_create_server` reference (import stays the same — it imports from `mcp_tools_py.server`)
 15. **Update** expected `_tool_availability` dicts to include `"black": True/False` and `"isort": True/False`
+    - Note: all `_tool_availability` dict literals need `"black"` and `"isort"` keys added (~8-10 places across multiple test methods including `test_all_tools_available`, `test_all_tools_missing`, `test_timed_out_tool_marked_unavailable`, and `TestToolHandlerShortCircuit` overrides)
 16. **Add tests**: `test_black_available`, `test_isort_available` (follow existing pattern)
 
 ### `tests/test_checker_tools.py`

@@ -65,7 +65,7 @@ Reads target directories from `pyproject.toml`:
 |------|--------|
 | `src/mcp_tools_py/server.py` | Rename class, service name, add formatter registration, add black/isort availability |
 | `src/mcp_tools_py/checker_tools.py` | Update TYPE_CHECKING import (`CodeCheckerServer` → `ToolServer`) |
-| `src/mcp_tools_py/utils/__init__.py` | Re-export `get_target_directories` |
+| `src/mcp_tools_py/utils/__init__.py` | Re-export `get_target_directories` and `TargetDirs` |
 | `pyproject.toml` | Move black/isort to main deps |
 | `tach.toml` | Add formatter module, project_config module, update server deps |
 | `tests/test_tool_availability.py` | Update class name refs, add black/isort availability tests |

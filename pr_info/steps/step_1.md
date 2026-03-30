@@ -46,7 +46,7 @@ class TargetDirs:
 
 - Uses `tomllib` (stdlib Python 3.11+) to parse `pyproject.toml`
 - No external dependencies needed
-- Exported via `utils/__init__.py`
+- Export both `get_target_directories` and `TargetDirs` from `utils/__init__.py`
 
 ## ALGORITHM (pseudocode)
 
