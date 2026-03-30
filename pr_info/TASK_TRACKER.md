@@ -32,9 +32,9 @@ This tracks **Feature Implementation** consisting of multiple **Tasks**.
 - [x] Commit message prepared
 
 ### Step 3: Migrate subprocess_runner.py to stdlib-only logging
-- [ ] Implementation: remove structlog, convert all 8 `structured_logger` calls to `logger` with `extra={}` dicts
-- [ ] Quality checks: pylint, pytest, mypy — fix all issues
-- [ ] Commit message prepared
+- [x] Implementation: remove structlog, convert all 8 `structured_logger` calls to `logger` with `extra={}` dicts
+- [x] Quality checks: pylint, pytest, mypy — fix all issues
+- [x] Commit message prepared
 
 ### Step 4: Migrate checker_tools.py to stdlib-only logging
 - [ ] Implementation: remove structlog, merge 17 dual log calls across 5 checker methods, replace f-strings with lazy `%s` formatting
