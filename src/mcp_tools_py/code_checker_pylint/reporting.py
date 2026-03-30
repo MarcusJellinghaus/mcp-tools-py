@@ -7,8 +7,6 @@ import logging
 from collections import defaultdict
 from typing import NamedTuple, Optional
 
-import structlog
-
 from mcp_tools_py.code_checker_pylint.models import (
     PylintMessage,
     PylintResult,
@@ -61,7 +59,6 @@ def _group_and_sort_issues(messages: list[PylintMessage]) -> list[IssueGroup]:
 
 
 logger = logging.getLogger(__name__)
-structured_logger = structlog.get_logger(__name__)
 
 
 def get_direct_instruction_for_pylint_code(code: str) -> Optional[str]:
@@ -216,10 +213,9 @@ def get_pylint_prompt(
         A prompt string with issue details and instructions, or None if no issues were found.
         Returns the error message as a prompt if pylint execution failed (e.g., timeout).
     """
-    structured_logger.info(
+    logger.info(
         "Starting pylint prompt generation",
-        project_dir=project_dir,
-        extra_args=extra_args,
+        extra={"project_dir": project_dir, "extra_args": extra_args},
     )
 
     pylint_results = get_pylint_results(
@@ -231,10 +227,12 @@ def get_pylint_prompt(
 
     # Check if there was an error running pylint (e.g., timeout, execution failure)
     if pylint_results.error:
-        structured_logger.error(
+        logger.error(
             "Pylint execution error detected",
-            error=pylint_results.error,
-            return_code=pylint_results.return_code,
+            extra={
+                "error": pylint_results.error,
+                "return_code": pylint_results.return_code,
+            },
         )
         return f"Pylint analysis failed: {pylint_results.error}"
 
@@ -242,7 +240,7 @@ def get_pylint_prompt(
     groups = _group_and_sort_issues(pylint_results.messages)
 
     if not groups:
-        structured_logger.info("No pylint issues found", project_dir=project_dir)
+        logger.info("No pylint issues found", extra={"project_dir": project_dir})
         return None
 
     total_types = len(groups)
@@ -262,10 +260,9 @@ def get_pylint_prompt(
         lines.append("\nUse max_issues>=1 to see details for one or more issue types.")
         return "\n".join(lines)
 
-    structured_logger.info(
+    logger.info(
         "Pylint issues found, generating prompt",
-        total_codes=total_types,
-        max_issues=max_issues,
+        extra={"total_codes": total_types, "max_issues": max_issues},
     )
 
     # Detailed sections for top N issue types

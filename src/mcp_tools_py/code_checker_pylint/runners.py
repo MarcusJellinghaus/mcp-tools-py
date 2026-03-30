@@ -6,8 +6,6 @@ import logging
 import os
 from typing import List, Optional
 
-import structlog
-
 from mcp_tools_py.code_checker_pylint.models import PylintResult
 from mcp_tools_py.code_checker_pylint.parsers import parse_pylint_json_output
 from mcp_tools_py.log_utils import log_function_call
@@ -18,7 +16,6 @@ from mcp_tools_py.utils.subprocess_runner import (
 )
 
 logger = logging.getLogger(__name__)
-structured_logger = structlog.get_logger(__name__)
 
 
 @log_function_call
@@ -62,20 +59,21 @@ def get_pylint_results(
         if os.path.exists(full_path):
             valid_directories.append(directory)
         else:
-            structured_logger.warning(
+            logger.warning(
                 "Target directory does not exist, skipping",
-                directory=directory,
-                full_path=full_path,
+                extra={"directory": directory, "full_path": full_path},
             )
 
     if not valid_directories:
         error_message = (
             f"No valid target directories found. Checked: {target_directories}"
         )
-        structured_logger.error(
+        logger.error(
             "No valid directories to analyze",
-            target_directories=target_directories,
-            project_dir=project_dir,
+            extra={
+                "target_directories": target_directories,
+                "project_dir": project_dir,
+            },
         )
         return PylintResult(
             return_code=1,
@@ -84,11 +82,13 @@ def get_pylint_results(
             raw_output=None,
         )
 
-    structured_logger.info(
+    logger.info(
         "Starting pylint analysis",
-        project_dir=project_dir,
-        extra_args=extra_args,
-        target_directories=valid_directories,
+        extra={
+            "project_dir": project_dir,
+            "extra_args": extra_args,
+            "target_directories": valid_directories,
+        },
     )
 
     # Construct the pylint command
@@ -140,16 +140,18 @@ def get_pylint_results(
         )
 
     # Log subprocess results
-    structured_logger.info(
+    logger.info(
         "Pylint subprocess completed",
-        return_code=subprocess_result.return_code,
-        has_stdout=bool(subprocess_result.stdout),
-        has_stderr=bool(subprocess_result.stderr),
-        stdout_empty=not subprocess_result.stdout
-        or subprocess_result.stdout.strip() == "",
-        stderr_empty=not subprocess_result.stderr
-        or subprocess_result.stderr.strip() == "",
-        command_executed=" ".join(pylint_command),
+        extra={
+            "return_code": subprocess_result.return_code,
+            "has_stdout": bool(subprocess_result.stdout),
+            "has_stderr": bool(subprocess_result.stderr),
+            "stdout_empty": not subprocess_result.stdout
+            or subprocess_result.stdout.strip() == "",
+            "stderr_empty": not subprocess_result.stderr
+            or subprocess_result.stderr.strip() == "",
+            "command_executed": " ".join(pylint_command),
+        },
     )
 
     raw_output = subprocess_result.stdout
@@ -171,11 +173,13 @@ def get_pylint_results(
         raw_output=raw_output,
     )
 
-    structured_logger.info(
+    logger.info(
         "Pylint analysis completed",
-        return_code=subprocess_result.return_code,
-        messages_count=len(messages),
-        unique_codes=len(result.get_message_ids()),
+        extra={
+            "return_code": subprocess_result.return_code,
+            "messages_count": len(messages),
+            "unique_codes": len(result.get_message_ids()),
+        },
     )
 
     return result

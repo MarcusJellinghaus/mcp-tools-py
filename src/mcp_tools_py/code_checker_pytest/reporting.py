@@ -5,14 +5,10 @@ Functions for formatting and reporting pytest test results.
 import logging
 from typing import Any, Dict, List, Optional, Tuple
 
-import structlog
-
 from mcp_tools_py.code_checker_pytest.models import Collector, PytestReport, Test
 from mcp_tools_py.log_utils import log_function_call
 
 logger = logging.getLogger(__name__)
-structured_logger = structlog.get_logger(__name__)
-
 # Constants to avoid magic numbers
 MAX_OUTPUT_LINES = 300
 MAX_FAILURES = 10

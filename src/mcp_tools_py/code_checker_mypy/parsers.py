@@ -3,12 +3,9 @@
 import json
 import logging
 
-import structlog
-
 from mcp_tools_py.code_checker_mypy.models import MypyMessage
 
 logger = logging.getLogger(__name__)
-structured_logger = structlog.get_logger(__name__)
 
 
 def parse_mypy_json_output(output: str) -> tuple[list[MypyMessage], str | None]:
@@ -47,8 +44,9 @@ def parse_mypy_json_output(output: str) -> tuple[list[MypyMessage], str | None]:
 
         except json.JSONDecodeError:
             # Some lines might not be JSON (like summary text)
-            structured_logger.debug(
-                "Non-JSON line in mypy output", line_num=line_num, content=line[:100]
+            logger.debug(
+                "Non-JSON line in mypy output",
+                extra={"line_num": line_num, "content": line[:100]},
             )
         except (KeyError, TypeError, ValueError) as e:
             parse_errors.append(f"Line {line_num}: {str(e)}")
@@ -57,10 +55,12 @@ def parse_mypy_json_output(output: str) -> tuple[list[MypyMessage], str | None]:
         error_msg = f"Failed to parse mypy output: {'; '.join(parse_errors)}"
         return [], error_msg
 
-    structured_logger.info(
+    logger.info(
         "Parsed mypy output",
-        total_messages=len(messages),
-        severities=list({msg.severity for msg in messages}),
+        extra={
+            "total_messages": len(messages),
+            "severities": list({msg.severity for msg in messages}),
+        },
     )
 
     return messages, None

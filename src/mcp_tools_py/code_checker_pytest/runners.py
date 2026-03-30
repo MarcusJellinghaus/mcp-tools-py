@@ -8,8 +8,6 @@ import shutil
 import tempfile
 from typing import Any, Dict, List, Optional
 
-import structlog
-
 from mcp_tools_py.code_checker_pytest.models import PytestReport
 from mcp_tools_py.code_checker_pytest.parsers import parse_pytest_report
 from mcp_tools_py.code_checker_pytest.reporting import (
@@ -44,7 +42,6 @@ def _build_error_detail(output: str, error_output: str) -> str:
 
 
 logger = logging.getLogger(__name__)
-structured_logger = structlog.get_logger(__name__)
 
 
 class ProcessResult:
@@ -123,21 +120,25 @@ def run_tests(
     temp_dir = tempfile.mkdtemp(prefix="pytest_runner_")
     temp_report_file = os.path.join(temp_dir, "pytest_result.json")
 
-    structured_logger.info(
+    logger.info(
         "Starting pytest execution",
-        project_dir=project_dir,
-        test_folder=test_folder,
-        markers=markers,
-        verbosity=verbosity,
-        venv_path=venv_path,
+        extra={
+            "project_dir": project_dir,
+            "test_folder": test_folder,
+            "markers": markers,
+            "verbosity": verbosity,
+            "venv_path": venv_path,
+        },
     )
 
     # Check for recursive pytest execution
     if os.environ.get("PYTEST_SUBPROCESS_DEPTH", "0") != "0":
-        structured_logger.warning(
+        logger.warning(
             "Detected nested pytest execution",
-            depth=os.environ.get("PYTEST_SUBPROCESS_DEPTH"),
-            project_dir=project_dir,
+            extra={
+                "depth": os.environ.get("PYTEST_SUBPROCESS_DEPTH"),
+                "project_dir": project_dir,
+            },
         )
         # Log warning but continue - this might be intentional in some test scenarios
         # If you want to prevent it entirely, raise an exception here:
@@ -183,7 +184,7 @@ def run_tests(
         if not skip_default_test_folder:
             command.append(os.path.join(project_dir, test_folder))
 
-        logger.debug(f"Running command: {' '.join(command)}")
+        logger.debug("Running command: %s", " ".join(command))
 
         # Prepare environment variables
         env = os.environ.copy()
@@ -325,8 +326,9 @@ def run_tests(
                 )
                 # Log warning but continue execution
                 logger.warning(
-                    f"Test collection error occurred (code {process.returncode}), "
-                    f"but continuing execution: {error_details}"
+                    "Test collection error occurred (code %s), but continuing execution: %s",
+                    process.returncode,
+                    error_details,
                 )
 
             # Handle other error cases
@@ -386,25 +388,29 @@ def run_tests(
             # Add error context to the results
             parsed_results.error_context = error_context
 
-            structured_logger.info(
+            logger.info(
                 "Pytest execution completed successfully",
-                passed=parsed_results.summary.passed,
-                failed=parsed_results.summary.failed,
-                errors=parsed_results.summary.error,
-                skipped=parsed_results.summary.skipped,
-                duration=parsed_results.duration,
+                extra={
+                    "passed": parsed_results.summary.passed,
+                    "failed": parsed_results.summary.failed,
+                    "errors": parsed_results.summary.error,
+                    "skipped": parsed_results.summary.skipped,
+                    "duration": parsed_results.duration,
+                },
             )
 
             return parsed_results
 
         except Exception as e:
             command_line = " ".join(command)
-            structured_logger.error(
+            logger.error(
                 "Pytest execution failed",
-                error=str(e),
-                error_type=type(e).__name__,
-                project_dir=project_dir,
-                command=command_line,
+                extra={
+                    "error": str(e),
+                    "error_type": type(e).__name__,
+                    "project_dir": project_dir,
+                    "command": command_line,
+                },
             )
             print(f"""Error during pytest execution:
 - folder {project_dir}
@@ -420,7 +426,7 @@ def run_tests(
                 shutil.rmtree(temp_dir)
             except Exception as cleanup_error:
                 logger.warning(
-                    f"Failed to clean up temporary directory: {cleanup_error}"
+                    "Failed to clean up temporary directory: %s", cleanup_error
                 )
 
 
@@ -461,12 +467,14 @@ def check_code_with_pytest(
         - test_results: Complete PytestReport object with detailed test information
         - error_info: Details about any errors that occurred during test execution
     """
-    structured_logger.info(
+    logger.info(
         "Starting pytest code check",
-        project_dir=project_dir,
-        test_folder=test_folder,
-        markers=markers,
-        verbosity=verbosity,
+        extra={
+            "project_dir": project_dir,
+            "test_folder": test_folder,
+            "markers": markers,
+            "verbosity": verbosity,
+        },
     )
 
     try:
@@ -497,12 +505,14 @@ def check_code_with_pytest(
             "duration": test_results.duration,
         }
 
-        structured_logger.info(
+        logger.info(
             "Pytest code check completed",
-            passed=test_results.summary.passed,
-            failed=test_results.summary.failed,
-            errors=test_results.summary.error,
-            skipped=test_results.summary.skipped,
+            extra={
+                "passed": test_results.summary.passed,
+                "failed": test_results.summary.failed,
+                "errors": test_results.summary.error,
+                "skipped": test_results.summary.skipped,
+            },
         )
 
         failed_tests_prompt = None
@@ -532,11 +542,13 @@ def check_code_with_pytest(
         }
 
     except Exception as e:
-        structured_logger.error(
+        logger.error(
             "Pytest code check failed",
-            error=str(e),
-            error_type=type(e).__name__,
-            project_dir=project_dir,
-            test_folder=test_folder,
+            extra={
+                "error": str(e),
+                "error_type": type(e).__name__,
+                "project_dir": project_dir,
+                "test_folder": test_folder,
+            },
         )
         return {"success": False, "error": str(e)}

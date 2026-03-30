@@ -3,8 +3,6 @@
 import logging
 import os
 
-import structlog
-
 from mcp_tools_py.code_checker_mypy.models import MypyResult
 from mcp_tools_py.code_checker_mypy.parsers import parse_mypy_json_output
 from mcp_tools_py.log_utils import log_function_call
@@ -15,7 +13,6 @@ from mcp_tools_py.utils.subprocess_runner import (
 )
 
 logger = logging.getLogger(__name__)
-structured_logger = structlog.get_logger(__name__)
 
 # Default strict flags from tools/mypy.bat
 STRICT_FLAGS = [
@@ -83,7 +80,7 @@ def run_mypy_check(
         if os.path.exists(full_path):
             valid_directories.append(directory)
         else:
-            structured_logger.warning("Target directory not found", directory=directory)
+            logger.warning("Target directory not found", extra={"directory": directory})
 
     # Set target directories
     mypy_targets = valid_directories
@@ -130,12 +127,14 @@ def run_mypy_check(
     # Add target directories
     command.extend(mypy_targets)
 
-    structured_logger.info(
+    logger.info(
         "Starting mypy check",
-        project_dir=project_dir,
-        strict=strict,
-        targets=mypy_targets,
-        command=" ".join(command),
+        extra={
+            "project_dir": project_dir,
+            "strict": strict,
+            "targets": mypy_targets,
+            "command": " ".join(command),
+        },
     )
 
     # Set MYPYPATH to src directory to handle module resolution correctly
@@ -185,12 +184,14 @@ def run_mypy_check(
 
     # Log raw output for debugging when return code is 2
     if result.return_code == 2:
-        structured_logger.warning(
+        logger.warning(
             "Mypy returned configuration error",
-            return_code=result.return_code,
-            stdout_length=len(result.stdout),
-            stderr_length=len(result.stderr),
-            command=" ".join(command),
+            extra={
+                "return_code": result.return_code,
+                "stdout_length": len(result.stdout),
+                "stderr_length": len(result.stderr),
+                "command": " ".join(command),
+            },
         )
         # For configuration errors, include stderr in the error message
         if result.stderr.strip() and not messages:
@@ -219,11 +220,13 @@ def run_mypy_check(
         errors_found=errors_found,
     )
 
-    structured_logger.info(
+    logger.info(
         "Mypy check completed",
-        return_code=result.return_code,
-        total_messages=len(messages),
-        errors=errors_found,
+        extra={
+            "return_code": result.return_code,
+            "total_messages": len(messages),
+            "errors": errors_found,
+        },
     )
 
     return mypy_result

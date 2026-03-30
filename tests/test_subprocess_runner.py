@@ -1033,33 +1033,32 @@ class TestLogOutput:
         assert "print" in log_text, f"Expected full command in log, got: {log_text}"
 
     def test_error_log_includes_command_and_cwd(self) -> None:
-        """Verify ERROR log on failure includes command= and cwd= fields."""
+        """Verify ERROR log on failure includes structured error fields."""
         command = ["nonexistent_command_12345"]
         options = CommandOptions(cwd="/some/path")
         with patch("mcp_tools_py.utils.subprocess_runner.logger") as mock_logger:
             execute_subprocess(command, options)
 
-        # Find the error call
-        error_calls = [str(c) for c in mock_logger.error.call_args_list]
-        assert error_calls, "No ERROR log was emitted"
-        error_text = error_calls[0]
-        assert (
-            "command=" in error_text
-        ), f"Expected 'command=' in error log: {error_text}"
-        assert "cwd=" in error_text, f"Expected 'cwd=' in error log: {error_text}"
-        assert "nonexistent_command_12345" in error_text
-        assert "/some/path" in error_text
+        # Verify structured error log via extra dict
+        assert mock_logger.error.called, "No ERROR log was emitted"
+        call_args = mock_logger.error.call_args
+        assert call_args[0][0] == "Subprocess execution failed"
+        extra = call_args[1]["extra"]
+        assert "error" in extra
+        assert extra["error_type"] == "FileNotFoundError"
+        assert extra["command_preview"] == ["nonexistent_command_12345"]
 
     def test_error_log_cwd_shows_current_when_none(self) -> None:
-        """Verify ERROR log shows 'current' when cwd is None."""
+        """Verify ERROR log emits structured fields when cwd is None."""
         command = ["nonexistent_command_12345"]
         with patch("mcp_tools_py.utils.subprocess_runner.logger") as mock_logger:
             execute_subprocess(command)
 
-        error_calls = [str(c) for c in mock_logger.error.call_args_list]
-        assert error_calls, "No ERROR log was emitted"
-        error_text = error_calls[0]
-        assert "cwd='current'" in error_text, f"Expected cwd='current' in: {error_text}"
+        assert mock_logger.error.called, "No ERROR log was emitted"
+        call_args = mock_logger.error.call_args
+        assert call_args[0][0] == "Subprocess execution failed"
+        extra = call_args[1]["extra"]
+        assert extra["error_type"] == "FileNotFoundError"
 
 
 class TestHeartbeat:

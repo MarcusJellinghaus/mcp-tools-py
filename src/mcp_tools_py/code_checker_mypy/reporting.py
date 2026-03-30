@@ -2,12 +2,9 @@
 
 import logging
 
-import structlog
-
 from mcp_tools_py.code_checker_mypy.models import MypyMessage, MypyResult
 
 logger = logging.getLogger(__name__)
-structured_logger = structlog.get_logger(__name__)
 
 
 def create_mypy_prompt(result: MypyResult) -> str | None:

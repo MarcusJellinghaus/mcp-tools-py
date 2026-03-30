@@ -319,9 +319,15 @@ def _run_subprocess(  # pylint: disable=too-many-statements
                         if popen_proc:
                             elapsed_time = time.time() - subprocess_start_time
                             logger.warning(
-                                f"Killing timed out process (STDIO isolation, PID: {popen_proc.pid}): "
-                                f"command='{format_command(command)}', timeout={options.timeout_seconds}s, "
-                                f"elapsed={elapsed_time:.1f}s, cwd='{options.cwd or 'current'}'"
+                                "Killing timed out process",
+                                extra={
+                                    "mode": "stdio_isolation",
+                                    "pid": popen_proc.pid,
+                                    "command": format_command(command),
+                                    "timeout_seconds": options.timeout_seconds,
+                                    "elapsed_seconds": round(elapsed_time, 1),
+                                    "cwd": options.cwd or "current",
+                                },
                             )
 
                             # On Windows, use taskkill to kill process tree
@@ -346,7 +352,8 @@ def _run_subprocess(  # pylint: disable=too-many-statements
                                     OSError,
                                 ) as e:
                                     logger.debug(
-                                        f"Taskkill failed, using fallback: {e}"
+                                        "Taskkill failed, using fallback",
+                                        extra={"error": str(e), "pid": popen_proc.pid},
                                     )
                                     popen_proc.terminate()
                                     time.sleep(0.5)
@@ -381,7 +388,8 @@ def _run_subprocess(  # pylint: disable=too-many-statements
                                     AttributeError,
                                 ) as e:
                                     logger.debug(
-                                        f"Process group kill failed, using fallback: {e}"
+                                        "Process group kill failed, using fallback",
+                                        extra={"error": str(e), "pid": popen_proc.pid},
                                     )
                                     popen_proc.terminate()
                                     time.sleep(0.5)
@@ -438,13 +446,13 @@ def _run_subprocess(  # pylint: disable=too-many-statements
                 if stdout_file.exists():
                     stdout = stdout_file.read_text(encoding="utf-8")
             except (OSError, PermissionError) as exc:
-                logger.debug(f"Could not read stdout file: {exc}")
+                logger.debug("Could not read stdout file", extra={"error": str(exc)})
 
             try:
                 if stderr_file.exists():
                     stderr = stderr_file.read_text(encoding="utf-8")
             except (OSError, PermissionError) as exc:
-                logger.debug(f"Could not read stderr file: {exc}")
+                logger.debug("Could not read stderr file", extra={"error": str(exc)})
 
             # Update the process with the actual output read from files
             return subprocess.CompletedProcess(
@@ -489,9 +497,15 @@ def _run_subprocess(  # pylint: disable=too-many-statements
                     if popen_proc:
                         elapsed_time = time.time() - subprocess_start_time
                         logger.warning(
-                            f"Killing timed out process (regular execution, PID: {popen_proc.pid}): "
-                            f"command='{format_command(command)}', timeout={options.timeout_seconds}s, "
-                            f"elapsed={elapsed_time:.1f}s, cwd='{options.cwd or 'current'}'"
+                            "Killing timed out process",
+                            extra={
+                                "mode": "regular_execution",
+                                "pid": popen_proc.pid,
+                                "command": format_command(command),
+                                "timeout_seconds": options.timeout_seconds,
+                                "elapsed_seconds": round(elapsed_time, 1),
+                                "cwd": options.cwd or "current",
+                            },
                         )
 
                         if os.name == "nt":
@@ -515,7 +529,8 @@ def _run_subprocess(  # pylint: disable=too-many-statements
                                 OSError,
                             ) as e:
                                 logger.debug(
-                                    f"Taskkill failed in regular execution: {e}"
+                                    "Taskkill failed in regular execution",
+                                    extra={"error": str(e), "pid": popen_proc.pid},
                                 )
                                 popen_proc.kill()
                         else:
@@ -539,7 +554,8 @@ def _run_subprocess(  # pylint: disable=too-many-statements
                                     popen_proc.kill()
                             except (OSError, ProcessLookupError, AttributeError) as e:
                                 logger.debug(
-                                    f"Process group kill failed in regular execution: {e}"
+                                    "Process group kill failed in regular execution",
+                                    extra={"error": str(e), "pid": popen_proc.pid},
                                 )
                                 popen_proc.kill()
 
@@ -625,7 +641,15 @@ def execute_subprocess(
     )
     use_isolation = is_python_command(command) and not disable_isolation
 
-    logger.debug(f"Starting subprocess execution: {format_command(command)}")
+    logger.debug(
+        "Starting subprocess execution",
+        extra={
+            "command": command[:3] if command else None,
+            "cwd": options.cwd,
+            "timeout_seconds": options.timeout_seconds,
+            "use_isolation": use_isolation,
+        },
+    )
 
     stop_event = None
     heartbeat_thread = None
@@ -696,8 +720,12 @@ def execute_subprocess(
         # Handle file system and permission errors
         execution_time_ms = int((time.time() - start_time) * 1000)
         logger.error(
-            f"Subprocess execution failed: {type(e).__name__}: {e}, "
-            f"command='{format_command(command)}', cwd='{options.cwd or 'current'}'"
+            "Subprocess execution failed",
+            extra={
+                "error": str(e),
+                "error_type": type(e).__name__,
+                "command_preview": command[:3] if command else None,
+            },
         )
         return CommandResult(
             return_code=1,
