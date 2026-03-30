@@ -1,5 +1,4 @@
-"""
-Subprocess execution utilities with MCP STDIO isolation support.
+"""Subprocess execution utilities with MCP STDIO isolation support.
 
 This module provides functions for executing command-line tools with proper
 timeout handling and STDIO isolation for Python commands in MCP server contexts.
@@ -11,19 +10,60 @@ import signal
 import subprocess
 import sys
 import tempfile
+import threading
 import time
 from dataclasses import dataclass, field
 from pathlib import Path
-from typing import Any, Callable
 
-import structlog
-
-from mcp_tools_py.log_utils import log_function_call
+# Re-export for external use (allows catching without direct subprocess import)
+from subprocess import CalledProcessError, SubprocessError, TimeoutExpired
 
 logger = logging.getLogger(__name__)
-structured_logger = structlog.get_logger(__name__)
 
 MAX_STDERR_IN_ERROR: int = 500
+
+__all__ = [
+    "CommandResult",
+    "CommandOptions",
+    "MAX_STDERR_IN_ERROR",
+    "check_tool_missing_error",
+    "execute_command",
+    "execute_subprocess",
+    "launch_process",
+    "truncate_stderr",
+    # Re-exported exceptions
+    "CalledProcessError",
+    "SubprocessError",
+    "TimeoutExpired",
+]
+
+
+def check_tool_missing_error(
+    stderr: str, tool_name: str, python_path: str
+) -> str | None:
+    """Check if stderr indicates the tool is not installed.
+
+    Returns:
+        Error message string if the tool is missing, or None if no issue detected.
+    """
+    if f"No module named {tool_name}" in stderr:
+        return (
+            f"{tool_name} is not installed in the configured Python environment "
+            f"({python_path}). Ensure --python-executable and --venv-path point "
+            f"to the environment where {tool_name} is installed."
+        )
+    return None
+
+
+def truncate_stderr(stderr: str, max_len: int = MAX_STDERR_IN_ERROR) -> str:
+    """Truncate stderr to a maximum length.
+
+    Returns:
+        The original stderr if within max_len, otherwise truncated with ellipsis.
+    """
+    if len(stderr) > max_len:
+        return stderr[:max_len] + "..."
+    return stderr
 
 
 @dataclass
@@ -50,6 +90,7 @@ class CommandOptions:
         env: Environment variables for the subprocess. May contain internal
              testing flags prefixed with underscore (e.g., _DISABLE_STDIO_ISOLATION)
              that should NEVER be used in production code.
+        env_remove: List of environment variable names to remove after merging
         capture_output: Whether to capture stdout and stderr
         text: Whether to decode output as text
         check: Whether to raise exception on non-zero exit code
@@ -69,10 +110,15 @@ class CommandOptions:
     check: bool = False
     shell: bool = False
     input_data: str | None = None
+    env_remove: list[str] | None = None
 
 
 def is_python_command(command: list[str]) -> bool:
-    """Check if a command is a Python execution command."""
+    """Check if a command is a Python execution command.
+
+    Returns:
+        True if the command runs a Python interpreter.
+    """
     if not command:
         return False
 
@@ -84,7 +130,11 @@ def is_python_command(command: list[str]) -> bool:
 
 
 def get_python_isolation_env() -> dict[str, str]:
-    """Get environment variables for Python subprocess isolation."""
+    """Get environment variables for Python subprocess isolation.
+
+    Returns:
+        Dict of environment variables with MCP isolation settings.
+    """
     env = os.environ.copy()
 
     # Python-specific settings to prevent MCP STDIO conflicts
@@ -106,26 +156,78 @@ def get_python_isolation_env() -> dict[str, str]:
     return env
 
 
-def _safe_preexec_fn() -> None:
+def get_utf8_env() -> dict[str, str]:
+    """Get environment variables for UTF-8 encoding support on all subprocess types.
+
+    Returns:
+        Dict of environment variables with UTF-8 encoding settings.
     """
-    Safely attempt to create a new session.
+    env = os.environ.copy()
 
-    This is used on Unix-like systems to isolate the subprocess.
-    Errors are silently ignored as they may occur in restricted environments.
+    # Set UTF-8 encoding for all subprocess types
+    env.update(
+        {
+            "PYTHONIOENCODING": "utf-8",
+            "PYTHONUTF8": "1",
+        }
+    )
+
+    # On Windows, also set legacy encoding variables
+    if os.name == "nt":
+        env.update(
+            {
+                "PYTHONLEGACYWINDOWSFSENCODING": "utf-8",
+            }
+        )
+    else:
+        # On Unix systems, set locale for UTF-8
+        env.update(
+            {
+                "LC_ALL": "C.UTF-8",
+            }
+        )
+
+    return env
+
+
+def prepare_env(
+    command: list[str] | str,
+    env: dict[str, str] | None,
+    env_remove: list[str] | None,
+) -> dict[str, str]:
+    """Build a complete environment dict for subprocess execution.
+
+    Starts from os.environ, applies Python isolation or UTF-8 settings
+    based on command type, merges caller-provided env on top, then
+    removes any keys listed in env_remove.
+
+    Args:
+        command: Command as list or string. String commands are always
+            treated as non-Python (shell=True implies unknown executable).
+        env: Optional caller-provided environment variables to merge.
+        env_remove: Optional list of environment variable names to remove.
+
+    Returns:
+        Complete environment dict ready for subprocess.Popen.
     """
-    try:
-        if hasattr(os, "setsid"):
-            os.setsid()
-    except (OSError, PermissionError, AttributeError):
-        # Ignore errors - may already be session leader or restricted env
-        pass
+    if isinstance(command, list) and is_python_command(command):
+        result = get_python_isolation_env()
+    else:
+        result = get_utf8_env()
+
+    if env:
+        result.update(env)
+
+    for key in env_remove or []:
+        result.pop(key, None)
+
+    return result
 
 
-def _run_subprocess(
+def _run_subprocess(  # pylint: disable=too-many-statements
     command: list[str], options: CommandOptions, use_stdio_isolation: bool = False
 ) -> subprocess.CompletedProcess[str]:
-    """
-    Internal function to run subprocess with or without STDIO isolation.
+    """Run subprocess with or without STDIO isolation.
 
     Args:
         command: Command to execute
@@ -134,23 +236,19 @@ def _run_subprocess(
 
     Returns:
         CompletedProcess with execution results
+
+    Raises:
+        TimeoutExpired: If the subprocess exceeds the configured timeout.
     """
-    # Prepare environment
-    env = options.env or os.environ.copy()
-    if is_python_command(command):
-        env = get_python_isolation_env()
-        if options.env:
-            env.update(options.env)
+    # Track start time for timeout logging
+    subprocess_start_time = time.time()
+    env = prepare_env(command, options.env, options.env_remove)
 
     # Handle input data and stdin
     stdin_value = subprocess.DEVNULL if options.input_data is None else None
 
-    # Prepare preexec_fn for Unix-like systems
-    preexec_fn: Callable[[], Any] | None = None
-    start_new_session = False
-    if os.name != "nt":
-        preexec_fn = _safe_preexec_fn
-        start_new_session = True
+    # Use start_new_session for process isolation (thread-safe alternative to preexec_fn)
+    start_new_session = os.name != "nt"  # True on Unix, False on Windows
 
     # Use file-based STDIO for Python commands if needed
     if use_stdio_isolation and options.capture_output:
@@ -181,10 +279,11 @@ def _run_subprocess(
                         ),
                         cwd=options.cwd,
                         text=options.text,
+                        encoding="utf-8" if options.text else None,
+                        errors="replace",  # Replace invalid characters instead of crashing
                         env=env,
                         shell=options.shell,
                         start_new_session=start_new_session,
-                        preexec_fn=preexec_fn,
                     )
 
                     # Communicate with timeout
@@ -201,10 +300,14 @@ def _run_subprocess(
                     except subprocess.TimeoutExpired:
                         # Kill the process and all children
                         if popen_proc:
-                            structured_logger.warning(
-                                "Killing timed out process",
-                                pid=popen_proc.pid,
-                                command=command[:3] if command else None,
+                            elapsed_time = time.time() - subprocess_start_time
+                            cmd_display = " ".join(command[:3]) + (
+                                "..." if len(command) > 3 else ""
+                            )
+                            logger.warning(
+                                f"Killing timed out process (STDIO isolation, PID: {popen_proc.pid}): "
+                                f"command='{cmd_display}', timeout={options.timeout_seconds}s, "
+                                f"elapsed={elapsed_time:.1f}s, cwd='{options.cwd or 'current'}'"
                             )
 
                             # On Windows, use taskkill to kill process tree
@@ -221,17 +324,15 @@ def _run_subprocess(
                                         ],
                                         capture_output=True,
                                         timeout=5,
+                                        check=False,
                                     )
                                 except (
                                     subprocess.SubprocessError,
                                     subprocess.TimeoutExpired,
-                                    Exception,
+                                    OSError,
                                 ) as e:
-                                    # Fallback to terminate/kill
-                                    structured_logger.debug(
-                                        "Taskkill failed, using fallback",
-                                        error=str(e),
-                                        pid=popen_proc.pid,
+                                    logger.debug(
+                                        f"Taskkill failed, using fallback: {e}"
                                     )
                                     popen_proc.terminate()
                                     time.sleep(0.5)
@@ -240,19 +341,22 @@ def _run_subprocess(
                             else:
                                 # On Unix, kill the process group
                                 try:
-                                    # Check if killpg and getpgid are available (Unix-only)
                                     if (
                                         hasattr(os, "killpg")
                                         and hasattr(os, "getpgid")
                                         and hasattr(signal, "SIGTERM")
                                         and hasattr(signal, "SIGKILL")
                                     ):
-                                        os.killpg(os.getpgid(popen_proc.pid), signal.SIGTERM)  # type: ignore[attr-defined]  # needed for Windows
+                                        os.killpg(  # type: ignore[attr-defined,unused-ignore]
+                                            os.getpgid(popen_proc.pid), signal.SIGTERM  # type: ignore[attr-defined,unused-ignore]
+                                        )
                                         time.sleep(0.5)
                                         if popen_proc.poll() is None:
-                                            os.killpg(os.getpgid(popen_proc.pid), signal.SIGKILL)  # type: ignore[attr-defined]  # needed for Windows
+                                            os.killpg(  # type: ignore[attr-defined,unused-ignore]
+                                                os.getpgid(popen_proc.pid),  # type: ignore[attr-defined,unused-ignore]
+                                                signal.SIGKILL,  # type: ignore[attr-defined,unused-ignore]
+                                            )
                                     else:
-                                        # Fallback for systems without killpg/getpgid
                                         popen_proc.terminate()
                                         time.sleep(0.5)
                                         if popen_proc.poll() is None:
@@ -262,11 +366,8 @@ def _run_subprocess(
                                     ProcessLookupError,
                                     AttributeError,
                                 ) as e:
-                                    # Fallback to terminate/kill
-                                    structured_logger.debug(
-                                        "Process group kill failed, using fallback",
-                                        error=str(e),
-                                        pid=popen_proc.pid,
+                                    logger.debug(
+                                        f"Process group kill failed, using fallback: {e}"
                                     )
                                     popen_proc.terminate()
                                     time.sleep(0.5)
@@ -284,6 +385,7 @@ def _run_subprocess(
 
                 except subprocess.TimeoutExpired:
                     # Close files before re-raising to prevent Windows file locking
+                    # This cleanup is necessary before re-raising the timeout exception
                     if stdout_f:
                         stdout_f.flush()
                         stdout_f.close()
@@ -293,10 +395,10 @@ def _run_subprocess(
 
                     # On Windows, add a small delay to help with file handle cleanup
                     if os.name == "nt":
-                        time.sleep(0.1)  # Give Windows time to release handles
+                        time.sleep(0.1)
 
                     # Re-raise to be handled by the caller
-                    raise
+                    raise  # pylint: disable=try-except-raise
                 finally:
                     # Ensure files are closed
                     if stdout_f and not stdout_f.closed:
@@ -304,20 +406,15 @@ def _run_subprocess(
                     if stderr_f and not stderr_f.closed:
                         stderr_f.close()
             except subprocess.TimeoutExpired:
-                # This will be caught by the outer execute_subprocess
-                raise
+                raise  # pylint: disable=try-except-raise
             except Exception:
-                # For any other exception, ensure files are closed
-                if stdout_f and not stdout_f.closed:
-                    stdout_f.close()
-                if stderr_f and not stderr_f.closed:
-                    stderr_f.close()
-                raise
+                # Let any other exceptions propagate after cleanup in finally block
+                raise  # pylint: disable=try-except-raise
 
             # Read output files after process completes
             # Use a small delay on Windows to avoid file locking issues
             if os.name == "nt":
-                time.sleep(0.2)  # Increased delay for Windows
+                time.sleep(0.2)
 
             # Read output files, handling potential errors
             stdout = ""
@@ -327,18 +424,15 @@ def _run_subprocess(
                 if stdout_file.exists():
                     stdout = stdout_file.read_text(encoding="utf-8")
             except (OSError, PermissionError) as exc:
-                # If we can't read the file, leave stdout empty
-                logger.debug("Could not read stdout file: %s", exc)
+                logger.debug(f"Could not read stdout file: {exc}")
 
             try:
                 if stderr_file.exists():
                     stderr = stderr_file.read_text(encoding="utf-8")
             except (OSError, PermissionError) as exc:
-                # If we can't read the file, leave stderr empty
-                logger.debug("Could not read stderr file: %s", exc)
+                logger.debug(f"Could not read stderr file: {exc}")
 
             # Update the process with the actual output read from files
-            # If process is None (shouldn't happen), use default returncode of 1
             return subprocess.CompletedProcess(
                 args=command,
                 returncode=process.returncode if process else 1,
@@ -359,10 +453,11 @@ def _run_subprocess(
                     ),
                     cwd=options.cwd,
                     text=options.text,
+                    encoding="utf-8" if options.text else None,
+                    errors="replace",  # Replace invalid characters instead of crashing
                     env=env,
                     shell=options.shell,
                     start_new_session=start_new_session,
-                    preexec_fn=preexec_fn,
                 )
 
                 try:
@@ -378,10 +473,14 @@ def _run_subprocess(
                 except subprocess.TimeoutExpired:
                     # Kill the process tree on timeout
                     if popen_proc:
-                        structured_logger.warning(
-                            "Killing timed out process (regular execution)",
-                            pid=popen_proc.pid,
-                            command=command[:3] if command else None,
+                        elapsed_time = time.time() - subprocess_start_time
+                        cmd_display = " ".join(command[:3]) + (
+                            "..." if len(command) > 3 else ""
+                        )
+                        logger.warning(
+                            f"Killing timed out process (regular execution, PID: {popen_proc.pid}): "
+                            f"command='{cmd_display}', timeout={options.timeout_seconds}s, "
+                            f"elapsed={elapsed_time:.1f}s, cwd='{options.cwd or 'current'}'"
                         )
 
                         if os.name == "nt":
@@ -397,41 +496,39 @@ def _run_subprocess(
                                     ],
                                     capture_output=True,
                                     timeout=5,
+                                    check=False,
                                 )
                             except (
                                 subprocess.SubprocessError,
                                 subprocess.TimeoutExpired,
-                                Exception,
+                                OSError,
                             ) as e:
-                                structured_logger.debug(
-                                    "Taskkill failed in regular execution, using kill",
-                                    error=str(e),
-                                    pid=popen_proc.pid,
+                                logger.debug(
+                                    f"Taskkill failed in regular execution: {e}"
                                 )
                                 popen_proc.kill()
                         else:
                             # Unix: Kill process group
                             try:
-                                # Check if killpg and getpgid are available (Unix-only)
                                 if (
                                     hasattr(os, "killpg")
                                     and hasattr(os, "getpgid")
                                     and hasattr(signal, "SIGTERM")
                                     and hasattr(signal, "SIGKILL")
                                 ):
-                                    # Try graceful termination first (consistent with first timeout block)
-                                    os.killpg(os.getpgid(popen_proc.pid), signal.SIGTERM)  # type: ignore[attr-defined]  # needed for Windows
+                                    os.killpg(  # type: ignore[attr-defined,unused-ignore]
+                                        os.getpgid(popen_proc.pid), signal.SIGTERM  # type: ignore[attr-defined,unused-ignore]
+                                    )
                                     time.sleep(0.5)
                                     if popen_proc.poll() is None:
-                                        # Force kill if still running
-                                        os.killpg(os.getpgid(popen_proc.pid), signal.SIGKILL)  # type: ignore[attr-defined]  # needed for Windows
+                                        os.killpg(  # type: ignore[attr-defined,unused-ignore]
+                                            os.getpgid(popen_proc.pid), signal.SIGKILL  # type: ignore[attr-defined,unused-ignore]
+                                        )
                                 else:
                                     popen_proc.kill()
                             except (OSError, ProcessLookupError, AttributeError) as e:
-                                structured_logger.debug(
-                                    "Process group kill failed in regular execution, using kill",
-                                    error=str(e),
-                                    pid=popen_proc.pid,
+                                logger.debug(
+                                    f"Process group kill failed in regular execution: {e}"
                                 )
                                 popen_proc.kill()
 
@@ -448,36 +545,63 @@ def _run_subprocess(
                     capture_output=False,
                     cwd=options.cwd,
                     text=options.text,
+                    encoding="utf-8" if options.text else None,
+                    errors="replace",  # Replace invalid characters instead of crashing
                     timeout=options.timeout_seconds,
                     env=env,
                     shell=options.shell,
                     stdin=stdin_value,
                     input=options.input_data,
                     start_new_session=start_new_session,
-                    preexec_fn=preexec_fn,
                     check=False,
                 )
         except subprocess.TimeoutExpired:
-            raise  # Re-raise for handling in execute_subprocess
+            raise  # pylint: disable=try-except-raise
         except Exception:
-            raise
+            # Re-raise any other exceptions (this catch-all is needed for cleanup)
+            raise  # pylint: disable=try-except-raise
+
+
+def _run_heartbeat(
+    stop_event: threading.Event,
+    interval: int,
+    message: str,
+    start_time: float,
+) -> None:
+    """Heartbeat loop — runs in a daemon thread, logs at regular intervals."""
+    while not stop_event.wait(interval):
+        elapsed = time.time() - start_time
+        minutes, seconds = divmod(int(elapsed), 60)
+        logger.info("%s (elapsed: %dm %ds)", message, minutes, seconds)
 
 
 def execute_subprocess(
-    command: list[str], options: CommandOptions | None = None
+    command: list[str],
+    options: CommandOptions | None = None,
+    heartbeat_interval_seconds: int | None = None,
+    heartbeat_message: str = "",
 ) -> CommandResult:
-    """
-    Execute a command with automatic STDIO isolation for Python commands.
+    """Execute a command with automatic STDIO isolation for Python commands.
 
     Args:
         command: Command and arguments as a list
         options: Execution options
+        heartbeat_interval_seconds: If set and > 0, log a heartbeat message
+            at this interval (in seconds) while the subprocess is running.
+        heartbeat_message: Message to include in heartbeat log entries.
 
     Returns:
         CommandResult with execution details
+
+    Raises:
+        TypeError: If command is None.
+        CalledProcessError: If check is True and the process returns non-zero exit code.
     """
     if command is None:
         raise TypeError("Command cannot be None")
+
+    if not command:
+        raise ValueError("Command cannot be empty")
 
     if options is None:
         options = CommandOptions()
@@ -485,43 +609,29 @@ def execute_subprocess(
     start_time = time.time()
 
     # Determine if we need STDIO isolation
-    # INTERNAL TESTING FLAG: _DISABLE_STDIO_ISOLATION
-    # ================================================
-    # This flag is ONLY for internal testing purposes to disable STDIO isolation
-    # for Python commands. It allows tests to verify subprocess behavior without
-    # the file-based STDIO redirection that's normally applied to Python commands.
-    #
-    # WHEN TO USE:
-    # - Only in unit tests that need to test raw subprocess behavior
-    # - When testing concurrent subprocess execution where file locking might interfere
-    # - For performance testing where STDIO isolation overhead needs to be excluded
-    #
-    # HOW IT WORKS:
-    # - Set environment variable _DISABLE_STDIO_ISOLATION=1 to disable isolation
-    # - Python commands will then use direct subprocess pipes instead of temp files
-    # - This bypasses the MCP STDIO conflict prevention mechanism
-    #
-    # WARNING: DO NOT USE IN PRODUCTION!
-    # - This flag bypasses important isolation mechanisms
-    # - Using it in production may cause STDIO conflicts with MCP servers
-    # - It can lead to output corruption when Python subprocesses are involved
-    # - This is an internal implementation detail that may change without notice
-    #
-    # Example (TEST ONLY):
-    #   options = CommandOptions(env={"_DISABLE_STDIO_ISOLATION": "1"})
-    #   result = execute_subprocess([sys.executable, "script.py"], options)
     disable_isolation = (
         options.env and options.env.get("_DISABLE_STDIO_ISOLATION") == "1"
     )
     use_isolation = is_python_command(command) and not disable_isolation
 
-    structured_logger.debug(
-        "Starting subprocess execution",
-        command=command[:3] if command else None,
-        cwd=options.cwd,
-        timeout_seconds=options.timeout_seconds,
-        use_isolation=use_isolation,
-    )
+    logger.debug(f"Starting subprocess execution: {command[:3] if command else None}")
+
+    stop_event = None
+    heartbeat_thread = None
+
+    if heartbeat_interval_seconds and heartbeat_interval_seconds > 0:
+        stop_event = threading.Event()
+        heartbeat_thread = threading.Thread(
+            target=_run_heartbeat,
+            args=(
+                stop_event,
+                heartbeat_interval_seconds,
+                heartbeat_message,
+                start_time,
+            ),
+            daemon=True,
+        )
+        heartbeat_thread.start()
 
     try:
         process = _run_subprocess(command, options, use_isolation)
@@ -571,15 +681,10 @@ def execute_subprocess(
             execution_time_ms=execution_time_ms,
         )
 
-    except Exception as e:
-        # Handle all other exceptions (FileNotFoundError, PermissionError, etc.)
+    except (FileNotFoundError, PermissionError, OSError) as e:
+        # Handle file system and permission errors
         execution_time_ms = int((time.time() - start_time) * 1000)
-        structured_logger.error(
-            "Subprocess execution failed",
-            error=str(e),
-            error_type=type(e).__name__,
-            command_preview=command[:3] if command else None,
-        )
+        logger.error(f"Subprocess execution failed: {type(e).__name__}: {e}")
         return CommandResult(
             return_code=1,
             stdout="",
@@ -591,42 +696,11 @@ def execute_subprocess(
             execution_time_ms=execution_time_ms,
         )
 
-
-def check_tool_missing_error(
-    stderr: str, tool_name: str, python_path: str
-) -> str | None:
-    """Check if stderr indicates the tool is not installed.
-
-    Args:
-        stderr: The stderr output from the subprocess.
-        tool_name: The name of the tool (e.g., 'pytest', 'pylint', 'mypy').
-        python_path: The path to the Python executable used.
-
-    Returns:
-        An actionable error message if the tool is missing, or None.
-    """
-    if f"No module named {tool_name}" in stderr:
-        return (
-            f"{tool_name} is not installed in the configured Python environment "
-            f"({python_path}). Ensure --python-executable and --venv-path point "
-            f"to the environment where {tool_name} is installed."
-        )
-    return None
-
-
-def truncate_stderr(stderr: str, max_len: int = MAX_STDERR_IN_ERROR) -> str:
-    """Truncate stderr to a maximum length.
-
-    Args:
-        stderr: The stderr string to truncate.
-        max_len: Maximum length before truncation.
-
-    Returns:
-        The stderr string, truncated with '...' if it exceeds max_len.
-    """
-    if len(stderr) > max_len:
-        return stderr[:max_len] + "..."
-    return stderr
+    finally:
+        if stop_event is not None:
+            stop_event.set()
+        if heartbeat_thread is not None:
+            heartbeat_thread.join(timeout=2)
 
 
 def execute_command(
@@ -635,8 +709,7 @@ def execute_command(
     timeout_seconds: int = 120,
     env: dict[str, str] | None = None,
 ) -> CommandResult:
-    """
-    Execute a command with automatic STDIO isolation for Python commands.
+    """Execute a command with automatic STDIO isolation for Python commands.
 
     Args:
         command: Complete command as list (e.g., ["python", "-m", "pylint", "src"])
@@ -653,3 +726,50 @@ def execute_command(
         env=env,
     )
     return execute_subprocess(command, options)
+
+
+def launch_process(
+    command: list[str] | str,
+    cwd: str | Path | None = None,
+    shell: bool = False,
+    env: dict[str, str] | None = None,
+    env_remove: list[str] | None = None,
+) -> int:
+    """Launch a process without waiting for it to complete.
+
+    This is for fire-and-forget process launching where you need the PID
+    but don't need to wait for completion or capture output.
+
+    Environment variables are always inherited from the parent process
+    via prepare_env(). The ``env`` parameter merges on top of the parent
+    environment rather than replacing it entirely.
+
+    Args:
+        command: Command as list or string (string requires shell=True)
+        cwd: Working directory for the process
+        shell: Whether to execute through shell (required for string commands)
+        env: Extra environment variables merged on top of the parent env
+        env_remove: Environment variable names to remove after merging
+
+    Returns:
+        Process ID (PID) of the launched process
+
+    Example:
+        # Launch VSCode — parent env is inherited automatically
+        pid = launch_process(["code", "myfile.txt"])
+
+        # Launch with extra env vars (no need for os.environ.copy())
+        pid = launch_process(["code", "myfile.txt"], env={"CUSTOM_VAR": "value"})
+    """
+    cwd_str = str(cwd) if cwd else None
+    prepared_env = prepare_env(command, env, env_remove)
+
+    process = subprocess.Popen(
+        command,
+        cwd=cwd_str,
+        shell=shell,
+        env=prepared_env,
+        stdout=subprocess.DEVNULL,
+        stderr=subprocess.DEVNULL,
+    )
+    return process.pid

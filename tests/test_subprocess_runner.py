@@ -6,6 +6,7 @@ import subprocess
 import sys
 import tempfile
 import threading
+import time
 from pathlib import Path
 from typing import Generator
 from unittest.mock import patch
@@ -13,12 +14,21 @@ from unittest.mock import patch
 import pytest
 
 from mcp_tools_py.utils.subprocess_runner import (
+    CalledProcessError,
     CommandOptions,
     CommandResult,
+    SubprocessError,
+    TimeoutExpired,
+    _run_heartbeat,
+    check_tool_missing_error,
     execute_command,
     execute_subprocess,
     get_python_isolation_env,
+    get_utf8_env,
     is_python_command,
+    launch_process,
+    prepare_env,
+    truncate_stderr,
 )
 
 
@@ -233,16 +243,16 @@ class TestExecuteSubprocess:
             assert result.runner_type == "subprocess"
 
     def test_execute_command_unexpected_error(self) -> None:
-        """Test handling unexpected errors."""
+        """Test handling OS-level errors."""
         with patch("subprocess.Popen") as mock_popen:
-            mock_popen.side_effect = RuntimeError("Unexpected error")
+            mock_popen.side_effect = OSError("Unexpected OS error")
 
             result = execute_subprocess(["test_command"])
 
             assert result.return_code == 1
             assert not result.timed_out
             assert result.execution_error is not None
-            assert "Unexpected error" in result.execution_error
+            assert "Unexpected OS error" in result.execution_error
             assert result.runner_type == "subprocess"
 
     def test_execute_command_with_check_option(self) -> None:
@@ -710,11 +720,8 @@ class TestErrorHandling:
 
     def test_empty_command_list(self) -> None:
         """Test handling of empty command list."""
-        result = execute_subprocess([])
-
-        assert result.return_code == 1
-        assert result.execution_error is not None
-        assert result.runner_type == "subprocess"
+        with pytest.raises(ValueError, match="Command cannot be empty"):
+            execute_subprocess([])
 
     def test_execution_time_tracking(self) -> None:
         """Test that execution time is tracked."""
@@ -792,3 +799,209 @@ def test_command_result_creation_with_fixture(
     assert sample_command_result.return_code == 0
     assert sample_command_result.stdout == "test output"
     assert sample_command_result.runner_type == "subprocess"
+
+
+class TestPrepareEnv:
+    """Unit tests for prepare_env()."""
+
+    def test_python_command_uses_isolation_env(self) -> None:
+        """Verify Python commands get isolation env."""
+        env = prepare_env([sys.executable, "-c", "pass"], None, None)
+        # Python isolation env sets these
+        assert env["PYTHONUNBUFFERED"] == "1"
+        assert env["PYTHONDONTWRITEBYTECODE"] == "1"
+
+    def test_non_python_command_uses_utf8_env(self) -> None:
+        """Verify non-Python commands get UTF-8 base env."""
+        env = prepare_env(["echo", "hello"], None, None)
+        assert env["PYTHONIOENCODING"] == "utf-8"
+        assert env["PYTHONUTF8"] == "1"
+
+    def test_caller_env_merged_on_top(self) -> None:
+        """Verify env dict is merged, not replaced."""
+        env = prepare_env(["echo", "hi"], {"MY_CUSTOM": "val"}, None)
+        assert env["MY_CUSTOM"] == "val"
+        # Should still have base env keys
+        assert "PATH" in env or "Path" in env
+
+    def test_env_inherits_parent_path(self) -> None:
+        """Verify PATH from parent env is preserved (the bug fix)."""
+        original_path = os.environ.get("PATH", os.environ.get("Path", ""))
+        env = prepare_env(["echo", "hi"], {"MY_VAR": "test"}, None)
+        # PATH should be inherited from os.environ, not lost
+        env_path = env.get("PATH", env.get("Path", ""))
+        assert env_path == original_path
+
+    def test_env_remove_keys(self) -> None:
+        """Verify env_remove removes specified keys."""
+        env = prepare_env(
+            ["echo", "hi"],
+            env={"KEEP": "yes", "REMOVE_ME": "gone"},
+            env_remove=["REMOVE_ME"],
+        )
+        assert env["KEEP"] == "yes"
+        assert "REMOVE_ME" not in env
+
+    def test_claudecode_inherited_from_parent(self) -> None:
+        """Verify CLAUDECODE is inherited from parent env (not stripped)."""
+        original_env = os.environ.copy()
+        try:
+            os.environ["CLAUDECODE"] = "1"
+            env = prepare_env(["echo", "hi"], None, None)
+            assert env.get("CLAUDECODE") == "1"
+        finally:
+            os.environ.clear()
+            os.environ.update(original_env)
+
+    def test_env_remove_none_is_noop(self) -> None:
+        """Verify None env_remove doesn't error."""
+        env = prepare_env(["echo", "hi"], None, None)
+        assert isinstance(env, dict)
+
+
+class TestCommandOptionsEnvRemove:
+    """Tests for env_remove field on CommandOptions."""
+
+    def test_env_remove_defaults_none(self) -> None:
+        """Verify default is None."""
+        opts = CommandOptions()
+        assert opts.env_remove is None
+
+    def test_env_remove_with_values(self) -> None:
+        """Verify setting a list works."""
+        opts = CommandOptions(env_remove=["FOO", "BAR"])
+        assert opts.env_remove == ["FOO", "BAR"]
+
+
+class TestMergedUtilities:
+    """Parametrized tests for check_tool_missing_error and truncate_stderr."""
+
+    @pytest.mark.parametrize("tool", ["pytest", "pylint", "mypy"])
+    def test_check_tool_missing_found(self, tool: str) -> None:
+        """Parametrize with pytest/pylint/mypy."""
+        stderr = f"No module named {tool}"
+        result = check_tool_missing_error(stderr, tool, "/usr/bin/python")
+        assert result is not None
+        assert tool in result
+
+    def test_check_tool_missing_not_found(self) -> None:
+        """Returns None when no match."""
+        result = check_tool_missing_error(
+            "some other error", "pytest", "/usr/bin/python"
+        )
+        assert result is None
+
+    def test_truncate_stderr_short(self) -> None:
+        """No truncation needed."""
+        short = "short error"
+        assert truncate_stderr(short) == short
+
+    def test_truncate_stderr_long(self) -> None:
+        """Truncation with '...'."""
+        long_str = "x" * 600
+        result = truncate_stderr(long_str)
+        assert result.endswith("...")
+        assert len(result) == 503  # 500 + len("...")
+
+    def test_truncate_stderr_exact(self) -> None:
+        """Exact boundary."""
+        exact = "x" * 500
+        assert truncate_stderr(exact) == exact
+
+
+class TestLaunchProcess:
+    """Mock-based tests for launch_process."""
+
+    def test_launch_process_returns_pid(self) -> None:
+        """Verify return type is int (PID)."""
+        with patch(
+            "mcp_tools_py.utils.subprocess_runner.subprocess.Popen"
+        ) as mock_popen:
+            mock_popen.return_value.pid = 12345
+            pid = launch_process(["echo", "hi"])
+            assert isinstance(pid, int)
+            assert pid == 12345
+
+    def test_launch_process_uses_devnull(self) -> None:
+        """Verify stdout/stderr use DEVNULL."""
+        with patch(
+            "mcp_tools_py.utils.subprocess_runner.subprocess.Popen"
+        ) as mock_popen:
+            mock_popen.return_value.pid = 1
+            launch_process(["echo", "hi"])
+            call_kwargs = mock_popen.call_args[1]
+            assert call_kwargs["stdout"] == subprocess.DEVNULL
+            assert call_kwargs["stderr"] == subprocess.DEVNULL
+
+    def test_launch_process_uses_prepare_env(self) -> None:
+        """Mock prepare_env, verify called."""
+        with (
+            patch(
+                "mcp_tools_py.utils.subprocess_runner.subprocess.Popen"
+            ) as mock_popen,
+            patch(
+                "mcp_tools_py.utils.subprocess_runner.prepare_env",
+                return_value={"MERGED": "1"},
+            ) as mock_prep,
+        ):
+            mock_popen.return_value.pid = 1
+            launch_process(["echo", "hi"], env={"X": "1"}, env_remove=["Y"])
+            mock_prep.assert_called_once_with(["echo", "hi"], {"X": "1"}, ["Y"])
+            call_kwargs = mock_popen.call_args[1]
+            assert call_kwargs["env"] == {"MERGED": "1"}
+
+    def test_launch_process_passes_cwd_and_shell(self) -> None:
+        """Verify args forwarded."""
+        with patch(
+            "mcp_tools_py.utils.subprocess_runner.subprocess.Popen"
+        ) as mock_popen:
+            mock_popen.return_value.pid = 1
+            launch_process(["echo", "hi"], cwd="/tmp", shell=True)
+            call_kwargs = mock_popen.call_args[1]
+            assert call_kwargs["cwd"] == "/tmp"
+            assert call_kwargs["shell"] is True
+
+
+class TestHeartbeat:
+    """Tests for _run_heartbeat."""
+
+    def test_heartbeat_stops_on_event(self) -> None:
+        """Verify thread stops when event set."""
+        stop = threading.Event()
+        t = threading.Thread(
+            target=_run_heartbeat,
+            args=(stop, 1, "test", time.time()),
+            daemon=True,
+        )
+        t.start()
+        stop.set()
+        t.join(timeout=3)
+        assert not t.is_alive()
+
+    def test_heartbeat_logs_at_interval(self) -> None:
+        """Verify logger.info called with expected format."""
+        stop = threading.Event()
+        start = time.time()
+        with patch("mcp_tools_py.utils.subprocess_runner.logger") as mock_logger:
+            t = threading.Thread(
+                target=_run_heartbeat,
+                args=(stop, 0.1, "working", start),
+                daemon=True,
+            )
+            t.start()
+            time.sleep(0.35)
+            stop.set()
+            t.join(timeout=3)
+            assert mock_logger.info.call_count >= 1
+            # Check format string
+            first_call_args = mock_logger.info.call_args_list[0][0]
+            assert first_call_args[0] == "%s (elapsed: %dm %ds)"
+            assert first_call_args[1] == "working"
+
+    def test_heartbeat_interval_is_int(self) -> None:
+        """Verify interval parameter is int type."""
+        import inspect
+
+        sig = inspect.signature(_run_heartbeat)
+        param = sig.parameters["interval"]
+        assert param.annotation is int
