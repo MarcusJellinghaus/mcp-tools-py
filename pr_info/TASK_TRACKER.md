@@ -42,9 +42,9 @@ This tracks **Feature Implementation** consisting of multiple **Tasks**.
 - [x] Commit message prepared
 
 ### Step 5: Migrate pylint modules to stdlib-only logging
-- [ ] Implementation: remove structlog from `code_checker_pylint/parsers.py` (5 calls), `runners.py` (5 calls), `reporting.py` (4 calls) — convert to `logger` with `extra={}`
-- [ ] Quality checks: pylint, pytest, mypy — fix all issues
-- [ ] Commit message prepared
+- [x] Implementation: remove structlog from `code_checker_pylint/parsers.py` (5 calls), `runners.py` (5 calls), `reporting.py` (4 calls) — convert to `logger` with `extra={}`
+- [x] Quality checks: pylint, pytest, mypy — fix all issues
+- [x] Commit message prepared
 
 ### Step 6: Migrate mypy and pytest runner modules to stdlib-only logging, update docs
 - [ ] Implementation: remove structlog from `code_checker_mypy/parsers.py` (2 calls), `runners.py` (4 calls), `code_checker_pytest/runners.py` (7 calls) — convert to `logger` with `extra={}`, fix f-string log calls, update `docs/architecture/architecture.md` Section 8
