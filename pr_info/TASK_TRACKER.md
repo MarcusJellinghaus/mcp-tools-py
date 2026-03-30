@@ -32,9 +32,9 @@ This tracks **Feature Implementation** consisting of multiple **Tasks**.
 - [x] Commit message prepared
 
 ### Step 3: `FormatterTools` class + MCP tool registration + tests
-- [ ] Implementation: `formatter/formatter_tools.py` with `FormatterTools` class, update `formatter/__init__.py` re-export, tests in `tests/test_formatter_tools.py`
-- [ ] Quality checks: pylint, pytest, mypy — fix all issues
-- [ ] Commit message prepared
+- [x] Implementation: `formatter/formatter_tools.py` with `FormatterTools` class, update `formatter/__init__.py` re-export, tests in `tests/test_formatter_tools.py`
+- [x] Quality checks: pylint, pytest, mypy — fix all issues
+- [x] Commit message prepared
 
 ### Step 4: Server rename + wiring (all integration changes)
 - [ ] Implementation: rename `CodeCheckerServer` → `ToolServer`, wire `FormatterTools`, add black/isort availability, move deps to main, update `tach.toml`, `.importlinter`, and all affected tests
