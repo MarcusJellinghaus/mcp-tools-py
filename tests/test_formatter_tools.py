@@ -188,6 +188,7 @@ class TestCheckOnlyMode:
         assert call_order == ["isort", "black"]
         assert "## isort" in result
         assert "## black" in result
+        assert "Formatting stopped" not in result
 
     def test_normal_mode_stops_on_first_failure(self, mock_server: MagicMock) -> None:
         """isort returns success=False, black does NOT run."""

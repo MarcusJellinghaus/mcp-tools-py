@@ -45,7 +45,10 @@ def get_target_directories(project_dir: str) -> TargetDirs:
     toml_data: dict[str, object] = {}
     if os.path.isfile(pyproject_path):
         with open(pyproject_path, "rb") as f:
-            toml_data = tomllib.load(f)
+            try:
+                toml_data = tomllib.load(f)
+            except tomllib.TOMLDecodeError as exc:
+                raise ValueError(f"Invalid pyproject.toml: {exc}") from exc
 
     # --- source dirs ---
     src_dirs: list[str] | None = None

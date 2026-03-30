@@ -5,7 +5,7 @@ import textwrap
 
 import pytest
 
-from mcp_tools_py.utils.project_config import TargetDirs, get_target_directories
+from mcp_tools_py.utils.project_config import get_target_directories
 
 
 class TestGetTargetDirectories:
@@ -138,3 +138,12 @@ class TestGetTargetDirectories:
         assert len(result.warnings) == 2
         assert "setuptools" in result.warnings[0]
         assert "pytest" in result.warnings[1]
+
+    def test_malformed_pyproject_raises_valueerror(self, tmp_path: object) -> None:
+        """Invalid TOML content raises ValueError, not TOMLDecodeError."""
+        path = str(tmp_path)
+        with open(os.path.join(path, "pyproject.toml"), "w", encoding="utf-8") as f:
+            f.write("invalid toml {{{{")
+
+        with pytest.raises(ValueError, match="Invalid pyproject.toml"):
+            get_target_directories(path)

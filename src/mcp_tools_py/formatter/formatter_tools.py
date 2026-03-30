@@ -80,14 +80,14 @@ class FormatterTools:
             for step in resolved_steps:
                 # Check tool availability
                 if not self._server._tool_availability.get(step, False):
-                    return (
-                        _join_sections(sections)
-                        + f"\n\nError: {step} is not available in the configured "
+                    sections.append(
+                        f"Error: {step} is not available in the configured "
                         f"Python environment ({self._server._resolved_python}). "
                         f"Ensure --python-executable and --venv-path point to the "
                         f"environment where {step} is installed. "
                         f"Restart the server after installing."
-                    ).strip()
+                    )
+                    return _join_sections(sections)
 
                 runner = _STEP_RUNNERS[step]
                 output, success = runner(
