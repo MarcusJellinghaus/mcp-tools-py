@@ -6,6 +6,7 @@ timeout handling and STDIO isolation for Python commands in MCP server contexts.
 
 import logging
 import os
+import shlex
 import signal
 import subprocess
 import sys
@@ -30,6 +31,7 @@ __all__ = [
     "execute_command",
     "execute_subprocess",
     "launch_process",
+    "format_command",
     "truncate_stderr",
     # Re-exported exceptions
     "CalledProcessError",
@@ -64,6 +66,21 @@ def truncate_stderr(stderr: str, max_len: int = MAX_STDERR_IN_ERROR) -> str:
     if len(stderr) > max_len:
         return stderr[:max_len] + "..."
     return stderr
+
+
+def format_command(command: list[str]) -> str:
+    """Format a command list as a platform-aware shell string.
+
+    Uses shlex.join() on Unix, subprocess.list2cmdline() on Windows.
+    Truncates at 200 characters with '...' suffix.
+    """
+    if os.name == "nt":
+        full = subprocess.list2cmdline(command)
+    else:
+        full = shlex.join(command)
+    if len(full) > 200:
+        return full[:200] + "..."
+    return full
 
 
 @dataclass
@@ -301,12 +318,9 @@ def _run_subprocess(  # pylint: disable=too-many-statements
                         # Kill the process and all children
                         if popen_proc:
                             elapsed_time = time.time() - subprocess_start_time
-                            cmd_display = " ".join(command[:3]) + (
-                                "..." if len(command) > 3 else ""
-                            )
                             logger.warning(
                                 f"Killing timed out process (STDIO isolation, PID: {popen_proc.pid}): "
-                                f"command='{cmd_display}', timeout={options.timeout_seconds}s, "
+                                f"command='{format_command(command)}', timeout={options.timeout_seconds}s, "
                                 f"elapsed={elapsed_time:.1f}s, cwd='{options.cwd or 'current'}'"
                             )
 
@@ -474,12 +488,9 @@ def _run_subprocess(  # pylint: disable=too-many-statements
                     # Kill the process tree on timeout
                     if popen_proc:
                         elapsed_time = time.time() - subprocess_start_time
-                        cmd_display = " ".join(command[:3]) + (
-                            "..." if len(command) > 3 else ""
-                        )
                         logger.warning(
                             f"Killing timed out process (regular execution, PID: {popen_proc.pid}): "
-                            f"command='{cmd_display}', timeout={options.timeout_seconds}s, "
+                            f"command='{format_command(command)}', timeout={options.timeout_seconds}s, "
                             f"elapsed={elapsed_time:.1f}s, cwd='{options.cwd or 'current'}'"
                         )
 
@@ -614,7 +625,7 @@ def execute_subprocess(
     )
     use_isolation = is_python_command(command) and not disable_isolation
 
-    logger.debug(f"Starting subprocess execution: {command[:3] if command else None}")
+    logger.debug(f"Starting subprocess execution: {format_command(command)}")
 
     stop_event = None
     heartbeat_thread = None
@@ -684,7 +695,10 @@ def execute_subprocess(
     except (FileNotFoundError, PermissionError, OSError) as e:
         # Handle file system and permission errors
         execution_time_ms = int((time.time() - start_time) * 1000)
-        logger.error(f"Subprocess execution failed: {type(e).__name__}: {e}")
+        logger.error(
+            f"Subprocess execution failed: {type(e).__name__}: {e}, "
+            f"command='{format_command(command)}', cwd='{options.cwd or 'current'}'"
+        )
         return CommandResult(
             return_code=1,
             stdout="",

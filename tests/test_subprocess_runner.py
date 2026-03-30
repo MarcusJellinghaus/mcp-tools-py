@@ -23,6 +23,7 @@ from mcp_tools_py.utils.subprocess_runner import (
     check_tool_missing_error,
     execute_command,
     execute_subprocess,
+    format_command,
     get_python_isolation_env,
     get_utf8_env,
     is_python_command,
@@ -60,6 +61,56 @@ def temp_dir() -> Generator[Path, None, None]:
                 warnings.warn(f"Could not clean up temp directory {tmp_path}: {e}")
             else:
                 raise
+
+
+class TestFormatCommand:
+    """Tests for format_command() utility."""
+
+    @pytest.mark.parametrize(
+        "command,expected_truncated",
+        [
+            # Exactly 200 chars - no truncation
+            (["x" * 200], False),
+            # 201 chars - truncated
+            (["x" * 201], True),
+            # Well under limit
+            (["echo", "hello"], False),
+        ],
+    )
+    def test_truncation_boundary(
+        self, command: list[str], expected_truncated: bool
+    ) -> None:
+        """Test truncation at the 200-character boundary."""
+        result = format_command(command)
+        if expected_truncated:
+            assert result.endswith("...")
+            assert len(result) == 203  # 200 + len("...")
+        else:
+            assert not result.endswith("...")
+
+    def test_single_element_command(self) -> None:
+        """Test formatting a single-element command."""
+        result = format_command(["echo"])
+        assert result == "echo"
+
+    def test_empty_command(self) -> None:
+        """Test formatting an empty command list."""
+        result = format_command([])
+        assert result == ""
+
+    def test_unix_uses_shlex_join(self) -> None:
+        """Test that Unix platforms use shlex.join()."""
+        with patch("mcp_tools_py.utils.subprocess_runner.os.name", "posix"):
+            result = format_command(["echo", "hello world"])
+            # shlex.join quotes arguments with spaces
+            assert result == "echo 'hello world'"
+
+    def test_windows_uses_list2cmdline(self) -> None:
+        """Test that Windows platforms use subprocess.list2cmdline()."""
+        with patch("mcp_tools_py.utils.subprocess_runner.os.name", "nt"):
+            result = format_command(["echo", "hello world"])
+            # list2cmdline quotes arguments with spaces
+            assert result == 'echo "hello world"'
 
 
 class TestCommandResult:
@@ -960,6 +1011,55 @@ class TestLaunchProcess:
             call_kwargs = mock_popen.call_args[1]
             assert call_kwargs["cwd"] == "/tmp"
             assert call_kwargs["shell"] is True
+
+
+class TestLogOutput:
+    """Tests verifying log messages use format_command() output."""
+
+    def test_debug_log_contains_full_command(self) -> None:
+        """Verify DEBUG log at execution start contains the full formatted command."""
+        command = [sys.executable, "-c", "print('hello')"]
+        with patch("mcp_tools_py.utils.subprocess_runner.logger") as mock_logger:
+            execute_subprocess(command)
+
+        # Find the debug call with "Starting subprocess execution"
+        debug_calls = [str(c) for c in mock_logger.debug.call_args_list]
+        matching = [c for c in debug_calls if "Starting subprocess execution" in c]
+        assert (
+            matching
+        ), f"No DEBUG log with 'Starting subprocess execution' found in {debug_calls}"
+        # Should contain all command parts, not just first 3
+        log_text = matching[0]
+        assert "print" in log_text, f"Expected full command in log, got: {log_text}"
+
+    def test_error_log_includes_command_and_cwd(self) -> None:
+        """Verify ERROR log on failure includes command= and cwd= fields."""
+        command = ["nonexistent_command_12345"]
+        options = CommandOptions(cwd="/some/path")
+        with patch("mcp_tools_py.utils.subprocess_runner.logger") as mock_logger:
+            execute_subprocess(command, options)
+
+        # Find the error call
+        error_calls = [str(c) for c in mock_logger.error.call_args_list]
+        assert error_calls, "No ERROR log was emitted"
+        error_text = error_calls[0]
+        assert (
+            "command=" in error_text
+        ), f"Expected 'command=' in error log: {error_text}"
+        assert "cwd=" in error_text, f"Expected 'cwd=' in error log: {error_text}"
+        assert "nonexistent_command_12345" in error_text
+        assert "/some/path" in error_text
+
+    def test_error_log_cwd_shows_current_when_none(self) -> None:
+        """Verify ERROR log shows 'current' when cwd is None."""
+        command = ["nonexistent_command_12345"]
+        with patch("mcp_tools_py.utils.subprocess_runner.logger") as mock_logger:
+            execute_subprocess(command)
+
+        error_calls = [str(c) for c in mock_logger.error.call_args_list]
+        assert error_calls, "No ERROR log was emitted"
+        error_text = error_calls[0]
+        assert "cwd='current'" in error_text, f"Expected cwd='current' in: {error_text}"
 
 
 class TestHeartbeat:
