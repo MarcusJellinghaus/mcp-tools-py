@@ -4,8 +4,6 @@ import logging
 from collections.abc import Callable
 from typing import TYPE_CHECKING
 
-import structlog
-
 from mcp_tools_py.formatter.black_runner import run_black
 from mcp_tools_py.formatter.isort_runner import run_isort
 from mcp_tools_py.log_utils import log_function_call
@@ -15,7 +13,6 @@ if TYPE_CHECKING:
     from mcp_tools_py.server import FastMCPProtocol, ToolServer
 
 logger = logging.getLogger(__name__)
-structured_logger = structlog.get_logger(__name__)
 
 _VALID_STEPS = {"isort", "black"}
 
