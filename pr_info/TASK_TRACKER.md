@@ -29,7 +29,7 @@ This tracks **Feature Implementation** consisting of multiple **Tasks**.
 
 ### Step 2: Update All 4 Log Sites to Use `format_command()`
 > Detail: [step_2.md](./steps/step_2.md)
-- [ ] Implementation: update 4 log sites + add `TestLogOutput` tests
+- [x] Implementation: update 4 log sites + add `TestLogOutput` tests
 - [ ] Quality checks: pylint, pytest, mypy — fix all issues
 - [ ] Commit: `Use format_command() in all subprocess log sites (#96)`
 
