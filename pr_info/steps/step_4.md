@@ -15,6 +15,7 @@ Rename `CodeCheckerServer` → `ToolServer`, wire up `FormatterTools`, add `blac
 | Modify | `pyproject.toml` |
 | Modify | `tach.toml` |
 | Modify | `tests/test_tool_availability.py` |
+| Modify | `.importlinter` |
 | Modify | `tests/test_checker_tools.py` |
 
 ## WHAT — Changes per file
@@ -53,25 +54,28 @@ Rename `CodeCheckerServer` → `ToolServer`, wire up `FormatterTools`, add `blac
    ]
    ```
 
-10. **Add** `mcp_tools_py.utils.project_config` module:
-    ```toml
-    [[modules]]
-    path = "mcp_tools_py.utils.project_config"
-    layer = "utilities"
-    depends_on = []
+10. **Update** `mcp_tools_py.server` depends_on to include `{ path = "mcp_tools_py.formatter" }`
+
+### `.importlinter`
+
+11. **Add** `mcp_tools_py.formatter` to the layers contract (piped with other tool_implementation modules):
+    ```
+    mcp_tools_py.checker_tools | mcp_tools_py.refactoring | mcp_tools_py.utility_tools | mcp_tools_py.inspect_library | mcp_tools_py.formatter
     ```
 
-11. **Update** `mcp_tools_py.server` depends_on to include `{ path = "mcp_tools_py.formatter" }`
+12. **Add** `mcp_tools_py.formatter -> mcp_tools_py.server` to `ignore_imports` (same pattern as checker_tools/refactoring/etc.)
+
+13. **Add** `mcp_tools_py.formatter` to `forbidden_modules` in the forbidden-imports contract
 
 ### `tests/test_tool_availability.py`
 
-12. **Update** `_create_server` reference (import stays the same — it imports from `mcp_tools_py.server`)
-13. **Update** expected `_tool_availability` dicts to include `"black": True/False` and `"isort": True/False`
-14. **Add tests**: `test_black_available`, `test_isort_available` (follow existing pattern)
+14. **Update** `_create_server` reference (import stays the same — it imports from `mcp_tools_py.server`)
+15. **Update** expected `_tool_availability` dicts to include `"black": True/False` and `"isort": True/False`
+16. **Add tests**: `test_black_available`, `test_isort_available` (follow existing pattern)
 
 ### `tests/test_checker_tools.py`
 
-15. **Update** `mock_server` fixture: add `"black": True, "isort": True` to `_tool_availability`
+17. **Update** `mock_server` fixture: add `"black": True, "isort": True` to `_tool_availability`
 
 ## ALGORITHM
 
@@ -112,8 +116,9 @@ This is the final wiring step. Make all changes listed in the step file:
 4. Add black/isort to _check_tool_availability() loop (same pattern as pytest/pylint/mypy)
 5. Update checker_tools.py TYPE_CHECKING import
 6. Move black/isort from dev deps to main deps in pyproject.toml
-7. Add formatter and utils.project_config modules to tach.toml
-8. Update all test files: new availability dict keys, class name references
+7. Add formatter module to tach.toml, update server depends_on
+8. Update .importlinter: add formatter to layers contract, ignore_imports, and forbidden_modules
+9. Update all test files: new availability dict keys, class name references
 
 Run pylint, mypy, and pytest checks. Fix any issues. Commit when all pass.
 After committing, run ./tools/format_all.sh to ensure formatting is clean.
