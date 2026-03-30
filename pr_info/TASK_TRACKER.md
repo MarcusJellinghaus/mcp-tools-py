@@ -31,7 +31,7 @@ This tracks **Feature Implementation** consisting of multiple **Tasks**.
 > Detail: [step_2.md](./steps/step_2.md)
 - [x] Implementation: update 4 log sites + add `TestLogOutput` tests
 - [x] Quality checks: pylint, pytest, mypy — fix all issues
-- [ ] Commit: `Use format_command() in all subprocess log sites (#96)`
+- [x] Commit: `Use format_command() in all subprocess log sites (#96)`
 
 ## Pull Request
 - [ ] PR review: verify all changes match summary spec
