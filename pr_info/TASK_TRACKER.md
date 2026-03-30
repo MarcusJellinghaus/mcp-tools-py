@@ -21,6 +21,26 @@ This tracks **Feature Implementation** consisting of multiple **Tasks**.
 
 ## Tasks
 
-<!-- Tasks populated from pr_info/steps/ by prepare_task_tracker -->
+### Step 1: Shared utility `utils/project_config.py` + tests
+- [ ] Implementation: `TargetDirs` dataclass, `get_target_directories()` function, tests in `tests/test_project_config.py`, export from `utils/__init__.py`
+- [ ] Quality checks: pylint, pytest, mypy — fix all issues
+- [ ] Commit message prepared
+
+### Step 2: Formatter runners (`black_runner.py` + `isort_runner.py`) + tests
+- [ ] Implementation: `formatter/__init__.py`, `black_runner.py` with `run_black()`, `isort_runner.py` with `run_isort()`, tests in `tests/test_black_runner.py` and `tests/test_isort_runner.py`
+- [ ] Quality checks: pylint, pytest, mypy — fix all issues
+- [ ] Commit message prepared
+
+### Step 3: `FormatterTools` class + MCP tool registration + tests
+- [ ] Implementation: `formatter/formatter_tools.py` with `FormatterTools` class, update `formatter/__init__.py` re-export, tests in `tests/test_formatter_tools.py`
+- [ ] Quality checks: pylint, pytest, mypy — fix all issues
+- [ ] Commit message prepared
+
+### Step 4: Server rename + wiring (all integration changes)
+- [ ] Implementation: rename `CodeCheckerServer` → `ToolServer`, wire `FormatterTools`, add black/isort availability, move deps to main, update `tach.toml`, `.importlinter`, and all affected tests
+- [ ] Quality checks: pylint, pytest, mypy — fix all issues
+- [ ] Commit message prepared
 
 ## Pull Request
+- [ ] PR review: verify all steps integrated correctly
+- [ ] PR summary prepared
