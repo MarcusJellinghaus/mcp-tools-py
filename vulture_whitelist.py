@@ -66,5 +66,8 @@ _.module_file_absolute
 # MCP tool handler for library introspection
 _.get_library_source  # FastMCP tool handler
 
+# MCP tool handler for code formatting
+_.run_format_code  # FastMCP tool handler
+
 # Test mock attributes used for nested attribute resolution
 _.c  # Mock attribute in test_inspect_library
