@@ -47,9 +47,9 @@ This tracks **Feature Implementation** consisting of multiple **Tasks**.
 - [x] Commit message prepared
 
 ### Step 6: Migrate mypy and pytest runner modules to stdlib-only logging, update docs
-- [ ] Implementation: remove structlog from `code_checker_mypy/parsers.py` (2 calls), `runners.py` (4 calls), `code_checker_pytest/runners.py` (7 calls) — convert to `logger` with `extra={}`, fix f-string log calls, update `docs/architecture/architecture.md` Section 8
-- [ ] Quality checks: pylint, pytest, mypy — fix all issues
-- [ ] Commit message prepared
+- [x] Implementation: remove structlog from `code_checker_mypy/parsers.py` (2 calls), `runners.py` (4 calls), `code_checker_pytest/runners.py` (7 calls) — convert to `logger` with `extra={}`, fix f-string log calls, update `docs/architecture/architecture.md` Section 8
+- [x] Quality checks: pylint, pytest, mypy — fix all issues
+- [x] Commit message prepared
 
 ## Pull Request
 - [ ] PR review: verify no module except `log_utils.py` imports structlog, no f-string log calls remain
