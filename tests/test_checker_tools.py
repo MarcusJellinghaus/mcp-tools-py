@@ -24,6 +24,8 @@ def mock_server() -> MagicMock:
         "pylint": True,
         "pytest": True,
         "mypy": True,
+        "black": True,
+        "isort": True,
         "lint-imports": True,
         "vulture": True,
     }

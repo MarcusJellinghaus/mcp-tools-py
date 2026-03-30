@@ -13,7 +13,7 @@ from typing import Generator
 import pytest
 
 from mcp_tools_py.checker_tools import CheckerTools
-from mcp_tools_py.server import CodeCheckerServer
+from mcp_tools_py.server import ToolServer
 
 
 class TestParameterCombinationsValidation:
@@ -102,7 +102,7 @@ class TestParameterCombinationsValidation:
 
     def test_show_details_true_with_specific_test(self, temp_project: Path) -> None:
         """Test show_details=True with specific failing test."""
-        server = CodeCheckerServer(temp_project)
+        server = ToolServer(temp_project)
 
         # Test the formatting method directly with mock test results
         from mcp_tools_py.code_checker_pytest.models import PytestReport, Summary
@@ -134,7 +134,7 @@ class TestParameterCombinationsValidation:
 
     def test_show_details_false_with_multiple_tests(self, temp_project: Path) -> None:
         """Test show_details=False with multiple tests provides summary."""
-        server = CodeCheckerServer(temp_project)
+        server = ToolServer(temp_project)
 
         result = CheckerTools(server)._format_pytest_result_with_details(
             {
@@ -153,7 +153,7 @@ class TestParameterCombinationsValidation:
         self, temp_project: Path
     ) -> None:
         """Test that small test runs provide hint to use show_details=True."""
-        server = CodeCheckerServer(temp_project)
+        server = ToolServer(temp_project)
 
         # Need test_results to be present for failures to trigger hint logic
         from mcp_tools_py.code_checker_pytest.models import PytestReport, Summary
@@ -185,7 +185,7 @@ class TestParameterCombinationsValidation:
 
     def test_collection_errors_always_shown(self, temp_project: Path) -> None:
         """Test that collection errors are shown regardless of show_details setting."""
-        server = CodeCheckerServer(temp_project)
+        server = ToolServer(temp_project)
 
         # Simulate collection error result
         test_result = {
@@ -212,7 +212,7 @@ class TestOutputFormatConsistency:
 
     def test_success_message_consistency(self) -> None:
         """Test that success messages are consistent."""
-        server = CodeCheckerServer(Path("/tmp"))
+        server = ToolServer(Path("/tmp"))
 
         success_result = {
             "success": True,
@@ -237,7 +237,7 @@ class TestOutputFormatConsistency:
 
     def test_error_message_consistency(self) -> None:
         """Test that error messages are consistent."""
-        server = CodeCheckerServer(Path("/tmp"))
+        server = ToolServer(Path("/tmp"))
 
         error_result = {"success": False, "error": "pytest execution failed"}
 
@@ -256,7 +256,7 @@ class TestOutputFormatConsistency:
 
     def test_invalid_summary_handling(self) -> None:
         """Test handling of invalid summary data."""
-        server = CodeCheckerServer(Path("/tmp"))
+        server = ToolServer(Path("/tmp"))
 
         invalid_result = {
             "success": True,
@@ -281,7 +281,7 @@ class TestPerformanceBenchmarks:
     def test_both_code_paths_complete_successfully(self) -> None:
         """Test that both show_details code paths complete successfully."""
         # Note: Tests correctness, not timing - microbenchmarks are unreliable in CI
-        server = CodeCheckerServer(Path("/tmp"))
+        server = ToolServer(Path("/tmp"))
 
         # Create test data
         test_result = {
@@ -306,7 +306,7 @@ class TestPerformanceBenchmarks:
 
     def test_memory_usage_reasonable(self) -> None:
         """Test that memory usage remains reasonable with show_details."""
-        server = CodeCheckerServer(Path("/tmp"))
+        server = ToolServer(Path("/tmp"))
 
         # Create large test result data
         large_summary = {
@@ -331,7 +331,7 @@ class TestDocumentationAccuracy:
         # This tests the examples from the docstring in run_pytest_check
 
         # Test that the function signature matches documentation
-        server = CodeCheckerServer(Path("/tmp"))
+        server = ToolServer(Path("/tmp"))
 
         # These should not raise TypeError due to missing/incorrect parameters
         try:
@@ -360,7 +360,7 @@ class TestDocumentationAccuracy:
 
     def test_parameter_type_validation(self) -> None:
         """Test that parameters accept documented types."""
-        server = CodeCheckerServer(Path("/tmp"))
+        server = ToolServer(Path("/tmp"))
 
         # show_details should accept boolean
         assert CheckerTools(server)._format_pytest_result_with_details(
@@ -375,7 +375,7 @@ class TestDocumentationAccuracy:
 
     def test_return_type_consistency(self) -> None:
         """Test that return types match documentation."""
-        server = CodeCheckerServer(Path("/tmp"))
+        server = ToolServer(Path("/tmp"))
 
         test_cases = [
             {"success": True, "summary": {"passed": 1, "collected": 1}},
@@ -394,7 +394,7 @@ class TestDocumentationAccuracy:
 
 def test_parameter_combinations_backward_compatible() -> None:
     """Test that new parameters don't break existing usage."""
-    server = CodeCheckerServer(Path("/tmp"))
+    server = ToolServer(Path("/tmp"))
 
     # Should work with minimal parameters (existing usage)
     test_result = {"success": True, "summary": {"passed": 1, "collected": 1}}
@@ -410,7 +410,7 @@ class TestEdgeCases:
 
     def test_none_values_handling(self) -> None:
         """Test handling of None values in summary."""
-        server = CodeCheckerServer(Path("/tmp"))
+        server = ToolServer(Path("/tmp"))
 
         result_with_nones = {
             "success": True,
@@ -436,7 +436,7 @@ class TestEdgeCases:
 
     def test_empty_summary_handling(self) -> None:
         """Test handling of empty summary dict."""
-        server = CodeCheckerServer(Path("/tmp"))
+        server = ToolServer(Path("/tmp"))
 
         empty_result = {"success": True, "summary": {}}
 
@@ -447,7 +447,7 @@ class TestEdgeCases:
 
     def test_missing_summary_handling(self) -> None:
         """Test handling when summary is missing."""
-        server = CodeCheckerServer(Path("/tmp"))
+        server = ToolServer(Path("/tmp"))
 
         no_summary_result = {"success": True}
 

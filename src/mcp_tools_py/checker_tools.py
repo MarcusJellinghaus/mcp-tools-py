@@ -19,7 +19,7 @@ from mcp_tools_py.log_utils import log_function_call
 from mcp_tools_py.utils.subprocess_runner import execute_command
 
 if TYPE_CHECKING:
-    from mcp_tools_py.server import CodeCheckerServer, FastMCPProtocol
+    from mcp_tools_py.server import FastMCPProtocol, ToolServer
 
 logger = logging.getLogger(__name__)
 
@@ -27,7 +27,7 @@ logger = logging.getLogger(__name__)
 class CheckerTools:
     """Registers pylint, pytest, mypy, lint-imports, and vulture checker tools on an MCP server."""
 
-    def __init__(self, server: "CodeCheckerServer") -> None:
+    def __init__(self, server: "ToolServer") -> None:
         self._server = server
 
     def register(self, mcp: "FastMCPProtocol") -> None:

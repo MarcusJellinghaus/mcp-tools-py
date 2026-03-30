@@ -36,12 +36,12 @@ dependencies = [
     "igittigitt>=2.1.0",
     "import-linter>=2.0",
     "vulture>=2.13",
+    "black>=24.10.0",
+    "isort>=5.13.2",
 ]
 
 [project.optional-dependencies]
 dev = [
-    "black>=24.10.0",
-    "isort>=5.13.2",
     "mcp-workspace",
     # Architecture and code quality tools
     "tach>=0.15.0",
