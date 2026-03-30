@@ -23,6 +23,7 @@ from mcp_tools_py.utils.subprocess_runner import (
     check_tool_missing_error,
     execute_command,
     execute_subprocess,
+    format_command,
     get_python_isolation_env,
     get_utf8_env,
     is_python_command,
@@ -60,6 +61,56 @@ def temp_dir() -> Generator[Path, None, None]:
                 warnings.warn(f"Could not clean up temp directory {tmp_path}: {e}")
             else:
                 raise
+
+
+class TestFormatCommand:
+    """Tests for format_command() utility."""
+
+    @pytest.mark.parametrize(
+        "command,expected_truncated",
+        [
+            # Exactly 200 chars - no truncation
+            (["x" * 200], False),
+            # 201 chars - truncated
+            (["x" * 201], True),
+            # Well under limit
+            (["echo", "hello"], False),
+        ],
+    )
+    def test_truncation_boundary(
+        self, command: list[str], expected_truncated: bool
+    ) -> None:
+        """Test truncation at the 200-character boundary."""
+        result = format_command(command)
+        if expected_truncated:
+            assert result.endswith("...")
+            assert len(result) == 203  # 200 + len("...")
+        else:
+            assert not result.endswith("...")
+
+    def test_single_element_command(self) -> None:
+        """Test formatting a single-element command."""
+        result = format_command(["echo"])
+        assert result == "echo"
+
+    def test_empty_command(self) -> None:
+        """Test formatting an empty command list."""
+        result = format_command([])
+        assert result == ""
+
+    def test_unix_uses_shlex_join(self) -> None:
+        """Test that Unix platforms use shlex.join()."""
+        with patch("mcp_tools_py.utils.subprocess_runner.os.name", "posix"):
+            result = format_command(["echo", "hello world"])
+            # shlex.join quotes arguments with spaces
+            assert result == "echo 'hello world'"
+
+    def test_windows_uses_list2cmdline(self) -> None:
+        """Test that Windows platforms use subprocess.list2cmdline()."""
+        with patch("mcp_tools_py.utils.subprocess_runner.os.name", "nt"):
+            result = format_command(["echo", "hello world"])
+            # list2cmdline quotes arguments with spaces
+            assert result == 'echo "hello world"'
 
 
 class TestCommandResult:

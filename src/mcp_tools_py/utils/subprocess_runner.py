@@ -6,6 +6,7 @@ timeout handling and STDIO isolation for Python commands in MCP server contexts.
 
 import logging
 import os
+import shlex
 import signal
 import subprocess
 import sys
@@ -30,6 +31,7 @@ __all__ = [
     "execute_command",
     "execute_subprocess",
     "launch_process",
+    "format_command",
     "truncate_stderr",
     # Re-exported exceptions
     "CalledProcessError",
@@ -64,6 +66,21 @@ def truncate_stderr(stderr: str, max_len: int = MAX_STDERR_IN_ERROR) -> str:
     if len(stderr) > max_len:
         return stderr[:max_len] + "..."
     return stderr
+
+
+def format_command(command: list[str]) -> str:
+    """Format a command list as a platform-aware shell string.
+
+    Uses shlex.join() on Unix, subprocess.list2cmdline() on Windows.
+    Truncates at 200 characters with '...' suffix.
+    """
+    if os.name == "nt":
+        full = subprocess.list2cmdline(command)
+    else:
+        full = shlex.join(command)
+    if len(full) > 200:
+        return full[:200] + "..."
+    return full
 
 
 @dataclass

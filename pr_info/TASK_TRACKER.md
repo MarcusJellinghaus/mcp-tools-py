@@ -23,9 +23,9 @@ This tracks **Feature Implementation** consisting of multiple **Tasks**.
 
 ### Step 1: Add `format_command()` Function with Tests (TDD)
 > Detail: [step_1.md](./steps/step_1.md)
-- [ ] Implementation: tests (`TestFormatCommand`) + `format_command()` in `subprocess_runner.py`
-- [ ] Quality checks: pylint, pytest, mypy — fix all issues
-- [ ] Commit: `Add format_command() helper for full command logging (#96)`
+- [x] Implementation: tests (`TestFormatCommand`) + `format_command()` in `subprocess_runner.py`
+- [x] Quality checks: pylint, pytest, mypy — fix all issues
+- [x] Commit: `Add format_command() helper for full command logging (#96)`
 
 ### Step 2: Update All 4 Log Sites to Use `format_command()`
 > Detail: [step_2.md](./steps/step_2.md)
