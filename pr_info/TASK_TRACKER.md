@@ -28,8 +28,8 @@ This tracks **Feature Implementation** consisting of multiple **Tasks**.
 
 ### Step 2: Migrate main.py and server.py to stdlib-only logging
 - [x] Implementation: remove structlog, rename `stdlogger` → `logger` in main.py, consolidate dual log calls using `extra={}`, fix f-string log calls in server.py
-- [ ] Quality checks: pylint, pytest, mypy — fix all issues
-- [ ] Commit message prepared
+- [x] Quality checks: pylint, pytest, mypy — fix all issues
+- [x] Commit message prepared
 
 ### Step 3: Migrate subprocess_runner.py to stdlib-only logging
 - [ ] Implementation: remove structlog, convert all 8 `structured_logger` calls to `logger` with `extra={}` dicts
