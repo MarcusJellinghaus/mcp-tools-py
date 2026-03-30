@@ -4,8 +4,6 @@ import logging
 import os
 from typing import TYPE_CHECKING, Any, Dict, List, Optional
 
-import structlog
-
 from mcp_tools_py.code_checker_mypy import get_mypy_prompt
 from mcp_tools_py.code_checker_pylint import get_pylint_prompt
 from mcp_tools_py.code_checker_pytest.reporting import (
@@ -24,7 +22,6 @@ if TYPE_CHECKING:
     from mcp_tools_py.server import CodeCheckerServer, FastMCPProtocol
 
 logger = logging.getLogger(__name__)
-structured_logger = structlog.get_logger(__name__)
 
 
 class CheckerTools:
@@ -69,14 +66,13 @@ class CheckerTools:
 
             try:
                 logger.info(
-                    f"Running pylint check on project directory: {self._server.project_dir}"
-                )
-                structured_logger.info(
                     "Starting pylint check",
-                    project_dir=str(self._server.project_dir),
-                    extra_args=extra_args,
-                    target_directories=target_directories,
-                    max_issues=max_issues,
+                    extra={
+                        "project_dir": str(self._server.project_dir),
+                        "extra_args": extra_args,
+                        "target_directories": target_directories,
+                        "max_issues": max_issues,
+                    },
                 )
 
                 pylint_prompt = get_pylint_prompt(
@@ -89,21 +85,24 @@ class CheckerTools:
 
                 result = self._format_pylint_result(pylint_prompt)
 
-                structured_logger.info(
+                logger.info(
                     "Pylint check completed",
-                    issues_found=pylint_prompt is not None,
-                    result_length=len(result),
+                    extra={
+                        "issues_found": pylint_prompt is not None,
+                        "result_length": len(result),
+                    },
                 )
 
                 return result
 
             except Exception as e:
-                logger.error(f"Error running pylint check: {str(e)}")
-                structured_logger.error(
+                logger.error(
                     "Pylint check failed",
-                    error=str(e),
-                    error_type=type(e).__name__,
-                    project_dir=str(self._server.project_dir),
+                    extra={
+                        "error": str(e),
+                        "error_type": type(e).__name__,
+                        "project_dir": str(self._server.project_dir),
+                    },
                 )
                 raise
 
@@ -169,14 +168,13 @@ class CheckerTools:
 
             try:
                 logger.info(
-                    f"Running pytest check on project directory: {self._server.project_dir}"
-                )
-                structured_logger.info(
                     "Starting pytest check",
-                    project_dir=str(self._server.project_dir),
-                    test_folder=self._server.test_folder,
-                    markers=markers,
-                    extra_args=extra_args,
+                    extra={
+                        "project_dir": str(self._server.project_dir),
+                        "test_folder": self._server.test_folder,
+                        "markers": markers,
+                        "extra_args": extra_args,
+                    },
                 )
 
                 # Sanitize extra_args: deduplicate flags, extract verbosity
@@ -189,7 +187,7 @@ class CheckerTools:
 
                 # Log any deduplication notes
                 for note in sanitized.notes:
-                    structured_logger.info("extra_args sanitized", note=note)
+                    logger.info("extra_args sanitized", extra={"note": note})
 
                 # Run pytest
                 test_results = check_code_with_pytest(
@@ -217,29 +215,34 @@ class CheckerTools:
 
                 if test_results.get("success"):
                     summary = test_results.get("summary", {})
-                    structured_logger.info(
+                    logger.info(
                         "Pytest execution completed",
-                        passed=summary.get("passed", 0) or 0,
-                        failed=summary.get("failed", 0) or 0,
-                        errors=summary.get("error", 0) or 0,
-                        duration=summary.get("duration", 0) or 0,
+                        extra={
+                            "passed": summary.get("passed", 0) or 0,
+                            "failed": summary.get("failed", 0) or 0,
+                            "errors": summary.get("error", 0) or 0,
+                            "duration": summary.get("duration", 0) or 0,
+                        },
                     )
                 else:
-                    structured_logger.error(
+                    logger.error(
                         "Pytest execution failed",
-                        error=test_results.get("error", "Unknown error"),
+                        extra={
+                            "error": test_results.get("error", "Unknown error"),
+                        },
                     )
 
                 return result
 
             except Exception as e:
                 error_msg = f"Unexpected error running pytest: {type(e).__name__}: {e}"
-                logger.error(error_msg)
-                structured_logger.error(
+                logger.error(
                     "Pytest check failed",
-                    error=str(e),
-                    error_type=type(e).__name__,
-                    project_dir=str(self._server.project_dir),
+                    extra={
+                        "error": str(e),
+                        "error_type": type(e).__name__,
+                        "project_dir": str(self._server.project_dir),
+                    },
                 )
                 return error_msg
 
@@ -299,14 +302,13 @@ class CheckerTools:
 
             try:
                 logger.info(
-                    f"Running mypy check on project directory: {self._server.project_dir}"
-                )
-                structured_logger.info(
                     "Starting mypy check",
-                    project_dir=str(self._server.project_dir),
-                    strict=strict,
-                    disable_error_codes=disable_error_codes,
-                    target_directories=target_directories,
+                    extra={
+                        "project_dir": str(self._server.project_dir),
+                        "strict": strict,
+                        "disable_error_codes": disable_error_codes,
+                        "target_directories": target_directories,
+                    },
                 )
 
                 # Run mypy check
@@ -323,21 +325,24 @@ class CheckerTools:
                 # Format result
                 result = self._format_mypy_result(mypy_prompt)
 
-                structured_logger.info(
+                logger.info(
                     "Mypy check completed",
-                    issues_found=mypy_prompt is not None,
-                    result_length=len(result),
+                    extra={
+                        "issues_found": mypy_prompt is not None,
+                        "result_length": len(result),
+                    },
                 )
 
                 return result
 
             except Exception as e:
-                logger.error(f"Error running mypy check: {str(e)}")
-                structured_logger.error(
+                logger.error(
                     "Mypy check failed",
-                    error=str(e),
-                    error_type=type(e).__name__,
-                    project_dir=str(self._server.project_dir),
+                    extra={
+                        "error": str(e),
+                        "error_type": type(e).__name__,
+                        "project_dir": str(self._server.project_dir),
+                    },
                 )
                 raise
 
@@ -369,13 +374,11 @@ class CheckerTools:
 
             try:
                 logger.info(
-                    f"Running lint-imports check on project directory: "
-                    f"{self._server.project_dir}"
-                )
-                structured_logger.info(
                     "Starting lint-imports check",
-                    project_dir=str(self._server.project_dir),
-                    extra_args=extra_args,
+                    extra={
+                        "project_dir": str(self._server.project_dir),
+                        "extra_args": extra_args,
+                    },
                 )
 
                 binary = self._server._lint_imports_binary
@@ -387,10 +390,12 @@ class CheckerTools:
                 if result.stderr:
                     output = output + "\n" + result.stderr if output else result.stderr
 
-                structured_logger.info(
+                logger.info(
                     "lint-imports check completed",
-                    return_code=result.return_code,
-                    output_length=len(output),
+                    extra={
+                        "return_code": result.return_code,
+                        "output_length": len(output),
+                    },
                 )
 
                 return output.strip() or "lint-imports produced no output."
@@ -400,12 +405,13 @@ class CheckerTools:
                     f"Unexpected error running lint-imports: "
                     f"{type(e).__name__}: {e}"
                 )
-                logger.error(error_msg)
-                structured_logger.error(
+                logger.error(
                     "lint-imports check failed",
-                    error=str(e),
-                    error_type=type(e).__name__,
-                    project_dir=str(self._server.project_dir),
+                    extra={
+                        "error": str(e),
+                        "error_type": type(e).__name__,
+                        "project_dir": str(self._server.project_dir),
+                    },
                 )
                 return error_msg
 
@@ -441,15 +447,13 @@ class CheckerTools:
 
             try:
                 logger.info(
-                    f"Running vulture check on project directory: "
-                    f"{self._server.project_dir}"
-                )
-                structured_logger.info(
                     "Starting vulture check",
-                    project_dir=str(self._server.project_dir),
-                    target_directories=target_directories,
-                    min_confidence=min_confidence,
-                    extra_args=extra_args,
+                    extra={
+                        "project_dir": str(self._server.project_dir),
+                        "target_directories": target_directories,
+                        "min_confidence": min_confidence,
+                        "extra_args": extra_args,
+                    },
                 )
 
                 binary = self._server._vulture_binary
@@ -476,10 +480,12 @@ class CheckerTools:
                 if result.stderr:
                     output = output + "\n" + result.stderr if output else result.stderr
 
-                structured_logger.info(
+                logger.info(
                     "vulture check completed",
-                    return_code=result.return_code,
-                    output_length=len(output),
+                    extra={
+                        "return_code": result.return_code,
+                        "output_length": len(output),
+                    },
                 )
 
                 return output.strip() or "vulture produced no output."
@@ -488,12 +494,13 @@ class CheckerTools:
                 error_msg = (
                     f"Unexpected error running vulture: " f"{type(e).__name__}: {e}"
                 )
-                logger.error(error_msg)
-                structured_logger.error(
+                logger.error(
                     "vulture check failed",
-                    error=str(e),
-                    error_type=type(e).__name__,
-                    project_dir=str(self._server.project_dir),
+                    extra={
+                        "error": str(e),
+                        "error_type": type(e).__name__,
+                        "project_dir": str(self._server.project_dir),
+                    },
                 )
                 return error_msg
 
