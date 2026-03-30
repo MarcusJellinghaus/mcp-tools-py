@@ -46,4 +46,27 @@
 - Narrowed `__init__.py` re-exports to match upstream
 - Updated tests for new API signatures
 
-**Status**: Ready to commit
+**Status**: Committed (3313884)
+
+## Round 2 — 2026-03-30
+
+**Findings**:
+- 2.1 Missing provenance comment in module docstring (cosmetic)
+- 2.2 Redundant exception subclasses in handler (matches upstream)
+- 3.1 Unused test imports for re-exported exceptions (implicit re-export test)
+- 3.2 Missing inline comments on type:ignore directives (cosmetic)
+- 3.3 Fragile inspect-based test (already skipped in round 1)
+- 3.4 Trimmed __init__.py API — verified no consumers break
+
+**Decisions**: All **Skip** — cosmetic, matches upstream exactly, or already addressed
+
+**Changes**: None
+
+**Status**: No changes needed
+
+## Final Status
+
+- **Rounds**: 2
+- **Commits**: 1 (3313884)
+- **Open issues**: None — all critical and accept items resolved in round 1
+- **Upstream alignment**: subprocess_runner.py now mirrors p_coder reference
