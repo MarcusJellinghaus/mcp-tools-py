@@ -318,12 +318,9 @@ def _run_subprocess(  # pylint: disable=too-many-statements
                         # Kill the process and all children
                         if popen_proc:
                             elapsed_time = time.time() - subprocess_start_time
-                            cmd_display = " ".join(command[:3]) + (
-                                "..." if len(command) > 3 else ""
-                            )
                             logger.warning(
                                 f"Killing timed out process (STDIO isolation, PID: {popen_proc.pid}): "
-                                f"command='{cmd_display}', timeout={options.timeout_seconds}s, "
+                                f"command='{format_command(command)}', timeout={options.timeout_seconds}s, "
                                 f"elapsed={elapsed_time:.1f}s, cwd='{options.cwd or 'current'}'"
                             )
 
@@ -491,12 +488,9 @@ def _run_subprocess(  # pylint: disable=too-many-statements
                     # Kill the process tree on timeout
                     if popen_proc:
                         elapsed_time = time.time() - subprocess_start_time
-                        cmd_display = " ".join(command[:3]) + (
-                            "..." if len(command) > 3 else ""
-                        )
                         logger.warning(
                             f"Killing timed out process (regular execution, PID: {popen_proc.pid}): "
-                            f"command='{cmd_display}', timeout={options.timeout_seconds}s, "
+                            f"command='{format_command(command)}', timeout={options.timeout_seconds}s, "
                             f"elapsed={elapsed_time:.1f}s, cwd='{options.cwd or 'current'}'"
                         )
 
@@ -631,7 +625,7 @@ def execute_subprocess(
     )
     use_isolation = is_python_command(command) and not disable_isolation
 
-    logger.debug(f"Starting subprocess execution: {command[:3] if command else None}")
+    logger.debug(f"Starting subprocess execution: {format_command(command)}")
 
     stop_event = None
     heartbeat_thread = None
@@ -701,7 +695,10 @@ def execute_subprocess(
     except (FileNotFoundError, PermissionError, OSError) as e:
         # Handle file system and permission errors
         execution_time_ms = int((time.time() - start_time) * 1000)
-        logger.error(f"Subprocess execution failed: {type(e).__name__}: {e}")
+        logger.error(
+            f"Subprocess execution failed: {type(e).__name__}: {e}, "
+            f"command='{format_command(command)}', cwd='{options.cwd or 'current'}'"
+        )
         return CommandResult(
             return_code=1,
             stdout="",

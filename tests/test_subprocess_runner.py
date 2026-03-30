@@ -1013,6 +1013,55 @@ class TestLaunchProcess:
             assert call_kwargs["shell"] is True
 
 
+class TestLogOutput:
+    """Tests verifying log messages use format_command() output."""
+
+    def test_debug_log_contains_full_command(self) -> None:
+        """Verify DEBUG log at execution start contains the full formatted command."""
+        command = [sys.executable, "-c", "print('hello')"]
+        with patch("mcp_tools_py.utils.subprocess_runner.logger") as mock_logger:
+            execute_subprocess(command)
+
+        # Find the debug call with "Starting subprocess execution"
+        debug_calls = [str(c) for c in mock_logger.debug.call_args_list]
+        matching = [c for c in debug_calls if "Starting subprocess execution" in c]
+        assert (
+            matching
+        ), f"No DEBUG log with 'Starting subprocess execution' found in {debug_calls}"
+        # Should contain all command parts, not just first 3
+        log_text = matching[0]
+        assert "print" in log_text, f"Expected full command in log, got: {log_text}"
+
+    def test_error_log_includes_command_and_cwd(self) -> None:
+        """Verify ERROR log on failure includes command= and cwd= fields."""
+        command = ["nonexistent_command_12345"]
+        options = CommandOptions(cwd="/some/path")
+        with patch("mcp_tools_py.utils.subprocess_runner.logger") as mock_logger:
+            execute_subprocess(command, options)
+
+        # Find the error call
+        error_calls = [str(c) for c in mock_logger.error.call_args_list]
+        assert error_calls, "No ERROR log was emitted"
+        error_text = error_calls[0]
+        assert (
+            "command=" in error_text
+        ), f"Expected 'command=' in error log: {error_text}"
+        assert "cwd=" in error_text, f"Expected 'cwd=' in error log: {error_text}"
+        assert "nonexistent_command_12345" in error_text
+        assert "/some/path" in error_text
+
+    def test_error_log_cwd_shows_current_when_none(self) -> None:
+        """Verify ERROR log shows 'current' when cwd is None."""
+        command = ["nonexistent_command_12345"]
+        with patch("mcp_tools_py.utils.subprocess_runner.logger") as mock_logger:
+            execute_subprocess(command)
+
+        error_calls = [str(c) for c in mock_logger.error.call_args_list]
+        assert error_calls, "No ERROR log was emitted"
+        error_text = error_calls[0]
+        assert "cwd='current'" in error_text, f"Expected cwd='current' in: {error_text}"
+
+
 class TestHeartbeat:
     """Tests for _run_heartbeat."""
 
