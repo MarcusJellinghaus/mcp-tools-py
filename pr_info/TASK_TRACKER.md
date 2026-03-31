@@ -31,8 +31,8 @@ This tracks **Feature Implementation** consisting of multiple **Tasks**.
 ### Step 2: Create `code_checker_vulture/` runner module + tests
 > [Detail](./steps/step_2.md) — new `src/mcp_tools_py/code_checker_vulture/` package, `tach.toml`
 
-- [ ] Implementation: tests (`tests/test_code_checker_vulture/test_runners.py`) + `runners.py` + `__init__.py` + `tach.toml` update
-- [ ] Quality checks: pylint, pytest, mypy — fix all issues
+- [x] Implementation: tests (`tests/test_code_checker_vulture/test_runners.py`) + `runners.py` + `__init__.py` + `tach.toml` update
+- [x] Quality checks: pylint, pytest, mypy — fix all issues
 - [ ] Commit: `refactor: extract vulture runner into code_checker_vulture module`
 
 ### Step 3: Wire up all 3 tools in `checker_tools.py` + update runners + update tests
