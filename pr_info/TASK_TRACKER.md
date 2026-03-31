@@ -33,7 +33,7 @@ This tracks **Feature Implementation** consisting of multiple **Tasks**.
 
 - [x] Implementation: tests (`tests/test_code_checker_vulture/test_runners.py`) + `runners.py` + `__init__.py` + `tach.toml` update
 - [x] Quality checks: pylint, pytest, mypy — fix all issues
-- [ ] Commit: `refactor: extract vulture runner into code_checker_vulture module`
+- [x] Commit: `refactor: extract vulture runner into code_checker_vulture module`
 
 ### Step 3: Wire up all 3 tools in `checker_tools.py` + update runners + update tests
 > [Detail](./steps/step_3.md) — `checker_tools.py`, pylint/mypy runners & reporting, `formatter_tools.py`, `test_checker_tools.py`
