@@ -186,8 +186,9 @@ def run_tests(
 
         logger.debug("Running command: %s", " ".join(command))
 
-        # Prepare environment variables
-        env = os.environ.copy()
+        # Build additive env vars — prepare_env() in subprocess_runner
+        # handles the base environment (os.environ copy + Python isolation).
+        env: Dict[str, str] = {}
         if env_vars:
             env.update(env_vars)
 
@@ -202,7 +203,7 @@ def run_tests(
             else:  # Unix-like systems
                 venv_bin = os.path.join(venv_path, "bin")
 
-            env["PATH"] = f"{venv_bin}{os.pathsep}{env.get('PATH', '')}"
+            env["PATH"] = f"{venv_bin}{os.pathsep}{os.environ.get('PATH', '')}"
 
         try:
             # Print command for debugging
