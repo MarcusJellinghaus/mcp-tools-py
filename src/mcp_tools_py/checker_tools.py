@@ -54,7 +54,7 @@ class CheckerTools:
 
             Args:
                 extra_args: Additional pylint arguments.
-                target_directories: Directories to analyze relative to project_dir. Defaults to ["src"] and "tests" if it exists.
+                target_directories: Directories to analyze relative to project_dir. Auto-detected from pyproject.toml when None.
                 max_issues: Number of issue types to show in detail (default: 1). Remaining issues shown as summary counts.
             """
             if not self._server._tool_availability.get("pylint", False):
@@ -280,7 +280,7 @@ class CheckerTools:
                     - 'attr-defined': Attribute not defined errors
                     - 'var-annotated': Missing variable annotations
                 target_directories: Optional list of directories to check relative to project_dir.
-                    Defaults to ["src"] and conditionally "tests" if it exists.
+                    Auto-detected from pyproject.toml when None.
                     Examples:
                     - ["src"] - Check only source code
                     - ["src", "tests"] - Check both source and tests
@@ -443,7 +443,7 @@ class CheckerTools:
 
             Args:
                 target_directories: Directories to scan relative to project_dir.
-                    Defaults to ["src"] and "tests" if it exists.
+                    Auto-detected from pyproject.toml when None.
                 extra_args: Additional vulture arguments.
                 min_confidence: Minimum confidence for reporting (default: 60).
 

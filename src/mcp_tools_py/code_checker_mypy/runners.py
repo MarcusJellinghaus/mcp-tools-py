@@ -50,7 +50,7 @@ def run_mypy_check(
         project_dir: Path to the project directory
         strict: Use strict mode settings (default: True)
         disable_error_codes: List of error codes to ignore (e.g., ['import', 'arg-type'])
-        target_directories: Directories to check (default: ['src', 'tests'])
+        target_directories: Directories to check (auto-detected from pyproject.toml when None)
         follow_imports: How to handle imports ('normal', 'silent', 'skip', 'error')
         python_executable: Python interpreter to use (default: sys.executable)
         cache_dir: Custom cache directory for incremental checking
