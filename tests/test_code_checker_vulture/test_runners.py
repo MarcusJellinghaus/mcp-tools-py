@@ -60,7 +60,7 @@ def test_run_vulture_no_output(mock_exec: Any) -> None:
 
 @patch(f"{MODULE_PATH}.os.path.exists", return_value=True)
 @patch(f"{MODULE_PATH}.execute_command")
-def test_run_vulture_includes_whitelist(mock_exec: Any, mock_exists: Any) -> None:
+def test_run_vulture_includes_whitelist(mock_exec: Any, _mock_exists: Any) -> None:
     """Provide whitelist_path to existing file, verify it's in command."""
     mock_exec.return_value = make_command_result(stdout="output")
 
@@ -77,7 +77,7 @@ def test_run_vulture_includes_whitelist(mock_exec: Any, mock_exists: Any) -> Non
 
 @patch(f"{MODULE_PATH}.os.path.exists", return_value=False)
 @patch(f"{MODULE_PATH}.execute_command")
-def test_run_vulture_skips_missing_whitelist(mock_exec: Any, mock_exists: Any) -> None:
+def test_run_vulture_skips_missing_whitelist(mock_exec: Any, _mock_exists: Any) -> None:
     """Provide whitelist_path to non-existent file, verify it's NOT in command."""
     mock_exec.return_value = make_command_result(stdout="output")
 
