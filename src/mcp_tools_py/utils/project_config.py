@@ -5,8 +5,11 @@ with sensible fallbacks when sections are missing.
 """
 
 import dataclasses
+import logging
 import os
 import tomllib
+
+logger = logging.getLogger(__name__)
 
 
 @dataclasses.dataclass
@@ -104,3 +107,27 @@ def get_target_directories(project_dir: str) -> TargetDirs:
         raise ValueError(f"No target directories found: {combined}")
 
     return TargetDirs(directories=existing, warnings=warnings)
+
+
+def resolve_target_directories(
+    project_dir: str,
+    target_directories: list[str] | None,
+) -> list[str] | str:
+    """Resolve target directories, auto-detecting from pyproject.toml if needed.
+
+    Args:
+        project_dir: Path to project root.
+        target_directories: Explicit directories, or None to auto-detect.
+
+    Returns:
+        A list of directory names on success, or an error message string on failure.
+    """
+    if target_directories is not None:
+        return target_directories
+    try:
+        result = get_target_directories(project_dir)
+        for warning in result.warnings:
+            logger.warning(warning)
+        return result.directories
+    except ValueError as exc:
+        return f"Error resolving target directories: {exc}"

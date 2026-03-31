@@ -24,9 +24,9 @@ This tracks **Feature Implementation** consisting of multiple **Tasks**.
 ### Step 1: Add `resolve_target_directories()` helper + tests
 > [Detail](./steps/step_1.md) — `src/mcp_tools_py/utils/project_config.py`, `tests/test_project_config.py`
 
-- [ ] Implementation: tests (`TestResolveTargetDirectories`) + production code in `utils/project_config.py`
-- [ ] Quality checks: pylint, pytest, mypy — fix all issues
-- [ ] Commit: `refactor: add shared resolve_target_directories helper`
+- [x] Implementation: tests (`TestResolveTargetDirectories`) + production code in `utils/project_config.py`
+- [x] Quality checks: pylint, pytest, mypy — fix all issues
+- [x] Commit: `refactor: add shared resolve_target_directories helper`
 
 ### Step 2: Create `code_checker_vulture/` runner module + tests
 > [Detail](./steps/step_2.md) — new `src/mcp_tools_py/code_checker_vulture/` package, `tach.toml`
