@@ -463,6 +463,10 @@ class TestServerPylintMaxIssues:
             patch(
                 "mcp_tools_py.checker_tools.get_pylint_prompt"
             ) as mock_get_pylint_prompt,
+            patch(
+                "mcp_tools_py.checker_tools.resolve_target_directories",
+                return_value=["src"],
+            ),
         ):
             mock_tool = MagicMock()
             mock_fastmcp.return_value.tool.return_value = mock_tool
@@ -485,6 +489,10 @@ class TestServerPylintMaxIssues:
             patch(
                 "mcp_tools_py.checker_tools.get_pylint_prompt"
             ) as mock_get_pylint_prompt,
+            patch(
+                "mcp_tools_py.checker_tools.resolve_target_directories",
+                return_value=["src"],
+            ),
         ):
             mock_tool = MagicMock()
             mock_fastmcp.return_value.tool.return_value = mock_tool

@@ -1,7 +1,6 @@
 """Checker tools extracted from server.py for pylint, pytest, mypy, lint-imports, and vulture."""
 
 import logging
-import os
 from typing import TYPE_CHECKING, Any, Dict, List, Optional
 
 from mcp_tools_py.code_checker_mypy import get_mypy_prompt
@@ -15,7 +14,9 @@ from mcp_tools_py.code_checker_pytest.reporting import (
 )
 from mcp_tools_py.code_checker_pytest.runners import check_code_with_pytest
 from mcp_tools_py.code_checker_pytest.utils import sanitize_extra_args
+from mcp_tools_py.code_checker_vulture import run_vulture_check as run_vulture
 from mcp_tools_py.log_utils import log_function_call
+from mcp_tools_py.utils.project_config import resolve_target_directories
 from mcp_tools_py.utils.subprocess_runner import execute_command
 
 if TYPE_CHECKING:
@@ -64,13 +65,19 @@ class CheckerTools:
                     f"Restart the server after installing."
                 )
 
+            resolved = resolve_target_directories(
+                str(self._server.project_dir), target_directories
+            )
+            if isinstance(resolved, str):
+                return resolved
+
             try:
                 logger.info(
                     "Starting pylint check",
                     extra={
                         "project_dir": str(self._server.project_dir),
                         "extra_args": extra_args,
-                        "target_directories": target_directories,
+                        "target_directories": resolved,
                         "max_issues": max_issues,
                     },
                 )
@@ -79,7 +86,7 @@ class CheckerTools:
                     str(self._server.project_dir),
                     python_executable=self._server._resolved_python,
                     extra_args=extra_args,
-                    target_directories=target_directories,
+                    target_directories=resolved,
                     max_issues=max_issues,
                 )
 
@@ -300,6 +307,12 @@ class CheckerTools:
                     f"Restart the server after installing."
                 )
 
+            resolved = resolve_target_directories(
+                str(self._server.project_dir), target_directories
+            )
+            if isinstance(resolved, str):
+                return resolved
+
             try:
                 logger.info(
                     "Starting mypy check",
@@ -307,7 +320,7 @@ class CheckerTools:
                         "project_dir": str(self._server.project_dir),
                         "strict": strict,
                         "disable_error_codes": disable_error_codes,
-                        "target_directories": target_directories,
+                        "target_directories": resolved,
                     },
                 )
 
@@ -317,7 +330,7 @@ class CheckerTools:
                     python_executable=self._server._resolved_python,
                     strict=strict,
                     disable_error_codes=disable_error_codes,
-                    target_directories=target_directories,
+                    target_directories=resolved,
                     follow_imports=follow_imports,
                     cache_dir=cache_dir,
                 )
@@ -445,12 +458,18 @@ class CheckerTools:
                     f"and --venv-path is configured. Restart the server after installing."
                 )
 
+            resolved = resolve_target_directories(
+                str(self._server.project_dir), target_directories
+            )
+            if isinstance(resolved, str):
+                return resolved
+
             try:
                 logger.info(
                     "Starting vulture check",
                     extra={
                         "project_dir": str(self._server.project_dir),
-                        "target_directories": target_directories,
+                        "target_directories": resolved,
                         "min_confidence": min_confidence,
                         "extra_args": extra_args,
                     },
@@ -460,35 +479,26 @@ class CheckerTools:
                 assert binary is not None  # guarded by availability check above
 
                 project_dir = self._server.project_dir
-                tests_dir = os.path.join(str(project_dir), "tests")
-                dirs = target_directories or (
-                    ["src"] + (["tests"] if os.path.isdir(tests_dir) else [])
-                )
                 whitelist_path = project_dir / self._server.vulture_whitelist
-                paths = dirs + (
-                    [str(whitelist_path)] if whitelist_path.exists() else []
-                )
-                command = (
-                    [binary]
-                    + paths
-                    + ["--min-confidence", str(min_confidence)]
-                    + (extra_args or [])
-                )
-                result = execute_command(command, cwd=str(project_dir))
+                whitelist = str(whitelist_path) if whitelist_path.exists() else None
 
-                output = result.stdout
-                if result.stderr:
-                    output = output + "\n" + result.stderr if output else result.stderr
+                output = run_vulture(
+                    vulture_binary=binary,
+                    project_dir=str(project_dir),
+                    target_directories=resolved,
+                    min_confidence=min_confidence,
+                    extra_args=extra_args,
+                    whitelist_path=whitelist,
+                )
 
                 logger.info(
                     "vulture check completed",
                     extra={
-                        "return_code": result.return_code,
                         "output_length": len(output),
                     },
                 )
 
-                return output.strip() or "vulture produced no output."
+                return output
 
             except Exception as e:
                 error_msg = (

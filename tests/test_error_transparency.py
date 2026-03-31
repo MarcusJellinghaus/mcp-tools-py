@@ -109,7 +109,11 @@ class TestPylintNoModuleDetection:
             stderr="No module named pylint",
             execution_error="ModuleNotFoundError: No module named 'pylint'",
         )
-        result = get_pylint_results(project_dir=".", python_executable=sys.executable)
+        result = get_pylint_results(
+            project_dir=".",
+            python_executable=sys.executable,
+            target_directories=["src"],
+        )
         assert result.error is not None
         assert "pylint is not installed" in result.error
 
@@ -120,7 +124,11 @@ class TestPylintNoModuleDetection:
             stderr="some pylint subprocess error",
             execution_error="Command failed",
         )
-        result = get_pylint_results(project_dir=".", python_executable=sys.executable)
+        result = get_pylint_results(
+            project_dir=".",
+            python_executable=sys.executable,
+            target_directories=["src"],
+        )
         assert result.error is not None
         assert "Command failed" in result.error
         assert "some pylint subprocess error" in result.error
@@ -141,7 +149,11 @@ class TestMypyNoModuleDetection:
             stderr="No module named mypy",
             execution_error="ModuleNotFoundError: No module named 'mypy'",
         )
-        result = run_mypy_check(project_dir=".", python_executable=sys.executable)
+        result = run_mypy_check(
+            project_dir=".",
+            python_executable=sys.executable,
+            target_directories=["src"],
+        )
         assert result.error is not None
         assert "mypy is not installed" in result.error
 
@@ -152,7 +164,11 @@ class TestMypyNoModuleDetection:
             stderr="some mypy subprocess error",
             execution_error="Command failed",
         )
-        result = run_mypy_check(project_dir=".", python_executable=sys.executable)
+        result = run_mypy_check(
+            project_dir=".",
+            python_executable=sys.executable,
+            target_directories=["src"],
+        )
         assert result.error is not None
         assert "Command failed" in result.error
         assert "some mypy subprocess error" in result.error

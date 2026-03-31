@@ -65,17 +65,9 @@ def run_mypy_check(
     # Convert to absolute path
     project_dir = os.path.abspath(project_dir)
 
-    # Set default target directories
-    if target_directories is None:
-        target_directories = []
-        for default_dir in ["src", "tests"]:
-            dir_path = os.path.join(project_dir, default_dir)
-            if os.path.exists(dir_path):
-                target_directories.append(default_dir)
-
     # Validate target directories exist
     valid_directories = []
-    for directory in target_directories:
+    for directory in target_directories or []:
         full_path = os.path.join(project_dir, directory)
         if os.path.exists(full_path):
             valid_directories.append(directory)

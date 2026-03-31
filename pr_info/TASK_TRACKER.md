@@ -38,8 +38,8 @@ This tracks **Feature Implementation** consisting of multiple **Tasks**.
 ### Step 3: Wire up all 3 tools in `checker_tools.py` + update runners + update tests
 > [Detail](./steps/step_3.md) — `checker_tools.py`, pylint/mypy runners & reporting, `formatter_tools.py`, `test_checker_tools.py`
 
-- [ ] Implementation: update `checker_tools.py` to use `resolve_target_directories` + `run_vulture_check`; remove fallback logic from pylint/mypy runners; update reporting signatures; refactor `formatter_tools.py`; update tests
-- [ ] Quality checks: pylint, pytest, mypy — fix all issues
+- [x] Implementation: update `checker_tools.py` to use `resolve_target_directories` + `run_vulture_check`; remove fallback logic from pylint/mypy runners; update reporting signatures; refactor `formatter_tools.py`; update tests
+- [x] Quality checks: pylint, pytest, mypy — fix all issues
 - [ ] Commit: `refactor: use pyproject.toml auto-detection in checker tools`
 
 ## Pull Request

@@ -58,6 +58,7 @@ def test_get_pylint_results_no_issues(temp_project_dir: Path) -> None:
         str(temp_project_dir),
         python_executable=sys.executable,
         extra_args=["--disable=C0114,C0116"],
+        target_directories=["src"],
     )
     assert result.return_code == 0
     assert not result.messages
@@ -70,7 +71,11 @@ def test_get_pylint_results_with_issues(temp_project_dir: Path) -> None:
         os.path.join(temp_project_dir, "src", "test_module.py"),
         "def hello():\n    print('hello')\n",
     )
-    result = get_pylint_results(str(temp_project_dir), python_executable=sys.executable)
+    result = get_pylint_results(
+        str(temp_project_dir),
+        python_executable=sys.executable,
+        target_directories=["src"],
+    )
     # assert result.return_code == 0
     assert len(result.messages) > 0
     assert result.error is None
@@ -89,7 +94,11 @@ def test_get_pylint_results_pylint_error(temp_project_dir: Path) -> None:
         os.path.join(temp_project_dir, "src", "test_module.py"),
         "def hello()\n    print('hello')\n",
     )  # missing colon
-    result = get_pylint_results(str(temp_project_dir), python_executable=sys.executable)
+    result = get_pylint_results(
+        str(temp_project_dir),
+        python_executable=sys.executable,
+        target_directories=["src"],
+    )
 
     assert result.return_code != 0
     # assert result.messages == []
@@ -100,7 +109,11 @@ def test_get_pylint_results_empty_file(temp_project_dir: Path) -> None:
     """Tests get_pylint_results with an empty python file"""
     write_file(os.path.join(temp_project_dir, "src", "empty_file.py"), "")
 
-    result = get_pylint_results(str(temp_project_dir), python_executable=sys.executable)
+    result = get_pylint_results(
+        str(temp_project_dir),
+        python_executable=sys.executable,
+        target_directories=["src"],
+    )
     assert result.return_code == 0
     assert len(result.messages) == 0
     assert result.error is None

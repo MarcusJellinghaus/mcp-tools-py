@@ -244,9 +244,16 @@ def test_vulture_success_returns_raw_output(mock_server: MagicMock) -> None:
     """When vulture succeeds, return raw stdout."""
     run_vulture = _capture_vulture(mock_server)
 
-    with patch(
-        "mcp_tools_py.checker_tools.execute_command",
-        return_value=make_command_result(return_code=0, stdout="No dead code found!"),
+    with (
+        patch(
+            "mcp_tools_py.checker_tools.run_vulture",
+            return_value="No dead code found!",
+        ),
+        patch(
+            "mcp_tools_py.checker_tools.resolve_target_directories",
+            return_value=["src"],
+        ),
+        patch.object(Path, "exists", return_value=False),
     ):
         result = run_vulture()
 
@@ -257,50 +264,156 @@ def test_vulture_failure_returns_raw_output(mock_server: MagicMock) -> None:
     """When vulture fails, return raw stdout+stderr."""
     run_vulture = _capture_vulture(mock_server)
 
-    with patch(
-        "mcp_tools_py.checker_tools.execute_command",
-        return_value=make_command_result(
-            return_code=1, stderr="vulture: error: invalid config"
+    with (
+        patch(
+            "mcp_tools_py.checker_tools.run_vulture",
+            return_value="vulture: error: invalid config",
         ),
+        patch(
+            "mcp_tools_py.checker_tools.resolve_target_directories",
+            return_value=["src"],
+        ),
+        patch.object(Path, "exists", return_value=False),
     ):
         result = run_vulture()
 
     assert "vulture: error: invalid config" in result
 
 
-def test_vulture_whitelist_auto_included(mock_server: MagicMock) -> None:
-    """When whitelist file exists, it is appended to the command."""
+def test_vulture_passes_whitelist_to_runner(mock_server: MagicMock) -> None:
+    """When whitelist file exists, it is passed to run_vulture_check."""
     run_vulture = _capture_vulture(mock_server)
 
     with (
         patch(
-            "mcp_tools_py.checker_tools.execute_command",
-            return_value=make_command_result(return_code=0, stdout="ok"),
-        ) as mock_exec,
+            "mcp_tools_py.checker_tools.run_vulture",
+            return_value="ok",
+        ) as mock_runner,
+        patch(
+            "mcp_tools_py.checker_tools.resolve_target_directories",
+            return_value=["src"],
+        ),
         patch.object(Path, "exists", return_value=True),
     ):
         run_vulture()
 
-    cmd = mock_exec.call_args[0][0]
     whitelist_str = str(Path("/fake/project") / "vulture_whitelist.py")
-    assert whitelist_str in cmd
+    assert mock_runner.call_args[1]["whitelist_path"] == whitelist_str
 
 
-def test_vulture_default_directories(mock_server: MagicMock) -> None:
-    """Verify default dirs are ["src"] (+ "tests" if exists)."""
-    run_vulture = _capture_vulture(mock_server)
+# --- Auto-detection tests ---
+
+
+def _capture_tool(
+    mock_server: MagicMock,
+    tool_name: str,
+) -> Any:
+    """Register checker tools and capture a specific tool function."""
+    captured_fns: dict[str, Any] = {}
+
+    def capture(fn: Any) -> Any:
+        captured_fns[fn.__name__] = fn
+        return fn
+
+    mock_mcp = MagicMock()
+    mock_mcp.tool.return_value = capture
+    checker = CheckerTools(mock_server)
+    checker.register(mock_mcp)
+    return captured_fns[tool_name]
+
+
+def test_pylint_auto_detects_directories(mock_server: MagicMock) -> None:
+    """Pylint uses resolve_target_directories when no dirs are given."""
+    run_pylint = _capture_tool(mock_server, "run_pylint_check")
 
     with (
         patch(
-            "mcp_tools_py.checker_tools.execute_command",
-            return_value=make_command_result(return_code=0, stdout="ok"),
-        ) as mock_exec,
-        patch("mcp_tools_py.checker_tools.os.path.isdir", return_value=False),
+            "mcp_tools_py.checker_tools.resolve_target_directories",
+            return_value=["src", "tests"],
+        ),
+        patch(
+            "mcp_tools_py.checker_tools.get_pylint_prompt",
+            return_value=None,
+        ) as mock_prompt,
+    ):
+        run_pylint()
+
+    assert mock_prompt.call_args[1]["target_directories"] == ["src", "tests"]
+
+
+def test_pylint_resolution_error_returns_message(mock_server: MagicMock) -> None:
+    """Pylint returns error string when directory resolution fails."""
+    run_pylint = _capture_tool(mock_server, "run_pylint_check")
+
+    with patch(
+        "mcp_tools_py.checker_tools.resolve_target_directories",
+        return_value="Error resolving target directories: No target directories found",
+    ):
+        result = run_pylint()
+
+    assert "Error resolving target directories" in result
+
+
+def test_mypy_auto_detects_directories(mock_server: MagicMock) -> None:
+    """Mypy uses resolve_target_directories when no dirs are given."""
+    run_mypy = _capture_tool(mock_server, "run_mypy_check")
+
+    with (
+        patch(
+            "mcp_tools_py.checker_tools.resolve_target_directories",
+            return_value=["src", "tests"],
+        ),
+        patch(
+            "mcp_tools_py.checker_tools.get_mypy_prompt",
+            return_value=None,
+        ) as mock_prompt,
+    ):
+        run_mypy()
+
+    assert mock_prompt.call_args[1]["target_directories"] == ["src", "tests"]
+
+
+def test_mypy_resolution_error_returns_message(mock_server: MagicMock) -> None:
+    """Mypy returns error string when directory resolution fails."""
+    run_mypy = _capture_tool(mock_server, "run_mypy_check")
+
+    with patch(
+        "mcp_tools_py.checker_tools.resolve_target_directories",
+        return_value="Error resolving target directories: No target directories found",
+    ):
+        result = run_mypy()
+
+    assert "Error resolving target directories" in result
+
+
+def test_vulture_auto_detects_directories(mock_server: MagicMock) -> None:
+    """Vulture uses resolve_target_directories when no dirs are given."""
+    run_vulture_fn = _capture_vulture(mock_server)
+
+    with (
+        patch(
+            "mcp_tools_py.checker_tools.resolve_target_directories",
+            return_value=["src", "tests"],
+        ),
+        patch(
+            "mcp_tools_py.checker_tools.run_vulture",
+            return_value="ok",
+        ) as mock_runner,
         patch.object(Path, "exists", return_value=False),
     ):
-        run_vulture()
+        run_vulture_fn()
 
-    cmd = mock_exec.call_args[0][0]
-    assert cmd[0] == "/mock/venv/bin/vulture"
-    assert "src" in cmd
-    assert "tests" not in cmd
+    assert mock_runner.call_args[1]["target_directories"] == ["src", "tests"]
+
+
+def test_vulture_resolution_error_returns_message(mock_server: MagicMock) -> None:
+    """Vulture returns error string when directory resolution fails."""
+    run_vulture_fn = _capture_vulture(mock_server)
+
+    with patch(
+        "mcp_tools_py.checker_tools.resolve_target_directories",
+        return_value="Error resolving target directories: No target directories found",
+    ):
+        result = run_vulture_fn()
+
+    assert "Error resolving target directories" in result
