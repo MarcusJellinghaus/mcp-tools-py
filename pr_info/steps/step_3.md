@@ -11,6 +11,9 @@ Connect everything together: use `resolve_target_directories()` in `checker_tool
 - `src/mcp_tools_py/checker_tools.py` — add directory resolution for all 3 tools
 - `src/mcp_tools_py/code_checker_pylint/runners.py` — remove fallback logic
 - `src/mcp_tools_py/code_checker_mypy/runners.py` — remove fallback logic
+- `src/mcp_tools_py/code_checker_pylint/reporting.py` — update `get_pylint_prompt` signature
+- `src/mcp_tools_py/code_checker_mypy/reporting.py` — update `get_mypy_prompt` signature
+- `src/mcp_tools_py/formatter_tools.py` — refactor to use `resolve_target_directories()`
 - `tests/test_checker_tools.py` — update tests for new behavior
 
 ## WHAT
@@ -51,6 +54,17 @@ if target_directories is None:
 ```
 
 **Change** parameter type from `Optional[List[str]]` to `List[str]` (remove `Optional` and `None` default).
+
+### Changes to `code_checker_pylint/reporting.py`
+Change `target_directories: Optional[list[str]] = None` to `target_directories: list[str]` in `get_pylint_prompt()`.
+
+### Changes to `code_checker_mypy/reporting.py`
+Change `target_directories: list[str] | None = None` to `target_directories: list[str]` in `get_mypy_prompt()`.
+
+### Changes to `formatter_tools.py`
+Replace the inline directory resolution logic (the `if target_directories is None: try: ...` block) with a call to `resolve_target_directories(str(self._server.project_dir), target_directories)` and the same `isinstance(resolved, str)` check pattern used by the checker tools.
+
+Import `resolve_target_directories` from `mcp_tools_py.utils.project_config`.
 
 ### Changes to `code_checker_mypy/runners.py`
 
@@ -97,7 +111,7 @@ checker_tools._register_vulture
 ### Update existing vulture tests
 - `test_vulture_success_returns_raw_output` — patch `mcp_tools_py.checker_tools.run_vulture` instead of `execute_command`
 - `test_vulture_failure_returns_raw_output` — same patch change
-- `test_vulture_whitelist_auto_included` — remove (whitelist is now handled inside the runner, tested in Step 2)
+- `test_vulture_whitelist_auto_included` — replace with `test_vulture_passes_whitelist_to_runner`: patch `run_vulture_check` and verify that `checker_tools.py` passes the correct `whitelist_path` argument when `self._server.vulture_whitelist` is set
 - `test_vulture_default_directories` — replace with auto-detection test (see below)
 
 ### Add new auto-detection tests for all 3 tools
@@ -134,8 +148,15 @@ Implement Step 3: Wire up resolve_target_directories in checker_tools.py for all
    - Remove fallback block, change target_directories to list[str]
 4. Update src/mcp_tools_py/code_checker_mypy/runners.py:
    - Remove fallback block, change target_directories to list[str]
-5. Run all three quality checks (pylint, mypy, pytest) and fix any issues
-6. Commit with message: "refactor: use pyproject.toml auto-detection in checker tools"
+5. Update src/mcp_tools_py/code_checker_pylint/reporting.py:
+   - Change target_directories param in get_pylint_prompt() to list[str]
+6. Update src/mcp_tools_py/code_checker_mypy/reporting.py:
+   - Change target_directories param in get_mypy_prompt() to list[str]
+7. Update src/mcp_tools_py/formatter_tools.py:
+   - Replace inline directory resolution with resolve_target_directories() call
+8. Replace test_vulture_whitelist_auto_included with test_vulture_passes_whitelist_to_runner
+9. Run all three quality checks (pylint, mypy, pytest) and fix any issues
+10. Commit with message: "refactor: use pyproject.toml auto-detection in checker tools"
 
 Use MCP tools for all file operations and quality checks per CLAUDE.md.
 ```

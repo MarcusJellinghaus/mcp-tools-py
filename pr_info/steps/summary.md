@@ -41,6 +41,9 @@ Callers check `isinstance(result, str)` for error; otherwise receive `list[str]`
 | `src/mcp_tools_py/checker_tools.py` | **Modified** | Use `resolve_target_directories()` for all 3 tools; call vulture runner |
 | `src/mcp_tools_py/code_checker_pylint/runners.py` | **Modified** | Remove fallback logic, make `target_directories` required (`list[str]`) |
 | `src/mcp_tools_py/code_checker_mypy/runners.py` | **Modified** | Remove fallback logic, make `target_directories` required (`list[str]`) |
+| `src/mcp_tools_py/code_checker_pylint/reporting.py` | **Modified** | Update `get_pylint_prompt` signature: `target_directories` becomes `list[str]` |
+| `src/mcp_tools_py/code_checker_mypy/reporting.py` | **Modified** | Update `get_mypy_prompt` signature: `target_directories` becomes `list[str]` |
+| `src/mcp_tools_py/formatter_tools.py` | **Modified** | Replace inline directory resolution with `resolve_target_directories()` |
 | `tach.toml` | **Modified** | Add `code_checker_vulture` module + dependency from `checker_tools` |
 | `tests/test_project_config.py` | **Modified** | Add tests for `resolve_target_directories()` |
 | `tests/test_checker_tools.py` | **Modified** | Update vulture tests for runner extraction; add auto-detection tests for all 3 tools |
