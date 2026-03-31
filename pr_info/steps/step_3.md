@@ -13,7 +13,7 @@ Connect everything together: use `resolve_target_directories()` in `checker_tool
 - `src/mcp_tools_py/code_checker_mypy/runners.py` — remove fallback logic
 - `src/mcp_tools_py/code_checker_pylint/reporting.py` — update `get_pylint_prompt` signature
 - `src/mcp_tools_py/code_checker_mypy/reporting.py` — update `get_mypy_prompt` signature
-- `src/mcp_tools_py/formatter_tools.py` — refactor to use `resolve_target_directories()`
+- `src/mcp_tools_py/formatter/formatter_tools.py` — refactor to use `resolve_target_directories()`
 - `tests/test_checker_tools.py` — update tests for new behavior
 
 ## WHAT
@@ -61,7 +61,7 @@ Change `target_directories: Optional[list[str]] = None` to `target_directories: 
 ### Changes to `code_checker_mypy/reporting.py`
 Change `target_directories: list[str] | None = None` to `target_directories: list[str]` in `get_mypy_prompt()`.
 
-### Changes to `formatter_tools.py`
+### Changes to `formatter/formatter_tools.py`
 Replace the inline directory resolution logic (the `if target_directories is None: try: ...` block) with a call to `resolve_target_directories(str(self._server.project_dir), target_directories)` and the same `isinstance(resolved, str)` check pattern used by the checker tools.
 
 Import `resolve_target_directories` from `mcp_tools_py.utils.project_config`.
@@ -152,7 +152,7 @@ Implement Step 3: Wire up resolve_target_directories in checker_tools.py for all
    - Change target_directories param in get_pylint_prompt() to list[str]
 6. Update src/mcp_tools_py/code_checker_mypy/reporting.py:
    - Change target_directories param in get_mypy_prompt() to list[str]
-7. Update src/mcp_tools_py/formatter_tools.py:
+7. Update src/mcp_tools_py/formatter/formatter_tools.py:
    - Replace inline directory resolution with resolve_target_directories() call
 8. Replace test_vulture_whitelist_auto_included with test_vulture_passes_whitelist_to_runner
 9. Run all three quality checks (pylint, mypy, pytest) and fix any issues
