@@ -21,6 +21,28 @@ This tracks **Feature Implementation** consisting of multiple **Tasks**.
 
 ## Tasks
 
-<!-- Tasks populated from pr_info/steps/ by prepare_task_tracker -->
+### Step 1: Add `resolve_target_directories()` helper + tests
+> [Detail](./steps/step_1.md) — `src/mcp_tools_py/utils/project_config.py`, `tests/test_project_config.py`
+
+- [ ] Implementation: tests (`TestResolveTargetDirectories`) + production code in `utils/project_config.py`
+- [ ] Quality checks: pylint, pytest, mypy — fix all issues
+- [ ] Commit: `refactor: add shared resolve_target_directories helper`
+
+### Step 2: Create `code_checker_vulture/` runner module + tests
+> [Detail](./steps/step_2.md) — new `src/mcp_tools_py/code_checker_vulture/` package, `tach.toml`
+
+- [ ] Implementation: tests (`tests/test_code_checker_vulture/test_runners.py`) + `runners.py` + `__init__.py` + `tach.toml` update
+- [ ] Quality checks: pylint, pytest, mypy — fix all issues
+- [ ] Commit: `refactor: extract vulture runner into code_checker_vulture module`
+
+### Step 3: Wire up all 3 tools in `checker_tools.py` + update runners + update tests
+> [Detail](./steps/step_3.md) — `checker_tools.py`, pylint/mypy runners & reporting, `formatter_tools.py`, `test_checker_tools.py`
+
+- [ ] Implementation: update `checker_tools.py` to use `resolve_target_directories` + `run_vulture_check`; remove fallback logic from pylint/mypy runners; update reporting signatures; refactor `formatter_tools.py`; update tests
+- [ ] Quality checks: pylint, pytest, mypy — fix all issues
+- [ ] Commit: `refactor: use pyproject.toml auto-detection in checker tools`
 
 ## Pull Request
+
+- [ ] PR review: verify all steps integrated correctly, no regressions
+- [ ] PR summary prepared
