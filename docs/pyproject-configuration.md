@@ -74,6 +74,33 @@ valid pylint option works here.
 
 ---
 
+## Target directory auto-detection
+
+When `target_directories` is omitted (or `None`), the checker tools (pylint, mypy,
+vulture) auto-detect which directories to analyze from `pyproject.toml`:
+
+| Setting | `pyproject.toml` key | Fallback |
+|---------|---------------------|----------|
+| Source dirs | `[tool.setuptools.packages.find] where` | `["src"]` |
+| Test dirs | `[tool.pytest.ini_options] testpaths` | `["tests"]` |
+
+Example `pyproject.toml` that would auto-detect `["src"]` and `["tests"]`:
+
+```toml
+[tool.setuptools.packages.find]
+where = ["src"]
+
+[tool.pytest.ini_options]
+testpaths = ["tests"]
+```
+
+Only directories that actually exist on disk are included. If none of the resolved
+directories exist, an error is returned.
+
+Pass an explicit `target_directories` list to override auto-detection.
+
+---
+
 ## Reference
 
 Full list of pylint message codes and categories:

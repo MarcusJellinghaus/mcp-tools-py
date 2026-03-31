@@ -196,7 +196,7 @@ def get_pylint_prompt(
     project_dir: str,
     python_executable: str,
     extra_args: Optional[list[str]] = None,
-    target_directories: Optional[list[str]] = None,
+    target_directories: list[str] | None = None,
     max_issues: int = 1,
 ) -> Optional[str]:
     """

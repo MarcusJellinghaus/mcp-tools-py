@@ -7,7 +7,6 @@ from unittest.mock import MagicMock, patch
 import pytest
 
 from mcp_tools_py.formatter.formatter_tools import FormatterTools
-from mcp_tools_py.utils.project_config import TargetDirs
 
 
 @pytest.fixture
@@ -120,7 +119,7 @@ class TestTargetDirectories:
     """Tests for target directory resolution."""
 
     def test_target_directories_auto_detected(self, mock_server: MagicMock) -> None:
-        """Mock get_target_directories, verify it's called when target_directories=None."""
+        """Mock resolve_target_directories, verify it's called when target_directories=None."""
         run_format = _capture_run_format_code(mock_server)
 
         def fake_runner(*_args: Any, **_kwargs: Any) -> tuple[str, bool]:
@@ -128,9 +127,9 @@ class TestTargetDirectories:
 
         with (
             patch(
-                "mcp_tools_py.formatter.formatter_tools.get_target_directories",
-                return_value=TargetDirs(directories=["src"], warnings=[]),
-            ) as mock_get_dirs,
+                "mcp_tools_py.formatter.formatter_tools.resolve_target_directories",
+                return_value=["src"],
+            ) as mock_resolve,
             patch(
                 "mcp_tools_py.formatter.formatter_tools._STEP_RUNNERS",
                 {"isort": fake_runner, "black": fake_runner},
@@ -138,10 +137,10 @@ class TestTargetDirectories:
         ):
             run_format()
 
-        mock_get_dirs.assert_called_once_with(str(mock_server.project_dir))
+        mock_resolve.assert_called_once_with(str(mock_server.project_dir), None)
 
     def test_target_directories_explicit(self, mock_server: MagicMock) -> None:
-        """Pass explicit dirs, verify get_target_directories NOT called."""
+        """Pass explicit dirs, verify resolve_target_directories returns them directly."""
         run_format = _capture_run_format_code(mock_server)
 
         def fake_runner(*_args: Any, **_kwargs: Any) -> tuple[str, bool]:
@@ -149,8 +148,9 @@ class TestTargetDirectories:
 
         with (
             patch(
-                "mcp_tools_py.formatter.formatter_tools.get_target_directories",
-            ) as mock_get_dirs,
+                "mcp_tools_py.formatter.formatter_tools.resolve_target_directories",
+                return_value=["src", "tests"],
+            ) as mock_resolve,
             patch(
                 "mcp_tools_py.formatter.formatter_tools._STEP_RUNNERS",
                 {"isort": fake_runner, "black": fake_runner},
@@ -158,7 +158,9 @@ class TestTargetDirectories:
         ):
             run_format(target_directories=["src", "tests"])
 
-        mock_get_dirs.assert_not_called()
+        mock_resolve.assert_called_once_with(
+            str(mock_server.project_dir), ["src", "tests"]
+        )
 
 
 class TestCheckOnlyMode:

@@ -50,7 +50,7 @@ def run_mypy_check(
         project_dir: Path to the project directory
         strict: Use strict mode settings (default: True)
         disable_error_codes: List of error codes to ignore (e.g., ['import', 'arg-type'])
-        target_directories: Directories to check (default: ['src', 'tests'])
+        target_directories: Directories to check (auto-detected from pyproject.toml when None)
         follow_imports: How to handle imports ('normal', 'silent', 'skip', 'error')
         python_executable: Python interpreter to use (default: sys.executable)
         cache_dir: Custom cache directory for incremental checking
@@ -65,17 +65,9 @@ def run_mypy_check(
     # Convert to absolute path
     project_dir = os.path.abspath(project_dir)
 
-    # Set default target directories
-    if target_directories is None:
-        target_directories = []
-        for default_dir in ["src", "tests"]:
-            dir_path = os.path.join(project_dir, default_dir)
-            if os.path.exists(dir_path):
-                target_directories.append(default_dir)
-
     # Validate target directories exist
     valid_directories = []
-    for directory in target_directories:
+    for directory in target_directories or []:
         full_path = os.path.join(project_dir, directory)
         if os.path.exists(full_path):
             valid_directories.append(directory)

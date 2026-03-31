@@ -85,8 +85,7 @@ def get_mypy_prompt(
     follow_imports: str | None = None,
     cache_dir: str | None = None,
 ) -> str | None:
-    """
-    Run mypy and generate an LLM prompt if issues are found.
+    """Run mypy and generate an LLM prompt if issues are found.
 
     This is a convenience function that combines running and reporting.
 

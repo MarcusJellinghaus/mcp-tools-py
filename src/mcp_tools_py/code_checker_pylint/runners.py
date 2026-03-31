@@ -4,7 +4,7 @@ Functions for running pylint analysis and processing results.
 
 import logging
 import os
-from typing import List, Optional
+from typing import List
 
 from mcp_tools_py.code_checker_pylint.models import PylintResult
 from mcp_tools_py.code_checker_pylint.parsers import parse_pylint_json_output
@@ -22,8 +22,8 @@ logger = logging.getLogger(__name__)
 def get_pylint_results(
     project_dir: str,
     python_executable: str,
-    extra_args: Optional[List[str]] = None,
-    target_directories: Optional[List[str]] = None,
+    extra_args: List[str] | None = None,
+    target_directories: List[str] | None = None,
 ) -> PylintResult:
     """
     Runs pylint on the specified project directory and returns the results.
@@ -34,7 +34,6 @@ def get_pylint_results(
             Examples: ["--disable=C0114,C0116"], ["--enable=W0613", "--disable=C"]
         python_executable: Path to Python executable to use for running pylint. Already resolved by server.
         target_directories: List of directories to analyze relative to project_dir.
-            Defaults to ["src"] and conditionally "tests" if it exists.
             Examples: ["src"], ["src", "tests"], ["mypackage", "tests"], ["."]
 
     Returns:
@@ -46,15 +45,9 @@ def get_pylint_results(
     if not os.path.isdir(project_dir):
         raise FileNotFoundError(f"Project directory not found: {project_dir}")
 
-    # Set default target directories if none provided
-    if target_directories is None:
-        target_directories = ["src"]
-        if os.path.exists(os.path.join(project_dir, "tests")):
-            target_directories.append("tests")
-
     # Validate that target directories exist
     valid_directories = []
-    for directory in target_directories:
+    for directory in target_directories or []:
         full_path = os.path.join(project_dir, directory)
         if os.path.exists(full_path):
             valid_directories.append(directory)

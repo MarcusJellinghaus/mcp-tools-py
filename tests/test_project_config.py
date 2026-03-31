@@ -1,11 +1,15 @@
 """Tests for utils.project_config module."""
 
+import logging
 import os
 import textwrap
 
 import pytest
 
-from mcp_tools_py.utils.project_config import get_target_directories
+from mcp_tools_py.utils.project_config import (
+    get_target_directories,
+    resolve_target_directories,
+)
 
 
 class TestGetTargetDirectories:
@@ -147,3 +151,70 @@ class TestGetTargetDirectories:
 
         with pytest.raises(ValueError, match="Invalid pyproject.toml"):
             get_target_directories(path)
+
+
+class TestResolveTargetDirectories:
+    """Tests for the resolve_target_directories function."""
+
+    def test_explicit_dirs_returned_as_is(self, tmp_path: object) -> None:
+        """When target_directories is provided, returns it without lookup."""
+        path = str(tmp_path)
+        result = resolve_target_directories(path, ["custom"])
+        assert result == ["custom"]
+
+    def test_auto_detects_from_pyproject(self, tmp_path: object) -> None:
+        """When target_directories=None, resolves from pyproject.toml."""
+        path = str(tmp_path)
+        os.makedirs(os.path.join(path, "src"))
+        os.makedirs(os.path.join(path, "tests"))
+        pyproject = textwrap.dedent("""\
+            [tool.setuptools.packages.find]
+            where = ["src"]
+
+            [tool.pytest.ini_options]
+            testpaths = ["tests"]
+        """)
+        with open(os.path.join(path, "pyproject.toml"), "w", encoding="utf-8") as f:
+            f.write(pyproject)
+
+        result = resolve_target_directories(path, None)
+
+        assert isinstance(result, list)
+        assert "src" in result
+        assert "tests" in result
+
+    def test_logs_fallback_warnings(
+        self, tmp_path: object, caplog: pytest.LogCaptureFixture
+    ) -> None:
+        """When pyproject.toml has no setuptools section, warnings are logged."""
+        path = str(tmp_path)
+        os.makedirs(os.path.join(path, "src"))
+        os.makedirs(os.path.join(path, "tests"))
+        # No pyproject.toml — triggers both fallback warnings
+
+        with caplog.at_level(
+            logging.WARNING, logger="mcp_tools_py.utils.project_config"
+        ):
+            result = resolve_target_directories(path, None)
+
+        assert isinstance(result, list)
+        assert len(caplog.records) >= 1
+        assert any("setuptools" in r.message for r in caplog.records)
+
+    def test_returns_error_string_on_valueerror(self, tmp_path: object) -> None:
+        """When no directories exist on disk, returns an error string."""
+        path = str(tmp_path)
+        pyproject = textwrap.dedent("""\
+            [tool.setuptools.packages.find]
+            where = ["src"]
+
+            [tool.pytest.ini_options]
+            testpaths = ["tests"]
+        """)
+        with open(os.path.join(path, "pyproject.toml"), "w", encoding="utf-8") as f:
+            f.write(pyproject)
+
+        result = resolve_target_directories(path, None)
+
+        assert isinstance(result, str)
+        assert result.startswith("Error resolving target directories:")

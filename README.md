@@ -33,7 +33,7 @@ The pylint tools expose the following parameters for customization:
 | Parameter | Type | Default | Description |
 |-----------|------|---------|-------------|
 | `extra_args` | list | None | Optional list of additional pylint CLI arguments (e.g. `["--disable=W0611"]`) |
-| `target_directories` | list | ["src", "tests"] | List of directories to analyze relative to project_dir |
+| `target_directories` | list | None (auto-detected) | Directories to analyze relative to project_dir. Auto-detected from `pyproject.toml` when omitted |
 
 ### Pylint Configuration
 
@@ -42,11 +42,20 @@ are reported by configuring `[tool.pylint.messages_control]` in your `pyproject.
 See [docs/pyproject-configuration.md](docs/pyproject-configuration.md) for examples
 and migration guidance.
 
-**Target Directories Examples:**
+### Target Directory Auto-Detection
+
+When `target_directories` is not specified, all checker tools (pylint, mypy, vulture)
+auto-detect directories from `pyproject.toml`:
+
+- **Source dirs** from `[tool.setuptools.packages.find] where` (fallback: `["src"]`)
+- **Test dirs** from `[tool.pytest.ini_options] testpaths` (fallback: `["tests"]`)
+
+Only directories that exist on disk are included. You can override auto-detection
+by passing an explicit list:
+
 - `["src"]` - Analyze only source code directory
-- `["src", "tests"]` - Analyze both source and test directories (default)
+- `["src", "tests"]` - Analyze both source and test directories
 - `["mypackage", "tests"]` - For projects with different package structures
-- `["lib", "scripts", "tests"]` - For complex multi-directory projects
 - `["."]` - Analyze entire project directory (may be slow for large projects)
 
 ### Pytest Parameters
@@ -70,7 +79,7 @@ The mypy tools expose the following parameters for customization:
 |-----------|------|---------|-------------|
 | `strict` | boolean | True | Use strict mode settings |
 | `disable_error_codes` | list | None | List of mypy error codes to ignore |
-| `target_directories` | list | ["src", "tests"] | List of directories to check relative to project_dir |
+| `target_directories` | list | None (auto-detected) | Directories to check relative to project_dir. Auto-detected from `pyproject.toml` when omitted |
 | `follow_imports` | string | 'normal' | How to handle imports during type checking |
 
 ## Command Line Interface (CLI)

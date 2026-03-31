@@ -7,7 +7,7 @@ from typing import TYPE_CHECKING
 from mcp_tools_py.formatter.black_runner import run_black
 from mcp_tools_py.formatter.isort_runner import run_isort
 from mcp_tools_py.log_utils import log_function_call
-from mcp_tools_py.utils.project_config import get_target_directories
+from mcp_tools_py.utils.project_config import resolve_target_directories
 
 if TYPE_CHECKING:
     from mcp_tools_py.server import FastMCPProtocol, ToolServer
@@ -63,18 +63,12 @@ class FormatterTools:
                 )
 
             # Resolve target directories
-            if target_directories is None:
-                try:
-                    target_result = get_target_directories(
-                        str(self._server.project_dir)
-                    )
-                    dirs = target_result.directories
-                    for warning in target_result.warnings:
-                        logger.warning(warning)
-                except ValueError as exc:
-                    return f"Error resolving target directories: {exc}"
-            else:
-                dirs = target_directories
+            resolved = resolve_target_directories(
+                str(self._server.project_dir), target_directories
+            )
+            if isinstance(resolved, str):
+                return resolved
+            dirs = resolved
 
             sections: list[str] = []
             for step in resolved_steps:
