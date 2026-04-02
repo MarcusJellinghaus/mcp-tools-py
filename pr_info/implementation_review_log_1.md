@@ -17,8 +17,28 @@
 **Decisions**:
 - Findings 1-4, 6-7: Skip — positive observations, no action needed
 - Finding 5 (inline `import re`): Accept — simple Boy Scout fix, move to top-level import per convention
-- Finding 6: Skip — non-issue
 
 **Changes**: Moved `import re` from inside two test function bodies to top-level import in `tests/test_checker_tools.py`
 
-**Status**: Ready to commit
+**Status**: Committed (6e3ea9d)
+
+## Round 2 — 2026-04-02
+
+**Findings**:
+- Function design, regex patterns, integration point, and test coverage all confirmed solid
+- `_ONLY_DASHES` matching single-dash lines: non-issue in practice (skip)
+- Stripping applied to error output too: correct behavior (skip)
+- Test regex uses Unicode escapes vs production literal chars: cosmetic only (skip)
+
+**Decisions**: All skip — no actionable issues found
+
+**Changes**: None
+
+**Status**: No changes needed
+
+## Final Status
+
+- **Rounds**: 2
+- **Commits**: 1 (6e3ea9d — move inline import re to top-level)
+- **Issues remaining**: None
+- **Verdict**: Implementation is clean, well-tested, and ready to merge
