@@ -1,12 +1,13 @@
 """Tests for CheckerTools extraction from server.py."""
 
+import re
 from pathlib import Path
 from typing import Any
 from unittest.mock import MagicMock, patch
 
 import pytest
 
-from mcp_tools_py.checker_tools import CheckerTools
+from mcp_tools_py.checker_tools import CheckerTools, _strip_lint_imports_header
 from tests.conftest import make_command_result
 
 
@@ -156,7 +157,13 @@ def test_format_pytest_result_execution_error(checker_tools: CheckerTools) -> No
 def test_lint_imports_success_returns_raw_output(
     mock_server: MagicMock, checker_tools: CheckerTools
 ) -> None:
-    """When lint-imports succeeds, return raw stdout."""
+    """When lint-imports succeeds, banner is stripped and content is returned."""
+    banner_and_content = (
+        "\u2500\u2500\u2500 import-linter \u2500\u2500\u2500\n"
+        "\u2502 \u25b6 Checking imports \u2502\n"
+        "---\n"
+        "Contracts: 2 kept, 0 broken\n"
+    )
     mock_mcp = MagicMock()
     mock_mcp.tool.return_value = lambda fn: fn
 
@@ -164,14 +171,8 @@ def test_lint_imports_success_returns_raw_output(
 
     with patch(
         "mcp_tools_py.checker_tools.execute_command",
-        return_value=make_command_result(
-            return_code=0, stdout="Contracts: 2 kept, 0 broken"
-        ),
+        return_value=make_command_result(return_code=0, stdout=banner_and_content),
     ):
-        # Call the registered tool function directly via the instance's register
-        # We need to get the function - it was registered via @mcp.tool()
-        # Since mock_mcp.tool returns identity, the function is defined in scope
-        # Re-register to capture
         captured_fns: dict[str, Any] = {}
 
         def capture(fn: Any) -> Any:
@@ -185,6 +186,8 @@ def test_lint_imports_success_returns_raw_output(
         result = captured_fns["run_lint_imports_check"]()
 
     assert "Contracts: 2 kept, 0 broken" in result
+    # Verify box-drawing characters were stripped
+    assert not re.search(r"[\u2500-\u257F\u25b6\u25c0\u25b2\u25bc]", result)
 
 
 def test_lint_imports_failure_returns_raw_output(
@@ -210,6 +213,54 @@ def test_lint_imports_failure_returns_raw_output(
         result = captured_fns["run_lint_imports_check"]()
 
     assert "Could not read any configuration." in result
+
+
+# --- _strip_lint_imports_header tests ---
+
+
+def test_strip_lint_imports_header_removes_banner() -> None:
+    """Input has full logo + Contracts content -> output starts with Contracts."""
+    raw = (
+        "\u2500\u2500\u2500 import-linter \u2500\u2500\u2500\n"
+        "\u2502 \u25b6 Checking imports \u2502\n"
+        "---\n"
+        "Contracts: 2 kept, 0 broken\n"
+        "Details follow...\n"
+    )
+    result = _strip_lint_imports_header(raw)
+    assert result.startswith("Contracts")
+    assert not re.search(r"[\u2500-\u257F\u25b6\u25c0\u25b2\u25bc]", result)
+
+
+def test_strip_lint_imports_header_preserves_content_only() -> None:
+    """Input has no logo, just contract results -> output unchanged."""
+    raw = "Contracts: 2 kept, 0 broken"
+    result = _strip_lint_imports_header(raw)
+    assert result == raw
+
+
+def test_strip_lint_imports_header_logo_only_falls_back() -> None:
+    """Input is only logo lines -> returns original raw input."""
+    raw = (
+        "\u2500\u2500\u2500 import-linter \u2500\u2500\u2500\n"
+        "\u2502 \u25b6 Checking imports \u2502\n"
+        "---\n"
+    )
+    result = _strip_lint_imports_header(raw)
+    assert result == raw
+
+
+def test_strip_lint_imports_header_empty_string_falls_back() -> None:
+    """Empty string -> returns empty string (fallback)."""
+    result = _strip_lint_imports_header("")
+    assert result == ""
+
+
+def test_strip_lint_imports_header_removes_dash_separators() -> None:
+    """Input has dash separator lines around Contracts -> dashes removed."""
+    raw = "---\n" "Contracts: 2 kept, 0 broken\n" "------\n"
+    result = _strip_lint_imports_header(raw)
+    assert result == "Contracts: 2 kept, 0 broken"
 
 
 # --- Vulture handler tests ---
