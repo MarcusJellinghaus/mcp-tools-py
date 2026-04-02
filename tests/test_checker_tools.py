@@ -1,5 +1,6 @@
 """Tests for CheckerTools extraction from server.py."""
 
+import re
 from pathlib import Path
 from typing import Any
 from unittest.mock import MagicMock, patch
@@ -186,8 +187,6 @@ def test_lint_imports_success_returns_raw_output(
 
     assert "Contracts: 2 kept, 0 broken" in result
     # Verify box-drawing characters were stripped
-    import re
-
     assert not re.search(r"[\u2500-\u257F\u25b6\u25c0\u25b2\u25bc]", result)
 
 
@@ -230,8 +229,6 @@ def test_strip_lint_imports_header_removes_banner() -> None:
     )
     result = _strip_lint_imports_header(raw)
     assert result.startswith("Contracts")
-    import re
-
     assert not re.search(r"[\u2500-\u257F\u25b6\u25c0\u25b2\u25bc]", result)
 
 
