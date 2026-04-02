@@ -35,5 +35,4 @@ if nothing remains, return the original raw input
 
 ## Implementation Steps
 
-- **Step 1**: Add `_strip_lint_imports_header()` with unit tests
-- **Step 2**: Integrate the helper into `run_lint_imports_check` and update integration test
+- **Step 1**: Add `_strip_lint_imports_header()` helper, integrate into `run_lint_imports_check`, and add all tests
