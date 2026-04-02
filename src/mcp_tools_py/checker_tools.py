@@ -1,6 +1,7 @@
 """Checker tools extracted from server.py for pylint, pytest, mypy, lint-imports, and vulture."""
 
 import logging
+import re
 from typing import TYPE_CHECKING, Any, Dict, List, Optional
 
 from mcp_tools_py.code_checker_mypy import get_mypy_prompt
@@ -23,6 +24,21 @@ if TYPE_CHECKING:
     from mcp_tools_py.server import FastMCPProtocol, ToolServer
 
 logger = logging.getLogger(__name__)
+
+_BOX_DRAWING_OR_ARROWS = re.compile(r"[\u2500-\u257F▶◀▲▼]")
+_ONLY_DASHES = re.compile(r"^-+$")
+
+
+def _strip_lint_imports_header(raw: str) -> str:
+    """Remove the import-linter ASCII art banner and dashed separators."""
+    lines = raw.splitlines()
+    kept = [
+        line
+        for line in lines
+        if not _BOX_DRAWING_OR_ARROWS.search(line) and not _ONLY_DASHES.match(line)
+    ]
+    result = "\n".join(kept).strip()
+    return result if result else raw
 
 
 class CheckerTools:
@@ -411,7 +427,8 @@ class CheckerTools:
                     },
                 )
 
-                return output.strip() or "lint-imports produced no output."
+                output = _strip_lint_imports_header(output)
+                return output or "lint-imports produced no output."
 
             except Exception as e:
                 error_msg = (
