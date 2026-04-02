@@ -121,7 +121,7 @@ ignore_missing_imports = true
 #        as documentation: f-strings in logging calls are acceptable for readability
 disable = ["W", "C", "R", "W1203"]
 
-[tool.mcp-coder.from-github]
+[tool.mcp-coder.install-from-github]
 # Installed WITH deps (leaves — picks up new external deps)
 packages = [
     "mcp-config-tool @ git+https://github.com/MarcusJellinghaus/mcp-config.git",
