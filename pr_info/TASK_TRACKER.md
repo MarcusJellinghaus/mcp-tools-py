@@ -22,9 +22,9 @@ This tracks **Feature Implementation** consisting of multiple **Tasks**.
 ## Tasks
 
 ### Step 1: Remove obsolete `mcp[server]` extra from dependencies (#147)
-- [ ] Implementation: remove `mcp[server]>=1.3.0` from pyproject.toml, update docs/architecture/architecture.md lines 42 and 48
-- [ ] Quality checks: pylint, pytest, mypy — fix all issues
-- [ ] Commit message prepared
+- [x] Implementation: remove `mcp[server]>=1.3.0` from pyproject.toml, update docs/architecture/architecture.md lines 42 and 48
+- [x] Quality checks: pylint, pytest, mypy — fix all issues
+- [x] Commit message prepared
 
 ## Pull Request
 - [ ] PR review
