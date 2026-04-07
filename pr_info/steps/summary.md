@@ -25,11 +25,13 @@ Remove the single line `"mcp[server]>=1.3.0",` from `pyproject.toml` dependencie
 | File | Action | Description |
 |------|--------|-------------|
 | `pyproject.toml` | **Modified** | Remove `"mcp[server]>=1.3.0"` from `[project] dependencies` |
+| `docs/architecture/architecture.md` | **Modified** | Update line 42 to reference `mcp` instead of `mcp[server]` |
 
 No files created. No files deleted.
 
 ## Acceptance Criteria
 
-- [x] `"mcp[server]>=1.3.0"` line removed from `pyproject.toml`
-- [x] `"mcp>=1.3.0"` and `"mcp[cli]>=1.3.0"` remain unchanged
-- [x] All code quality checks pass (pylint, pytest, mypy)
+- [ ] `"mcp[server]>=1.3.0"` line removed from `pyproject.toml`
+- [ ] `"mcp>=1.3.0"` and `"mcp[cli]>=1.3.0"` remain unchanged
+- [ ] `docs/architecture/architecture.md` line 42 updated to reference `mcp` (not `mcp[server]`)
+- [ ] All code quality checks pass (pylint, pytest, mypy)
