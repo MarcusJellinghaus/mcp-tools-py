@@ -39,13 +39,13 @@ Compared to a general-purpose bash MCP tool, this server offers a more controlle
 
 ### Technical Constraints
 - **Python 3.11+** minimum version
-- **MCP Protocol** via STDIO transport, using `mcp[server]` (FastMCP)
+- **MCP Protocol** via STDIO transport, using `mcp` (FastMCP)
 - **Subprocess Execution**: All tools run as separate processes
 - **JSON Report**: Pytest results via `pytest-json-report` plugin
 
 ### Dependencies
 
-**Runtime**: `mcp[server,cli]`, `pylint`, `pytest` + `pytest-json-report` + `pytest-xdist`, `mypy`, `jedi`, `rope`, `structlog` + `python-json-logger`, `mcp-config`
+**Runtime**: `mcp`, `mcp[cli]`, `pylint`, `pytest` + `pytest-json-report` + `pytest-xdist`, `mypy`, `jedi`, `rope`, `structlog` + `python-json-logger`, `mcp-config`
 
 **Development**: `mcp-coder`, `black` + `isort`, `import-linter` + `tach`, `pycycle`, `vulture`, `pydeps`
 
