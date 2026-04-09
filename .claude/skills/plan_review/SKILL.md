@@ -1,13 +1,18 @@
 ---
-allowed-tools: Bash(git fetch *), Bash(git status *), Read, Glob, Grep
-workflow-stage: plan-review
-suggested-next: discuss -> plan_update -> commit_push -> plan_approve
+description: Review implementation plan for completeness, simplicity, and risks
+disable-model-invocation: true
+allowed-tools:
+  - "Bash(git fetch *)"
+  - "Bash(git status *)"
+  - mcp__workspace__read_file
+  - mcp__workspace__list_directory
+  - Glob
+  - Grep
 ---
 
 # Review Implementation Plan
 
 **First, ensure we're up to date:**
-
 ```bash
 git fetch
 git status
@@ -28,7 +33,6 @@ Please consider the already discussed and decided decisions (if any) under decis
 We do not need to challenge them again unless absolutely necessary.
 
 **Focus on:**
-
 - Completeness of implementation steps
 - Appropriate level of detail
 - Opportunities for simplification (KISS principle)
