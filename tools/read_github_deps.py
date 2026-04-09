@@ -5,7 +5,6 @@ from pyproject.toml without requiring any installed packages.
 
 Output format (one command per line):
     uv pip install "pkg1" "pkg2"
-    uv pip install --no-deps "pkg3"
 """
 
 import tomllib
@@ -22,14 +21,10 @@ def main() -> None:
 
     gh = data.get("tool", {}).get("mcp-coder", {}).get("install-from-github", {})
     packages = gh.get("packages", [])
-    packages_no_deps = gh.get("packages-no-deps", [])
 
     if packages:
         quoted = " ".join(f'"{p}"' for p in packages)
         print(f"uv pip install {quoted}")
-    if packages_no_deps:
-        quoted = " ".join(f'"{p}"' for p in packages_no_deps)
-        print(f"uv pip install --no-deps {quoted}")
 
 
 if __name__ == "__main__":
