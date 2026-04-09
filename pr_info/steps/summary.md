@@ -20,7 +20,7 @@ The same 5 `execute_command()` calls are submitted to a `concurrent.futures.Thre
 ### Key design decisions
 - **Pattern:** `executor.submit()` + `as_completed()` per the issue spec.
 - **Max workers:** Omitted — Python default (`min(32, cpu_count+4)`) is sufficient for 5 tasks.
-- **Logging:** Per-tool timing via existing `CommandResult.execution_time_ms`. Overall method timing at INFO level via `time.time()`.
+- **Logging:** Per-tool timing via existing `CommandResult.execution_time_ms` (already measured inside `execute_command`). No additional timing code.
 - **Import:** Module-level `from concurrent.futures import ThreadPoolExecutor, as_completed` (stdlib, no cost).
 
 ## Files Modified
