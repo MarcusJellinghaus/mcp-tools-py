@@ -1,12 +1,14 @@
 """Functions for running ruff check and ruff fix."""
 
 import logging
+import os
 
 from mcp_tools_py.code_checker_ruff.parsers import parse_ruff_json_output
 from mcp_tools_py.code_checker_ruff.reporting import (
     format_ruff_check_report,
     format_ruff_fix_report,
 )
+from mcp_tools_py.log_utils import log_function_call
 from mcp_tools_py.utils.subprocess_runner import execute_command
 
 logger = logging.getLogger(__name__)
@@ -33,6 +35,7 @@ def _build_ruff_command(
     return cmd
 
 
+@log_function_call
 def run_ruff_check_impl(
     ruff_binary: str,
     project_dir: str,
@@ -46,6 +49,9 @@ def run_ruff_check_impl(
     Returns:
         LLM-formatted report string, or "No issues found" message.
     """
+    if not os.path.isdir(project_dir):
+        raise FileNotFoundError(f"Project directory not found: {project_dir}")
+
     cmd = _build_ruff_command(
         ruff_binary,
         target_directories,
@@ -71,6 +77,7 @@ def run_ruff_check_impl(
     return report or "No ruff issues found."
 
 
+@log_function_call
 def run_ruff_fix_impl(
     ruff_binary: str,
     project_dir: str,
@@ -86,6 +93,9 @@ def run_ruff_fix_impl(
     Returns:
         Report with changed file list + remaining unfixed errors.
     """
+    if not os.path.isdir(project_dir):
+        raise FileNotFoundError(f"Project directory not found: {project_dir}")
+
     # Pre-check to identify fixable files
     check_cmd = _build_ruff_command(
         ruff_binary,

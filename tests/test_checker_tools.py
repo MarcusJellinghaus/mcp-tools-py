@@ -471,3 +471,91 @@ def test_vulture_resolution_error_returns_message(mock_server: MagicMock) -> Non
         result = run_vulture_fn()
 
     assert "Error resolving target directories" in result
+
+
+# --- Ruff check handler tests ---
+
+
+def test_ruff_check_unavailable_returns_error(mock_server: MagicMock) -> None:
+    """When ruff is not available, return an error message."""
+    mock_server._tool_availability["ruff"] = False
+    run_ruff_check = _capture_tool(mock_server, "run_ruff_check")
+    result = run_ruff_check()
+    assert "ruff is not available" in result
+
+
+def test_ruff_check_success_delegates_to_impl(mock_server: MagicMock) -> None:
+    """When ruff check succeeds, delegate to run_ruff_check_impl."""
+    run_ruff_check = _capture_tool(mock_server, "run_ruff_check")
+
+    with (
+        patch(
+            "mcp_tools_py.checker_tools.run_ruff_check_impl",
+            return_value="No ruff issues found.",
+        ) as mock_impl,
+        patch(
+            "mcp_tools_py.checker_tools.resolve_target_directories",
+            return_value=["src"],
+        ),
+    ):
+        result = run_ruff_check()
+
+    assert "No ruff issues found." in result
+    mock_impl.assert_called_once()
+
+
+def test_ruff_check_resolution_error_returns_message(mock_server: MagicMock) -> None:
+    """Ruff check returns error string when directory resolution fails."""
+    run_ruff_check = _capture_tool(mock_server, "run_ruff_check")
+
+    with patch(
+        "mcp_tools_py.checker_tools.resolve_target_directories",
+        return_value="Error resolving target directories: No target directories found",
+    ):
+        result = run_ruff_check()
+
+    assert "Error resolving target directories" in result
+
+
+# --- Ruff fix handler tests ---
+
+
+def test_ruff_fix_unavailable_returns_error(mock_server: MagicMock) -> None:
+    """When ruff is not available, return an error message."""
+    mock_server._tool_availability["ruff"] = False
+    run_ruff_fix = _capture_tool(mock_server, "run_ruff_fix")
+    result = run_ruff_fix()
+    assert "ruff is not available" in result
+
+
+def test_ruff_fix_success_delegates_to_impl(mock_server: MagicMock) -> None:
+    """When ruff fix succeeds, delegate to run_ruff_fix_impl."""
+    run_ruff_fix = _capture_tool(mock_server, "run_ruff_fix")
+
+    with (
+        patch(
+            "mcp_tools_py.checker_tools.run_ruff_fix_impl",
+            return_value="No fixable violations found — no files modified.",
+        ) as mock_impl,
+        patch(
+            "mcp_tools_py.checker_tools.resolve_target_directories",
+            return_value=["src"],
+        ),
+    ):
+        result = run_ruff_fix()
+
+    assert "No fixable violations found" in result
+    mock_impl.assert_called_once()
+
+
+def test_ruff_fix_resolution_error_returns_message(mock_server: MagicMock) -> None:
+    """Ruff fix returns error string when directory resolution fails."""
+    run_ruff_fix = _capture_tool(mock_server, "run_ruff_fix")
+
+    with patch(
+        "mcp_tools_py.checker_tools.resolve_target_directories",
+        return_value="Error resolving target directories: No target directories found",
+    ):
+        result = run_ruff_fix()
+
+    assert "Error resolving target directories" in result

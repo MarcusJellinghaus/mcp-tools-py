@@ -2,7 +2,7 @@
 Data models for ruff analysis results.
 """
 
-from typing import List, NamedTuple, Optional
+from typing import NamedTuple
 
 
 class RuffMessage(NamedTuple):
@@ -18,12 +18,3 @@ class RuffMessage(NamedTuple):
     url: str
     fixable: bool
     noqa_row: int
-
-
-class RuffResult(NamedTuple):
-    """Represents the overall result of a ruff run."""
-
-    return_code: int
-    messages: List[RuffMessage]
-    error: Optional[str] = None
-    raw_output: Optional[str] = None
