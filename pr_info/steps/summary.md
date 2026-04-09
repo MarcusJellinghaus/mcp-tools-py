@@ -8,7 +8,7 @@ Add `run_ruff_check()` and `run_ruff_fix()` MCP tools wrapping the ruff linter, 
 
 ### New Package: `src/mcp_tools_py/code_checker_ruff/`
 
-Follows the standard 4-file checker module pattern:
+Follows the pattern established by `code_checker_pylint/`:
 
 ```
 code_checker_ruff/

@@ -15,7 +15,7 @@ Add ruff>=0.9.0 to pyproject.toml dependencies. Update tach.toml to declare
 code_checker_ruff as a tool_implementation module (depends on utils + log_utils)
 and add it to checker_tools depends_on. Update .importlinter to add
 code_checker_ruff to the layers contract (same tier as other checkers) and
-the forbidden-imports source_modules list for utils.
+the forbidden-imports forbidden_modules list for utils.
 
 After implementation, run all three code quality checks (pylint, pytest, mypy).
 Also run lint-imports check if possible. Fix any issues before committing.

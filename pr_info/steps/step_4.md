@@ -28,6 +28,7 @@ Fix any issues before committing.
 - `src/mcp_tools_py/server.py` — add ruff discovery in `_check_tool_availability()`
 - `src/mcp_tools_py/checker_tools.py` — add imports + `_register_ruff_check()` + `_register_ruff_fix()`
 - `tests/test_checker_tools.py` — update mock fixtures and tool count assertion
+- `tests/test_tool_availability.py` — update tool availability assertions to include ruff
 
 ## WHAT
 
@@ -128,6 +129,14 @@ Tool parameters match issue requirements:
 
 1. Update `mock_server` fixture: add `"ruff": True` to `_tool_availability`, add `server._ruff_binary = "/mock/venv/bin/ruff"`
 2. Update `test_checker_tools_registers_five_tools` → rename to `test_checker_tools_registers_seven_tools`, assert `mock_mcp.tool.call_count == 7`
+
+### `test_tool_availability.py` changes
+
+Update all `_tool_availability` dicts to include `"ruff": True` or `"ruff": False` matching the existing pattern for other tools. Tests affected:
+- `test_all_tools_available` — add `"ruff": True` (dict grows from 7 to 8 keys)
+- `test_all_tools_missing` — add `"ruff": False`
+- `test_timed_out_tool_marked_unavailable` — add `"ruff": True` (or False depending on scenario)
+- `TestToolHandlerShortCircuit` fixtures — add `"ruff": True` to `_tool_availability` dicts
 
 ## Commit
 
