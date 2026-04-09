@@ -22,9 +22,9 @@ This tracks **Feature Implementation** consisting of multiple **Tasks**.
 ## Tasks
 
 ### Step 1: Models and Parsers — [step_1.md](./steps/step_1.md)
-- [ ] Implementation: `RuffMessage`/`RuffResult` models, `parse_ruff_json_output`, tests in `test_parsers.py`
-- [ ] Quality checks: pylint, pytest, mypy — fix all issues
-- [ ] Commit message prepared
+- [x] Implementation: `RuffMessage`/`RuffResult` models, `parse_ruff_json_output`, tests in `test_parsers.py`
+- [x] Quality checks: pylint, pytest, mypy — fix all issues
+- [x] Commit message prepared
 
 ### Step 2: Reporting — [step_2.md](./steps/step_2.md)
 - [ ] Implementation: `reporting.py` with grouping/sorting/formatting, tests in `test_reporting.py`
