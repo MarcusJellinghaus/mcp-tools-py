@@ -32,9 +32,9 @@ This tracks **Feature Implementation** consisting of multiple **Tasks**.
 - [x] Commit message prepared
 
 ### Step 3: Runners — [step_3.md](./steps/step_3.md)
-- [ ] Implementation: `runners.py` with `run_ruff_check_impl`/`run_ruff_fix_impl`, tests in `test_runners.py`
-- [ ] Quality checks: pylint, pytest, mypy — fix all issues
-- [ ] Commit message prepared
+- [x] Implementation: `runners.py` with `run_ruff_check_impl`/`run_ruff_fix_impl`, tests in `test_runners.py`
+- [x] Quality checks: pylint, pytest, mypy — fix all issues
+- [x] Commit message prepared
 
 ### Step 4: Server Discovery + Checker Tools Registration — [step_4.md](./steps/step_4.md)
 - [ ] Implementation: ruff binary discovery in `server.py`, register tools in `checker_tools.py`, update test fixtures
