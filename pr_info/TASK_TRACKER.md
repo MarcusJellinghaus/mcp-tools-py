@@ -42,9 +42,9 @@ This tracks **Feature Implementation** consisting of multiple **Tasks**.
 - [x] Commit message prepared
 
 ### Step 5: Architecture Config + Dependency — [step_5.md](./steps/step_5.md)
-- [ ] Implementation: add `ruff>=0.9.0` to `pyproject.toml`, update `tach.toml` and `.importlinter`
-- [ ] Quality checks: pylint, pytest, mypy — fix all issues
-- [ ] Commit message prepared
+- [x] Implementation: add `ruff>=0.9.0` to `pyproject.toml`, update `tach.toml` and `.importlinter`
+- [x] Quality checks: pylint, pytest, mypy — fix all issues
+- [x] Commit message prepared
 
 ## Pull Request
 - [ ] PR review: all steps completed and passing

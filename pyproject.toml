@@ -35,6 +35,7 @@ dependencies = [
     "igittigitt>=2.1.0",
     "import-linter>=2.0",
     "vulture>=2.13",
+    "ruff>=0.9.0",
     "black>=24.10.0",
     "isort>=5.13.2",
     "mcp-coder-utils"
