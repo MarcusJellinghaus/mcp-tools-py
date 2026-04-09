@@ -37,11 +37,13 @@ dependencies = [
     "vulture>=2.13",
     "black>=24.10.0",
     "isort>=5.13.2",
+    "mcp-coder-utils"
 ]
 
 [project.optional-dependencies]
 dev = [
     "mcp-workspace",
+    "mcp-coder",
     # Architecture and code quality tools
     "tach>=0.15.0",
     "pycycle>=0.0.8",
@@ -121,13 +123,11 @@ ignore_missing_imports = true
 disable = ["W", "C", "R", "W1203"]
 
 [tool.mcp-coder.install-from-github]
-# Installed WITH deps (leaves — picks up new external deps)
+# All installed together WITH deps — uv resolves siblings in one pass
 packages = [
     "mcp-config-tool @ git+https://github.com/MarcusJellinghaus/mcp-config.git",
     "mcp-workspace @ git+https://github.com/MarcusJellinghaus/mcp-workspace.git",
-]
-# Installed WITHOUT deps (depend on siblings — avoid downgrading)
-packages-no-deps = [
+    "mcp-coder-utils @ git+https://github.com/MarcusJellinghaus/mcp-coder-utils.git",
     "mcp-coder @ git+https://github.com/MarcusJellinghaus/mcp_coder.git",
 ]
 
