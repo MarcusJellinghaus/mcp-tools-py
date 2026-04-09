@@ -53,8 +53,8 @@ uv pip uninstall mcp-coder mcp-tools-py mcp-config mcp-workspace --python "!VENV
 echo [OK] Packages uninstalled
 
 echo.
-echo [2/6] Installing mcp-coder (this project) in development mode...
-REM Editable install pulls all deps (including mcp-tools-py, mcp-workspace,
+echo [2/6] Installing mcp-tools-py (this project) in editable mode...
+REM Editable install pulls all deps (including mcp-workspace,
 REM mcp-config) from PyPI first.
 pushd "!PROJECT_DIR!"
 uv pip install -e ".[dev]" --python "!VENV_SCRIPTS!\python.exe"
@@ -68,14 +68,23 @@ echo [OK] Package and dev dependencies installed
 
 echo.
 echo [3/6] Overriding dependencies with GitHub versions...
-REM Reinstall mcp-tools-py, mcp-workspace, mcp-config from GitHub (no deps)
-REM to override the PyPI versions pulled in the previous step.
-uv pip install --no-deps "mcp-tools-py @ git+https://github.com/MarcusJellinghaus/mcp-tools-py.git" "mcp-workspace @ git+https://github.com/MarcusJellinghaus/mcp-workspace.git" "mcp-config @ git+https://github.com/MarcusJellinghaus/mcp-config.git" --python "!VENV_SCRIPTS!\python.exe"
+REM Validate read_github_deps.py succeeds before parsing its output
+"!VENV_SCRIPTS!\python.exe" tools\read_github_deps.py > nul 2>&1
 if !ERRORLEVEL! NEQ 0 (
-    echo [FAIL] GitHub dependency override failed!
+    echo [FAIL] read_github_deps.py failed!
+    "!VENV_SCRIPTS!\python.exe" tools\read_github_deps.py
     exit /b 1
 )
-echo [OK] mcp-tools-py, mcp-workspace, mcp-config overridden from GitHub
+REM Read GitHub dependency overrides from pyproject.toml
+for /f "delims=" %%C in ('"!VENV_SCRIPTS!\python.exe" tools\read_github_deps.py') do (
+    echo   %%C
+    %%C --python "!VENV_SCRIPTS!\python.exe"
+    if !ERRORLEVEL! NEQ 0 (
+        echo [FAIL] GitHub dependency override failed!
+        exit /b 1
+    )
+)
+echo [OK] GitHub dependencies overridden from pyproject.toml
 
 echo.
 echo [4/6] Installing LangChain and MLflow dependencies...
