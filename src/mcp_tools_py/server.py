@@ -3,6 +3,7 @@
 import logging
 import os
 import sys
+from concurrent.futures import ThreadPoolExecutor, as_completed
 from pathlib import Path
 from typing import Callable, Optional, Protocol, TypeVar
 
@@ -105,22 +106,31 @@ class ToolServer:
     def _check_tool_availability(self) -> dict[str, bool]:
         """Check availability of pytest, pylint, mypy, black, isort, and lint-imports."""
         availability: dict[str, bool] = {}
-        for tool in ["pytest", "pylint", "mypy", "black", "isort"]:
+
+        def _check_one(tool: str) -> tuple[str, bool]:
             result = execute_command(
                 [self._resolved_python, "-m", tool, "--version"],
                 timeout_seconds=10,
             )
-            available = result.return_code == 0 and not result.execution_error
-            availability[tool] = available
-            if not available:
-                logger.warning(
-                    "%s not found in %s. "
-                    "Ensure --python-executable and --venv-path point to "
-                    "the environment where %s is installed.",
-                    tool,
-                    self._resolved_python,
-                    tool,
-                )
+            return tool, result.return_code == 0 and not result.execution_error
+
+        with ThreadPoolExecutor() as executor:
+            futures = {
+                executor.submit(_check_one, tool): tool
+                for tool in ["pytest", "pylint", "mypy", "black", "isort"]
+            }
+            for future in as_completed(futures):
+                tool, available = future.result()
+                availability[tool] = available
+                if not available:
+                    logger.warning(
+                        "%s not found in %s. "
+                        "Ensure --python-executable and --venv-path point to "
+                        "the environment where %s is installed.",
+                        tool,
+                        self._resolved_python,
+                        tool,
+                    )
 
         # lint-imports: check via file existence (not subprocess)
         lint_imports_available = False
