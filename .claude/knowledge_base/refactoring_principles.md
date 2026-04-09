@@ -1,20 +1,22 @@
 # Refactoring Principles
 
+Quick reference for refactoring rules and tools. For detailed process, examples, and checklists, see the [Safe Refactoring Guide](../../docs/processes-prompts/refactoring-guide.md).
+
 ## Key Rules
 
-- **Move, don't change.** Functions and classes should be relocated as-is. Logic changes belong in a separate PR.
-- **Only adjust imports.** The only code changes during a refactor should be import statements and `__init__.py` re-exports.
-- **Clean deletion, no legacy artifacts.** Delete old files entirely — no stubs, no deprecation warnings, no backward-compatible re-exports. Update all consumers immediately.
-- **Small steps.** One module per PR when possible. Keep diffs under 25,000 tokens. Move related functions together.
-- **Tests mirror source structure.** When moving source code, move corresponding tests to match.
+- **Move, don't change.** Logic changes belong in a separate PR.
+- **Only adjust imports.** Use `move_symbol` — it updates imports automatically.
+- **Clean deletion, no legacy artifacts.** No stubs, no re-exports for backward compatibility.
+- **Small steps.** One module per PR. Keep diffs under 25,000 tokens.
+- **Tests mirror source structure.**
 
 ## Process
 
-1. Plan the target structure before moving anything
-2. Move source code (copy-paste, no modifications)
+1. Plan target structure
+2. Move source code — `move_symbol` / `move_module`
 3. Move tests to mirror new structure
-4. Run all checks (pytest, pylint, mypy, import linter, tach)
+4. Review diff — `mcp-coder git-tool compact-diff` (remaining diff should be imports only)
+5. Run all checks — pytest, pylint, mypy, ruff
+6. Check file sizes — `mcp-coder check file-size --max-lines 750`
 
-## Full Guide
-
-For detailed process, checklists, and conflict resolution strategies, see [Safe Refactoring Guide](../../docs/processes-prompts/refactoring-guide.md).
+See [Safe Refactoring Guide](../../docs/processes-prompts/refactoring-guide.md) for the full checklist.

@@ -1,7 +1,8 @@
 ---
-allowed-tools: Bash(mcp-coder gh-tool set-status *)
-workflow-stage: code-review
-suggested-next: (bot runs implement) -> /clear -> implementation_review or implementation_review_supervisor
+description: Return issue to plan-ready status for re-implementation after major review issues
+disable-model-invocation: true
+allowed-tools:
+  - "Bash(mcp-coder gh-tool set-status *)"
 ---
 
 # Return to plan-ready after major review issues

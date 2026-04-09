@@ -1,7 +1,8 @@
 ---
-allowed-tools: Bash(mcp-coder gh-tool set-status *)
-workflow-stage: plan-review
-suggested-next: (bot runs implement) -> /clear -> implementation_review or implementation_review_supervisor
+description: Approve implementation plan and transition to plan-ready status
+disable-model-invocation: true
+allowed-tools:
+  - "Bash(mcp-coder gh-tool set-status *)"
 ---
 
 # Approve Implementation Plan
