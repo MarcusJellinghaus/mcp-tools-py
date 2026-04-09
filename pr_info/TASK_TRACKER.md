@@ -37,9 +37,9 @@ This tracks **Feature Implementation** consisting of multiple **Tasks**.
 - [x] Commit message prepared
 
 ### Step 4: Server Discovery + Checker Tools Registration — [step_4.md](./steps/step_4.md)
-- [ ] Implementation: ruff binary discovery in `server.py`, register tools in `checker_tools.py`, update test fixtures
-- [ ] Quality checks: pylint, pytest, mypy — fix all issues
-- [ ] Commit message prepared
+- [x] Implementation: ruff binary discovery in `server.py`, register tools in `checker_tools.py`, update test fixtures
+- [x] Quality checks: pylint, pytest, mypy — fix all issues
+- [x] Commit message prepared
 
 ### Step 5: Architecture Config + Dependency — [step_5.md](./steps/step_5.md)
 - [ ] Implementation: add `ruff>=0.9.0` to `pyproject.toml`, update `tach.toml` and `.importlinter`

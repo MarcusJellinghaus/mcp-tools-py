@@ -29,8 +29,10 @@ def mock_server() -> MagicMock:
         "isort": True,
         "lint-imports": True,
         "vulture": True,
+        "ruff": True,
     }
     server._vulture_binary = "/mock/venv/bin/vulture"
+    server._ruff_binary = "/mock/venv/bin/ruff"
     server.vulture_whitelist = "vulture_whitelist.py"
     return server
 
@@ -44,8 +46,8 @@ def checker_tools(mock_server: MagicMock) -> CheckerTools:
 # --- Registration tests ---
 
 
-def test_checker_tools_registers_five_tools(mock_server: MagicMock) -> None:
-    """Test that CheckerTools.register() registers exactly 5 tools on an MCP server."""
+def test_checker_tools_registers_seven_tools(mock_server: MagicMock) -> None:
+    """Test that CheckerTools.register() registers exactly 7 tools on an MCP server."""
     mock_mcp = MagicMock()
     mock_decorator = MagicMock(side_effect=lambda fn: fn)
     mock_mcp.tool.return_value = mock_decorator
@@ -53,8 +55,9 @@ def test_checker_tools_registers_five_tools(mock_server: MagicMock) -> None:
     checker = CheckerTools(mock_server)
     checker.register(mock_mcp)
 
-    # 5 tools: run_pylint_check, run_pytest_check, run_mypy_check, run_lint_imports_check, run_vulture_check
-    assert mock_mcp.tool.call_count == 5
+    # 7 tools: run_pylint_check, run_pytest_check, run_mypy_check,
+    # run_lint_imports_check, run_vulture_check, run_ruff_check, run_ruff_fix
+    assert mock_mcp.tool.call_count == 7
 
 
 # --- Pylint formatting tests ---
