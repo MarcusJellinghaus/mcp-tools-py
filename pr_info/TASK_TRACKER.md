@@ -27,9 +27,9 @@ This tracks **Feature Implementation** consisting of multiple **Tasks**.
 - [x] Commit message prepared
 
 ### Step 2: Reporting — [step_2.md](./steps/step_2.md)
-- [ ] Implementation: `reporting.py` with grouping/sorting/formatting, tests in `test_reporting.py`
-- [ ] Quality checks: pylint, pytest, mypy — fix all issues
-- [ ] Commit message prepared
+- [x] Implementation: `reporting.py` with grouping/sorting/formatting, tests in `test_reporting.py`
+- [x] Quality checks: pylint, pytest, mypy — fix all issues
+- [x] Commit message prepared
 
 ### Step 3: Runners — [step_3.md](./steps/step_3.md)
 - [ ] Implementation: `runners.py` with `run_ruff_check_impl`/`run_ruff_fix_impl`, tests in `test_runners.py`
