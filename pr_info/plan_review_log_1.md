@@ -26,3 +26,30 @@
 - `pr_info/steps/step_5.md`: Fixed "source_modules" → "forbidden_modules" in LLM prompt
 
 **Status**: committed
+
+## Round 2 — 2026-04-09
+
+**Findings**:
+- All Round 1 fixes verified correctly applied
+- Pre-existing gap: `code_checker_vulture` missing from `.importlinter` layers and forbidden_modules (not a plan defect)
+- `__init__.py` re-export chaining across steps 1-3 is correct
+- `tach.toml` depends_on for ruff matches vulture pattern
+- `ruff>=0.9.0` minimum version is reasonable
+- No other test files would break beyond those already covered in step 4
+- `conftest.py` shared fixtures correctly referenced in step 3
+
+**Decisions**:
+- Skip: All findings — no actionable issues found
+
+**User decisions**: None needed.
+
+**Changes**: None.
+
+**Status**: no changes needed
+
+## Final Status
+
+- **Rounds**: 2
+- **Commits**: 1 (plan fixes from Round 1)
+- **Plan status**: Ready for approval
+- **Notes**: Pre-existing `.importlinter` gap for `code_checker_vulture` noted but out of scope for this issue
