@@ -136,6 +136,7 @@ class TestCheckToolAvailability:
                 "isort": True,
                 "lint-imports": True,
                 "vulture": True,
+                "ruff": True,
             }
 
     def test_one_tool_missing(self) -> None:
@@ -186,6 +187,7 @@ class TestCheckToolAvailability:
                 "isort": False,
                 "lint-imports": False,
                 "vulture": False,
+                "ruff": False,
             }
 
     def test_timed_out_tool_marked_unavailable(self) -> None:
@@ -207,6 +209,7 @@ class TestCheckToolAvailability:
                 "isort": False,
                 "lint-imports": False,
                 "vulture": False,
+                "ruff": False,
             }
 
     def test_lint_imports_available_when_binary_exists(self) -> None:
@@ -434,6 +437,7 @@ class TestToolHandlerShortCircuit:
                 "black": True,
                 "isort": True,
                 "lint-imports": False,
+                "ruff": True,
             }
 
             result = registered_tools["run_pytest_check"]()
@@ -458,6 +462,7 @@ class TestToolHandlerShortCircuit:
                 "black": True,
                 "isort": True,
                 "lint-imports": False,
+                "ruff": True,
             }
 
             result = registered_tools["run_pylint_check"]()
@@ -482,6 +487,7 @@ class TestToolHandlerShortCircuit:
                 "black": True,
                 "isort": True,
                 "lint-imports": False,
+                "ruff": True,
             }
 
             result = registered_tools["run_mypy_check"]()
@@ -513,6 +519,7 @@ class TestToolHandlerShortCircuit:
                 "black": True,
                 "isort": True,
                 "lint-imports": True,
+                "ruff": True,
             }
 
             result = registered_tools["run_pytest_check"]()
@@ -547,6 +554,7 @@ class TestToolHandlerShortCircuit:
                 "black": True,
                 "isort": True,
                 "lint-imports": True,
+                "ruff": True,
             }
 
             registered_tools["run_pytest_check"]()
@@ -574,6 +582,7 @@ class TestToolHandlerShortCircuit:
                 "black": True,
                 "isort": True,
                 "lint-imports": False,
+                "ruff": True,
             }
             server._lint_imports_binary = "/mock/venv/bin/lint-imports"
 

@@ -15,6 +15,10 @@ from mcp_tools_py.code_checker_pytest.reporting import (
 )
 from mcp_tools_py.code_checker_pytest.runners import check_code_with_pytest
 from mcp_tools_py.code_checker_pytest.utils import sanitize_extra_args
+from mcp_tools_py.code_checker_ruff.runners import (
+    run_ruff_check_impl,
+    run_ruff_fix_impl,
+)
 from mcp_tools_py.code_checker_vulture import run_vulture_check as run_vulture
 from mcp_tools_py.log_utils import log_function_call
 from mcp_tools_py.utils.project_config import resolve_target_directories
@@ -54,6 +58,8 @@ class CheckerTools:
         self._register_mypy(mcp)
         self._register_lint_imports(mcp)
         self._register_vulture(mcp)
+        self._register_ruff_check(mcp)
+        self._register_ruff_fix(mcp)
 
     def _register_pylint(self, mcp: "FastMCPProtocol") -> None:
         """Register the pylint checker tool."""
@@ -523,6 +529,161 @@ class CheckerTools:
                 )
                 logger.error(
                     "vulture check failed",
+                    extra={
+                        "error": str(e),
+                        "error_type": type(e).__name__,
+                        "project_dir": str(self._server.project_dir),
+                    },
+                )
+                return error_msg
+
+    def _register_ruff_check(self, mcp: "FastMCPProtocol") -> None:
+        """Register the ruff check (read-only analysis) tool."""
+
+        @mcp.tool()
+        @log_function_call
+        def run_ruff_check(
+            select: Optional[List[str]] = None,
+            target_directories: Optional[List[str]] = None,
+            extra_args: Optional[List[str]] = None,
+            max_issues: int = 1,
+        ) -> str:
+            """Run ruff check on the project (read-only analysis).
+
+            Args:
+                select: Override rule selection (e.g. ["D", "DOC"]). Defaults to project config.
+                target_directories: Directories to check relative to project_dir. Auto-detected when None.
+                extra_args: Additional ruff CLI flags (e.g. ["--preview"] for DOC rules).
+                max_issues: Number of issue types shown in detail (default: 1).
+            """
+            if not self._server._tool_availability.get("ruff", False):
+                binary_path = self._server._ruff_binary or "N/A"
+                return (
+                    f"ruff is not available at {binary_path}. "
+                    f"Ensure the virtual environment has ruff installed "
+                    f"and --venv-path is configured. Restart the server after installing."
+                )
+
+            resolved = resolve_target_directories(
+                str(self._server.project_dir), target_directories
+            )
+            if isinstance(resolved, str):
+                return resolved
+
+            try:
+                logger.info(
+                    "Starting ruff check",
+                    extra={
+                        "project_dir": str(self._server.project_dir),
+                        "select": select,
+                        "target_directories": resolved,
+                        "extra_args": extra_args,
+                        "max_issues": max_issues,
+                    },
+                )
+
+                binary = self._server._ruff_binary
+                assert binary is not None  # guarded by availability check above
+
+                output = run_ruff_check_impl(
+                    ruff_binary=binary,
+                    project_dir=str(self._server.project_dir),
+                    target_directories=resolved,
+                    select=select,
+                    extra_args=extra_args,
+                    max_issues=max_issues,
+                )
+
+                logger.info(
+                    "ruff check completed",
+                    extra={"output_length": len(output)},
+                )
+
+                return output
+
+            except Exception as e:
+                error_msg = (
+                    f"Unexpected error running ruff check: " f"{type(e).__name__}: {e}"
+                )
+                logger.error(
+                    "ruff check failed",
+                    extra={
+                        "error": str(e),
+                        "error_type": type(e).__name__,
+                        "project_dir": str(self._server.project_dir),
+                    },
+                )
+                return error_msg
+
+    def _register_ruff_fix(self, mcp: "FastMCPProtocol") -> None:
+        """Register the ruff fix (modifies files) tool."""
+
+        @mcp.tool()
+        @log_function_call
+        def run_ruff_fix(
+            select: Optional[List[str]] = None,
+            target_directories: Optional[List[str]] = None,
+            extra_args: Optional[List[str]] = None,
+        ) -> str:
+            """Run ruff check --fix on the project (MODIFIES FILES in-place).
+
+            Only applies safe fixes by default. Pass ["--unsafe-fixes"] via
+            extra_args to also apply unsafe fixes.
+
+            Args:
+                select: Override rule selection. Defaults to project config.
+                target_directories: Directories to fix relative to project_dir. Auto-detected when None.
+                extra_args: Additional ruff CLI flags.
+            """
+            if not self._server._tool_availability.get("ruff", False):
+                binary_path = self._server._ruff_binary or "N/A"
+                return (
+                    f"ruff is not available at {binary_path}. "
+                    f"Ensure the virtual environment has ruff installed "
+                    f"and --venv-path is configured. Restart the server after installing."
+                )
+
+            resolved = resolve_target_directories(
+                str(self._server.project_dir), target_directories
+            )
+            if isinstance(resolved, str):
+                return resolved
+
+            try:
+                logger.info(
+                    "Starting ruff fix",
+                    extra={
+                        "project_dir": str(self._server.project_dir),
+                        "select": select,
+                        "target_directories": resolved,
+                        "extra_args": extra_args,
+                    },
+                )
+
+                binary = self._server._ruff_binary
+                assert binary is not None  # guarded by availability check above
+
+                output = run_ruff_fix_impl(
+                    ruff_binary=binary,
+                    project_dir=str(self._server.project_dir),
+                    target_directories=resolved,
+                    select=select,
+                    extra_args=extra_args,
+                )
+
+                logger.info(
+                    "ruff fix completed",
+                    extra={"output_length": len(output)},
+                )
+
+                return output
+
+            except Exception as e:
+                error_msg = (
+                    f"Unexpected error running ruff fix: " f"{type(e).__name__}: {e}"
+                )
+                logger.error(
+                    "ruff fix failed",
                     extra={
                         "error": str(e),
                         "error_type": type(e).__name__,

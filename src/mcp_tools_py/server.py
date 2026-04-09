@@ -170,6 +170,23 @@ class ToolServer:
                 "an environment where vulture is installed."
             )
 
+        # ruff: check via file existence (not subprocess)
+        ruff_available = False
+        ruff_binary: Optional[str] = None
+        if self.venv_path:
+            if os.name == "nt":
+                ruff_binary = os.path.join(self.venv_path, "Scripts", "ruff.exe")
+            else:
+                ruff_binary = os.path.join(self.venv_path, "bin", "ruff")
+            ruff_available = os.path.exists(ruff_binary)
+        self._ruff_binary: Optional[str] = ruff_binary if ruff_available else None
+        availability["ruff"] = ruff_available
+        if not ruff_available:
+            logger.warning(
+                "ruff not found. Ensure --venv-path points to "
+                "an environment where ruff is installed."
+            )
+
         return availability
 
     @log_function_call
