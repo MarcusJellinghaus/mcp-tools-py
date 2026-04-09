@@ -32,7 +32,9 @@
         "--reference-project",
         "p_config=${USERPROFILE}\\Documents\\GitHub\\mcp-config",
         "--reference-project",
-        "p_workspace=${USERPROFILE}\\Documents\\GitHub\\mcp-workspace"
+        "p_workspace=${USERPROFILE}\\Documents\\GitHub\\mcp-workspace",
+        "--reference-project",
+        "p_coder_utils=${USERPROFILE}\\Documents\\GitHub\\mcp-coder-utils"
       ],
       "env": {
         "PYTHONPATH": "${MCP_CODER_VENV_DIR}\\Lib\\"
