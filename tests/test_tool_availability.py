@@ -346,6 +346,52 @@ class TestCheckToolAvailability:
 
             assert server._tool_availability["isort"] is True
 
+    def test_parallel_execution_maps_results_correctly(self) -> None:
+        """Parallel execution maps distinct results to the correct tool names."""
+        from concurrent.futures import ThreadPoolExecutor as RealTPE
+
+        submit_calls: list[Any] = []
+
+        class TrackingExecutor(RealTPE):
+            def submit(self, fn: Any, /, *args: Any, **kwargs: Any) -> Any:
+                submit_calls.append((fn, args, kwargs))
+                return super().submit(fn, *args, **kwargs)
+
+        def side_effect(command: list[str], **kwargs: Any) -> CommandResult:
+            for tool in ["pytest", "mypy", "isort"]:
+                if tool in command:
+                    return make_command_result(return_code=0, stdout=f"{tool} ok")
+            for tool in ["pylint", "black"]:
+                if tool in command:
+                    return make_command_result(
+                        return_code=1,
+                        stderr=f"No module named {tool}",
+                        execution_error="error",
+                    )
+            return make_command_result(return_code=0, stdout="ok")
+
+        with (
+            patch("mcp.server.fastmcp.FastMCP") as mock_fastmcp,
+            patch("mcp_tools_py.server.execute_command") as mock_exec,
+            patch(
+                "mcp_tools_py.server.ThreadPoolExecutor",
+                TrackingExecutor,
+            ),
+        ):
+            mock_fastmcp.return_value.tool.return_value = MagicMock()
+            mock_exec.side_effect = side_effect
+
+            server = _create_server(project_dir=Path("/project"))
+
+            assert server._tool_availability["pytest"] is True
+            assert server._tool_availability["pylint"] is False
+            assert server._tool_availability["black"] is False
+            assert server._tool_availability["mypy"] is True
+            assert server._tool_availability["isort"] is True
+
+            # Verify ThreadPoolExecutor.submit was called 5 times
+            assert len(submit_calls) == 5
+
 
 # ---------------------------------------------------------------------------
 # Tool handler short-circuit tests
