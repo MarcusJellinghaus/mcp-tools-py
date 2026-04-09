@@ -111,7 +111,13 @@ def run_ruff_fix_impl(
     if check_result.timed_out:
         return "Ruff timed out."
 
-    pre_messages, _ = parse_ruff_json_output(check_result.stdout, project_dir)
+    if check_result.return_code == 2:
+        return f"Ruff error: {check_result.stderr}"
+
+    pre_messages, parse_error = parse_ruff_json_output(check_result.stdout, project_dir)
+    if parse_error:
+        return parse_error
+
     changed_files = sorted({m.filename for m in pre_messages if m.fixable})
 
     if not changed_files:
@@ -133,5 +139,11 @@ def run_ruff_fix_impl(
     if fix_result.timed_out:
         return "Ruff fix timed out."
 
-    remaining, _ = parse_ruff_json_output(fix_result.stdout, project_dir)
+    if fix_result.return_code == 2:
+        return f"Ruff fix error: {fix_result.stderr}"
+
+    remaining, parse_error = parse_ruff_json_output(fix_result.stdout, project_dir)
+    if parse_error:
+        return f"Ruff applied fixes but could not parse remaining issues: {parse_error}"
+
     return format_ruff_fix_report(changed_files, remaining)

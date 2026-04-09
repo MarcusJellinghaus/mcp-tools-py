@@ -260,3 +260,79 @@ class TestRunRuffFixImpl:
         )
 
         assert "timed out" in result.lower()
+
+    @patch("os.path.isdir", return_value=True)
+    @patch(f"{MODULE_PATH}.execute_command")
+    def test_pre_check_exit_code_2(self, mock_exec: Any, _mock_isdir: Any) -> None:
+        """Return error when pre-check exits with code 2."""
+        mock_exec.return_value = make_command_result(
+            return_code=2, stderr="error: invalid config"
+        )
+
+        result = run_ruff_fix_impl("/usr/bin/ruff", "/project", ["src"])
+
+        assert "Ruff error" in result
+        assert "invalid config" in result
+        mock_exec.assert_called_once()
+
+    @patch("os.path.isdir", return_value=True)
+    @patch(f"{MODULE_PATH}.execute_command")
+    def test_pre_check_parse_error(self, mock_exec: Any, _mock_isdir: Any) -> None:
+        """Propagate parse error from pre-check output."""
+        mock_exec.return_value = make_command_result(
+            return_code=1, stdout="not valid json"
+        )
+
+        result = run_ruff_fix_impl("/usr/bin/ruff", "/project", ["src"])
+
+        assert "parse" in result.lower() or "json" in result.lower()
+        mock_exec.assert_called_once()
+
+    @patch("os.path.isdir", return_value=True)
+    @patch(f"{MODULE_PATH}.execute_command")
+    def test_fix_exit_code_2(self, mock_exec: Any, _mock_isdir: Any) -> None:
+        """Return error when fix step exits with code 2."""
+        pre_check_output = _make_ruff_json(
+            [
+                {
+                    "code": "F401",
+                    "message": "Unused import",
+                    "filename": "/project/src/a.py",
+                    "fix": {"applicability": "safe", "edits": []},
+                },
+            ]
+        )
+        mock_exec.side_effect = [
+            make_command_result(return_code=1, stdout=pre_check_output),
+            make_command_result(return_code=2, stderr="error: fix failed"),
+        ]
+
+        result = run_ruff_fix_impl("/usr/bin/ruff", "/project", ["src"])
+
+        assert "Ruff fix error" in result
+        assert "fix failed" in result
+        assert mock_exec.call_count == 2
+
+    @patch("os.path.isdir", return_value=True)
+    @patch(f"{MODULE_PATH}.execute_command")
+    def test_post_fix_parse_error(self, mock_exec: Any, _mock_isdir: Any) -> None:
+        """Return error when post-fix output cannot be parsed."""
+        pre_check_output = _make_ruff_json(
+            [
+                {
+                    "code": "F401",
+                    "message": "Unused import",
+                    "filename": "/project/src/a.py",
+                    "fix": {"applicability": "safe", "edits": []},
+                },
+            ]
+        )
+        mock_exec.side_effect = [
+            make_command_result(return_code=1, stdout=pre_check_output),
+            make_command_result(return_code=1, stdout="not valid json"),
+        ]
+
+        result = run_ruff_fix_impl("/usr/bin/ruff", "/project", ["src"])
+
+        assert "applied fixes but could not parse" in result.lower()
+        assert mock_exec.call_count == 2
