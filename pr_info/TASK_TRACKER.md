@@ -37,9 +37,9 @@ This tracks **Feature Implementation** consisting of multiple **Tasks**.
 - [x] Commit: `feat(bandit): add LLM-optimized reporting with tests`
 
 ### Step 4: Subprocess Runner + Tests ([detail](./steps/step_4.md))
-- [ ] Implementation: create `runners.py` with `run_bandit_check_impl`, create `test_runners.py`, update `__init__.py`
+- [x] Implementation: create `runners.py` with `run_bandit_check_impl`, create `test_runners.py`, update `__init__.py`
 - [ ] Quality checks: pylint, pytest, mypy — fix all issues
-- [ ] Commit: `feat(bandit): add subprocess runner with tests`
+- [x] Commit: `feat(bandit): add subprocess runner with tests`
 
 ### Step 5: Server + Checker Tools Integration ([detail](./steps/step_5.md))
 - [ ] Implementation: add bandit binary detection in `server.py`, add `_register_bandit()` in `checker_tools.py`, create `test_integration.py`

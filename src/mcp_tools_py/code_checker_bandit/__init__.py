@@ -9,6 +9,7 @@ from mcp_tools_py.code_checker_bandit.reporting import (
     format_bandit_report,
     group_and_sort_issues,
 )
+from mcp_tools_py.code_checker_bandit.runners import run_bandit_check_impl
 
 __all__ = [
     "BanditIssueGroup",
@@ -17,4 +18,5 @@ __all__ = [
     "format_bandit_report",
     "group_and_sort_issues",
     "parse_bandit_json_output",
+    "run_bandit_check_impl",
 ]
