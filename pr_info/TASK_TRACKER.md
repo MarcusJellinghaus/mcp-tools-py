@@ -22,9 +22,9 @@ This tracks **Feature Implementation** consisting of multiple **Tasks**.
 ## Tasks
 
 ### Step 1: Data Models + Dependency ([detail](./steps/step_1.md))
-- [ ] Implementation: add `bandit>=1.7.5` to pyproject.toml, create `code_checker_bandit/models.py` and `__init__.py`
-- [ ] Quality checks: pylint, pytest, mypy — fix all issues
-- [ ] Commit: `feat(bandit): add data models and dependency`
+- [x] Implementation: add `bandit>=1.7.5` to pyproject.toml, create `code_checker_bandit/models.py` and `__init__.py`
+- [x] Quality checks: pylint, pytest, mypy — fix all issues
+- [x] Commit: `feat(bandit): add data models and dependency`
 
 ### Step 2: JSON Parser + Tests ([detail](./steps/step_2.md))
 - [ ] Implementation: create `parsers.py` with `parse_bandit_json_output`, create `test_parsers.py`, update `__init__.py`
