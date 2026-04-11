@@ -21,6 +21,31 @@ This tracks **Feature Implementation** consisting of multiple **Tasks**.
 
 ## Tasks
 
-<!-- Tasks populated from pr_info/steps/ by prepare_task_tracker -->
+### Step 1: FormatterResult model + update both runners
+
+Detail: [step_1.md](./steps/step_1.md)
+
+- [ ] Implementation: Create `formatter/models.py` with `FormatterResult` dataclass, update `black_runner.py` and `isort_runner.py` to return `FormatterResult` with `files_changed` parsing, update `formatter_tools.py` for compatibility, update all affected tests
+- [ ] Quality checks pass: pylint, pytest, mypy — fix all issues
+- [ ] Commit: `refactor(formatter): add FormatterResult model, update runners`
+
+### Step 2: Extract `run_format_code` into `runner.py` + update MCP wrapper
+
+Detail: [step_2.md](./steps/step_2.md)
+
+- [ ] Implementation: Create `formatter/runner.py` with plain `run_format_code()` and tests, update `formatter_tools.py` to thin MCP wrapper delegating to `runner.py`, update `formatter/__init__.py` exports, update all affected tests
+- [ ] Quality checks pass: pylint, pytest, mypy — fix all issues
+- [ ] Commit: `refactor(formatter): extract run_format_code into runner.py`
+
+### Step 3: Add `check_line_length_conflicts` + wire into MCP wrapper
+
+Detail: [step_3.md](./steps/step_3.md)
+
+- [ ] Implementation: Add `check_line_length_conflicts()` to `utils/project_config.py` with tests, wire into `formatter_tools.py` MCP wrapper, add wiring tests
+- [ ] Quality checks pass: pylint, pytest, mypy — fix all issues
+- [ ] Commit: `feat(formatter): add line-length conflict pre-check`
 
 ## Pull Request
+
+- [ ] PR review: verify all steps integrated correctly
+- [ ] PR summary prepared
