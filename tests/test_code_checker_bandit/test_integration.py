@@ -1,5 +1,6 @@
 """Integration tests for bandit checker tool registration and execution."""
 
+from collections.abc import Callable
 from pathlib import Path
 from unittest.mock import MagicMock, patch
 
@@ -21,9 +22,8 @@ def _register_and_capture(server: MagicMock) -> dict[str, object]:
     """Register checker tools and capture the registered functions."""
     registered: dict[str, object] = {}
 
-    def capture(func: object) -> object:
-        assert callable(func)
-        registered[func.__name__] = func  # type: ignore[union-attr]
+    def capture(func: Callable[..., object]) -> Callable[..., object]:
+        registered[func.__name__] = func
         return func
 
     mock_mcp = MagicMock()
