@@ -32,9 +32,9 @@ This tracks **Feature Implementation** consisting of multiple **Tasks**.
 - [x] Commit: `feat(bandit): add JSON parser with tests`
 
 ### Step 3: LLM-Optimized Reporting + Tests ([detail](./steps/step_3.md))
-- [ ] Implementation: create `reporting.py` with grouping/sorting/formatting, create `test_reporting.py`, update `__init__.py`
-- [ ] Quality checks: pylint, pytest, mypy — fix all issues
-- [ ] Commit: `feat(bandit): add LLM-optimized reporting with tests`
+- [x] Implementation: create `reporting.py` with grouping/sorting/formatting, create `test_reporting.py`, update `__init__.py`
+- [x] Quality checks: pylint, pytest, mypy — fix all issues
+- [x] Commit: `feat(bandit): add LLM-optimized reporting with tests`
 
 ### Step 4: Subprocess Runner + Tests ([detail](./steps/step_4.md))
 - [ ] Implementation: create `runners.py` with `run_bandit_check_impl`, create `test_runners.py`, update `__init__.py`
