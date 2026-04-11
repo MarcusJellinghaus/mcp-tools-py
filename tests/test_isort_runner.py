@@ -24,10 +24,10 @@ def _make_result(
 def test_run_isort_success(mock_exec: MagicMock) -> None:
     mock_exec.return_value = _make_result(stdout="Fixing imports")
 
-    output, success = run_isort("/usr/bin/python", ["src"], "/project")
+    result = run_isort("/usr/bin/python", ["src"], "/project")
 
-    assert success is True
-    assert "Fixing imports" in output
+    assert result.success is True
+    assert "Fixing imports" in result.output
 
 
 @patch("mcp_tools_py.formatter.isort_runner.execute_command")
@@ -58,10 +58,10 @@ def test_run_isort_failure(mock_exec: MagicMock) -> None:
         return_code=1, stderr="ERROR: imports are incorrectly sorted"
     )
 
-    output, success = run_isort("/usr/bin/python", ["src"], "/project")
+    result = run_isort("/usr/bin/python", ["src"], "/project")
 
-    assert success is False
-    assert "incorrectly sorted" in output
+    assert result.success is False
+    assert "incorrectly sorted" in result.output
 
 
 @patch("mcp_tools_py.formatter.isort_runner.execute_command")
@@ -69,9 +69,9 @@ def test_run_isort_truncates_output(mock_exec: MagicMock) -> None:
     long_stdout = "\n".join(f"line {i}" for i in range(250))
     mock_exec.return_value = _make_result(stdout=long_stdout)
 
-    output, _ = run_isort("/usr/bin/python", ["src"], "/project")
+    result = run_isort("/usr/bin/python", ["src"], "/project")
 
-    lines = output.splitlines()
+    lines = result.output.splitlines()
     assert len(lines) == 201  # 200 lines + truncation notice
     assert "truncated" in lines[-1]
     assert "50 more lines" in lines[-1]
@@ -83,7 +83,41 @@ def test_run_isort_combines_stdout_stderr(mock_exec: MagicMock) -> None:
         stdout="Fixing file.py", stderr="warning: something"
     )
 
-    output, _ = run_isort("/usr/bin/python", ["src"], "/project")
+    result = run_isort("/usr/bin/python", ["src"], "/project")
 
-    assert "Fixing file.py" in output
-    assert "warning: something" in output
+    assert "Fixing file.py" in result.output
+    assert "warning: something" in result.output
+
+
+@patch("mcp_tools_py.formatter.isort_runner.execute_command")
+def test_run_isort_parses_fixing_files(mock_exec: MagicMock) -> None:
+    mock_exec.return_value = _make_result(
+        stdout="Fixing src/foo.py",
+    )
+
+    result = run_isort("/usr/bin/python", ["src"], "/project")
+
+    assert result.files_changed == ["src/foo.py"]
+
+
+@patch("mcp_tools_py.formatter.isort_runner.execute_command")
+def test_run_isort_parses_check_mode_errors(mock_exec: MagicMock) -> None:
+    mock_exec.return_value = _make_result(
+        return_code=1,
+        stderr="ERROR: src/foo.py Imports are incorrectly sorted and/or formatted.",
+    )
+
+    result = run_isort("/usr/bin/python", ["src"], "/project", check_only=True)
+
+    assert result.files_changed == ["src/foo.py"]
+
+
+@patch("mcp_tools_py.formatter.isort_runner.execute_command")
+def test_run_isort_no_files_changed(mock_exec: MagicMock) -> None:
+    mock_exec.return_value = _make_result(
+        stdout="Skipping file as it has already been sorted.",
+    )
+
+    result = run_isort("/usr/bin/python", ["src"], "/project")
+
+    assert result.files_changed == []

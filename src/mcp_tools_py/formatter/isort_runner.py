@@ -1,8 +1,9 @@
 """Runner for isort import sorter.
 
-Invokes isort as a subprocess and returns raw text output.
+Invokes isort as a subprocess and returns a FormatterResult.
 """
 
+from mcp_tools_py.formatter.models import FormatterResult
 from mcp_tools_py.utils.subprocess_runner import execute_command
 
 _MAX_LINES = 200
@@ -19,12 +20,29 @@ def _truncate_output(text: str) -> str:
     return "\n".join(truncated)
 
 
+def _parse_isort_changed_files(output: str) -> list[str]:
+    """Parse file paths from isort output.
+
+    isort reports changed files as:
+    - Normal mode: ``Fixing src/foo.py``
+    - Check mode: ``ERROR: src/foo.py Imports are incorrectly sorted ...``
+    """
+    files: list[str] = []
+    for line in output.splitlines():
+        if line.startswith("Fixing "):
+            files.append(line[len("Fixing ") :])
+        elif line.startswith("ERROR: ") and " Imports are incorrectly sorted" in line:
+            path = line[len("ERROR: ") : line.index(" Imports are incorrectly sorted")]
+            files.append(path)
+    return files
+
+
 def run_isort(
     python_executable: str,
     target_dirs: list[str],
     project_dir: str,
     check_only: bool = False,
-) -> tuple[str, bool]:
+) -> FormatterResult:
     """Run isort on target directories.
 
     Args:
@@ -34,8 +52,7 @@ def run_isort(
         check_only: If True, pass --check-only to only verify sorting.
 
     Returns:
-        Tuple of (output_text, success).
-        success is True when return_code == 0.
+        FormatterResult with output, success status, and changed files.
     """
     command = [python_executable, "-m", "isort"]
     if check_only:
@@ -51,4 +68,8 @@ def run_isort(
         output_parts.append(result.stderr)
     output = "\n".join(output_parts) if output_parts else ""
 
-    return _truncate_output(output), result.return_code == 0
+    return FormatterResult(
+        output=_truncate_output(output),
+        success=result.return_code == 0,
+        files_changed=_parse_isort_changed_files(output),
+    )

@@ -1,8 +1,9 @@
 """Runner for black code formatter.
 
-Invokes black as a subprocess and returns raw text output.
+Invokes black as a subprocess and returns a FormatterResult.
 """
 
+from mcp_tools_py.formatter.models import FormatterResult
 from mcp_tools_py.utils.subprocess_runner import execute_command
 
 _MAX_LINES = 200
@@ -19,12 +20,28 @@ def _truncate_output(text: str) -> str:
     return "\n".join(truncated)
 
 
+def _parse_black_changed_files(output: str) -> list[str]:
+    """Parse file paths from black output.
+
+    Black reports changed files as:
+    - Normal mode: ``reformatted src/foo.py``
+    - Check mode: ``would reformat src/foo.py``
+    """
+    files: list[str] = []
+    for line in output.splitlines():
+        if line.startswith("reformatted "):
+            files.append(line[len("reformatted ") :])
+        elif line.startswith("would reformat "):
+            files.append(line[len("would reformat ") :])
+    return files
+
+
 def run_black(
     python_executable: str,
     target_dirs: list[str],
     project_dir: str,
     check_only: bool = False,
-) -> tuple[str, bool]:
+) -> FormatterResult:
     """Run black on target directories.
 
     Args:
@@ -34,8 +51,7 @@ def run_black(
         check_only: If True, pass --check to only verify formatting.
 
     Returns:
-        Tuple of (output_text, success).
-        success is True when return_code == 0.
+        FormatterResult with output, success status, and changed files.
     """
     command = [python_executable, "-m", "black"]
     if check_only:
@@ -51,4 +67,8 @@ def run_black(
         output_parts.append(result.stderr)
     output = "\n".join(output_parts) if output_parts else ""
 
-    return _truncate_output(output), result.return_code == 0
+    return FormatterResult(
+        output=_truncate_output(output),
+        success=result.return_code == 0,
+        files_changed=_parse_black_changed_files(output),
+    )

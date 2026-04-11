@@ -7,6 +7,7 @@ from unittest.mock import MagicMock, patch
 import pytest
 
 from mcp_tools_py.formatter.formatter_tools import FormatterTools
+from mcp_tools_py.formatter.models import FormatterResult
 
 
 @pytest.fixture
@@ -36,6 +37,12 @@ def _capture_run_format_code(mock_server: MagicMock) -> Any:
     return captured_fns["run_format_code"]
 
 
+def _make_formatter_result(
+    output: str = "output", success: bool = True
+) -> FormatterResult:
+    return FormatterResult(output=output, success=success, files_changed=[])
+
+
 class TestRegistration:
     """Tests for tool registration."""
 
@@ -58,13 +65,13 @@ class TestStepOrdering:
         run_format = _capture_run_format_code(mock_server)
         call_order: list[str] = []
 
-        def fake_isort(*_args: Any, **_kwargs: Any) -> tuple[str, bool]:
+        def fake_isort(*_args: Any, **_kwargs: Any) -> FormatterResult:
             call_order.append("isort")
-            return "isort output", True
+            return _make_formatter_result(output="isort output")
 
-        def fake_black(*_args: Any, **_kwargs: Any) -> tuple[str, bool]:
+        def fake_black(*_args: Any, **_kwargs: Any) -> FormatterResult:
             call_order.append("black")
-            return "black output", True
+            return _make_formatter_result(output="black output")
 
         with (
             patch(
@@ -90,8 +97,8 @@ class TestStepOrdering:
         """Pass steps=["black"], verify only black runs."""
         run_format = _capture_run_format_code(mock_server)
 
-        def fake_black(*_args: Any, **_kwargs: Any) -> tuple[str, bool]:
-            return "black output", True
+        def fake_black(*_args: Any, **_kwargs: Any) -> FormatterResult:
+            return _make_formatter_result(output="black output")
 
         with patch(
             "mcp_tools_py.formatter.formatter_tools._STEP_RUNNERS",
@@ -122,8 +129,8 @@ class TestTargetDirectories:
         """Mock resolve_target_directories, verify it's called when target_directories=None."""
         run_format = _capture_run_format_code(mock_server)
 
-        def fake_runner(*_args: Any, **_kwargs: Any) -> tuple[str, bool]:
-            return "output", True
+        def fake_runner(*_args: Any, **_kwargs: Any) -> FormatterResult:
+            return _make_formatter_result()
 
         with (
             patch(
@@ -143,8 +150,8 @@ class TestTargetDirectories:
         """Pass explicit dirs, verify resolve_target_directories returns them directly."""
         run_format = _capture_run_format_code(mock_server)
 
-        def fake_runner(*_args: Any, **_kwargs: Any) -> tuple[str, bool]:
-            return "output", True
+        def fake_runner(*_args: Any, **_kwargs: Any) -> FormatterResult:
+            return _make_formatter_result()
 
         with (
             patch(
@@ -173,13 +180,13 @@ class TestCheckOnlyMode:
         run_format = _capture_run_format_code(mock_server)
         call_order: list[str] = []
 
-        def fake_isort(*_args: Any, **_kwargs: Any) -> tuple[str, bool]:
+        def fake_isort(*_args: Any, **_kwargs: Any) -> FormatterResult:
             call_order.append("isort")
-            return "needs formatting", False
+            return _make_formatter_result(output="needs formatting", success=False)
 
-        def fake_black(*_args: Any, **_kwargs: Any) -> tuple[str, bool]:
+        def fake_black(*_args: Any, **_kwargs: Any) -> FormatterResult:
             call_order.append("black")
-            return "needs formatting", False
+            return _make_formatter_result(output="needs formatting", success=False)
 
         with patch(
             "mcp_tools_py.formatter.formatter_tools._STEP_RUNNERS",
@@ -197,13 +204,13 @@ class TestCheckOnlyMode:
         run_format = _capture_run_format_code(mock_server)
         call_order: list[str] = []
 
-        def fake_isort(*_args: Any, **_kwargs: Any) -> tuple[str, bool]:
+        def fake_isort(*_args: Any, **_kwargs: Any) -> FormatterResult:
             call_order.append("isort")
-            return "error output", False
+            return _make_formatter_result(output="error output", success=False)
 
-        def fake_black(*_args: Any, **_kwargs: Any) -> tuple[str, bool]:
+        def fake_black(*_args: Any, **_kwargs: Any) -> FormatterResult:
             call_order.append("black")
-            return "black output", True
+            return _make_formatter_result(output="black output")
 
         with patch(
             "mcp_tools_py.formatter.formatter_tools._STEP_RUNNERS",
@@ -224,8 +231,8 @@ class TestOutput:
         """Verify output contains ## isort and ## black."""
         run_format = _capture_run_format_code(mock_server)
 
-        def fake_runner(*_args: Any, **_kwargs: Any) -> tuple[str, bool]:
-            return "some output", True
+        def fake_runner(*_args: Any, **_kwargs: Any) -> FormatterResult:
+            return _make_formatter_result(output="some output")
 
         with patch(
             "mcp_tools_py.formatter.formatter_tools._STEP_RUNNERS",
@@ -245,8 +252,8 @@ class TestToolAvailability:
         mock_server._tool_availability = {"isort": True, "black": False}
         run_format = _capture_run_format_code(mock_server)
 
-        def fake_isort(*_args: Any, **_kwargs: Any) -> tuple[str, bool]:
-            return "isort output", True
+        def fake_isort(*_args: Any, **_kwargs: Any) -> FormatterResult:
+            return _make_formatter_result(output="isort output")
 
         with patch(
             "mcp_tools_py.formatter.formatter_tools._STEP_RUNNERS",

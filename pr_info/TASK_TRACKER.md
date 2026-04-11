@@ -25,9 +25,9 @@ This tracks **Feature Implementation** consisting of multiple **Tasks**.
 
 Detail: [step_1.md](./steps/step_1.md)
 
-- [ ] Implementation: Create `formatter/models.py` with `FormatterResult` dataclass, update `black_runner.py` and `isort_runner.py` to return `FormatterResult` with `files_changed` parsing, update `formatter_tools.py` for compatibility, update all affected tests
-- [ ] Quality checks pass: pylint, pytest, mypy — fix all issues
-- [ ] Commit: `refactor(formatter): add FormatterResult model, update runners`
+- [x] Implementation: Create `formatter/models.py` with `FormatterResult` dataclass, update `black_runner.py` and `isort_runner.py` to return `FormatterResult` with `files_changed` parsing, update `formatter_tools.py` for compatibility, update all affected tests
+- [x] Quality checks pass: pylint, pytest, mypy — fix all issues
+- [x] Commit: `refactor(formatter): add FormatterResult model, update runners`
 
 ### Step 2: Extract `run_format_code` into `runner.py` + update MCP wrapper
 

@@ -6,6 +6,7 @@ from typing import TYPE_CHECKING
 
 from mcp_tools_py.formatter.black_runner import run_black
 from mcp_tools_py.formatter.isort_runner import run_isort
+from mcp_tools_py.formatter.models import FormatterResult
 from mcp_tools_py.log_utils import log_function_call
 from mcp_tools_py.utils.project_config import resolve_target_directories
 
@@ -16,7 +17,7 @@ logger = logging.getLogger(__name__)
 
 _VALID_STEPS = {"isort", "black"}
 
-_STEP_RUNNERS: dict[str, Callable[..., tuple[str, bool]]] = {
+_STEP_RUNNERS: dict[str, Callable[..., FormatterResult]] = {
     "isort": run_isort,
     "black": run_black,
 }
@@ -84,16 +85,16 @@ class FormatterTools:
                     return _join_sections(sections)
 
                 runner = _STEP_RUNNERS[step]
-                output, success = runner(
+                result = runner(
                     self._server._resolved_python,
                     dirs,
                     str(self._server.project_dir),
                     check_only,
                 )
 
-                sections.append(f"## {step}\n{output}")
+                sections.append(f"## {step}\n{result.output}")
 
-                if not success and not check_only:
+                if not result.success and not check_only:
                     sections.append(
                         f"\nFormatting stopped due to errors in {step} step."
                     )
