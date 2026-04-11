@@ -6,7 +6,10 @@ from typing import TYPE_CHECKING
 from mcp_tools_py.formatter.models import FormatterResult
 from mcp_tools_py.formatter.runner import run_format_code as _run_format_code
 from mcp_tools_py.log_utils import log_function_call
-from mcp_tools_py.utils.project_config import resolve_target_directories
+from mcp_tools_py.utils.project_config import (
+    check_line_length_conflicts,
+    resolve_target_directories,
+)
 
 if TYPE_CHECKING:
     from mcp_tools_py.server import FastMCPProtocol, ToolServer
@@ -65,6 +68,11 @@ class FormatterTools:
                         f"Restart the server after installing."
                     )
 
+            # Check for line-length conflicts
+            warnings = check_line_length_conflicts(
+                str(self._server.project_dir), resolved_steps
+            )
+
             # Delegate to runner
             try:
                 results = _run_format_code(
@@ -77,7 +85,10 @@ class FormatterTools:
             except ValueError as exc:
                 return f"Error: {exc}"
 
-            return _format_results(results, resolved_steps, check_only)
+            output = _format_results(results, resolved_steps, check_only)
+            if warnings:
+                output = "\n".join(warnings) + "\n\n" + output
+            return output
 
 
 def _format_results(

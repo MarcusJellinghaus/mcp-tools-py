@@ -249,3 +249,57 @@ class TestToolAvailability:
         # Runner should NOT have been called
         mock_runner.assert_not_called()
         assert "black is not available" in result
+
+
+_CONFLICT_PATCH = "mcp_tools_py.formatter.formatter_tools.check_line_length_conflicts"
+
+
+class TestLineLengthWarnings:
+    """Tests for line-length conflict warning integration."""
+
+    def test_line_length_warnings_prepended(self, mock_server: MagicMock) -> None:
+        """Warnings from check_line_length_conflicts appear before formatter output."""
+        run_format = _capture_run_format_code(mock_server)
+
+        mock_runner = MagicMock(
+            return_value={
+                "isort": _make_formatter_result(output="isort output"),
+                "black": _make_formatter_result(output="black output"),
+            }
+        )
+
+        with (
+            patch(_RUNNER_PATCH, mock_runner),
+            patch(
+                _CONFLICT_PATCH,
+                return_value=[
+                    "Line-length mismatch: black=88, isort=120. Formatting may be inconsistent."
+                ],
+            ),
+        ):
+            result = run_format(target_directories=["src"])
+
+        # Warning should appear before formatter sections
+        warning_pos = result.index("Line-length mismatch")
+        isort_pos = result.index("## isort")
+        assert warning_pos < isort_pos
+
+    def test_no_line_length_warnings(self, mock_server: MagicMock) -> None:
+        """No warnings → no extra text prepended."""
+        run_format = _capture_run_format_code(mock_server)
+
+        mock_runner = MagicMock(
+            return_value={
+                "isort": _make_formatter_result(output="isort output"),
+                "black": _make_formatter_result(output="black output"),
+            }
+        )
+
+        with (
+            patch(_RUNNER_PATCH, mock_runner),
+            patch(_CONFLICT_PATCH, return_value=[]),
+        ):
+            result = run_format(target_directories=["src"])
+
+        assert "mismatch" not in result.lower()
+        assert result.startswith("## isort")

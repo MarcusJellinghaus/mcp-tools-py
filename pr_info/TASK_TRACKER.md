@@ -41,9 +41,9 @@ Detail: [step_2.md](./steps/step_2.md)
 
 Detail: [step_3.md](./steps/step_3.md)
 
-- [ ] Implementation: Add `check_line_length_conflicts()` to `utils/project_config.py` with tests, wire into `formatter_tools.py` MCP wrapper, add wiring tests
-- [ ] Quality checks pass: pylint, pytest, mypy — fix all issues
-- [ ] Commit: `feat(formatter): add line-length conflict pre-check`
+- [x] Implementation: Add `check_line_length_conflicts()` to `utils/project_config.py` with tests, wire into `formatter_tools.py` MCP wrapper, add wiring tests
+- [x] Quality checks pass: pylint, pytest, mypy — fix all issues
+- [x] Commit: `feat(formatter): add line-length conflict pre-check`
 
 ## Pull Request
 
