@@ -28,7 +28,7 @@ refactor(formatter): extract run_format_code into runner.py
 from pathlib import Path
 from mcp_tools_py.formatter.models import FormatterResult
 
-VALID_STEPS: set[str] = {"isort", "black"}
+_VALID_STEPS: set[str] = {"isort", "black"}
 
 def run_format_code(
     python_executable: str,
@@ -42,7 +42,7 @@ def run_format_code(
 ### ALGORITHM
 ```
 resolved_steps = steps or ["isort", "black"]
-validate steps against VALID_STEPS → raise ValueError if invalid
+validate steps against _VALID_STEPS → raise ValueError if invalid
 results = {}
 for step in resolved_steps:
     result = _STEP_RUNNERS[step](python_executable, target_dirs, str(project_root), check_only)
@@ -105,18 +105,21 @@ try:
     results = runner.run_format_code(python_exec, project_root, dirs, steps, check_only)
 except ValueError as e:
     return str(e)
-return _format_results(results, check_only)
+return _format_results(results, resolved_steps, check_only)
 ```
 
 ### HOW
 - Import `run_format_code as _run_format_code` from `formatter.runner` (or use qualified name)
 - Remove `_STEP_RUNNERS` dict and `_VALID_STEPS` from this file (moved to runner.py)
 - Remove `run_black` / `run_isort` direct imports (no longer needed here)
-- Add `_format_results(results: dict[str, FormatterResult], check_only: bool) -> str` helper
-- `_format_results` produces the same markdown string as today:
-  - `## {step}\n{result.output}` per step
-  - `\nFormatting stopped due to errors in {step} step.` if not check_only and not success
-  - Joined with `\n\n`
+- Add `_format_results(results: dict[str, FormatterResult], steps: list[str], check_only: bool) -> str` helper
+- `_format_results` algorithm:
+  - for step in steps:
+      - if step in results: append `## {step}\n{result.output}`
+      - (if step not in results, runner stopped before reaching it)
+  - if not check_only and any result has success=False and len(results) < len(steps):
+      append `\nFormatting stopped due to errors in {failed_step} step.`
+  - return joined output
 
 ### TEST CHANGES (`tests/test_formatter_tools.py`)
 - Tests now mock `mcp_tools_py.formatter.formatter_tools._run_format_code` (or the runner module)

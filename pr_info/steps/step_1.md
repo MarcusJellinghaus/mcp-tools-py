@@ -103,7 +103,9 @@ def run_isort(
 ```
 for each line in combined output:
     if line starts with "Fixing " → extract path, add to list
-    if line starts with "ERROR: " and contains "Imports are incorrectly sorted" → extract path, add to list
+    if line starts with "ERROR: " and contains " Imports are incorrectly sorted":
+        path = line[len("ERROR: "):line.index(" Imports are incorrectly sorted")]
+        add path to list
 return list
 ```
 

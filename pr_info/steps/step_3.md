@@ -34,8 +34,17 @@ def check_line_length_conflicts(
 ```
 load pyproject.toml (reuse existing pattern from get_target_directories)
 for tool in ["black", "isort", "ruff"]:
-    read [tool.{name}].line-length (isort uses line_length)
-    if configured → store value
+    if tool == "ruff":
+        # [tool.ruff.format].line-length overrides [tool.ruff].line-length
+        value = config.get("tool", {}).get("ruff", {}).get("format", {}).get("line-length")
+        if value is None:
+            value = config.get("tool", {}).get("ruff", {}).get("line-length")
+    elif tool == "isort":
+        value = config.get("tool", {}).get("isort", {}).get("line_length")  # underscore
+    else:
+        value = config.get("tool", {}).get(tool, {}).get("line-length")
+
+    if value is not None → store value
     elif tool in used_tools → store default 88
     else → store None (skip)
 filter out None entries
