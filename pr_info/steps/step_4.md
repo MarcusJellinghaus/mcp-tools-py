@@ -70,11 +70,11 @@ Note: `-r` is needed for recursive directory scanning. `-f json` sets JSON outpu
 1. Validate project_dir exists (raise FileNotFoundError if not)
 2. Build command via _build_bandit_command()
 3. Execute via execute_command(cmd, cwd=project_dir)
-4. If execution_error → return BanditResult(error=..., messages=[], errors=[])
-5. If timed_out → return BanditResult(error="timed out", messages=[], errors=[])
-6. If return_code > 1 → return BanditResult(error=stderr, messages=[], errors=[])
+4. If execution_error → return BanditResult(return_code=-1, messages=[], errors=[], error=str(execution_error))
+5. If timed_out → return BanditResult(return_code=-1, messages=[], errors=[], error="timed out")
+6. If return_code > 1 → return BanditResult(return_code=return_code, messages=[], errors=[], error=stderr)
 7. Parse stdout via parse_bandit_json_output(stdout, project_dir)
-8. If parse_error → return BanditResult(error=parse_error, ...)
+8. If parse_error → return BanditResult(return_code=return_code, messages=[], errors=[], error=parse_error)
 9. Return BanditResult(return_code, messages, errors, raw_output=stdout)
 ```
 

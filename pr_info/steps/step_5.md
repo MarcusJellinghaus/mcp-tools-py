@@ -80,12 +80,13 @@ def _register_bandit(self, mcp: "FastMCPProtocol") -> None:
 ### ALGORITHM — `run_bandit_check` (inside registration)
 
 ```
-1. Check availability → return not-available message if False
-2. Resolve target_directories via resolve_target_directories()
-3. Call run_bandit_check_impl(binary, project_dir, resolved, extra_args)
-4. If result.error → return error string
-5. Call format_bandit_report(result.messages, result.errors, max_issues)
-6. Return formatted report or "No bandit security issues found."
+1. Check availability via self._server._tool_availability.get("bandit", False) → return not-available message if False
+2. binary = self._server._bandit_binary; assert binary is not None
+3. Resolve target_directories via resolve_target_directories()
+4. Call run_bandit_check_impl(binary, project_dir, resolved, extra_args)
+5. If result.error → return error string
+6. Call format_bandit_report(result.messages, result.errors, max_issues)
+7. Return formatted report or "No bandit security issues found."
 ```
 
 ### DATA
@@ -122,3 +123,4 @@ self._register_bandit(mcp)
   - No `get_bandit_prompt()` convenience function (runner + reporting are called separately)
   - No special formatting method on CheckerTools (report formatting lives in reporting.py)
   - Error handling follows the ruff pattern (check result.error, then format)
+- Update the `CheckerTools` class docstring to include "ruff" and "bandit" alongside the existing tools

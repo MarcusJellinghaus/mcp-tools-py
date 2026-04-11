@@ -29,4 +29,29 @@
 - `pr_info/steps/step_6.md`: added forbidden-imports entry instructions
 - `pr_info/steps/Decisions.md`: created with all 6 decisions logged
 
+**Status**: Committed (8624d50)
+
+## Round 2 — 2026-04-11
+
+**Findings**:
+- (Important) Step 4 pseudocode omits `return_code` in BanditResult error-path construction
+- (Important) Step 5 pseudocode missing explicit `binary = self._server._bandit_binary` access pattern
+- (Minor) Step 2 algorithm doesn't explicitly show error dict → string formatting
+- (Minor) CheckerTools class docstring not updated to include bandit (and ruff)
+- (Minor) BanditResult helper methods not needed despite "mirrors" claim — acceptable as-is
+
+**Decisions**:
+- Accept #2: Fix BanditResult construction to always include return_code
+- Accept #6: Add explicit binary access and availability check pattern
+- Accept #4: Clarify error dict formatting in Step 2
+- Accept #14: Add note to update CheckerTools docstring
+- Skip #1: Already clear in plan
+
+**User decisions**: None needed.
+
+**Changes**:
+- `pr_info/steps/step_4.md`: Fixed BanditResult error-path pseudocode with explicit return_code
+- `pr_info/steps/step_5.md`: Added binary access pattern and docstring update note
+- `pr_info/steps/step_2.md`: Clarified error dict → string formatting
+
 **Status**: Pending commit

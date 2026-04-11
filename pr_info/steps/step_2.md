@@ -48,7 +48,7 @@ def parse_bandit_json_output(
 1. Return ([], [], None) if raw_output is empty/whitespace
 2. json.loads(raw_output) → expect dict with "results" and "errors" keys
 3. If not dict → return ([], [], "Expected JSON object...") 
-4. Extract data["errors"] → list of error strings (file-level errors)
+4. Extract data["errors"] → format each dict as "filename: reason" → list[str]
 5. For each item in data["results"]:
      - normalize filename via os.path.relpath(filename, project_dir)
      - extract cwe_id and cwe_link from item["issue_cwe"] dict
