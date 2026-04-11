@@ -137,6 +137,7 @@ class TestCheckToolAvailability:
                 "lint-imports": True,
                 "vulture": True,
                 "ruff": True,
+                "bandit": True,
             }
 
     def test_one_tool_missing(self) -> None:
@@ -188,6 +189,7 @@ class TestCheckToolAvailability:
                 "lint-imports": False,
                 "vulture": False,
                 "ruff": False,
+                "bandit": False,
             }
 
     def test_timed_out_tool_marked_unavailable(self) -> None:
@@ -210,6 +212,7 @@ class TestCheckToolAvailability:
                 "lint-imports": False,
                 "vulture": False,
                 "ruff": False,
+                "bandit": False,
             }
 
     def test_lint_imports_available_when_binary_exists(self) -> None:

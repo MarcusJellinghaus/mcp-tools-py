@@ -187,6 +187,23 @@ class ToolServer:
                 "an environment where ruff is installed."
             )
 
+        # bandit: check via file existence (not subprocess)
+        bandit_available = False
+        bandit_binary: Optional[str] = None
+        if self.venv_path:
+            if os.name == "nt":
+                bandit_binary = os.path.join(self.venv_path, "Scripts", "bandit.exe")
+            else:
+                bandit_binary = os.path.join(self.venv_path, "bin", "bandit")
+            bandit_available = os.path.exists(bandit_binary)
+        self._bandit_binary: Optional[str] = bandit_binary if bandit_available else None
+        availability["bandit"] = bandit_available
+        if not bandit_available:
+            logger.warning(
+                "bandit not found. Ensure --venv-path points to "
+                "an environment where bandit is installed."
+            )
+
         return availability
 
     @log_function_call

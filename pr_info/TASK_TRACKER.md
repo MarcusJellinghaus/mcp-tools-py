@@ -42,7 +42,7 @@ This tracks **Feature Implementation** consisting of multiple **Tasks**.
 - [x] Commit: `feat(bandit): add subprocess runner with tests`
 
 ### Step 5: Server + Checker Tools Integration ([detail](./steps/step_5.md))
-- [ ] Implementation: add bandit binary detection in `server.py`, add `_register_bandit()` in `checker_tools.py`, create `test_integration.py`
+- [x] Implementation: add bandit binary detection in `server.py`, add `_register_bandit()` in `checker_tools.py`, create `test_integration.py`
 - [ ] Quality checks: pylint, pytest, mypy — fix all issues
 - [ ] Commit: `feat(bandit): register run_bandit_check MCP tool`
 
