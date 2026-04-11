@@ -44,7 +44,7 @@ This tracks **Feature Implementation** consisting of multiple **Tasks**.
 ### Step 5: Server + Checker Tools Integration ([detail](./steps/step_5.md))
 - [x] Implementation: add bandit binary detection in `server.py`, add `_register_bandit()` in `checker_tools.py`, create `test_integration.py`
 - [x] Quality checks: pylint, pytest, mypy — fix all issues
-- [ ] Commit: `feat(bandit): register run_bandit_check MCP tool`
+- [x] Commit: `feat(bandit): register run_bandit_check MCP tool`
 
 ### Step 6: Architecture Boundary Configuration ([detail](./steps/step_6.md))
 - [ ] Implementation: update `tach.toml` and `.importlinter` with `code_checker_bandit` module boundaries
