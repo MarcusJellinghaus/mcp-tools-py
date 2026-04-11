@@ -55,6 +55,13 @@ Add `mcp_tools_py.code_checker_bandit` to the layers contract (same layer as oth
     mcp_tools_py.code_checker_pytest | mcp_tools_py.code_checker_pylint | mcp_tools_py.code_checker_mypy | mcp_tools_py.code_checker_ruff | mcp_tools_py.code_checker_bandit
 ```
 
+Also update the `[importlinter:contract:forbidden-imports]` section's `forbidden_modules` list to include `mcp_tools_py.code_checker_bandit`:
+
+```ini
+# In [importlinter:contract:forbidden-imports], add to forbidden_modules:
+    mcp_tools_py.code_checker_bandit
+```
+
 ## DATA
 
 No code changes — configuration only.

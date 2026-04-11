@@ -24,6 +24,7 @@ Commit: "feat(bandit): register run_bandit_check MCP tool"
 
 - **Modify**: `src/mcp_tools_py/server.py` — add bandit binary check
 - **Modify**: `src/mcp_tools_py/checker_tools.py` — add `_register_bandit()` method
+- **Create**: `tests/test_code_checker_bandit/test_integration.py` — integration tests
 
 ## WHAT
 
@@ -106,6 +107,14 @@ self._register_bandit(mcp)
 - Binary check follows vulture/ruff pattern in server.py — file existence, not subprocess
 - Use `resolve_target_directories()` for auto-detection (already imported)
 - No new test file needed — existing `test_tool_availability.py` and `test_checker_tools.py` patterns cover integration; the unit logic is already tested in steps 2-4
+
+### Integration Tests (`test_integration.py`)
+
+| Test | What it validates |
+|------|-------------------|
+| `test_bandit_not_available_message` | Mock bandit as unavailable, verify the tool returns a not-available message |
+| `test_bandit_happy_path` | Mock `run_bandit_check_impl` to return a `BanditResult` with messages, verify `format_bandit_report` output is returned |
+| `test_bandit_error_handling` | Mock `run_bandit_check_impl` to return a `BanditResult` with error set, verify error string is returned |
 
 ## Notes
 

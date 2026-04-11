@@ -50,7 +50,7 @@ bandit CLI (JSON) → parsers.py → BanditMessage list + errors
 - **`checker_tools.py`**: Add `_register_bandit()` method, call from `register()`
 - **`tach.toml`**: Add `code_checker_bandit` module with dependencies on `utils` and `log_utils`; add to `checker_tools` depends_on
 - **`.importlinter`**: Add `code_checker_bandit` to the layers contract
-- **`pyproject.toml`**: Add `bandit>=1.7.0` to `[project.dependencies]`
+- **`pyproject.toml`**: Add `bandit>=1.7.5` to `[project.dependencies]`
 
 ### MCP Tool Signature
 
@@ -75,12 +75,13 @@ def run_bandit_check(
 | `tests/test_code_checker_bandit/test_parsers.py` | Parser tests |
 | `tests/test_code_checker_bandit/test_reporting.py` | Reporting tests |
 | `tests/test_code_checker_bandit/test_runners.py` | Runner tests |
+| `tests/test_code_checker_bandit/test_integration.py` | Integration tests |
 
 ## Files Modified
 
 | File | Change |
 |------|--------|
-| `pyproject.toml` | Add `bandit>=1.7.0` dependency |
+| `pyproject.toml` | Add `bandit>=1.7.5` dependency |
 | `src/mcp_tools_py/server.py` | Add bandit binary detection |
 | `src/mcp_tools_py/checker_tools.py` | Add `_register_bandit()` + import |
 | `tach.toml` | Add `code_checker_bandit` module boundaries |

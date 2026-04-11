@@ -72,7 +72,7 @@ Note: `-r` is needed for recursive directory scanning. `-f json` sets JSON outpu
 3. Execute via execute_command(cmd, cwd=project_dir)
 4. If execution_error → return BanditResult(error=..., messages=[], errors=[])
 5. If timed_out → return BanditResult(error="timed out", messages=[], errors=[])
-6. If return_code == 2 → return BanditResult(error=stderr, messages=[], errors=[])
+6. If return_code > 1 → return BanditResult(error=stderr, messages=[], errors=[])
 7. Parse stdout via parse_bandit_json_output(stdout, project_dir)
 8. If parse_error → return BanditResult(error=parse_error, ...)
 9. Return BanditResult(return_code, messages, errors, raw_output=stdout)
@@ -80,7 +80,7 @@ Note: `-r` is needed for recursive directory scanning. `-f json` sets JSON outpu
 
 ### DATA
 
-**Return codes**: 0=no issues, 1=issues found, 2=error (same as ruff)
+**Return codes**: 0=no issues, 1=issues found, >1=error
 
 **`BanditResult`** fields populated by runner:
 - `return_code`: from subprocess
@@ -98,7 +98,7 @@ Note: `-r` is needed for recursive directory scanning. `-f json` sets JSON outpu
 | `test_build_command_multiple_directories` | Multiple dirs after `-r` |
 | `test_no_issues` | return_code=0, empty JSON → BanditResult with empty messages |
 | `test_with_issues` | return_code=1, valid JSON → BanditResult with messages |
-| `test_error_exit_code_2` | return_code=2 → BanditResult with error from stderr |
+| `test_error_exit_code_gt_1` | return_code > 1 → BanditResult with error from stderr |
 | `test_execution_error` | execution_error set → BanditResult with error |
 | `test_timeout` | timed_out=True → BanditResult with timeout error |
 | `test_invalid_project_dir` | Non-existent dir → FileNotFoundError |

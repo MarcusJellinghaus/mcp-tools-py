@@ -27,7 +27,7 @@ Commit: "feat(bandit): add data models and dependency"
 
 ### `pyproject.toml`
 
-Add `"bandit>=1.7.0"` to `[project.dependencies]` list (after `ruff>=0.9.0`).
+Add `"bandit>=1.7.5"` to `[project.dependencies]` list (after `ruff>=0.9.0`).
 
 ### `models.py`
 
@@ -60,9 +60,12 @@ Re-export `BanditMessage` and `BanditResult` (will grow as later steps add parse
 
 - `BanditMessage`: 10 fields — only what reporting actually uses (no `col_offset`, `end_col_offset`, `line_range`, `code` snippet)
 - `BanditResult`: mirrors `PylintResult`/`MypyResult` pattern with added `errors: list[str]` for bandit's file-level errors array
-- `errors` defaults to `[]` via empty list — NamedTuple with default
 
 ## Notes
 
 - No tests in this step — models are NamedTuples with no logic to test
 - The `__init__.py` will be updated in each subsequent step to re-export new public API
+
+## Pre-requisite
+
+The `bandit>=1.7.5` dependency should be added to `pyproject.toml` and installed before implementation begins, per planning principles.
