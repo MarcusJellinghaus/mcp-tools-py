@@ -11,6 +11,8 @@ from mcp_tools_py.formatter.black_runner import run_black
 from mcp_tools_py.formatter.isort_runner import run_isort
 from mcp_tools_py.formatter.models import FormatterResult
 
+DEFAULT_STEPS: list[str] = ["isort", "black"]
+
 _VALID_STEPS: set[str] = {"isort", "black"}
 
 _STEP_RUNNERS: dict[str, Callable[..., FormatterResult]] = {
@@ -43,7 +45,7 @@ def run_format_code(
     Raises:
         ValueError: If any step name is not in :data:`_VALID_STEPS`.
     """
-    resolved_steps = steps or ["isort", "black"]
+    resolved_steps = steps or DEFAULT_STEPS
 
     invalid = [s for s in resolved_steps if s not in _VALID_STEPS]
     if invalid:

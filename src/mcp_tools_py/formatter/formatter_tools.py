@@ -4,7 +4,7 @@ import logging
 from typing import TYPE_CHECKING
 
 from mcp_tools_py.formatter.models import FormatterResult
-from mcp_tools_py.formatter.runner import run_format_code as _run_format_code
+from mcp_tools_py.formatter.runner import DEFAULT_STEPS, run_format_code as _run_format_code
 from mcp_tools_py.log_utils import log_function_call
 from mcp_tools_py.utils.project_config import (
     check_line_length_conflicts,
@@ -47,7 +47,7 @@ class FormatterTools:
             Returns:
                 Formatted output with markdown headers per step.
             """
-            resolved_steps = steps or ["isort", "black"]
+            resolved_steps = steps or DEFAULT_STEPS
 
             # Resolve target directories
             resolved = resolve_target_directories(
@@ -79,7 +79,7 @@ class FormatterTools:
                     self._server._resolved_python,
                     self._server.project_dir,
                     dirs,
-                    steps,
+                    resolved_steps,
                     check_only,
                 )
             except ValueError as exc:
