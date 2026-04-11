@@ -27,9 +27,9 @@ This tracks **Feature Implementation** consisting of multiple **Tasks**.
 - [x] Commit: `feat(bandit): add data models and dependency`
 
 ### Step 2: JSON Parser + Tests ([detail](./steps/step_2.md))
-- [ ] Implementation: create `parsers.py` with `parse_bandit_json_output`, create `test_parsers.py`, update `__init__.py`
-- [ ] Quality checks: pylint, pytest, mypy — fix all issues
-- [ ] Commit: `feat(bandit): add JSON parser with tests`
+- [x] Implementation: create `parsers.py` with `parse_bandit_json_output`, create `test_parsers.py`, update `__init__.py`
+- [x] Quality checks: pylint, pytest, mypy — fix all issues
+- [x] Commit: `feat(bandit): add JSON parser with tests`
 
 ### Step 3: LLM-Optimized Reporting + Tests ([detail](./steps/step_3.md))
 - [ ] Implementation: create `reporting.py` with grouping/sorting/formatting, create `test_reporting.py`, update `__init__.py`
