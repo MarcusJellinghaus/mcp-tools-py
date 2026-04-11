@@ -35,10 +35,7 @@ def check_line_length_conflicts(
 load pyproject.toml (reuse existing pattern from get_target_directories)
 for tool in ["black", "isort", "ruff"]:
     if tool == "ruff":
-        # [tool.ruff.format].line-length overrides [tool.ruff].line-length
-        value = config.get("tool", {}).get("ruff", {}).get("format", {}).get("line-length")
-        if value is None:
-            value = config.get("tool", {}).get("ruff", {}).get("line-length")
+        value = config.get("tool", {}).get("ruff", {}).get("line-length")
     elif tool == "isort":
         value = config.get("tool", {}).get("isort", {}).get("line_length")  # underscore
     else:
@@ -59,7 +56,7 @@ else → return list of warning strings describing mismatches
   - `[tool.black].line-length` (int)
   - `[tool.isort].line_length` (int, note underscore)
   - `[tool.ruff].line-length` (int)  
-  - Also check `[tool.ruff.format].line-length` as override
+
 - **Default**: 88 for all three tools (only applied when tool is in `used_tools`)
 
 ### HOW
@@ -73,7 +70,7 @@ else → return list of warning strings describing mismatches
 - `test_unconfigured_unused_tool_skipped` — ruff not configured, not in `used_tools` → no warning about ruff
 - `test_unconfigured_used_tool_defaults_to_88` — isort not configured but in `used_tools` → treated as 88, compared
 - `test_no_pyproject_no_warnings` — no file at all → `[]`
-- `test_only_one_tool_configured_no_comparison` — only black=88, nothing else → `[]`
+- `test_only_one_tool_configured_no_comparison` — only `[tool.black].line-length = 88` configured, `used_tools=["black"]`, ruff and isort unconfigured and not in used_tools → only one value, nothing to compare → `[]`
 
 ---
 
@@ -95,6 +92,8 @@ if warnings:
     prepend "\n".join(warnings) + "\n\n" to output
 return output
 ```
+
+> **Design note**: Since `resolved_steps` only contains `"isort"` and/or `"black"` (the formatter tool never runs ruff), ruff is only included in the line-length comparison when it has an explicit `[tool.ruff].line-length` in `pyproject.toml`. Unconfigured ruff is skipped per issue decision #8.
 
 ### HOW
 - Import `check_line_length_conflicts` from `utils.project_config`

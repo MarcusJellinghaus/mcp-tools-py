@@ -108,6 +108,8 @@ except ValueError as e:
 return _format_results(results, resolved_steps, check_only)
 ```
 
+> **Note — behavioral improvement**: The original code interleaved tool availability checks with runner execution (run isort, check if black is available, run black). The refactored code checks all tool availability upfront before any runner executes. This is an intentional improvement: fail-fast on unavailable tools avoids partial formatting.
+
 ### HOW
 - Import `run_format_code as _run_format_code` from `formatter.runner` (or use qualified name)
 - Remove `_STEP_RUNNERS` dict and `_VALID_STEPS` from this file (moved to runner.py)

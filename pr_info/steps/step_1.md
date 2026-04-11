@@ -74,8 +74,8 @@ Black output examples:
 
 ### TEST CHANGES (`tests/test_black_runner.py`)
 - Update all existing tests: unpack `result.output` / `result.success` instead of `output, success`
-- Add test: `test_run_black_parses_reformatted_files` — stderr contains `reformatted src/foo.py`, assert `files_changed == ["src/foo.py"]`
-- Add test: `test_run_black_parses_would_reformat_files` — check_only mode, stderr contains `would reformat src/foo.py`, assert `files_changed == ["src/foo.py"]`
+- Add test: `test_run_black_parses_reformatted_files` — mock `CommandResult` with `stderr` containing `reformatted src/foo.py` (combined into output for parsing), assert `files_changed == ["src/foo.py"]`
+- Add test: `test_run_black_parses_would_reformat_files` — check_only mode, mock `CommandResult` with `stderr` containing `would reformat src/foo.py`, assert `files_changed == ["src/foo.py"]`
 - Add test: `test_run_black_no_files_changed` — clean output, assert `files_changed == []`
 
 ---
