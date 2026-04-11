@@ -33,9 +33,9 @@ Detail: [step_1.md](./steps/step_1.md)
 
 Detail: [step_2.md](./steps/step_2.md)
 
-- [ ] Implementation: Create `formatter/runner.py` with plain `run_format_code()` and tests, update `formatter_tools.py` to thin MCP wrapper delegating to `runner.py`, update `formatter/__init__.py` exports, update all affected tests
-- [ ] Quality checks pass: pylint, pytest, mypy — fix all issues
-- [ ] Commit: `refactor(formatter): extract run_format_code into runner.py`
+- [x] Implementation: Create `formatter/runner.py` with plain `run_format_code()` and tests, update `formatter_tools.py` to thin MCP wrapper delegating to `runner.py`, update `formatter/__init__.py` exports, update all affected tests
+- [x] Quality checks pass: pylint, pytest, mypy — fix all issues
+- [x] Commit: `refactor(formatter): extract run_format_code into runner.py`
 
 ### Step 3: Add `check_line_length_conflicts` + wire into MCP wrapper
 

@@ -43,6 +43,9 @@ def _make_formatter_result(
     return FormatterResult(output=output, success=success, files_changed=[])
 
 
+_RUNNER_PATCH = "mcp_tools_py.formatter.formatter_tools._run_format_code"
+
+
 class TestRegistration:
     """Tests for tool registration."""
 
@@ -61,49 +64,35 @@ class TestStepOrdering:
     """Tests for step selection and ordering."""
 
     def test_default_steps_isort_then_black(self, mock_server: MagicMock) -> None:
-        """Call with no args, verify isort runs before black."""
+        """Call with no args, verify steps passed through to runner."""
         run_format = _capture_run_format_code(mock_server)
-        call_order: list[str] = []
 
-        def fake_isort(*_args: Any, **_kwargs: Any) -> FormatterResult:
-            call_order.append("isort")
-            return _make_formatter_result(output="isort output")
+        mock_runner = MagicMock(
+            return_value={
+                "isort": _make_formatter_result(output="isort output"),
+                "black": _make_formatter_result(output="black output"),
+            }
+        )
 
-        def fake_black(*_args: Any, **_kwargs: Any) -> FormatterResult:
-            call_order.append("black")
-            return _make_formatter_result(output="black output")
-
-        with (
-            patch(
-                "mcp_tools_py.formatter.formatter_tools.run_isort",
-                side_effect=fake_isort,
-            ),
-            patch(
-                "mcp_tools_py.formatter.formatter_tools.run_black",
-                side_effect=fake_black,
-            ),
-            patch(
-                "mcp_tools_py.formatter.formatter_tools._STEP_RUNNERS",
-                {"isort": fake_isort, "black": fake_black},
-            ),
-        ):
+        with patch(_RUNNER_PATCH, mock_runner):
             result = run_format(target_directories=["src"])
 
-        assert call_order == ["isort", "black"]
+        # Default steps=None passed through
+        mock_runner.assert_called_once()
         assert "## isort" in result
         assert "## black" in result
 
     def test_custom_steps_order(self, mock_server: MagicMock) -> None:
-        """Pass steps=["black"], verify only black runs."""
+        """Pass steps=["black"], verify only black in output."""
         run_format = _capture_run_format_code(mock_server)
 
-        def fake_black(*_args: Any, **_kwargs: Any) -> FormatterResult:
-            return _make_formatter_result(output="black output")
+        mock_runner = MagicMock(
+            return_value={
+                "black": _make_formatter_result(output="black output"),
+            }
+        )
 
-        with patch(
-            "mcp_tools_py.formatter.formatter_tools._STEP_RUNNERS",
-            {"isort": MagicMock(), "black": fake_black},
-        ):
+        with patch(_RUNNER_PATCH, mock_runner):
             result = run_format(steps=["black"], target_directories=["src"])
 
         assert "## black" in result
@@ -114,9 +103,15 @@ class TestValidation:
     """Tests for input validation."""
 
     def test_invalid_step_returns_error(self, mock_server: MagicMock) -> None:
-        """Pass steps=["ruff"], verify error returned."""
+        """Runner raises ValueError, wrapper returns error string."""
         run_format = _capture_run_format_code(mock_server)
-        result = run_format(steps=["ruff"], target_directories=["src"])
+
+        mock_runner = MagicMock(
+            side_effect=ValueError("Invalid formatter steps: ['ruff']")
+        )
+
+        with patch(_RUNNER_PATCH, mock_runner):
+            result = run_format(steps=["ruff"], target_directories=["src"])
 
         assert "Error" in result
         assert "ruff" in result
@@ -129,39 +124,41 @@ class TestTargetDirectories:
         """Mock resolve_target_directories, verify it's called when target_directories=None."""
         run_format = _capture_run_format_code(mock_server)
 
-        def fake_runner(*_args: Any, **_kwargs: Any) -> FormatterResult:
-            return _make_formatter_result()
+        mock_runner = MagicMock(
+            return_value={
+                "isort": _make_formatter_result(),
+                "black": _make_formatter_result(),
+            }
+        )
 
         with (
             patch(
                 "mcp_tools_py.formatter.formatter_tools.resolve_target_directories",
                 return_value=["src"],
             ) as mock_resolve,
-            patch(
-                "mcp_tools_py.formatter.formatter_tools._STEP_RUNNERS",
-                {"isort": fake_runner, "black": fake_runner},
-            ),
+            patch(_RUNNER_PATCH, mock_runner),
         ):
             run_format()
 
         mock_resolve.assert_called_once_with(str(mock_server.project_dir), None)
 
     def test_target_directories_explicit(self, mock_server: MagicMock) -> None:
-        """Pass explicit dirs, verify resolve_target_directories returns them directly."""
+        """Pass explicit dirs, verify resolve_target_directories receives them."""
         run_format = _capture_run_format_code(mock_server)
 
-        def fake_runner(*_args: Any, **_kwargs: Any) -> FormatterResult:
-            return _make_formatter_result()
+        mock_runner = MagicMock(
+            return_value={
+                "isort": _make_formatter_result(),
+                "black": _make_formatter_result(),
+            }
+        )
 
         with (
             patch(
                 "mcp_tools_py.formatter.formatter_tools.resolve_target_directories",
                 return_value=["src", "tests"],
             ) as mock_resolve,
-            patch(
-                "mcp_tools_py.formatter.formatter_tools._STEP_RUNNERS",
-                {"isort": fake_runner, "black": fake_runner},
-            ),
+            patch(_RUNNER_PATCH, mock_runner),
         ):
             run_format(target_directories=["src", "tests"])
 
@@ -176,49 +173,40 @@ class TestCheckOnlyMode:
     def test_check_only_runs_all_steps_despite_nonzero(
         self, mock_server: MagicMock
     ) -> None:
-        """isort returns success=False (needs formatting), black still runs."""
+        """check_only with failures — both steps in output, no 'stopped' message."""
         run_format = _capture_run_format_code(mock_server)
-        call_order: list[str] = []
 
-        def fake_isort(*_args: Any, **_kwargs: Any) -> FormatterResult:
-            call_order.append("isort")
-            return _make_formatter_result(output="needs formatting", success=False)
+        mock_runner = MagicMock(
+            return_value={
+                "isort": _make_formatter_result(
+                    output="needs formatting", success=False
+                ),
+                "black": _make_formatter_result(
+                    output="needs formatting", success=False
+                ),
+            }
+        )
 
-        def fake_black(*_args: Any, **_kwargs: Any) -> FormatterResult:
-            call_order.append("black")
-            return _make_formatter_result(output="needs formatting", success=False)
-
-        with patch(
-            "mcp_tools_py.formatter.formatter_tools._STEP_RUNNERS",
-            {"isort": fake_isort, "black": fake_black},
-        ):
+        with patch(_RUNNER_PATCH, mock_runner):
             result = run_format(target_directories=["src"], check_only=True)
 
-        assert call_order == ["isort", "black"]
         assert "## isort" in result
         assert "## black" in result
         assert "Formatting stopped" not in result
 
     def test_normal_mode_stops_on_first_failure(self, mock_server: MagicMock) -> None:
-        """isort returns success=False, black does NOT run."""
+        """isort fails in runner, only isort in results → stopped message."""
         run_format = _capture_run_format_code(mock_server)
-        call_order: list[str] = []
 
-        def fake_isort(*_args: Any, **_kwargs: Any) -> FormatterResult:
-            call_order.append("isort")
-            return _make_formatter_result(output="error output", success=False)
+        mock_runner = MagicMock(
+            return_value={
+                "isort": _make_formatter_result(output="error output", success=False),
+            }
+        )
 
-        def fake_black(*_args: Any, **_kwargs: Any) -> FormatterResult:
-            call_order.append("black")
-            return _make_formatter_result(output="black output")
-
-        with patch(
-            "mcp_tools_py.formatter.formatter_tools._STEP_RUNNERS",
-            {"isort": fake_isort, "black": fake_black},
-        ):
+        with patch(_RUNNER_PATCH, mock_runner):
             result = run_format(target_directories=["src"])
 
-        assert call_order == ["isort"]
         assert "## isort" in result
         assert "Formatting stopped" in result
         assert "## black" not in result
@@ -231,13 +219,14 @@ class TestOutput:
         """Verify output contains ## isort and ## black."""
         run_format = _capture_run_format_code(mock_server)
 
-        def fake_runner(*_args: Any, **_kwargs: Any) -> FormatterResult:
-            return _make_formatter_result(output="some output")
+        mock_runner = MagicMock(
+            return_value={
+                "isort": _make_formatter_result(output="some output"),
+                "black": _make_formatter_result(output="some output"),
+            }
+        )
 
-        with patch(
-            "mcp_tools_py.formatter.formatter_tools._STEP_RUNNERS",
-            {"isort": fake_runner, "black": fake_runner},
-        ):
+        with patch(_RUNNER_PATCH, mock_runner):
             result = run_format(target_directories=["src"])
 
         assert "## isort" in result
@@ -248,17 +237,15 @@ class TestToolAvailability:
     """Tests for tool availability checking."""
 
     def test_tool_unavailable_returns_error(self, mock_server: MagicMock) -> None:
-        """black not in _tool_availability, verify error message."""
+        """black not available, verify error before runner is called."""
         mock_server._tool_availability = {"isort": True, "black": False}
         run_format = _capture_run_format_code(mock_server)
 
-        def fake_isort(*_args: Any, **_kwargs: Any) -> FormatterResult:
-            return _make_formatter_result(output="isort output")
+        mock_runner = MagicMock()
 
-        with patch(
-            "mcp_tools_py.formatter.formatter_tools._STEP_RUNNERS",
-            {"isort": fake_isort, "black": MagicMock()},
-        ):
+        with patch(_RUNNER_PATCH, mock_runner):
             result = run_format(target_directories=["src"])
 
+        # Runner should NOT have been called
+        mock_runner.assert_not_called()
         assert "black is not available" in result
