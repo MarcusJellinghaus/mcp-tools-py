@@ -4,6 +4,8 @@ import logging
 import re
 from typing import TYPE_CHECKING, Any, Dict, List, Optional
 
+from mcp_tools_py.code_checker_bandit.reporting import format_bandit_report
+from mcp_tools_py.code_checker_bandit.runners import run_bandit_check_impl
 from mcp_tools_py.code_checker_mypy import get_mypy_prompt
 from mcp_tools_py.code_checker_pylint import get_pylint_prompt
 from mcp_tools_py.code_checker_pytest.reporting import (
@@ -46,7 +48,7 @@ def _strip_lint_imports_header(raw: str) -> str:
 
 
 class CheckerTools:
-    """Registers pylint, pytest, mypy, lint-imports, and vulture checker tools on an MCP server."""
+    """Registers pylint, pytest, mypy, lint-imports, vulture, ruff, and bandit checker tools on an MCP server."""
 
     def __init__(self, server: "ToolServer") -> None:
         self._server = server
@@ -60,6 +62,7 @@ class CheckerTools:
         self._register_vulture(mcp)
         self._register_ruff_check(mcp)
         self._register_ruff_fix(mcp)
+        self._register_bandit(mcp)
 
     def _register_pylint(self, mcp: "FastMCPProtocol") -> None:
         """Register the pylint checker tool."""
@@ -684,6 +687,86 @@ class CheckerTools:
                 )
                 logger.error(
                     "ruff fix failed",
+                    extra={
+                        "error": str(e),
+                        "error_type": type(e).__name__,
+                        "project_dir": str(self._server.project_dir),
+                    },
+                )
+                return error_msg
+
+    def _register_bandit(self, mcp: "FastMCPProtocol") -> None:
+        """Register the bandit security checker tool."""
+
+        @mcp.tool()
+        @log_function_call
+        def run_bandit_check(
+            target_directories: Optional[List[str]] = None,
+            extra_args: Optional[List[str]] = None,
+            max_issues: int = 1,
+        ) -> str:
+            """Run bandit security linter on the project code.
+
+            Args:
+                target_directories: Directories to analyze relative to project_dir.
+                    Auto-detected from pyproject.toml when None.
+                extra_args: Additional bandit CLI flags.
+                max_issues: Number of issue types to show in detail (default: 1).
+                    Remaining issues shown as summary counts.
+            """
+            if not self._server._tool_availability.get("bandit", False):
+                binary_path = self._server._bandit_binary or "N/A"
+                return (
+                    f"bandit is not available at {binary_path}. "
+                    f"Ensure the virtual environment has bandit installed "
+                    f"and --venv-path is configured. Restart the server after installing."
+                )
+
+            resolved = resolve_target_directories(
+                str(self._server.project_dir), target_directories
+            )
+            if isinstance(resolved, str):
+                return resolved
+
+            try:
+                logger.info(
+                    "Starting bandit check",
+                    extra={
+                        "project_dir": str(self._server.project_dir),
+                        "target_directories": resolved,
+                        "extra_args": extra_args,
+                        "max_issues": max_issues,
+                    },
+                )
+
+                binary = self._server._bandit_binary
+                assert binary is not None  # guarded by availability check above
+
+                result = run_bandit_check_impl(
+                    bandit_binary=binary,
+                    project_dir=str(self._server.project_dir),
+                    target_directories=resolved,
+                    extra_args=extra_args,
+                )
+
+                if result.error:
+                    return f"bandit error: {result.error}"
+
+                report = format_bandit_report(
+                    result.messages, result.errors, max_issues
+                )
+
+                logger.info(
+                    "bandit check completed",
+                    extra={"output_length": len(report) if report else 0},
+                )
+
+                return report or "No bandit security issues found."
+
+            except Exception as e:
+                error_msg = f"Unexpected error running bandit: {type(e).__name__}: {e}"
+                logger.error(
+                    "bandit check failed",
                     extra={
                         "error": str(e),
                         "error_type": type(e).__name__,
