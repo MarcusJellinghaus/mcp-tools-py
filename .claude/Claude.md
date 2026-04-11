@@ -157,7 +157,7 @@ git diff  # Should show formatting changes if any
 - Stage the formatted files
 - Then commit
 
-**ALLOWED git operations via Bash tool:**
+**ALLOWED git/gh operations via Bash tool:**
 
 ```
 git status
@@ -165,6 +165,9 @@ git diff
 git log
 git fetch
 git ls-tree
+gh issue view (read-only)
+gh pr view (read-only)
+gh run view (read-only)
 ```
 
 **⚠️ Bash discipline (applies to subagents too):**
