@@ -12,6 +12,7 @@ _.run_pylint_check     # FastMCP tool handler
 _.run_mypy_check       # FastMCP tool handler
 _.run_lint_imports_check  # FastMCP tool handler
 _.run_vulture_check    # FastMCP tool handler
+_.run_bandit_check     # FastMCP tool handler
 # CLI entry points
 _.main  # Entry point function
 
