@@ -38,7 +38,7 @@ This tracks **Feature Implementation** consisting of multiple **Tasks**.
 
 ### Step 4: Subprocess Runner + Tests ([detail](./steps/step_4.md))
 - [x] Implementation: create `runners.py` with `run_bandit_check_impl`, create `test_runners.py`, update `__init__.py`
-- [ ] Quality checks: pylint, pytest, mypy — fix all issues
+- [x] Quality checks: pylint, pytest, mypy — fix all issues
 - [x] Commit: `feat(bandit): add subprocess runner with tests`
 
 ### Step 5: Server + Checker Tools Integration ([detail](./steps/step_5.md))
