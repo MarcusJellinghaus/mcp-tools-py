@@ -47,9 +47,9 @@ This tracks **Feature Implementation** consisting of multiple **Tasks**.
 - [x] Commit: `feat(bandit): register run_bandit_check MCP tool`
 
 ### Step 6: Architecture Boundary Configuration ([detail](./steps/step_6.md))
-- [ ] Implementation: update `tach.toml` and `.importlinter` with `code_checker_bandit` module boundaries
-- [ ] Quality checks: pylint, pytest, mypy — fix all issues
-- [ ] Commit: `chore(bandit): add architecture boundary config`
+- [x] Implementation: update `tach.toml` and `.importlinter` with `code_checker_bandit` module boundaries
+- [x] Quality checks: pylint, pytest, mypy — fix all issues
+- [x] Commit: `chore(bandit): add architecture boundary config`
 
 ## Pull Request
 - [ ] PR review: verify all steps complete and checks passing
