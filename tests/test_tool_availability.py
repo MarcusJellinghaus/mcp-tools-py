@@ -7,8 +7,8 @@ from typing import Any
 from unittest.mock import MagicMock, patch
 
 import pytest
+from mcp_coder_utils.subprocess_runner import CommandResult
 
-from mcp_tools_py.utils.subprocess_runner import CommandResult
 from tests.conftest import make_command_result
 
 

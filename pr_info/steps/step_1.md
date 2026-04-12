@@ -102,8 +102,8 @@ No changes to any return values or data structures. This is a pure import-path m
 
 ## Verification
 
-- [ ] All 16 files have `from mcp_coder_utils.subprocess_runner import ...`
-- [ ] Shim re-exports full shared `__all__` (including `prepare_env` not previously exported locally)
-- [ ] pylint passes
-- [ ] pytest passes (unit tests, excluding integration markers)
-- [ ] mypy passes
+- [x] All 16 files have `from mcp_coder_utils.subprocess_runner import ...`
+- [x] Shim re-exports full shared `__all__` (including `prepare_env` not previously exported locally)
+- [x] pylint passes
+- [x] pytest passes (unit tests, excluding integration markers)
+- [x] mypy passes
