@@ -1,32 +1,40 @@
---- This file is used by Claude Code - similar to a system prompt. ---
+## About this repo
 
-# ⚠️ MANDATORY INSTRUCTIONS - MUST BE FOLLOWED ⚠️
+`mcp-tools-py` is an MCP server exposing Python code-quality tools (pylint, pytest, mypy, ruff, black, isort, vulture, bandit, lint-imports) as structured MCP endpoints.
 
-**THESE INSTRUCTIONS OVERRIDE ALL DEFAULT BEHAVIORS - NO EXCEPTIONS**
+## MCP Tools — mandatory
 
-## 🔴 CRITICAL: ALWAYS Use MCP Tools
+Use MCP tools for **all** operations. Never use `Read`, `Write`, `Edit`, or `Bash` for tasks that have an MCP equivalent.
 
-**MANDATORY**: You MUST use MCP tools for ALL operations when available. DO NOT use standard Claude tools.
+### Tool mapping
 
-**BEFORE EVERY TOOL USE, ASK: "Does an MCP version exist?"**
+| Task | MCP tool |
+|------|----------|
+| Read file | `mcp__workspace__read_file` |
+| Edit file | `mcp__workspace__edit_file` |
+| Write file | `mcp__workspace__save_file` |
+| Append to file | `mcp__workspace__append_file` |
+| Delete file | `mcp__workspace__delete_this_file` |
+| Move file | `mcp__workspace__move_file` |
+| List directory | `mcp__workspace__list_directory` |
+| Search files | `mcp__workspace__search_files` |
+| Read reference project | `mcp__workspace__read_reference_file` |
+| List reference dir | `mcp__workspace__list_reference_directory` |
+| Get reference projects | `mcp__workspace__get_reference_projects` |
+| Run pytest | `mcp__tools-py__run_pytest_check` |
+| Run pylint | `mcp__tools-py__run_pylint_check` |
+| Run mypy | `mcp__tools-py__run_mypy_check` |
+| Run vulture | `mcp__tools-py__run_vulture_check` |
+| Run lint-imports | `mcp__tools-py__run_lint_imports_check` |
+| Run ruff check | `mcp__tools-py__run_ruff_check` |
+| Run ruff fix | `mcp__tools-py__run_ruff_fix` |
+| Run bandit | `mcp__tools-py__run_bandit_check` |
+| Format code (black+isort) | `mcp__tools-py__run_format_code` |
+| Refactoring | `mcp__tools-py__move_symbol`, `list_symbols`, `find_references` |
 
-### Tool Mapping Reference
+## Code quality checks
 
-| Task | ❌ NEVER USE | ✅ USE MCP TOOL |
-|------|--------------|------------------|
-| Read file | `Read()` | `mcp__workspace__read_file()` |
-| Edit file | `Edit()` | `mcp__workspace__edit_file()` |
-| Write file | `Write()` | `mcp__workspace__save_file()` |
-| Run pytest | `Bash("pytest ...")` | `mcp__tools-py__run_pytest_check()` |
-| Run pylint | `Bash("pylint ...")` | `mcp__tools-py__run_pylint_check()` |
-| Run mypy | `Bash("mypy ...")` | `mcp__tools-py__run_mypy_check()` |
-| Run vulture | `Bash("vulture ...")` | `mcp__tools-py__run_vulture_check()` |
-| Run lint-imports | `Bash("lint-imports ...")` | `mcp__tools-py__run_lint_imports_check()` |
-| Git operations | ✅ `Bash("git ...")` | ✅ `Bash("git ...")` (allowed) |
-
-## 🔴 CRITICAL: Code Quality Requirements
-
-**MANDATORY**: After making ANY code changes (after EACH edit), you MUST run ALL THREE code quality checks using the EXACT MCP tool names below:
+After making code changes, run:
 
 ```
 mcp__tools-py__run_pylint_check
@@ -34,168 +42,48 @@ mcp__tools-py__run_pytest_check
 mcp__tools-py__run_mypy_check
 ```
 
-This runs:
+All checks must pass before proceeding.
 
-- **Pylint** - Code quality and style analysis
-- **Pytest** - All unit and integration tests
-- **Mypy** - Static type checking
+**Pytest:** always use `extra_args: ["-n", "auto"]` for parallel execution.
 
-**⚠️ ALL CHECKS MUST PASS** - If ANY issues are found, you MUST fix them immediately before proceeding.
-
-### 📋 Pytest Execution Requirements
-
-**MANDATORY pytest parameters:**
-- ALWAYS use `extra_args: ["-n", "auto"]` for parallel execution
-
-**Available markers in pyproject.toml:**
-- `integration`: Integration tests requiring external resources
-
-**RECOMMENDED USAGE:**
-- **Fast unit tests (recommended)**: Use `-m` with `not` expressions to exclude slow integration tests
-- **All tests**: Run without markers to include everything (slow!)
-- **Specific integration tests**: Use specific `markers` parameter when testing integration functionality
-
-**Examples:**
+Available marker: `integration` (requires external resources).
 
 ```python
-# RECOMMENDED: Fast unit tests (excludes integration tests)
+# Fast unit tests (recommended for regular development)
 mcp__tools-py__run_pytest_check(extra_args=["-n", "auto", "-m", "not integration"])
 
-# All tests including slow integration tests (not recommended for regular development)
+# All tests (slow)
 mcp__tools-py__run_pytest_check(extra_args=["-n", "auto"])
 
-# Specific integration tests (only when needed)
+# Integration tests only
 mcp__tools-py__run_pytest_check(extra_args=["-n", "auto"], markers=["integration"])
 ```
 
-**Important:** Without the `-m "not integration"` exclusions, pytest runs ALL tests including slow integration tests that may require external resources. For regular development, always use the exclusion pattern as shown in the first example above.
+When debugging test failures, add `"-v", "-s", "--tb=short"` to extra_args.
 
-## 📁 MANDATORY: File Access Tools
+## Git operations
 
-**YOU MUST USE THESE MCP TOOLS** for all file operations:
-
-```
-mcp__workspace__get_reference_projects
-mcp__workspace__list_reference_directory
-mcp__workspace__read_reference_file
-mcp__workspace__list_directory
-mcp__workspace__read_file
-mcp__workspace__save_file
-mcp__workspace__append_file
-mcp__workspace__delete_this_file
-mcp__workspace__move_file
-mcp__workspace__edit_file
-```
-
-**⚠️ ABSOLUTELY FORBIDDEN:** Using `Read`, `Write`, `Edit`, `MultiEdit` tools when MCP filesystem tools are available.
-
-### Quick Examples
-
-```python
-# ❌ WRONG - Standard tools
-Read(file_path="src/example.py")
-Edit(file_path="src/example.py", old_string="...", new_string="...")
-Write(file_path="src/new.py", content="...")
-Bash("pytest tests/")
-
-# ✅ CORRECT - MCP tools
-mcp__workspace__read_file(file_path="src/example.py")
-mcp__workspace__edit_file(file_path="src/example.py", edits=[...])
-mcp__workspace__save_file(file_path="src/new.py", content="...")
-mcp__tools-py__run_pytest_check(extra_args=["-n", "auto"])
-```
-
-**WHY MCP TOOLS ARE MANDATORY:**
-
-- Proper security and access control
-- Consistent error handling
-- Better integration with the development environment
-- Required for this project's architecture
-
-## ✍️ Writing Style
-
-**Be concise.** Keep code comments, commit messages, documentation changes, and prompt additions short and direct. If one line works, don't use three.
-
-## 🚨 COMPLIANCE VERIFICATION
-
-**Before completing ANY task, you MUST:**
-
-1. ✅ Confirm all code quality checks passed using MCP tools
-2. ✅ Verify you used MCP tools exclusively (NO `Bash` for code checks, NO `Read`/`Write`/`Edit` for files)
-3. ✅ Ensure no issues remain unresolved
-4. ✅ State explicitly: "All CLAUDE.md requirements followed"
-
-## 🔧 DEBUGGING AND TROUBLESHOOTING
-
-**When tests fail or skip:**
-- Use MCP pytest tool with verbose flags: `extra_args: ["-v", "-s", "--tb=short"]`
-- For integration tests, check if they require external configuration (tokens, URLs)
-- Never fall back to `Bash` commands - always investigate within MCP tools
-- If MCP tools don't provide enough detail, ask user for guidance rather than using alternative tools
-
-## 🔧 MCP Server Issues
-
-**IMMEDIATELY ALERT** if MCP tools are not accessible - this blocks all work until resolved.
-
-## 🔄 Git Operations
-
-**MANDATORY: Before ANY commit:**
-
-```bash
-# ALWAYS run format_all before committing
-./tools/format_all.sh   # Linux/macOS
-tools\format_all.bat    # Windows
-
-# Then verify formatting worked
-git diff  # Should show formatting changes if any
-```
-
-**Format all code before committing:**
-
-- Run `./tools/format_all.sh` (or `tools\format_all.bat` on Windows) to format with black and isort
-- Review the changes to ensure they're formatting-only
-- Stage the formatted files
-- Then commit
-
-**ALLOWED git/gh operations via Bash tool:**
+**Allowed commands via Bash tool.** These have no MCP equivalent — use Bash directly. Skills that instruct bash commands (e.g. `gh issue view`) must also use Bash.
 
 ```
-git status
-git diff
-git log
-git fetch
-git ls-tree
-gh issue view (read-only)
-gh pr view (read-only)
-gh run view (read-only)
-```
-
-**⚠️ Bash discipline (applies to subagents too):**
-
-- No `cd` prefix, no `git -C` — the working directory is already correct. Just `git status`, never `git -C "/some/path" status`.
-- No redundant folder paths — MCP tools and git already operate from the project root. Use relative paths, don't prefix with absolute paths.
-- Stick to approved commands above. Avoid unapproved bash commands — they trigger user authorization prompts and interrupt the workflow.
-- Do not chain approved commands with unapproved ones (e.g. `git status && echo "---" && git diff`). The `echo` makes the whole command unapproved. Run approved commands separately instead.
-
-**Git commit message format:**
-
-- Use standard commit message format without advertising footers
-- Focus on clear, descriptive commit messages
-- No Claude Code attribution or links
-
-**Pull Request format:**
-
-- No "Generated with Claude Code" footer or similar attribution
-- Focus on clear summary and test plan
-- Keep PR descriptions concise and professional
-
-## 📏 File Size Check
-
-Check for large files (>750 lines) that may impact LLM context:
-
-```bash
+git status / diff / commit / log / fetch / ls-tree
+gh issue view / gh pr view / gh run view
+mcp-coder check branch-status
 mcp-coder check file-size --max-lines 750
-mcp-coder check branch-status --llm-truncate
 ```
 
-For guidance on splitting large files, consider breaking them into smaller, focused modules.
+**Before every commit:** run `mcp__tools-py__run_format_code`, then stage and commit.
+
+**Bash discipline:** no `cd` prefix, no `git -C`. Don't chain approved with unapproved commands. Run them separately.
+
+**Commit messages:** standard format, clear and descriptive. No attribution footers.
+
+**Pull requests:** no "Generated with Claude Code" footer. Keep descriptions concise.
+
+## Writing style
+
+Be concise. If one line works, don't use three.
+
+## MCP server issues
+
+Alert immediately if MCP tools are not accessible — this blocks all work.
