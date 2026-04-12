@@ -58,7 +58,8 @@
       "Skill(plan_review_supervisor)",
       "Skill(plan_update)",
       "Skill(rebase)",
-      "WebFetch(domain:*)"
+      "WebFetch(domain:*)",
+      "mcp__workspace__search_files"
     ]
   },
   "enableAllProjectMcpServers": true,

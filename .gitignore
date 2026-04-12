@@ -42,3 +42,6 @@ uv.lock
 .vscodeclaude_start.bat
 .vscodeclaude_start.sh
 
+# Windows reserved-name artifacts
+nul
+

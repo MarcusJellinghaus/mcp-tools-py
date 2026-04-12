@@ -131,3 +131,62 @@ def resolve_target_directories(
         return result.directories
     except ValueError as exc:
         return f"Error resolving target directories: {exc}"
+
+
+def check_line_length_conflicts(
+    project_dir: str,
+    used_tools: list[str],
+) -> list[str]:
+    """Check for line-length mismatches across formatter configs in pyproject.toml.
+
+    Compares ``line-length`` settings for black, isort, and ruff.  Tools not
+    present in *used_tools* and without an explicit config entry are skipped.
+
+    Args:
+        project_dir: Path to project root containing pyproject.toml.
+        used_tools: Tool names currently in use (e.g. ``["isort", "black"]``).
+
+    Returns:
+        A list of warning strings describing mismatches, or an empty list.
+    """
+    pyproject_path = os.path.join(project_dir, "pyproject.toml")
+
+    toml_data: dict[str, object] = {}
+    if os.path.isfile(pyproject_path):
+        with open(pyproject_path, "rb") as f:
+            try:
+                toml_data = tomllib.load(f)
+            except tomllib.TOMLDecodeError:
+                return []
+
+    tool_section = toml_data.get("tool")
+    if not isinstance(tool_section, dict):
+        tool_section = {}
+
+    default_line_length = 88
+    lengths: dict[str, int] = {}
+
+    for tool in ("black", "isort", "ruff"):
+        tool_cfg = tool_section.get(tool)
+        if not isinstance(tool_cfg, dict):
+            tool_cfg = {}
+
+        # isort uses underscore: line_length
+        key = "line_length" if tool == "isort" else "line-length"
+        value = tool_cfg.get(key)
+
+        if value is not None:
+            lengths[tool] = int(value)
+        elif tool in used_tools:
+            lengths[tool] = default_line_length
+        # else: skip — tool not configured and not in use
+
+    if len(lengths) <= 1:
+        return []
+
+    unique_values = set(lengths.values())
+    if len(unique_values) == 1:
+        return []
+
+    parts = ", ".join(f"{t}={v}" for t, v in sorted(lengths.items()))
+    return [f"Line-length mismatch: {parts}. Formatting may be inconsistent."]

@@ -1,25 +1,21 @@
 """FormatterTools class — registers run_format_code MCP tool."""
 
 import logging
-from collections.abc import Callable
 from typing import TYPE_CHECKING
 
-from mcp_tools_py.formatter.black_runner import run_black
-from mcp_tools_py.formatter.isort_runner import run_isort
+from mcp_tools_py.formatter.models import FormatterResult
+from mcp_tools_py.formatter.runner import DEFAULT_STEPS
+from mcp_tools_py.formatter.runner import run_format_code as _run_format_code
 from mcp_tools_py.log_utils import log_function_call
-from mcp_tools_py.utils.project_config import resolve_target_directories
+from mcp_tools_py.utils.project_config import (
+    check_line_length_conflicts,
+    resolve_target_directories,
+)
 
 if TYPE_CHECKING:
     from mcp_tools_py.server import FastMCPProtocol, ToolServer
 
 logger = logging.getLogger(__name__)
-
-_VALID_STEPS = {"isort", "black"}
-
-_STEP_RUNNERS: dict[str, Callable[..., tuple[str, bool]]] = {
-    "isort": run_isort,
-    "black": run_black,
-}
 
 
 class FormatterTools:
@@ -52,15 +48,7 @@ class FormatterTools:
             Returns:
                 Formatted output with markdown headers per step.
             """
-            resolved_steps = steps or ["isort", "black"]
-
-            # Validate step names
-            invalid = [s for s in resolved_steps if s not in _VALID_STEPS]
-            if invalid:
-                return (
-                    f"Error: Invalid formatter steps: {invalid}. "
-                    f"Valid steps are: {sorted(_VALID_STEPS)}"
-                )
+            resolved_steps = steps or DEFAULT_STEPS
 
             # Resolve target directories
             resolved = resolve_target_directories(
@@ -70,38 +58,56 @@ class FormatterTools:
                 return resolved
             dirs = resolved
 
-            sections: list[str] = []
+            # Check tool availability upfront
             for step in resolved_steps:
-                # Check tool availability
                 if not self._server._tool_availability.get(step, False):
-                    sections.append(
+                    return (
                         f"Error: {step} is not available in the configured "
                         f"Python environment ({self._server._resolved_python}). "
                         f"Ensure --python-executable and --venv-path point to the "
                         f"environment where {step} is installed. "
                         f"Restart the server after installing."
                     )
-                    return _join_sections(sections)
 
-                runner = _STEP_RUNNERS[step]
-                output, success = runner(
+            # Check for line-length conflicts
+            warnings = check_line_length_conflicts(
+                str(self._server.project_dir), resolved_steps
+            )
+
+            # Delegate to runner
+            try:
+                results = _run_format_code(
                     self._server._resolved_python,
+                    self._server.project_dir,
                     dirs,
-                    str(self._server.project_dir),
+                    resolved_steps,
                     check_only,
                 )
+            except ValueError as exc:
+                return f"Error: {exc}"
 
-                sections.append(f"## {step}\n{output}")
-
-                if not success and not check_only:
-                    sections.append(
-                        f"\nFormatting stopped due to errors in {step} step."
-                    )
-                    return _join_sections(sections)
-
-            return _join_sections(sections)
+            output = _format_results(results, resolved_steps, check_only)
+            if warnings:
+                output = "\n".join(warnings) + "\n\n" + output
+            return output
 
 
-def _join_sections(sections: list[str]) -> str:
-    """Join output sections with double newlines."""
+def _format_results(
+    results: dict[str, FormatterResult],
+    steps: list[str],
+    check_only: bool,
+) -> str:
+    """Format runner results into markdown output."""
+    sections: list[str] = []
+    failed_step: str | None = None
+
+    for step in steps:
+        if step in results:
+            sections.append(f"## {step}\n{results[step].output}")
+            if not results[step].success:
+                failed_step = step
+
+    if not check_only and failed_step is not None and len(results) < len(steps):
+        sections.append(f"\nFormatting stopped due to errors in {failed_step} step.")
+
     return "\n\n".join(sections)

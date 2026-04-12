@@ -7,6 +7,7 @@ import textwrap
 import pytest
 
 from mcp_tools_py.utils.project_config import (
+    check_line_length_conflicts,
     get_target_directories,
     resolve_target_directories,
 )
@@ -218,3 +219,95 @@ class TestResolveTargetDirectories:
 
         assert isinstance(result, str)
         assert result.startswith("Error resolving target directories:")
+
+
+class TestCheckLineLengthConflicts:
+    """Tests for the check_line_length_conflicts function."""
+
+    def test_all_match_no_warnings(self, tmp_path: object) -> None:
+        """All tools set to same line-length → no warnings."""
+        path = str(tmp_path)
+        pyproject = textwrap.dedent("""\
+            [tool.black]
+            line-length = 88
+
+            [tool.isort]
+            line_length = 88
+
+            [tool.ruff]
+            line-length = 88
+        """)
+        with open(os.path.join(path, "pyproject.toml"), "w", encoding="utf-8") as f:
+            f.write(pyproject)
+
+        result = check_line_length_conflicts(path, ["isort", "black"])
+        assert result == []
+
+    def test_mismatch_returns_warning(self, tmp_path: object) -> None:
+        """black=88, isort=120 → warning string."""
+        path = str(tmp_path)
+        pyproject = textwrap.dedent("""\
+            [tool.black]
+            line-length = 88
+
+            [tool.isort]
+            line_length = 120
+        """)
+        with open(os.path.join(path, "pyproject.toml"), "w", encoding="utf-8") as f:
+            f.write(pyproject)
+
+        result = check_line_length_conflicts(path, ["isort", "black"])
+        assert len(result) == 1
+        assert "mismatch" in result[0].lower()
+        assert "black=88" in result[0]
+        assert "isort=120" in result[0]
+
+    def test_unconfigured_unused_tool_skipped(self, tmp_path: object) -> None:
+        """Ruff not configured and not in used_tools → no warning about ruff."""
+        path = str(tmp_path)
+        pyproject = textwrap.dedent("""\
+            [tool.black]
+            line-length = 88
+
+            [tool.isort]
+            line_length = 88
+        """)
+        with open(os.path.join(path, "pyproject.toml"), "w", encoding="utf-8") as f:
+            f.write(pyproject)
+
+        result = check_line_length_conflicts(path, ["isort", "black"])
+        assert result == []
+
+    def test_unconfigured_used_tool_defaults_to_88(self, tmp_path: object) -> None:
+        """isort not configured but in used_tools → treated as 88."""
+        path = str(tmp_path)
+        pyproject = textwrap.dedent("""\
+            [tool.black]
+            line-length = 120
+        """)
+        with open(os.path.join(path, "pyproject.toml"), "w", encoding="utf-8") as f:
+            f.write(pyproject)
+
+        result = check_line_length_conflicts(path, ["isort", "black"])
+        assert len(result) == 1
+        assert "isort=88" in result[0]
+        assert "black=120" in result[0]
+
+    def test_no_pyproject_no_warnings(self, tmp_path: object) -> None:
+        """No pyproject.toml → no warnings."""
+        path = str(tmp_path)
+        result = check_line_length_conflicts(path, ["isort", "black"])
+        assert result == []
+
+    def test_only_one_tool_configured_no_comparison(self, tmp_path: object) -> None:
+        """Only one tool value → nothing to compare → no warnings."""
+        path = str(tmp_path)
+        pyproject = textwrap.dedent("""\
+            [tool.black]
+            line-length = 88
+        """)
+        with open(os.path.join(path, "pyproject.toml"), "w", encoding="utf-8") as f:
+            f.write(pyproject)
+
+        result = check_line_length_conflicts(path, ["black"])
+        assert result == []
