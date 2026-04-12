@@ -22,9 +22,31 @@ Refactor formatter: extract plain `run_format_code()` + port line-length pre-che
 
 **Status**: No changes needed
 
+## Round 1.5 — 2026-04-12 (CI fix)
+
+**Issue**: CI failing — black and isort flagged `formatter_tools.py` import formatting.
+
+**Fix**: Ran `format_all.bat`. isort split one combined import into two lines.
+
+**Changes**: `src/mcp_tools_py/formatter/formatter_tools.py` — import line split
+
+**Status**: Committed (`f0300a0`)
+
+## Round 2 — 2026-04-12
+
+**Trigger**: Re-review after formatting fix (round 1.5).
+
+**Quality Checks**: All pass (pylint clean, pytest 538 passed/1 skipped, mypy clean)
+
+**Findings**: None — formatting-only change, no new issues.
+
+**Changes**: None
+
+**Status**: No changes needed
+
 ## Final Status
 
-- **Rounds**: 1
-- **Code changes**: 0
+- **Rounds**: 2 (plus 1 CI fix)
+- **Code changes**: 1 (formatting fix)
 - **All quality checks**: PASS
 - **Review result**: Clean — implementation is well-structured, correct, and complete
