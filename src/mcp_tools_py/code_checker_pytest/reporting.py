@@ -5,8 +5,9 @@ Functions for formatting and reporting pytest test results.
 import logging
 from typing import Any, Dict, List, Optional, Tuple
 
+from mcp_coder_utils.log_utils import log_function_call
+
 from mcp_tools_py.code_checker_pytest.models import Collector, PytestReport, Test
-from mcp_tools_py.log_utils import log_function_call
 
 logger = logging.getLogger(__name__)
 # Constants to avoid magic numbers

@@ -3,6 +3,7 @@
 import logging
 import os
 
+from mcp_coder_utils.log_utils import log_function_call
 from mcp_coder_utils.subprocess_runner import execute_command
 
 from mcp_tools_py.code_checker_ruff.parsers import parse_ruff_json_output
@@ -10,7 +11,6 @@ from mcp_tools_py.code_checker_ruff.reporting import (
     format_ruff_check_report,
     format_ruff_fix_report,
 )
-from mcp_tools_py.log_utils import log_function_call
 
 logger = logging.getLogger(__name__)
 

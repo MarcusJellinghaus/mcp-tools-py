@@ -4,6 +4,7 @@ import logging
 import re
 from typing import TYPE_CHECKING, Any, Dict, List, Optional
 
+from mcp_coder_utils.log_utils import log_function_call
 from mcp_coder_utils.subprocess_runner import execute_command
 
 from mcp_tools_py.code_checker_bandit.reporting import format_bandit_report
@@ -24,7 +25,6 @@ from mcp_tools_py.code_checker_ruff.runners import (
     run_ruff_fix_impl,
 )
 from mcp_tools_py.code_checker_vulture import run_vulture_check as run_vulture
-from mcp_tools_py.log_utils import log_function_call
 from mcp_tools_py.utils.project_config import resolve_target_directories
 
 if TYPE_CHECKING:

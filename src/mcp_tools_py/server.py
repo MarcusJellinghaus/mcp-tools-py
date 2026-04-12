@@ -7,12 +7,12 @@ from concurrent.futures import ThreadPoolExecutor, as_completed
 from pathlib import Path
 from typing import Callable, Optional, Protocol, TypeVar
 
+from mcp_coder_utils.log_utils import log_function_call
 from mcp_coder_utils.subprocess_runner import execute_command
 
 from mcp_tools_py.checker_tools import CheckerTools
 from mcp_tools_py.formatter import FormatterTools
 from mcp_tools_py.inspect_library import InspectTools
-from mcp_tools_py.log_utils import log_function_call
 from mcp_tools_py.refactoring import RefactoringTools
 from mcp_tools_py.utility_tools import UtilityTools
 

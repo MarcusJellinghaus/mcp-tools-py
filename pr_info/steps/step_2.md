@@ -80,8 +80,8 @@ No changes to any return values or data structures. This is a pure import-path m
 
 ## Verification
 
-- [ ] All source files have `from mcp_coder_utils.log_utils import ...`
-- [ ] Shim re-exports full shared `__all__`
-- [ ] pylint passes
-- [ ] pytest passes (unit tests, excluding integration markers)
-- [ ] mypy passes
+- [x] All source files have `from mcp_coder_utils.log_utils import ...`
+- [x] Shim re-exports full shared `__all__`
+- [x] pylint passes
+- [x] pytest passes (unit tests, excluding integration markers)
+- [x] mypy passes
