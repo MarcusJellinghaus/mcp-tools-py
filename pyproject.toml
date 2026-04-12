@@ -142,6 +142,12 @@ where = ["src"]
 [tool.setuptools.package-data]
 "*" = ["py.typed"]
 
+[tool.uv.sources]
+mcp-config = { git = "https://github.com/MarcusJellinghaus/mcp-config.git" }
+mcp-coder-utils = { git = "https://github.com/MarcusJellinghaus/mcp-coder-utils.git" }
+mcp-workspace = { git = "https://github.com/MarcusJellinghaus/mcp-workspace.git" }
+mcp-coder = { git = "https://github.com/MarcusJellinghaus/mcp_coder.git" }
+
 [build-system]
 requires = ["setuptools>=61.0", "setuptools-scm>=8.0"]
 build-backend = "setuptools.build_meta"
