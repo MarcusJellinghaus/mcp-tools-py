@@ -47,5 +47,5 @@ Detail: [step_3.md](./steps/step_3.md)
 
 ## Pull Request
 
-- [ ] PR review: verify all steps integrated correctly
+- [x] PR review: verify all steps integrated correctly
 - [ ] PR summary prepared
