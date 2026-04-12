@@ -59,6 +59,9 @@ After:   checker modules → mcp_coder_utils.subprocess_runner (external package
 | `src/mcp_tools_py/code_checker_bandit/runners.py` | Update imports |
 | `src/mcp_tools_py/code_checker_vulture/runners.py` | Update imports |
 | `src/mcp_tools_py/refactoring/rope_tools.py` | Update imports |
+| `src/mcp_tools_py/code_checker_pylint/reporting.py` | Update imports |
+| `src/mcp_tools_py/code_checker_pytest/reporting.py` | Update imports |
+| `src/mcp_tools_py/refactoring/__init__.py` | Update imports |
 | `tests/conftest.py` | Update imports |
 | `tests/test_error_transparency.py` | Update imports |
 | `tests/test_tool_availability.py` | Update imports |
@@ -78,5 +81,4 @@ After:   checker modules → mcp_coder_utils.subprocess_runner (external package
 
 1. [Step 1](step_1.md) — Replace `subprocess_runner` imports + create shim
 2. [Step 2](step_2.md) — Replace `log_utils` imports + create shim
-3. [Step 3](step_3.md) — Delete local tests + update config files
-4. [Step 4](step_4.md) — Final verification and stale-import grep
+3. [Step 3](step_3.md) — Delete local tests + update config files + stale-import grep

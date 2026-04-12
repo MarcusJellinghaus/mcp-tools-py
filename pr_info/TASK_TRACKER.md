@@ -23,7 +23,6 @@ This tracks **Feature Implementation** consisting of multiple **Tasks**.
 
 - [ ] [Step 1: Replace subprocess_runner imports + create shim](steps/step_1.md)
 - [ ] [Step 2: Replace log_utils imports + create shim](steps/step_2.md)
-- [ ] [Step 3: Delete local tests + update config files](steps/step_3.md)
-- [ ] [Step 4: Final verification and stale-import grep](steps/step_4.md)
+- [ ] [Step 3: Delete local tests + update config files + stale-import grep](steps/step_3.md)
 
 ## Pull Request

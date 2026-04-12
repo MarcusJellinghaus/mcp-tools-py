@@ -1,6 +1,6 @@
 # Step 3: Delete local tests + update config files
 
-**Ref:** [summary.md](summary.md) | **Issue:** #152 | **Commit:** `adopt: remove local tests and update config for mcp-coder-utils`
+**Ref:** [summary.md](summary.md) | **Issue:** #152 | **Commit:** `adopt: remove local tests, update config, verify no stale imports`
 
 ## Goal
 
@@ -62,12 +62,24 @@ warn_unused_ignores = false
 
 This step only deletes files and removes config lines.
 
+## Stale import grep
+
+After all deletions and config changes, verify no stale import paths remain. Search all `.py` files for these patterns:
+
+1. `from mcp_tools_py.utils.subprocess_runner import` — should only appear in `src/mcp_tools_py/utils/__init__.py` (imports from the local shim)
+2. `from mcp_tools_py.log_utils import` — should appear nowhere (shim has no internal consumers)
+3. `import mcp_tools_py.utils.subprocess_runner` — should appear nowhere
+4. `import mcp_tools_py.log_utils` — should appear nowhere
+
+Any match outside the shim files and `utils/__init__.py` is a bug — fix the import.
+
 ## Verification
 
 - [ ] `tests/test_subprocess_runner.py` deleted
 - [ ] `tests/test_log_utils.py` deleted
 - [ ] `.importlinter` no longer lists `mcp_tools_py.log_utils`
 - [ ] `pyproject.toml` no longer has mypy override for `subprocess_runner`
+- [ ] No stale imports found (or all fixed)
 - [ ] pylint passes
 - [ ] pytest passes (unit tests, excluding integration markers)
 - [ ] mypy passes

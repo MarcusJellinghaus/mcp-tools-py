@@ -14,7 +14,7 @@ Replace all `from mcp_tools_py.log_utils import ...` with `from mcp_coder_utils.
 
 ## WHERE — Files to modify
 
-### Source files (14 import replacements):
+### Source files (15 — 14 import replacements + shim creation):
 1. `src/mcp_tools_py/main.py`
 2. `src/mcp_tools_py/server.py`
 3. `src/mcp_tools_py/checker_tools.py`
@@ -26,19 +26,20 @@ Replace all `from mcp_tools_py.log_utils import ...` with `from mcp_coder_utils.
 9. `src/mcp_tools_py/code_checker_mypy/runners.py`
 10. `src/mcp_tools_py/code_checker_ruff/runners.py`
 11. `src/mcp_tools_py/code_checker_bandit/runners.py`
-12. `src/mcp_tools_py/log_utils.py` ← becomes shim
+12. `src/mcp_tools_py/code_checker_pylint/reporting.py`
+13. `src/mcp_tools_py/code_checker_pytest/reporting.py`
+14. `src/mcp_tools_py/refactoring/__init__.py`
+15. `src/mcp_tools_py/log_utils.py` ← becomes shim
 
-Files 13-14: verify by grep — there may be additional source files importing `log_utils` not yet identified. The issue says 14 source + 1 test = 15 total. Grep all `.py` files for `from mcp_tools_py.log_utils` to find any remaining.
-
-### Test files (1):
-- `tests/test_log_utils.py` — deleted in step 3, not touched here
+### Test files (0):
+No test files need modification in this step. The only test file importing `log_utils` is `tests/test_log_utils.py`, which is deleted in step 3.
 
 ### NOT modified:
 - `tests/test_log_utils.py` — deleted in step 3
 
 ## WHAT — Changes per file
 
-### Import replacement (13+ files)
+### Import replacement (14 files)
 
 Each file: replace `from mcp_tools_py.log_utils import X` with `from mcp_coder_utils.log_utils import X`. The imported names stay identical.
 
@@ -54,23 +55,24 @@ This module re-exports the public API for backward compatibility.
 """
 
 from mcp_coder_utils.log_utils import (  # noqa: F401
+    OUTPUT,
     log_function_call,
     setup_logging,
 )
 
 __all__ = [
+    "OUTPUT",
     "log_function_call",
     "setup_logging",
 ]
 ```
-
-**Note:** The shared `log_utils` also exports `OUTPUT` level, `sensitive_fields`, and redaction features. The shim should re-export the full shared `__all__`. Check the actual `mcp_coder_utils.log_utils.__all__` at implementation time and re-export everything listed there.
 
 ## HOW — Integration
 
 - No API changes — `setup_logging` and `log_function_call` signatures are backward-compatible
 - Test files that mock `mcp_tools_py.*.log_function_call` still work because mocks target the consumer module
 - The shared `log_utils` does NOT suppress noisy third-party loggers (httpx, httpcore). If logging becomes noisy after migration, that's a separate follow-up (add suppression in `main.py`)
+- **Note on `sensitive_fields`:** The issue mentions `sensitive_fields` and redaction as separate exports, but the shared `__all__` only exports `OUTPUT`, `log_function_call`, and `setup_logging`. The `sensitive_fields` functionality is available through `log_function_call(sensitive_fields=[...])` parameter, not as a standalone export. The shim correctly follows the shared `__all__`.
 
 ## DATA — Return values
 

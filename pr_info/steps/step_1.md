@@ -15,7 +15,7 @@ Replace all `from mcp_tools_py.utils.subprocess_runner import ...` with `from mc
 
 ## WHERE — Files to modify
 
-### Source files (11 import replacements):
+### Source files (12 — 11 import replacements + shim creation):
 1. `src/mcp_tools_py/checker_tools.py`
 2. `src/mcp_tools_py/code_checker_pytest/runners.py`
 3. `src/mcp_tools_py/code_checker_pylint/runners.py`
@@ -26,7 +26,8 @@ Replace all `from mcp_tools_py.utils.subprocess_runner import ...` with `from mc
 8. `src/mcp_tools_py/formatter/black_runner.py`
 9. `src/mcp_tools_py/formatter/isort_runner.py`
 10. `src/mcp_tools_py/refactoring/rope_tools.py`
-11. `src/mcp_tools_py/utils/subprocess_runner.py` ← becomes shim
+11. `src/mcp_tools_py/server.py`
+12. `src/mcp_tools_py/utils/subprocess_runner.py` ← becomes shim
 
 ### Test files (5 import replacements):
 1. `tests/conftest.py`
@@ -41,7 +42,7 @@ Replace all `from mcp_tools_py.utils.subprocess_runner import ...` with `from mc
 
 ## WHAT — Changes per file
 
-### Import replacement (15 files)
+### Import replacement (16 files)
 
 Each file: replace `from mcp_tools_py.utils.subprocess_runner import X` with `from mcp_coder_utils.subprocess_runner import X`. The imported names stay identical.
 
@@ -101,7 +102,7 @@ No changes to any return values or data structures. This is a pure import-path m
 
 ## Verification
 
-- [ ] All 15 files have `from mcp_coder_utils.subprocess_runner import ...`
+- [ ] All 16 files have `from mcp_coder_utils.subprocess_runner import ...`
 - [ ] Shim re-exports full shared `__all__` (including `prepare_env` not previously exported locally)
 - [ ] pylint passes
 - [ ] pytest passes (unit tests, excluding integration markers)
