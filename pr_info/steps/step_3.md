@@ -75,11 +75,11 @@ Any match outside the shim files and `utils/__init__.py` is a bug — fix the im
 
 ## Verification
 
-- [ ] `tests/test_subprocess_runner.py` deleted
-- [ ] `tests/test_log_utils.py` deleted
-- [ ] `.importlinter` no longer lists `mcp_tools_py.log_utils`
-- [ ] `pyproject.toml` no longer has mypy override for `subprocess_runner`
-- [ ] No stale imports found (or all fixed)
-- [ ] pylint passes
-- [ ] pytest passes (unit tests, excluding integration markers)
-- [ ] mypy passes
+- [x] `tests/test_subprocess_runner.py` deleted
+- [x] `tests/test_log_utils.py` deleted
+- [x] `.importlinter` no longer lists `mcp_tools_py.log_utils`
+- [x] `pyproject.toml` no longer has mypy override for `subprocess_runner`
+- [x] No stale imports found (or all fixed)
+- [x] pylint passes
+- [x] pytest passes (unit tests, excluding integration markers)
+- [x] mypy passes
