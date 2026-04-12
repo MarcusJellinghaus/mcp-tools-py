@@ -2,7 +2,7 @@
 
 import os
 
-from mcp_tools_py.utils.subprocess_runner import execute_command
+from mcp_coder_utils.subprocess_runner import execute_command
 
 
 def run_vulture_check(

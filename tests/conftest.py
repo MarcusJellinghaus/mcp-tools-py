@@ -1,6 +1,6 @@
 """Shared test utilities and fixtures."""
 
-from mcp_tools_py.utils.subprocess_runner import CommandResult
+from mcp_coder_utils.subprocess_runner import CommandResult
 
 
 def make_command_result(

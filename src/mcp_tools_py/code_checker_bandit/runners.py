@@ -3,10 +3,11 @@
 import logging
 import os
 
+from mcp_coder_utils.log_utils import log_function_call
+from mcp_coder_utils.subprocess_runner import execute_command
+
 from mcp_tools_py.code_checker_bandit.models import BanditResult
 from mcp_tools_py.code_checker_bandit.parsers import parse_bandit_json_output
-from mcp_tools_py.log_utils import log_function_call
-from mcp_tools_py.utils.subprocess_runner import execute_command
 
 logger = logging.getLogger(__name__)
 

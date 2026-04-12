@@ -29,7 +29,7 @@ dependencies = [
     "mypy>=1.9.0",
     "structlog>=24.5.0",
     "python-json-logger>=3.2.1",
-    "mcp-config",
+    "mcp-config-tool",
     "rope>=1.13.0",
     "jedi>=0.19.0",
     "igittigitt>=2.1.0",
@@ -94,11 +94,6 @@ namespace_packages = true
 explicit_package_bases = true
 
 [[tool.mypy.overrides]]
-module = ["mcp_tools_py.utils.subprocess_runner"]
-# Disable unused ignore warnings for platform-specific Unix attributes
-warn_unused_ignores = false
-
-[[tool.mypy.overrides]]
 module = ["pytest.*"]
 ignore_missing_imports = true
 
@@ -116,6 +111,10 @@ ignore_missing_imports = true
 
 [[tool.mypy.overrides]]
 module = ["igittigitt", "igittigitt.*"]
+ignore_missing_imports = true
+
+[[tool.mypy.overrides]]
+module = ["mcp_coder_utils", "mcp_coder_utils.*"]
 ignore_missing_imports = true
 
 [tool.pylint.messages_control]
@@ -142,6 +141,12 @@ where = ["src"]
 
 [tool.setuptools.package-data]
 "*" = ["py.typed"]
+
+[tool.uv.sources]
+mcp-config-tool = { git = "https://github.com/MarcusJellinghaus/mcp-config.git" }
+mcp-coder-utils = { git = "https://github.com/MarcusJellinghaus/mcp-coder-utils.git" }
+mcp-workspace = { git = "https://github.com/MarcusJellinghaus/mcp-workspace.git" }
+mcp-coder = { git = "https://github.com/MarcusJellinghaus/mcp_coder.git" }
 
 [build-system]
 requires = ["setuptools>=61.0", "setuptools-scm>=8.0"]

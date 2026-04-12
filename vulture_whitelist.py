@@ -44,6 +44,7 @@ _.exc_text
 _.stack_info
 _.msecs
 _.relativeCreated
+_.thread
 _.threadName
 _.processName
 _.taskName
@@ -71,4 +72,5 @@ _.get_library_source  # FastMCP tool handler
 _.run_format_code  # FastMCP tool handler
 
 # Test mock attributes used for nested attribute resolution
+_.b  # Mock attribute in test_inspect_library
 _.c  # Mock attribute in test_inspect_library

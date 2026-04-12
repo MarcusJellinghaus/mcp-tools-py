@@ -3,7 +3,8 @@
 from pathlib import Path
 from typing import TYPE_CHECKING
 
-from mcp_tools_py.log_utils import log_function_call
+from mcp_coder_utils.log_utils import log_function_call
+
 from mcp_tools_py.refactoring.jedi_tools import find_references as jedi_find_references
 from mcp_tools_py.refactoring.jedi_tools import list_symbols as jedi_list_symbols
 from mcp_tools_py.refactoring.rope_tools import move_module as rope_move_module
