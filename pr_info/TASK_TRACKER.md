@@ -23,8 +23,8 @@ This tracks **Feature Implementation** consisting of multiple **Tasks**.
 
 ### Step 1: Add `_is_tool_available()` and shrink `_check_tool_availability()`
 - [x] Implementation: production code (`server.py`) + tests (`test_tool_availability.py`)
-- [ ] Quality checks: pylint, pytest, mypy — fix all issues
-- [ ] Commit message prepared
+- [x] Quality checks: pylint, pytest, mypy — fix all issues
+- [x] Commit message prepared
 
 ### Step 2: Migrate `checker_tools.py` and `formatter_tools.py` consumers to `_is_tool_available()`
 - [ ] Implementation: production code (`checker_tools.py`, `formatter_tools.py`) + tests (`test_checker_tools.py`, `test_formatter_tools.py`)
