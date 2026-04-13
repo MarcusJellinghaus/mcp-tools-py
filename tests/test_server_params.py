@@ -47,11 +47,12 @@ async def test_run_pytest_check_parameters(mock_project_dir: Path) -> None:
         with patch.object(
             ToolServer,
             "_check_tool_availability",
-            return_value={"pytest": True, "pylint": True, "mypy": True},
+            return_value={},
         ):
             _server = ToolServer(
                 mock_project_dir, test_folder="custom_tests", keep_temp_files=True
             )
+            _server._is_tool_available = lambda tool_name: True  # type: ignore[method-assign]
 
         assert (
             len(mock_tool.call_args_list) >= 2
@@ -97,9 +98,10 @@ async def test_run_pylint_check_signature() -> None:
         with patch.object(
             ToolServer,
             "_check_tool_availability",
-            return_value={"pytest": True, "pylint": True, "mypy": True},
+            return_value={},
         ):
             _server = ToolServer(project_dir=Path("/test/project"))
+            _server._is_tool_available = lambda tool_name: True  # type: ignore[method-assign]
 
         # Look up run_pylint_check by name to avoid fragile index assumptions
         tools = {
@@ -133,9 +135,10 @@ def mock_server() -> Tuple[Any, MagicMock]:
         with patch.object(
             ToolServer,
             "_check_tool_availability",
-            return_value={"pytest": True, "pylint": True, "mypy": True},
+            return_value={},
         ):
             server = ToolServer(project_dir=Path("/test/project"))
+            server._is_tool_available = lambda tool_name: True  # type: ignore[method-assign]
 
         # Return server and the mock tool for test access
         return server, mock_tool
@@ -390,9 +393,10 @@ async def test_mcp_tool_decorator_compatibility() -> None:
         with patch.object(
             ToolServer,
             "_check_tool_availability",
-            return_value={"pytest": True, "pylint": True, "mypy": True},
+            return_value={},
         ):
             server = ToolServer(project_dir=Path("/test/project"))
+            server._is_tool_available = lambda tool_name: True  # type: ignore[method-assign]
 
         # Verify that tools were registered correctly
         assert (
@@ -475,6 +479,7 @@ class TestServerPylintMaxIssues:
             from mcp_tools_py.server import ToolServer
 
             _server = ToolServer(project_dir=Path("/test/project"))
+            _server._is_tool_available = lambda tool_name: True  # type: ignore[method-assign]
             run_pylint_check = _get_tool(mock_tool, "run_pylint_check")
 
             run_pylint_check(max_issues=3)
@@ -501,6 +506,7 @@ class TestServerPylintMaxIssues:
             from mcp_tools_py.server import ToolServer
 
             _server = ToolServer(project_dir=Path("/test/project"))
+            _server._is_tool_available = lambda tool_name: True  # type: ignore[method-assign]
             run_pylint_check = _get_tool(mock_tool, "run_pylint_check")
 
             run_pylint_check()
