@@ -30,6 +30,9 @@ def test_missing_pyproject_returns_silently(tmp_path, capsys):
 
 def test_empty_config_returns_silently(tmp_path, capsys):
     """When install-from-github section is absent, no output."""
+
+def test_multiple_packages_grouped_in_one_command(tmp_path, capsys):
+    """Multiple 'packages' entries are joined into a single install command."""
 ```
 
 ### HOW — Test Strategy
@@ -52,6 +55,10 @@ packages-no-deps = ["pkg-b @ git+https://github.com/org/pkg-b.git"]
 [tool.mcp-coder.install-from-github]
 packages = ["pkg-a @ git+https://github.com/org/pkg-a.git"]
 packages-no-deps = ["pkg-b @ git+https://github.com/org/pkg-b.git"]
+
+# multiple packages
+[tool.mcp-coder.install-from-github]
+packages = ["pkg-a @ git+https://github.com/org/pkg-a.git", "pkg-b @ git+https://github.com/org/pkg-b.git"]
 ```
 
 ## Implementation
@@ -75,8 +82,10 @@ path = project_dir / "pyproject.toml"
 if not path.exists(): return
 data = tomllib.load(path)
 gh = data["tool"]["mcp-coder"]["install-from-github"]  # with .get() chain
-for pkg in gh.get("packages", []): print(f'uv pip install "{pkg}"')
-for pkg in gh.get("packages-no-deps", []): print(f'uv pip install --no-deps "{pkg}"')
+pkgs = gh.get("packages", [])
+if pkgs: print('uv pip install ' + ' '.join(f'"{ p}"' for p in pkgs))
+no_deps = gh.get("packages-no-deps", [])
+if no_deps: print('uv pip install --no-deps ' + ' '.join(f'"{ p}"' for p in no_deps))
 ```
 
 ### DATA — Output Format

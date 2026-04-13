@@ -8,7 +8,7 @@ Add a finalization step to `reinstall_local.bat`, switch to silent-deactivate fo
 
 - **No new modules or packages** — all changes are to existing tooling scripts.
 - **`read_github_deps.py`**: Gains a second output mode. Currently emits `uv pip install "pkg"` for `packages` entries. After this change, it also emits `uv pip install --no-deps "pkg"` for `packages-no-deps` entries. Adds a defensive early-return when `pyproject.toml` is missing.
-- **`reinstall_local.bat`**: Installation pipeline grows from 6 to 7 steps. A new finalization step (re-install local editable with `--no-deps`) ensures the local source always takes precedence over GitHub deps that might bundle a copy of the same package. Venv startup guard is simplified from "error out" to "silently deactivate", matching the mcp-coder pattern.
+- **`reinstall_local.bat`**: Installation pipeline grows from 6 to 7 steps. A new finalization step (re-install local editable) ensures the local source always takes precedence over GitHub deps that might bundle a copy of the same package. Venv startup guard is simplified from "error out" to "silently deactivate", matching the mcp-coder pattern.
 
 ## Files Modified
 

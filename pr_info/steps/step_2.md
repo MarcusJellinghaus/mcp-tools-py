@@ -42,9 +42,9 @@ Insert new step **after** step 3 (GitHub overrides) and **before** step 4 (LangC
 
 ```bat
 echo.
-echo [4/7] Reinstalling local package (editable, no deps)...
+echo [4/7] Reinstalling local package (editable)...
 pushd "!PROJECT_DIR!"
-uv pip install -e . --no-deps --python "!VENV_SCRIPTS!\python.exe"
+uv pip install -e . --python "!VENV_SCRIPTS!\python.exe"
 if !ERRORLEVEL! NEQ 0 (
     echo [FAIL] Local editable reinstall failed!
     popd
@@ -62,7 +62,7 @@ echo [OK] Local editable install takes precedence
 | `[1/6]` | `[1/7]` | Uninstalling existing packages |
 | `[2/6]` | `[2/7]` | Installing in editable mode |
 | `[3/6]` | `[3/7]` | Overriding with GitHub versions |
-| *(new)* | `[4/7]` | Reinstalling local package (no deps) |
+| *(new)* | `[4/7]` | Reinstalling local package (editable) |
 | `[4/6]` | `[5/7]` | Installing LangChain and MLflow |
 | `[5/6]` | `[6/7]` | Verifying CLI entry points |
 | `[6/6]` | `[7/7]` | Verifying CLI functionality |
