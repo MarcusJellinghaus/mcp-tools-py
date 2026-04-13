@@ -3,7 +3,6 @@
 import logging
 import os
 import sys
-from concurrent.futures import ThreadPoolExecutor, as_completed
 from pathlib import Path
 from typing import Callable, Optional, Protocol, TypeVar
 
@@ -79,13 +78,6 @@ class ToolServer:
         )
         UtilityTools().register(self.mcp)
         InspectTools().register(self.mcp)
-        logger.debug(
-            "Tool environment resolved",
-            extra={
-                "python_executable": self._resolved_python,
-                "tool_availability": self._tool_availability,
-            },
-        )
 
     def _resolve_python_executable(self) -> str:
         """Centralize venv -> python_executable -> sys.executable resolution."""
@@ -105,33 +97,8 @@ class ToolServer:
             return sys.executable
 
     def _check_tool_availability(self) -> dict[str, bool]:
-        """Check availability of pytest, pylint, mypy, black, isort, and lint-imports."""
+        """Check availability of file-existence tools (lint-imports, vulture, ruff, bandit)."""
         availability: dict[str, bool] = {}
-
-        def _check_one(tool: str) -> tuple[str, bool]:
-            result = execute_command(
-                [self._resolved_python, "-m", tool, "--version"],
-                timeout_seconds=10,
-            )
-            return tool, result.return_code == 0 and not result.execution_error
-
-        with ThreadPoolExecutor() as executor:
-            futures = {
-                executor.submit(_check_one, tool): tool
-                for tool in ["pytest", "pylint", "mypy", "black", "isort"]
-            }
-            for future in as_completed(futures):
-                tool, available = future.result()
-                availability[tool] = available
-                if not available:
-                    logger.warning(
-                        "%s not found in %s. "
-                        "Ensure --python-executable and --venv-path point to "
-                        "the environment where %s is installed.",
-                        tool,
-                        self._resolved_python,
-                        tool,
-                    )
 
         # lint-imports: check via file existence (not subprocess)
         lint_imports_available = False
@@ -206,6 +173,29 @@ class ToolServer:
             )
 
         return availability
+
+    def _is_tool_available(self, tool_name: str) -> bool:
+        """Check if a tool is available, running subprocess check on first call."""
+        if tool_name in self._tool_availability:
+            return self._tool_availability[tool_name]
+        result = execute_command(
+            [self._resolved_python, "-m", tool_name, "--version"],
+            timeout_seconds=10,
+        )
+        available = result.return_code == 0 and not result.execution_error
+        if available:
+            logger.info("%s version: %s", tool_name, result.stdout.strip())
+        else:
+            logger.warning(
+                "%s not found in %s. "
+                "Ensure --python-executable and --venv-path point to "
+                "the environment where %s is installed.",
+                tool_name,
+                self._resolved_python,
+                tool_name,
+            )
+        self._tool_availability[tool_name] = available
+        return available
 
     @log_function_call
     def run(self) -> None:

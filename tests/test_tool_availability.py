@@ -7,7 +7,6 @@ from typing import Any
 from unittest.mock import MagicMock, patch
 
 import pytest
-from mcp_coder_utils.subprocess_runner import CommandResult
 
 from tests.conftest import make_command_result
 
@@ -113,102 +112,32 @@ class TestCheckToolAvailability:
     """Test _check_tool_availability caching."""
 
     def test_all_tools_available(self) -> None:
-        """When all tools return success, all should be True."""
+        """When all file-existence tools exist, all should be True."""
         with (
             patch("mcp.server.fastmcp.FastMCP") as mock_fastmcp,
-            patch("mcp_tools_py.server.execute_command") as mock_exec,
             patch("mcp_tools_py.server.os.path.exists", return_value=True),
         ):
             mock_fastmcp.return_value.tool.return_value = MagicMock()
-            mock_exec.return_value = make_command_result(
-                return_code=0, stdout="tool 1.0.0"
-            )
 
             server = _create_server(
                 project_dir=Path("/project"), venv_path="/mock/venv"
             )
 
             assert server._tool_availability == {
-                "pytest": True,
-                "pylint": True,
-                "mypy": True,
-                "black": True,
-                "isort": True,
                 "lint-imports": True,
                 "vulture": True,
                 "ruff": True,
                 "bandit": True,
             }
 
-    def test_one_tool_missing(self) -> None:
-        """When one tool fails, it should be False while others True."""
-
-        def side_effect(command: list[str], **kwargs: Any) -> CommandResult:
-            # pytest missing, others available
-            if "pytest" in command:
-                return make_command_result(
-                    return_code=1,
-                    stderr="No module named pytest",
-                    execution_error="error",
-                )
-            return make_command_result(return_code=0, stdout="tool 1.0.0")
-
-        with (
-            patch("mcp.server.fastmcp.FastMCP") as mock_fastmcp,
-            patch("mcp_tools_py.server.execute_command") as mock_exec,
-        ):
-            mock_fastmcp.return_value.tool.return_value = MagicMock()
-            mock_exec.side_effect = side_effect
-
-            server = _create_server(project_dir=Path("/project"))
-
-            assert server._tool_availability["pytest"] is False
-            assert server._tool_availability["pylint"] is True
-            assert server._tool_availability["mypy"] is True
-            assert "vulture" in server._tool_availability
-
     def test_all_tools_missing(self) -> None:
-        """When all tools fail, all should be False."""
-        with (
-            patch("mcp.server.fastmcp.FastMCP") as mock_fastmcp,
-            patch("mcp_tools_py.server.execute_command") as mock_exec,
-        ):
+        """When no venv_path is set, all file-existence tools are False."""
+        with (patch("mcp.server.fastmcp.FastMCP") as mock_fastmcp,):
             mock_fastmcp.return_value.tool.return_value = MagicMock()
-            mock_exec.return_value = make_command_result(
-                return_code=1, execution_error="not found"
-            )
 
             server = _create_server(project_dir=Path("/project"))
 
             assert server._tool_availability == {
-                "pytest": False,
-                "pylint": False,
-                "mypy": False,
-                "black": False,
-                "isort": False,
-                "lint-imports": False,
-                "vulture": False,
-                "ruff": False,
-                "bandit": False,
-            }
-
-    def test_timed_out_tool_marked_unavailable(self) -> None:
-        """When a tool check times out, it should be marked as unavailable."""
-        with (
-            patch("mcp.server.fastmcp.FastMCP") as mock_fastmcp,
-            patch("mcp_tools_py.server.execute_command") as mock_exec,
-        ):
-            mock_fastmcp.return_value.tool.return_value = MagicMock()
-            mock_exec.return_value = make_command_result(return_code=1, timed_out=True)
-
-            server = _create_server(project_dir=Path("/project"))
-
-            assert server._tool_availability == {
-                "pytest": False,
-                "pylint": False,
-                "mypy": False,
-                "black": False,
-                "isort": False,
                 "lint-imports": False,
                 "vulture": False,
                 "ruff": False,
@@ -220,14 +149,10 @@ class TestCheckToolAvailability:
         project_dir = Path("/project")
         with (
             patch("mcp.server.fastmcp.FastMCP") as mock_fastmcp,
-            patch("mcp_tools_py.server.execute_command") as mock_exec,
             patch("mcp_tools_py.server.os.name", "nt"),
             patch("mcp_tools_py.server.os.path.exists", return_value=True),
         ):
             mock_fastmcp.return_value.tool.return_value = MagicMock()
-            mock_exec.return_value = make_command_result(
-                return_code=0, stdout="tool 1.0.0"
-            )
 
             server = _create_server(project_dir=project_dir, venv_path="/mock/venv")
 
@@ -239,14 +164,8 @@ class TestCheckToolAvailability:
 
     def test_lint_imports_unavailable_when_no_venv(self) -> None:
         """When no venv_path is configured, lint-imports is unavailable."""
-        with (
-            patch("mcp.server.fastmcp.FastMCP") as mock_fastmcp,
-            patch("mcp_tools_py.server.execute_command") as mock_exec,
-        ):
+        with (patch("mcp.server.fastmcp.FastMCP") as mock_fastmcp,):
             mock_fastmcp.return_value.tool.return_value = MagicMock()
-            mock_exec.return_value = make_command_result(
-                return_code=0, stdout="tool 1.0.0"
-            )
 
             server = _create_server(project_dir=Path("/project"))
 
@@ -266,7 +185,6 @@ class TestCheckToolAvailability:
 
         with (
             patch("mcp.server.fastmcp.FastMCP") as mock_fastmcp,
-            patch("mcp_tools_py.server.execute_command") as mock_exec,
             patch("mcp_tools_py.server.os.name", "nt"),
             patch(
                 "mcp_tools_py.server.os.path.exists",
@@ -274,9 +192,6 @@ class TestCheckToolAvailability:
             ),
         ):
             mock_fastmcp.return_value.tool.return_value = MagicMock()
-            mock_exec.return_value = make_command_result(
-                return_code=0, stdout="tool 1.0.0"
-            )
 
             server = _create_server(project_dir=project_dir, venv_path="/mock/venv")
 
@@ -290,14 +205,10 @@ class TestCheckToolAvailability:
         project_dir = Path("/project")
         with (
             patch("mcp.server.fastmcp.FastMCP") as mock_fastmcp,
-            patch("mcp_tools_py.server.execute_command") as mock_exec,
             patch("mcp_tools_py.server.os.name", "nt"),
             patch("mcp_tools_py.server.os.path.exists", return_value=True),
         ):
             mock_fastmcp.return_value.tool.return_value = MagicMock()
-            mock_exec.return_value = make_command_result(
-                return_code=0, stdout="tool 1.0.0"
-            )
 
             server = _create_server(project_dir=project_dir, venv_path="/mock/venv")
 
@@ -308,95 +219,124 @@ class TestCheckToolAvailability:
 
     def test_vulture_unavailable_when_no_venv(self) -> None:
         """When no venv_path is configured, vulture is unavailable."""
-        with (
-            patch("mcp.server.fastmcp.FastMCP") as mock_fastmcp,
-            patch("mcp_tools_py.server.execute_command") as mock_exec,
-        ):
+        with (patch("mcp.server.fastmcp.FastMCP") as mock_fastmcp,):
             mock_fastmcp.return_value.tool.return_value = MagicMock()
-            mock_exec.return_value = make_command_result(
-                return_code=0, stdout="tool 1.0.0"
-            )
 
             server = _create_server(project_dir=Path("/project"))
 
             assert server._tool_availability["vulture"] is False
             assert server._vulture_binary is None
 
-    def test_black_available(self) -> None:
-        """When black returns success, it should be marked available."""
+
+# ---------------------------------------------------------------------------
+# _is_tool_available tests
+# ---------------------------------------------------------------------------
+
+
+class TestIsToolAvailable:
+    """Test _is_tool_available lazy caching."""
+
+    def test_first_call_runs_subprocess_and_caches(self) -> None:
+        """First call to _is_tool_available runs subprocess and caches result."""
         with (
             patch("mcp.server.fastmcp.FastMCP") as mock_fastmcp,
             patch("mcp_tools_py.server.execute_command") as mock_exec,
         ):
             mock_fastmcp.return_value.tool.return_value = MagicMock()
             mock_exec.return_value = make_command_result(
-                return_code=0, stdout="black, 24.10.0"
+                return_code=0, stdout="pytest 8.0.0"
             )
 
             server = _create_server(project_dir=Path("/project"))
-
-            assert server._tool_availability["black"] is True
-
-    def test_isort_available(self) -> None:
-        """When isort returns success, it should be marked available."""
-        with (
-            patch("mcp.server.fastmcp.FastMCP") as mock_fastmcp,
-            patch("mcp_tools_py.server.execute_command") as mock_exec,
-        ):
-            mock_fastmcp.return_value.tool.return_value = MagicMock()
+            mock_exec.reset_mock()
             mock_exec.return_value = make_command_result(
-                return_code=0, stdout="isort, 5.13.2"
+                return_code=0, stdout="pytest 8.0.0"
             )
 
-            server = _create_server(project_dir=Path("/project"))
+            result = server._is_tool_available("pytest")
 
-            assert server._tool_availability["isort"] is True
-
-    def test_parallel_execution_maps_results_correctly(self) -> None:
-        """Parallel execution maps distinct results to the correct tool names."""
-        from concurrent.futures import ThreadPoolExecutor as RealTPE
-
-        submit_calls: list[Any] = []
-
-        class TrackingExecutor(RealTPE):
-            def submit(self, fn: Any, /, *args: Any, **kwargs: Any) -> Any:
-                submit_calls.append((fn, args, kwargs))
-                return super().submit(fn, *args, **kwargs)
-
-        def side_effect(command: list[str], **kwargs: Any) -> CommandResult:
-            for tool in ["pytest", "mypy", "isort"]:
-                if tool in command:
-                    return make_command_result(return_code=0, stdout=f"{tool} ok")
-            for tool in ["pylint", "black"]:
-                if tool in command:
-                    return make_command_result(
-                        return_code=1,
-                        stderr=f"No module named {tool}",
-                        execution_error="error",
-                    )
-            return make_command_result(return_code=0, stdout="ok")
-
-        with (
-            patch("mcp.server.fastmcp.FastMCP") as mock_fastmcp,
-            patch("mcp_tools_py.server.execute_command") as mock_exec,
-            patch(
-                "mcp_tools_py.server.ThreadPoolExecutor",
-                TrackingExecutor,
-            ),
-        ):
-            mock_fastmcp.return_value.tool.return_value = MagicMock()
-            mock_exec.side_effect = side_effect
-
-            server = _create_server(project_dir=Path("/project"))
-
+            assert result is True
             assert server._tool_availability["pytest"] is True
-            assert server._tool_availability["pylint"] is False
-            assert server._tool_availability["black"] is False
-            assert server._tool_availability["mypy"] is True
-            assert server._tool_availability["isort"] is True
+            mock_exec.assert_called_once()
 
-            # Verify ThreadPoolExecutor.submit was called 5 times
-            assert len(submit_calls) == 5
+    def test_second_call_returns_cached_no_subprocess(self) -> None:
+        """Second call returns cached result without running subprocess."""
+        with (
+            patch("mcp.server.fastmcp.FastMCP") as mock_fastmcp,
+            patch("mcp_tools_py.server.execute_command") as mock_exec,
+        ):
+            mock_fastmcp.return_value.tool.return_value = MagicMock()
+            mock_exec.return_value = make_command_result(return_code=0, stdout="ok")
+
+            server = _create_server(project_dir=Path("/project"))
+            server._tool_availability["pytest"] = True
+            mock_exec.reset_mock()
+
+            result = server._is_tool_available("pytest")
+
+            assert result is True
+            mock_exec.assert_not_called()
+
+    def test_eager_tool_returned_from_cache(self) -> None:
+        """Eager tools populated at init are returned from cache without subprocess."""
+        with (
+            patch("mcp.server.fastmcp.FastMCP") as mock_fastmcp,
+            patch("mcp_tools_py.server.os.path.exists", return_value=True),
+            patch("mcp_tools_py.server.execute_command") as mock_exec,
+        ):
+            mock_fastmcp.return_value.tool.return_value = MagicMock()
+
+            server = _create_server(
+                project_dir=Path("/project"), venv_path="/mock/venv"
+            )
+            mock_exec.reset_mock()
+
+            result = server._is_tool_available("ruff")
+
+            assert result is True
+            mock_exec.assert_not_called()
+
+    def test_subprocess_failure_marks_unavailable(self) -> None:
+        """When subprocess fails, result is False and cached."""
+        with (
+            patch("mcp.server.fastmcp.FastMCP") as mock_fastmcp,
+            patch("mcp_tools_py.server.execute_command") as mock_exec,
+        ):
+            mock_fastmcp.return_value.tool.return_value = MagicMock()
+            mock_exec.return_value = make_command_result(return_code=0, stdout="ok")
+
+            server = _create_server(project_dir=Path("/project"))
+            mock_exec.reset_mock()
+            mock_exec.return_value = make_command_result(
+                return_code=1,
+                stderr="No module named pytest",
+                execution_error="error",
+            )
+
+            result = server._is_tool_available("pytest")
+
+            assert result is False
+            assert server._tool_availability["pytest"] is False
+
+    def test_subprocess_success_marks_available(self) -> None:
+        """When subprocess succeeds, result is True and cached."""
+        with (
+            patch("mcp.server.fastmcp.FastMCP") as mock_fastmcp,
+            patch("mcp_tools_py.server.execute_command") as mock_exec,
+        ):
+            mock_fastmcp.return_value.tool.return_value = MagicMock()
+            mock_exec.return_value = make_command_result(return_code=0, stdout="ok")
+
+            server = _create_server(project_dir=Path("/project"))
+            mock_exec.reset_mock()
+            mock_exec.return_value = make_command_result(
+                return_code=0, stdout="pytest 8.0.0"
+            )
+
+            result = server._is_tool_available("pytest")
+
+            assert result is True
+            assert server._tool_availability["pytest"] is True
 
 
 # ---------------------------------------------------------------------------

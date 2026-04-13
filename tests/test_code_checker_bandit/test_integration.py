@@ -15,6 +15,7 @@ def _make_mock_server(bandit_available: bool = True) -> MagicMock:
     server._resolved_python = "/usr/bin/python3"
     server._bandit_binary = "/mock/venv/bin/bandit" if bandit_available else None
     server._tool_availability = {"bandit": bandit_available}
+    server._is_tool_available = lambda tool: server._tool_availability.get(tool, False)
     return server
 
 

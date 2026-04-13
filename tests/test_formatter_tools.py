@@ -20,6 +20,7 @@ def mock_server() -> MagicMock:
         "isort": True,
         "black": True,
     }
+    server._is_tool_available = lambda tool: server._tool_availability.get(tool, False)
     return server
 
 

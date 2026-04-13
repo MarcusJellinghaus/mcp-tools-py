@@ -36,6 +36,7 @@ def mock_server() -> MagicMock:
     server._ruff_binary = "/mock/venv/bin/ruff"
     server._bandit_binary = "/mock/venv/bin/bandit"
     server.vulture_whitelist = "vulture_whitelist.py"
+    server._is_tool_available = lambda tool: server._tool_availability.get(tool, False)
     return server
 
 

@@ -83,7 +83,7 @@ class CheckerTools:
                 target_directories: Directories to analyze relative to project_dir. Auto-detected from pyproject.toml when None.
                 max_issues: Number of issue types to show in detail (default: 1). Remaining issues shown as summary counts.
             """
-            if not self._server._tool_availability.get("pylint", False):
+            if not self._server._is_tool_available("pylint"):
                 return (
                     f"pylint is not available in the configured Python environment "
                     f"({self._server._resolved_python}). Ensure --python-executable and "
@@ -191,7 +191,7 @@ class CheckerTools:
                 # Integration test run
                 run_pytest_check(markers=["integration"])
             """
-            if not self._server._tool_availability.get("pytest", False):
+            if not self._server._is_tool_available("pytest"):
                 return (
                     f"pytest is not available in the configured Python environment "
                     f"({self._server._resolved_python}). Ensure --python-executable and "
@@ -325,7 +325,7 @@ class CheckerTools:
             Returns:
                 A string containing mypy results or a prompt for an LLM to interpret
             """
-            if not self._server._tool_availability.get("mypy", False):
+            if not self._server._is_tool_available("mypy"):
                 return (
                     f"mypy is not available in the configured Python environment "
                     f"({self._server._resolved_python}). Ensure --python-executable and "
@@ -403,7 +403,7 @@ class CheckerTools:
             Returns:
                 Raw lint-imports output (stdout + stderr combined)
             """
-            if not self._server._tool_availability.get("lint-imports", False):
+            if not self._server._is_tool_available("lint-imports"):
                 binary_path = self._server._lint_imports_binary or "N/A"
                 return (
                     f"lint-imports is not available at {binary_path}. "
@@ -477,7 +477,7 @@ class CheckerTools:
             Returns:
                 Raw vulture output (stdout + stderr combined)
             """
-            if not self._server._tool_availability.get("vulture", False):
+            if not self._server._is_tool_available("vulture"):
                 binary_path = self._server._vulture_binary or "N/A"
                 return (
                     f"vulture is not available at {binary_path}. "
@@ -560,7 +560,7 @@ class CheckerTools:
                 extra_args: Additional ruff CLI flags (e.g. ["--preview"] for DOC rules).
                 max_issues: Number of issue types shown in detail (default: 1).
             """
-            if not self._server._tool_availability.get("ruff", False):
+            if not self._server._is_tool_available("ruff"):
                 binary_path = self._server._ruff_binary or "N/A"
                 return (
                     f"ruff is not available at {binary_path}. "
@@ -639,7 +639,7 @@ class CheckerTools:
                 target_directories: Directories to fix relative to project_dir. Auto-detected when None.
                 extra_args: Additional ruff CLI flags.
             """
-            if not self._server._tool_availability.get("ruff", False):
+            if not self._server._is_tool_available("ruff"):
                 binary_path = self._server._ruff_binary or "N/A"
                 return (
                     f"ruff is not available at {binary_path}. "
@@ -715,7 +715,7 @@ class CheckerTools:
                 max_issues: Number of issue types to show in detail (default: 1).
                     Remaining issues shown as summary counts.
             """
-            if not self._server._tool_availability.get("bandit", False):
+            if not self._server._is_tool_available("bandit"):
                 binary_path = self._server._bandit_binary or "N/A"
                 return (
                     f"bandit is not available at {binary_path}. "

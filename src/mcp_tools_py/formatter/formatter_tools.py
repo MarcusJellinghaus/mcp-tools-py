@@ -61,7 +61,7 @@ class FormatterTools:
 
             # Check tool availability upfront
             for step in resolved_steps:
-                if not self._server._tool_availability.get(step, False):
+                if not self._server._is_tool_available(step):
                     return (
                         f"Error: {step} is not available in the configured "
                         f"Python environment ({self._server._resolved_python}). "
