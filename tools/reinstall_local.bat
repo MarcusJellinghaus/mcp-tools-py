@@ -15,21 +15,11 @@ popd
 
 set "VENV_DIR=!PROJECT_DIR!\.venv"
 set "VENV_SCRIPTS=!VENV_DIR!\Scripts"
-echo [0/6] Checking Python environment...
 
-REM Guard: if a venv is active, it must be the project-local .venv
-if defined VIRTUAL_ENV (
-    if /I not "!VIRTUAL_ENV!"=="!VENV_DIR!" (
-        echo [FAIL] Wrong virtual environment is active!
-        echo.
-        echo   Active venv:   !VIRTUAL_ENV!
-        echo   Expected venv: !VENV_DIR!
-        echo.
-        echo   Deactivate the current venv first, or activate the correct one:
-        echo     !VENV_DIR!\Scripts\activate
-        exit /b 1
-    )
-)
+REM Silently deactivate any active venv (will reactivate correct one at end)
+call deactivate 2>nul
+
+echo [0/7] Checking Python environment...
 
 REM Check if uv is available
 where uv >nul 2>&1
@@ -48,12 +38,12 @@ if not exist "!VENV_SCRIPTS!\activate.bat" (
 echo [OK] Target environment: !VENV_DIR!
 echo.
 
-echo [1/6] Uninstalling existing packages...
+echo [1/7] Uninstalling existing packages...
 uv pip uninstall mcp-coder mcp-tools-py mcp-config mcp-workspace --python "!VENV_SCRIPTS!\python.exe" 2>nul
 echo [OK] Packages uninstalled
 
 echo.
-echo [2/6] Installing mcp-tools-py (this project) in editable mode...
+echo [2/7] Installing mcp-tools-py (this project) in editable mode...
 REM Editable install pulls all deps (including mcp-workspace,
 REM mcp-config) from PyPI first.
 pushd "!PROJECT_DIR!"
@@ -67,7 +57,7 @@ popd
 echo [OK] Package and dev dependencies installed
 
 echo.
-echo [3/6] Overriding dependencies with GitHub versions...
+echo [3/7] Overriding dependencies with GitHub versions...
 REM Validate read_github_deps.py succeeds before parsing its output
 "!VENV_SCRIPTS!\python.exe" tools\read_github_deps.py > nul 2>&1
 if !ERRORLEVEL! NEQ 0 (
@@ -87,7 +77,19 @@ for /f "delims=" %%C in ('"!VENV_SCRIPTS!\python.exe" tools\read_github_deps.py'
 echo [OK] GitHub dependencies overridden from pyproject.toml
 
 echo.
-echo [4/6] Installing LangChain and MLflow dependencies...
+echo [4/7] Reinstalling local package (editable)...
+pushd "!PROJECT_DIR!"
+uv pip install -e . --python "!VENV_SCRIPTS!\python.exe"
+if !ERRORLEVEL! NEQ 0 (
+    echo [FAIL] Local editable reinstall failed!
+    popd
+    exit /b 1
+)
+popd
+echo [OK] Local editable install takes precedence
+
+echo.
+echo [5/7] Installing LangChain and MLflow dependencies...
 uv pip install langchain langchain-anthropic mlflow --python "!VENV_SCRIPTS!\python.exe"
 if !ERRORLEVEL! NEQ 0 (
     echo [FAIL] LangChain/MLflow installation failed!
@@ -96,7 +98,7 @@ if !ERRORLEVEL! NEQ 0 (
 echo [OK] langchain, langchain-anthropic, mlflow installed
 
 echo.
-echo [5/6] Verifying CLI entry points in venv...
+echo [6/7] Verifying CLI entry points in venv...
 
 if not exist "!VENV_SCRIPTS!\mcp-tools-py.exe" (
     echo [FAIL] mcp-tools-py.exe not found in !VENV_SCRIPTS!
@@ -120,7 +122,7 @@ if not exist "!VENV_SCRIPTS!\mcp-coder.exe" (
 echo [OK] mcp-coder.exe found in !VENV_SCRIPTS!
 
 echo.
-echo [6/6] Verifying CLI functionality...
+echo [7/7] Verifying CLI functionality...
 "!VENV_SCRIPTS!\mcp-tools-py.exe" --help >nul 2>&1
 if !ERRORLEVEL! NEQ 0 (
     echo [FAIL] mcp-tools-py CLI verification failed!
