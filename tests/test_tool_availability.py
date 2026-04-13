@@ -144,25 +144,6 @@ class TestCheckToolAvailability:
                 "bandit": False,
             }
 
-    def test_timed_out_tool_marked_unavailable(self) -> None:
-        """Eager file-existence checks are not affected by subprocess timeouts."""
-        with (
-            patch("mcp.server.fastmcp.FastMCP") as mock_fastmcp,
-            patch("mcp_tools_py.server.os.path.exists", return_value=True),
-        ):
-            mock_fastmcp.return_value.tool.return_value = MagicMock()
-
-            server = _create_server(
-                project_dir=Path("/project"), venv_path="/mock/venv"
-            )
-
-            assert server._tool_availability == {
-                "lint-imports": True,
-                "vulture": True,
-                "ruff": True,
-                "bandit": True,
-            }
-
     def test_lint_imports_available_when_binary_exists(self) -> None:
         """When venv_path is set and lint-imports binary exists, mark available."""
         project_dir = Path("/project")
@@ -315,7 +296,7 @@ class TestIsToolAvailable:
             assert result is True
             mock_exec.assert_not_called()
 
-    def test_unavailable_tool_logs_warning(self) -> None:
+    def test_subprocess_failure_marks_unavailable(self) -> None:
         """When subprocess fails, result is False and cached."""
         with (
             patch("mcp.server.fastmcp.FastMCP") as mock_fastmcp,
@@ -337,8 +318,8 @@ class TestIsToolAvailable:
             assert result is False
             assert server._tool_availability["pytest"] is False
 
-    def test_available_tool_logs_version(self) -> None:
-        """When subprocess succeeds, result is True and version is logged."""
+    def test_subprocess_success_marks_available(self) -> None:
+        """When subprocess succeeds, result is True and cached."""
         with (
             patch("mcp.server.fastmcp.FastMCP") as mock_fastmcp,
             patch("mcp_tools_py.server.execute_command") as mock_exec,
