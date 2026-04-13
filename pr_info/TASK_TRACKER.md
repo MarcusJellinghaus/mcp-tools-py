@@ -21,7 +21,7 @@ This tracks **Feature Implementation** consisting of multiple **Tasks**.
 
 ## Tasks
 
-- [ ] [Step 1](steps/step_1.md) — Update `read_github_deps.py`: path guard + `packages-no-deps` support (TDD)
+- [x] [Step 1](steps/step_1.md) — Update `read_github_deps.py`: path guard + `packages-no-deps` support (TDD)
 - [ ] [Step 2](steps/step_2.md) — Update `reinstall_local.bat`: silent deactivate + finalization step + renumber
 
 ## Pull Request
