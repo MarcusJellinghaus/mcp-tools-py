@@ -22,7 +22,7 @@ This tracks **Feature Implementation** consisting of multiple **Tasks**.
 ## Tasks
 
 ### Step 1: Add `_is_tool_available()` and shrink `_check_tool_availability()`
-- [ ] Implementation: production code (`server.py`) + tests (`test_tool_availability.py`)
+- [x] Implementation: production code (`server.py`) + tests (`test_tool_availability.py`)
 - [ ] Quality checks: pylint, pytest, mypy — fix all issues
 - [ ] Commit message prepared
 
