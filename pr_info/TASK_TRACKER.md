@@ -21,6 +21,21 @@ This tracks **Feature Implementation** consisting of multiple **Tasks**.
 
 ## Tasks
 
-<!-- Tasks populated from pr_info/steps/ by prepare_task_tracker -->
+### Step 1: Add `_is_tool_available()` and shrink `_check_tool_availability()`
+- [ ] Implementation: production code (`server.py`) + tests (`test_tool_availability.py`)
+- [ ] Quality checks: pylint, pytest, mypy — fix all issues
+- [ ] Commit message prepared
+
+### Step 2: Migrate `checker_tools.py` and `formatter_tools.py` consumers to `_is_tool_available()`
+- [ ] Implementation: production code (`checker_tools.py`, `formatter_tools.py`) + tests (`test_checker_tools.py`, `test_formatter_tools.py`)
+- [ ] Quality checks: pylint, pytest, mypy — fix all issues
+- [ ] Commit message prepared
+
+### Step 3: Update `test_server_params.py` patches
+- [ ] Implementation: test updates (`test_server_params.py`)
+- [ ] Quality checks: pylint, pytest, mypy — fix all issues
+- [ ] Commit message prepared
 
 ## Pull Request
+- [ ] PR review completed
+- [ ] PR summary prepared
