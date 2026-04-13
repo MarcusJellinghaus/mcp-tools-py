@@ -56,9 +56,12 @@ Remove the `logger.debug("Tool environment resolved", ...)` block at the end of 
 ### Tests to update in `TestCheckToolAvailability`:
 
 - `test_all_tools_available`: Expected dict shrinks to 4 eager keys (lint-imports, vulture, ruff, bandit). The 5 subprocess tools are no longer in the dict after init.
-- `test_one_tool_missing`: Only tests eager tools now. Subprocess tool assertions removed.
+  Expected dict: `{"lint-imports": True, "vulture": True, "ruff": True, "bandit": True}`
+- `test_one_tool_missing`: Delete — this test's concept (one subprocess tool fails at init time) no longer applies. The scenario is covered by `test_unavailable_tool_logs_warning` in the new `TestIsToolAvailable` class.
 - `test_all_tools_missing`: Expected dict shrinks to 4 eager keys (all False).
+  Expected dict: `{"lint-imports": False, "vulture": False, "ruff": False, "bandit": False}`
 - `test_timed_out_tool_marked_unavailable`: Expected dict shrinks to 4 eager keys.
+  Expected dict: `{"lint-imports": True, "vulture": True, "ruff": True, "bandit": True}` (timeout only applied to subprocess tools which are gone; eager file-checks aren't affected by subprocess timeouts)
 - `test_black_available`, `test_isort_available`: Remove (these tested subprocess-based checks at init time; now covered by lazy tests).
 - `test_parallel_execution_maps_results_correctly`: Remove (ThreadPoolExecutor is gone).
 
@@ -72,7 +75,7 @@ Remove the `logger.debug("Tool environment resolved", ...)` block at the end of 
 
 ### Tests to update in `TestToolHandlerShortCircuit`:
 
-These tests set `server._tool_availability` as a dict, then call tool handlers. After this step, the tool handlers still use the old `.get()` API (changed in steps 2-3), so these tests remain unchanged in step 1.
+These tests set `server._tool_availability` as a dict, then call tool handlers. After this step, the tool handlers still use the old `.get()` API (changed in step 2), so these tests remain unchanged in step 1.
 
 ## HOW — Integration Points
 

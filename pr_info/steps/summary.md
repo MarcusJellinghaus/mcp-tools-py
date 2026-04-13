@@ -45,6 +45,7 @@ Consumer access:  self._server._is_tool_available("pylint")
 | No thread safety | MCP tool calls are sequential from a single client |
 | Log version string on lazy check | Free diagnostic info since we already run `--version` |
 | Remove startup debug log | Per-tool logging at invocation time replaces it |
+| First `run_format_code` triggers two sequential lazy lookups (~2-4s) | Acceptable one-time cost; cached after first call |
 
 ### Impact on Module Boundaries
 
@@ -69,6 +70,5 @@ No files created. No files deleted.
 | Step | Description | Commit |
 |------|-------------|--------|
 | 1 | `server.py`: Add `_is_tool_available()` method + shrink `_check_tool_availability()` + remove debug log. Update `test_tool_availability.py`. | Tests + implementation for core lazy mechanism |
-| 2 | `checker_tools.py`: Switch 8 consumer sites to `_is_tool_available()`. Update `test_checker_tools.py` mock fixture. | Tests + consumer migration (checkers) |
-| 3 | `formatter_tools.py`: Switch 1 consumer site to `_is_tool_available()`. Update `test_formatter_tools.py` mock fixture. | Tests + consumer migration (formatter) |
-| 4 | `test_server_params.py`: Update patches for new `_check_tool_availability` scope. | Test-only fixes for integration tests |
+| 2 | `checker_tools.py` (8 sites) + `formatter_tools.py` (1 site): Switch all consumer sites to `_is_tool_available()`. Update `test_checker_tools.py` and `test_formatter_tools.py` mock fixtures. | Tests + consumer migration (checkers + formatter) |
+| 3 | `test_server_params.py`: Update patches for new `_check_tool_availability` scope. | Test-only fixes for integration tests |

@@ -1,68 +1,80 @@
-# Step 3: Migrate `formatter_tools.py` Consumer to `_is_tool_available()`
+# Step 3: Update `test_server_params.py` Patches
 
-> **Context**: See `pr_info/steps/summary.md` for context. Step 1 added the method, Step 2 migrated checkers.
+> **Context**: See `pr_info/steps/summary.md` for context. Steps 1-2 completed the production code changes.
 
 ## Goal
 
-Switch the 1 availability check in `formatter_tools.py` from dict access to `_is_tool_available()`. Update the `test_formatter_tools.py` mock fixture.
+Fix `test_server_params.py` which patches `_check_tool_availability` in 4 places. After step 1, `_check_tool_availability` only returns eager tools (lint-imports, vulture, ruff, bandit), but these tests patch it to return `{"pytest": True, "pylint": True, "mypy": True}` and then call tool handlers that now use `_is_tool_available()`.
 
 ## WHERE
 
 | File | Action |
 |------|--------|
-| `src/mcp_tools_py/formatter/formatter_tools.py` | Modify |
-| `tests/test_formatter_tools.py` | Modify |
+| `tests/test_server_params.py` | Modify |
 
-## WHAT — `formatter_tools.py` Changes
+## WHAT — Changes
 
-In `run_format_code`, replace:
+### Strategy
+
+The 4 `patch.object(ToolServer, "_check_tool_availability", ...)` calls need updating. The simplest fix: **keep the patches** (they still prevent real file-existence checks at init), but also **mock `_is_tool_available`** on the server instance after creation so tool handlers don't trigger real subprocesses.
+
+### Specific changes
+
+1. **`mock_server` fixture** and **`test_mcp_tool_decorator_compatibility`**: Both use `patch.object(ToolServer, "_check_tool_availability", return_value={...})`. Update the return value to only contain eager tools (or empty dict). After server creation, add:
+   ```python
+   server._is_tool_available = lambda tool: True
+   ```
+
+2. **`test_run_pytest_check_parameters`**, **`test_run_pylint_check_signature`**: Same pattern — update patched return value and add `_is_tool_available` override on the server instance.
+
+3. **`TestServerPylintMaxIssues`** tests: These create `ToolServer` without patching `_check_tool_availability` at all (they rely on mocked `execute_command`). After step 1, `_check_tool_availability` no longer calls `execute_command`, so these may need `_is_tool_available` mocked if their tool handlers call it. Check each test and add the lambda where needed.
+
+### Pattern for each test
+
 ```python
-if not self._server._tool_availability.get(step, False):
+# Before (current):
+with patch.object(
+    ToolServer,
+    "_check_tool_availability",
+    return_value={"pytest": True, "pylint": True, "mypy": True},
+):
+    server = ToolServer(project_dir=Path("/test/project"))
+
+# After:
+with patch.object(
+    ToolServer,
+    "_check_tool_availability",
+    return_value={},
+):
+    server = ToolServer(project_dir=Path("/test/project"))
+    server._is_tool_available = lambda tool: True
 ```
-with:
-```python
-if not self._server._is_tool_available(step):
-```
-
-This is inside the `for step in resolved_steps:` loop that checks each formatter step (black, isort) before running.
-
-No other changes to `formatter_tools.py`.
-
-## WHAT — `test_formatter_tools.py` Changes
-
-### Update `mock_server` fixture
-
-Add one line:
-```python
-server._is_tool_available = lambda tool: server._tool_availability.get(tool, False)
-```
-
-This preserves all existing test patterns, including `TestToolAvailability.test_tool_unavailable_returns_error` which sets `mock_server._tool_availability = {"isort": True, "black": False}`.
 
 ## DATA
 
-No new data structures. Same `bool` return as before.
+No new data structures. This is a test-only change.
 
 ## HOW — Integration Points
 
-- `formatter_tools.py` already holds `self._server`. Method called on that reference.
-- No new imports.
+- No production code changes in this step.
+- Tests already import `ToolServer` from `mcp_tools_py.server`.
 
 ## LLM Prompt
 
 ```
-Implement Step 3 of issue #158 (migrate formatter_tools consumer).
+Implement Step 3 of issue #158 (fix test_server_params.py).
 See pr_info/steps/summary.md for context and pr_info/steps/step_3.md for detailed spec.
 
-In formatter/formatter_tools.py:
-Replace:
-    if not self._server._tool_availability.get(step, False):
-with:
-    if not self._server._is_tool_available(step):
-
-In test_formatter_tools.py:
-Add one line to the mock_server fixture after the _tool_availability dict:
-    server._is_tool_available = lambda tool: server._tool_availability.get(tool, False)
+In test_server_params.py:
+1. Find all 4 places that patch _check_tool_availability with return values
+   containing subprocess tools (pytest, pylint, mypy). Update return values
+   to empty dict or eager-only tools.
+2. After each server creation, add:
+       server._is_tool_available = lambda tool: True
+   (or assign to _server if that's the variable name).
+3. For TestServerPylintMaxIssues tests that create ToolServer without patching
+   _check_tool_availability: add _is_tool_available override after server creation.
+4. Verify the _get_tool helper and all assertions still work.
 
 Run all three quality checks after changes. All must pass.
 ```
