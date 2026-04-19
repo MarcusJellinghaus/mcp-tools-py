@@ -27,9 +27,9 @@ This tracks **Feature Implementation** consisting of multiple **Tasks**.
 - [x] Commit message prepared
 
 ### Step 2: Add obsidian-wiki and search_reference_files permissions
-- [ ] Implementation: add 11 `mcp__obsidian-wiki__*` permissions and `mcp__workspace__search_reference_files` permission to `.claude/settings.local.json`
-- [ ] Quality checks: pylint, pytest, mypy — fix all issues
-- [ ] Commit message prepared
+- [x] Implementation: add 11 `mcp__obsidian-wiki__*` permissions and `mcp__workspace__search_reference_files` permission to `.claude/settings.local.json`
+- [x] Quality checks: pylint, pytest, mypy — fix all issues
+- [x] Commit message prepared
 
 ## Pull Request
 - [ ] PR review completed
