@@ -21,6 +21,16 @@ This tracks **Feature Implementation** consisting of multiple **Tasks**.
 
 ## Tasks
 
-<!-- Tasks populated from pr_info/steps/ by prepare_task_tracker -->
+### Step 1: Migrate .mcp.json reference-project args to new KV format
+- [ ] Implementation: migrate 4 `--reference-project` values to `name=X,path=Y,url=Z` format and rename `p_coder_utils` → `p_coder-utils`
+- [ ] Quality checks: pylint, pytest, mypy — fix all issues
+- [ ] Commit message prepared
+
+### Step 2: Add obsidian-wiki and search_reference_files permissions
+- [ ] Implementation: add 11 `mcp__obsidian-wiki__*` permissions and `mcp__workspace__search_reference_files` permission to `.claude/settings.local.json`
+- [ ] Quality checks: pylint, pytest, mypy — fix all issues
+- [ ] Commit message prepared
 
 ## Pull Request
+- [ ] PR review completed
+- [ ] PR summary prepared
