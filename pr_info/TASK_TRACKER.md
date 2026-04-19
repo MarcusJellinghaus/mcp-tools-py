@@ -24,9 +24,9 @@ This tracks **Feature Implementation** consisting of multiple **Tasks**.
 ### Step 1: Update settings.local.json — replace bash git permissions with MCP tools
 > [step_1.md](./steps/step_1.md)
 
-- [ ] Implementation: remove 4 Bash git permissions, add 4 MCP tool permissions in `.claude/settings.local.json`
-- [ ] Quality checks: pylint, pytest, mypy — fix all issues
-- [ ] Commit message prepared: `chore: replace bash git permissions with MCP tools in settings`
+- [x] Implementation: remove 4 Bash git permissions, add 4 MCP tool permissions in `.claude/settings.local.json`
+- [x] Quality checks: pylint, pytest, mypy — fix all issues
+- [x] Commit message prepared: `chore: replace bash git permissions with MCP tools in settings`
 
 ### Step 2: Update CLAUDE.md — add MCP git tools to tool mapping and git operations section
 > [step_2.md](./steps/step_2.md)
