@@ -3,7 +3,7 @@ description: Autonomous code review — supervisor delegates to engineer subagen
 disable-model-invocation: true
 allowed-tools:
   - "Bash(gh issue view *)"
-  - "Bash(mcp-coder git-tool *)"
+  - mcp__workspace__git_diff
   - "Bash(mcp-coder check branch-status *)"
   - mcp__workspace__read_file
   - mcp__workspace__save_file

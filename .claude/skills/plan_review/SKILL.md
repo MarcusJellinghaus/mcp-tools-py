@@ -3,7 +3,7 @@ description: Review implementation plan for completeness, simplicity, and risks
 disable-model-invocation: true
 allowed-tools:
   - "Bash(git fetch *)"
-  - "Bash(git status *)"
+  - mcp__workspace__git_status
   - mcp__workspace__read_file
   - mcp__workspace__list_directory
   - Glob
@@ -15,8 +15,8 @@ allowed-tools:
 **First, ensure we're up to date:**
 ```bash
 git fetch
-git status
 ```
+Use `mcp__workspace__git_status` to check working directory status.
 
 Confirm and display the current feature branch name.
 

@@ -38,9 +38,9 @@ This tracks **Feature Implementation** consisting of multiple **Tasks**.
 ### Step 3: Update all 6 skill files — replace bash git with MCP tools
 > [step_3.md](./steps/step_3.md)
 
-- [ ] Implementation: update allowed-tools and body text in `commit_push/SKILL.md`, `implementation_review/SKILL.md`, `implementation_review_supervisor/SKILL.md`, `plan_review/SKILL.md`, `rebase/SKILL.md`, `rebase/rebase_design.md`
-- [ ] Quality checks: pylint, pytest, mypy — fix all issues
-- [ ] Commit message prepared: `chore: replace bash git with MCP tools in skills`
+- [x] Implementation: update allowed-tools and body text in `commit_push/SKILL.md`, `implementation_review/SKILL.md`, `implementation_review_supervisor/SKILL.md`, `plan_review/SKILL.md`, `rebase/SKILL.md`, `rebase/rebase_design.md`
+- [x] Quality checks: pylint, pytest, mypy — fix all issues
+- [x] Commit message prepared: `chore: replace bash git with MCP tools in skills`
 
 ## Pull Request
 
