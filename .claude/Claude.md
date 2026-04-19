@@ -31,6 +31,10 @@ Use MCP tools for **all** operations. Never use `Read`, `Write`, `Edit`, or `Bas
 | Run bandit | `mcp__tools-py__run_bandit_check` |
 | Format code (black+isort) | `mcp__tools-py__run_format_code` |
 | Refactoring | `mcp__tools-py__move_symbol`, `list_symbols`, `find_references` |
+| Git log | `mcp__workspace__git_log` |
+| Git diff | `mcp__workspace__git_diff` |
+| Git status | `mcp__workspace__git_status` |
+| Git merge-base | `mcp__workspace__git_merge_base` |
 
 ## Code quality checks
 
@@ -63,10 +67,19 @@ When debugging test failures, add `"-v", "-s", "--tb=short"` to extra_args.
 
 ## Git operations
 
-**Allowed commands via Bash tool.** These have no MCP equivalent — use Bash directly. Skills that instruct bash commands (e.g. `gh issue view`) must also use Bash.
+**MCP tools (use these for read-only git):**
 
 ```
-git status / diff / commit / log / fetch / ls-tree
+mcp__workspace__git_status
+mcp__workspace__git_diff
+mcp__workspace__git_log
+mcp__workspace__git_merge_base
+```
+
+**Bash-only (no MCP equivalent):**
+
+```
+git commit / git fetch / git show / git ls-tree
 gh issue view / gh pr view / gh run view
 mcp-coder check branch-status
 mcp-coder check file-size --max-lines 750

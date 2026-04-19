@@ -31,9 +31,9 @@ This tracks **Feature Implementation** consisting of multiple **Tasks**.
 ### Step 2: Update CLAUDE.md — add MCP git tools to tool mapping and git operations section
 > [step_2.md](./steps/step_2.md)
 
-- [ ] Implementation: add 4 MCP git tool rows to tool mapping table, restructure git operations section into MCP vs Bash-only
-- [ ] Quality checks: pylint, pytest, mypy — fix all issues
-- [ ] Commit message prepared: `docs: add MCP git tools to CLAUDE.md tool mapping`
+- [x] Implementation: add 4 MCP git tool rows to tool mapping table, restructure git operations section into MCP vs Bash-only
+- [x] Quality checks: pylint, pytest, mypy — fix all issues
+- [x] Commit message prepared: `docs: add MCP git tools to CLAUDE.md tool mapping`
 
 ### Step 3: Update all 6 skill files — replace bash git with MCP tools
 > [step_3.md](./steps/step_3.md)
