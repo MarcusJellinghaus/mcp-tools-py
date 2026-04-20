@@ -3,9 +3,8 @@ description: Code review of implementation with compact diff analysis
 disable-model-invocation: true
 allowed-tools:
   - "Bash(git fetch *)"
-  - "Bash(git status *)"
-  - "Bash(git diff *)"
-  - "Bash(mcp-coder git-tool *)"
+  - mcp__workspace__git_status
+  - mcp__workspace__git_diff
   - "Bash(mcp-coder check branch-status *)"
   - mcp__workspace__read_file
   - mcp__workspace__list_directory
@@ -18,7 +17,9 @@ allowed-tools:
 **First, ensure we're up to date:**
 ```bash
 git fetch
-git status
+```
+Use `mcp__workspace__git_status` to check working directory status.
+```bash
 mcp-coder check branch-status --llm-truncate
 ```
 
@@ -30,10 +31,7 @@ Confirm and display the current feature branch name.
 
 ## Code Review Request
 
-Run this command to get the changes to review:
-```bash
-mcp-coder git-tool compact-diff
-```
+Use `mcp__workspace__git_diff` to get the changes to review.
 
 No need to run all checks; do not use pylint warnings. Feel free to further analyse any mentioned files and/or the file structure.
 
