@@ -13,6 +13,17 @@
       "mcp__tools-py__rename_symbol",
       "mcp__tools-py__move_module",
       "mcp__tools-py__get_library_source",
+      "mcp__obsidian-wiki__add-tags",
+      "mcp__obsidian-wiki__create-directory",
+      "mcp__obsidian-wiki__create-note",
+      "mcp__obsidian-wiki__delete-note",
+      "mcp__obsidian-wiki__edit-note",
+      "mcp__obsidian-wiki__list-available-vaults",
+      "mcp__obsidian-wiki__move-note",
+      "mcp__obsidian-wiki__read-note",
+      "mcp__obsidian-wiki__remove-tags",
+      "mcp__obsidian-wiki__rename-tag",
+      "mcp__obsidian-wiki__search-vault",
       "mcp__workspace__get_reference_projects",
       "mcp__workspace__list_reference_directory",
       "mcp__workspace__read_reference_file",
@@ -59,7 +70,8 @@
       "Skill(plan_update)",
       "Skill(rebase)",
       "WebFetch(domain:*)",
-      "mcp__workspace__search_files"
+      "mcp__workspace__search_files",
+      "mcp__workspace__search_reference_files"
     ]
   },
   "enableAllProjectMcpServers": true,
