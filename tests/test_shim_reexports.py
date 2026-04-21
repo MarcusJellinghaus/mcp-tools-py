@@ -36,3 +36,11 @@ def test_subprocess_runner_reexports():
     )
     assert execute_command is u_ec
     assert CommandResult is u_cr
+
+
+def test_importlinter_config_has_isolation_contract():
+    """Verify the isolation contract is defined in .importlinter."""
+    import pathlib
+
+    config = pathlib.Path(".importlinter").read_text(encoding="utf-8")
+    assert "mcp_coder_utils_isolation" in config
