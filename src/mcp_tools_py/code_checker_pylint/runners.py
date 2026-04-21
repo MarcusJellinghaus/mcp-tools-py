@@ -6,7 +6,7 @@ import logging
 import os
 from typing import List
 
-from mcp_coder_utils.log_utils import log_function_call
+from mcp_tools_py.log_utils import log_function_call
 from mcp_coder_utils.subprocess_runner import (
     check_tool_missing_error,
     execute_command,

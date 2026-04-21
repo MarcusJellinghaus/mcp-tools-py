@@ -7,7 +7,7 @@ import logging
 from collections import defaultdict
 from typing import NamedTuple, Optional
 
-from mcp_coder_utils.log_utils import log_function_call
+from mcp_tools_py.log_utils import log_function_call
 
 from mcp_tools_py.code_checker_pylint.models import (
     PylintMessage,

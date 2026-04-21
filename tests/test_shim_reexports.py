@@ -14,3 +14,15 @@ def test_pytest_utils_read_file(tmp_path):
     from mcp_tools_py.code_checker_pytest.utils import read_file
 
     assert read_file(str(p)) == "hello"
+
+
+def test_log_utils_reexports():
+    from mcp_tools_py.log_utils import OUTPUT, log_function_call, setup_logging
+    from mcp_coder_utils.log_utils import (
+        OUTPUT as u_OUTPUT,
+        log_function_call as u_lfc,
+        setup_logging as u_sl,
+    )
+    assert OUTPUT is u_OUTPUT
+    assert log_function_call is u_lfc
+    assert setup_logging is u_sl

@@ -6,7 +6,7 @@ import sys
 from pathlib import Path
 from typing import Callable, Optional, Protocol, TypeVar
 
-from mcp_coder_utils.log_utils import log_function_call
+from mcp_tools_py.log_utils import log_function_call
 from mcp_coder_utils.subprocess_runner import execute_command
 
 from mcp_tools_py.checker_tools import CheckerTools

@@ -3,7 +3,7 @@
 import time
 from typing import TYPE_CHECKING
 
-from mcp_coder_utils.log_utils import log_function_call
+from mcp_tools_py.log_utils import log_function_call
 
 if TYPE_CHECKING:
     from mcp_tools_py.server import FastMCPProtocol
