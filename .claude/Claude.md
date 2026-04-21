@@ -2,6 +2,22 @@
 
 `mcp-tools-py` is an MCP server exposing Python code-quality tools (pylint, pytest, mypy, ruff, black, isort, vulture, bandit, lint-imports) as structured MCP endpoints.
 
+## Shared libraries
+
+This project depends on `mcp-coder-utils` for subprocess execution, logging, and file I/O.
+
+**Import rule:** never import `mcp_coder_utils` directly. Always use the local shim modules:
+
+| Need | Import from |
+|------|-------------|
+| Logging (`log_function_call`, `setup_logging`, `OUTPUT`) | `mcp_tools_py.log_utils` |
+| Subprocess (`execute_command`, `CommandResult`, etc.) | `mcp_tools_py.utils.subprocess_runner` |
+| File I/O (`read_file`) | `mcp_tools_py.utils.file_utils` |
+
+This is enforced by the `mcp_coder_utils_isolation` contract in `.importlinter`.
+
+**Do not reimplement** functionality that exists in `mcp-coder-utils`. Check the `mcp-coder-utils` reference project before writing new utilities.
+
 ## MCP Tools — mandatory
 
 Use MCP tools for **all** operations. Never use `Read`, `Write`, `Edit`, or `Bash` for tasks that have an MCP equivalent.
