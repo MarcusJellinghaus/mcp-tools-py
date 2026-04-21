@@ -1,6 +1,7 @@
 [importlinter]
 root_package = mcp_tools_py
 root_package_paths = src
+include_external_packages = True
 
 [importlinter:contract:layers]
 name = Layered Architecture
@@ -35,3 +36,15 @@ forbidden_modules =
     mcp_tools_py.inspect_library
     mcp_tools_py.formatter
     mcp_tools_py.server
+
+[importlinter:contract:mcp_coder_utils_isolation]
+name = mcp_coder_utils imports only via shims
+type = forbidden
+source_modules =
+    mcp_tools_py
+forbidden_modules =
+    mcp_coder_utils
+ignore_imports =
+    mcp_tools_py.log_utils -> mcp_coder_utils
+    mcp_tools_py.utils.file_utils -> mcp_coder_utils
+    mcp_tools_py.utils.subprocess_runner -> mcp_coder_utils

@@ -31,6 +31,12 @@ build/
 # Rope project cache
 .ropeproject/
 
+# Grimp cache (import-linter dependency)
+.grimp_cache/
+
+# Import-linter cache
+.import_linter_cache/
+
 # MCP coder session files
 .mcp-coder/
 
