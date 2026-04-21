@@ -21,7 +21,7 @@ from pathlib import Path
 import rope.refactor.move  # pylint: disable=import-error
 import rope.refactor.rename  # pylint: disable=import-error
 from igittigitt import IgnoreParser  # pylint: disable=import-error
-from mcp_coder_utils.subprocess_runner import execute_command
+from mcp_tools_py.utils.subprocess_runner import execute_command
 from rope.base.change import ChangeSet  # pylint: disable=import-error
 from rope.base.project import Project  # pylint: disable=import-error
 

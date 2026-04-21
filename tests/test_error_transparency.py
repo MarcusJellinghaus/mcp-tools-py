@@ -5,7 +5,7 @@ from typing import Any
 from unittest.mock import patch
 
 import pytest
-from mcp_coder_utils.subprocess_runner import (
+from mcp_tools_py.utils.subprocess_runner import (
     MAX_STDERR_IN_ERROR,
     check_tool_missing_error,
     truncate_stderr,

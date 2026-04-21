@@ -26,3 +26,13 @@ def test_log_utils_reexports():
     assert OUTPUT is u_OUTPUT
     assert log_function_call is u_lfc
     assert setup_logging is u_sl
+
+
+def test_subprocess_runner_reexports():
+    from mcp_tools_py.utils.subprocess_runner import execute_command, CommandResult
+    from mcp_coder_utils.subprocess_runner import (
+        execute_command as u_ec,
+        CommandResult as u_cr,
+    )
+    assert execute_command is u_ec
+    assert CommandResult is u_cr

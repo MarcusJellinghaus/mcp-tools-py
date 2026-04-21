@@ -3,7 +3,7 @@
 Invokes black as a subprocess and returns a FormatterResult.
 """
 
-from mcp_coder_utils.subprocess_runner import execute_command
+from mcp_tools_py.utils.subprocess_runner import execute_command
 
 from mcp_tools_py.formatter.models import FormatterResult
 

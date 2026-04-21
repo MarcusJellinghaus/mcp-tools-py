@@ -4,7 +4,7 @@ import logging
 import os
 
 from mcp_tools_py.log_utils import log_function_call
-from mcp_coder_utils.subprocess_runner import (
+from mcp_tools_py.utils.subprocess_runner import (
     check_tool_missing_error,
     execute_command,
     truncate_stderr,

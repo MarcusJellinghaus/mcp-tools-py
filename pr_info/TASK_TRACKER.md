@@ -23,7 +23,7 @@ This tracks **Feature Implementation** consisting of multiple **Tasks**.
 
 - [x] [Step 1](./steps/step_1.md) — Update file_utils shim + swap pytest/utils.py consumer
 - [x] [Step 2](./steps/step_2.md) — Redirect all direct log_utils imports through shim
-- [ ] [Step 3](./steps/step_3.md) — Redirect all direct subprocess_runner imports through shim
+- [x] [Step 3](./steps/step_3.md) — Redirect all direct subprocess_runner imports through shim
 - [ ] [Step 4](./steps/step_4.md) — Add import-linter isolation contract
 - [ ] [Step 5](./steps/step_5.md) — Add "Shared libraries" section to CLAUDE.md
 
