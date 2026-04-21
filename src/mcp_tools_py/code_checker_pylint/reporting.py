@@ -7,14 +7,13 @@ import logging
 from collections import defaultdict
 from typing import NamedTuple, Optional
 
-from mcp_tools_py.log_utils import log_function_call
-
 from mcp_tools_py.code_checker_pylint.models import (
     PylintMessage,
     PylintResult,
 )
 from mcp_tools_py.code_checker_pylint.runners import get_pylint_results
 from mcp_tools_py.code_checker_pylint.utils import normalize_path
+from mcp_tools_py.log_utils import log_function_call
 
 MAX_LOCATIONS_PER_ISSUE = 50
 

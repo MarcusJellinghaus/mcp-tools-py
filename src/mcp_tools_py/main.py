@@ -6,10 +6,8 @@ import sys
 from datetime import datetime
 from pathlib import Path
 
-from mcp_tools_py.log_utils import setup_logging
-
-# Import logging utilities and version
 from mcp_tools_py import __version__  # pylint: disable=no-name-in-module
+from mcp_tools_py.log_utils import setup_logging
 from mcp_tools_py.server import create_server
 
 # Create logger

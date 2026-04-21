@@ -2,9 +2,8 @@
 
 from unittest.mock import MagicMock, patch
 
-from mcp_tools_py.utils.subprocess_runner import CommandResult
-
 from mcp_tools_py.formatter.black_runner import run_black
+from mcp_tools_py.utils.subprocess_runner import CommandResult
 
 
 def _make_result(
