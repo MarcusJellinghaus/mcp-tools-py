@@ -54,6 +54,10 @@ Shims decouple the codebase from the upstream package's module layout. If `mcp_c
 | `src/mcp_tools_py/code_checker_ruff/runners.py` | `log_utils` + `subprocess_runner` import prefix swap |
 | `src/mcp_tools_py/code_checker_bandit/runners.py` | `log_utils` + `subprocess_runner` import prefix swap |
 | `src/mcp_tools_py/code_checker_vulture/runners.py` | `subprocess_runner` import prefix swap |
+| `tests/conftest.py` | `subprocess_runner` import prefix swap |
+| `tests/test_black_runner.py` | `subprocess_runner` import prefix swap |
+| `tests/test_isort_runner.py` | `subprocess_runner` import prefix swap |
+| `tests/test_error_transparency.py` | `subprocess_runner` import prefix swap |
 | `.importlinter` | Add `mcp_coder_utils_isolation` forbidden contract |
 | `.claude/CLAUDE.md` | Add "Shared libraries" section |
 

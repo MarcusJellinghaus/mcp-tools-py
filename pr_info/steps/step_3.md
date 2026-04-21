@@ -4,7 +4,7 @@
 
 ## Goal
 
-Every `from mcp_coder_utils.subprocess_runner import ...` in production code becomes `from mcp_tools_py.utils.subprocess_runner import ...`. The shim (`src/mcp_tools_py/utils/subprocess_runner.py`) already re-exports everything needed.
+Every `from mcp_coder_utils.subprocess_runner import ...` in production and test code becomes `from mcp_tools_py.utils.subprocess_runner import ...`. The shim (`src/mcp_tools_py/utils/subprocess_runner.py`) already re-exports everything needed.
 
 ## Test first
 
@@ -28,7 +28,7 @@ def test_subprocess_runner_reexports():
 ## Implementation
 
 ### WHAT
-Mechanical prefix swap in ~10 files. No logic changes, no signature changes.
+Mechanical prefix swap in ~15 files (11 src + 4 test). No logic changes, no signature changes.
 
 ### Pattern
 ```
@@ -49,6 +49,10 @@ AFTER:  from mcp_tools_py.utils.subprocess_runner import <symbols>
 9. `src/mcp_tools_py/code_checker_ruff/runners.py`
 10. `src/mcp_tools_py/code_checker_bandit/runners.py`
 11. `src/mcp_tools_py/code_checker_vulture/runners.py`
+12. `tests/conftest.py`
+13. `tests/test_black_runner.py`
+14. `tests/test_isort_runner.py`
+15. `tests/test_error_transparency.py`
 
 ### ALGORITHM
 ```
@@ -68,6 +72,7 @@ Run pylint, pytest, mypy — all must pass.
 ```
 Read pr_info/steps/summary.md and pr_info/steps/step_3.md.
 Implement step 3: redirect all direct mcp_coder_utils.subprocess_runner imports
-to go through the mcp_tools_py.utils.subprocess_runner shim. Add the shim identity test.
-This is a mechanical prefix swap — no logic changes. Run all code quality checks after.
+to go through the mcp_tools_py.utils.subprocess_runner shim, including 4 test files.
+Add the shim identity test. This is a mechanical prefix swap — no logic changes.
+Run all code quality checks after.
 ```
