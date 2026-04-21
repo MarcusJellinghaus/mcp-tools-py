@@ -6,7 +6,7 @@ import os
 from typing import List, Optional, Tuple
 
 from mcp_tools_py.code_checker_pytest.models import ErrorContext, SanitizedArgs
-from mcp_tools_py.utils.file_utils import read_file
+from mcp_tools_py.utils.file_utils import read_file as read_file
 
 
 def sanitize_extra_args(
