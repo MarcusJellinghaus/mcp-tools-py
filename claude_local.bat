@@ -55,3 +55,8 @@ echo VIRTUAL_ENV=!VIRTUAL_ENV!
 echo MCP_CODER_PROJECT_DIR=!MCP_CODER_PROJECT_DIR!
 echo MCP_CODER_VENV_DIR=!MCP_CODER_VENV_DIR!
 C:\Users\%USERNAME%\.local\bin\claude.exe %*
+
+REM Reset terminal state after Claude exits (workaround for dirty terminal bug)
+REM See https://github.com/anthropics/claude-code/issues/38761
+for /f %%a in ('echo prompt $E ^| cmd') do set "ESC=%%a"
+<nul set /p="!ESC![?2004l!ESC![?1l!ESC![?25h!ESC![J"
