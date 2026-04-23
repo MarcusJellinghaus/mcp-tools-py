@@ -2,9 +2,7 @@
 description: Rebase feature branch onto base branch with conflict resolution
 disable-model-invocation: true
 allowed-tools:
-  - mcp__workspace__git_status
-  - mcp__workspace__git_log
-  - mcp__workspace__git_diff
+  - mcp__workspace__git
   - "Bash(git branch *)"
   - "Bash(git ls-files *)"
   - "Bash(git fetch *)"
@@ -38,7 +36,7 @@ allowed-tools:
   - mcp__workspace__move_file
 ---
 
-!`mcp__workspace__git_status`
+!`mcp__workspace__git status`
 
 # Rebase Branch onto Base Branch
 
