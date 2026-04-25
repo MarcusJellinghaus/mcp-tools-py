@@ -16,9 +16,7 @@ These are the additional git permissions needed specifically for rebase operatio
 
 ```
 # Status and investigation (MCP tools)
-# mcp__workspace__git_status
-# mcp__workspace__git_log
-# mcp__workspace__git_diff
+# mcp__workspace__git (unified tool for status, log, diff)
 Bash(git branch:*)
 Bash(git ls-files:*)
 
