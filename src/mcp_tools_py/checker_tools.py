@@ -21,6 +21,7 @@ from mcp_tools_py.code_checker_ruff.runners import (
     run_ruff_check_impl,
     run_ruff_fix_impl,
 )
+from mcp_tools_py.code_checker_tach import run_tach_check as run_tach
 from mcp_tools_py.code_checker_vulture import run_vulture_check as run_vulture
 from mcp_tools_py.log_utils import log_function_call
 from mcp_tools_py.utils.project_config import resolve_target_directories
@@ -48,7 +49,7 @@ def _strip_lint_imports_header(raw: str) -> str:
 
 
 class CheckerTools:
-    """Registers pylint, pytest, mypy, lint-imports, vulture, ruff, and bandit checker tools on an MCP server."""
+    """Registers pylint, pytest, mypy, lint-imports, vulture, ruff check, ruff fix, bandit, and tach checker tools on an MCP server."""
 
     def __init__(self, server: "ToolServer") -> None:
         self._server = server
@@ -63,6 +64,7 @@ class CheckerTools:
         self._register_ruff_check(mcp)
         self._register_ruff_fix(mcp)
         self._register_bandit(mcp)
+        self._register_tach(mcp)
 
     def _register_pylint(self, mcp: "FastMCPProtocol") -> None:
         """Register the pylint checker tool."""
@@ -767,6 +769,54 @@ class CheckerTools:
                 error_msg = f"Unexpected error running bandit: {type(e).__name__}: {e}"
                 logger.error(
                     "bandit check failed",
+                    extra={
+                        "error": str(e),
+                        "error_type": type(e).__name__,
+                        "project_dir": str(self._server.project_dir),
+                    },
+                )
+                return error_msg
+
+    def _register_tach(self, mcp: "FastMCPProtocol") -> None:
+        """Register the tach architecture boundary checker tool."""
+
+        @mcp.tool()
+        @log_function_call
+        def run_tach_check() -> str:
+            """Run tach check on the project to validate architectural boundaries.
+
+            Returns:
+                Status line followed by raw JSON output from `tach check --output json`.
+            """
+            if not self._server._is_tool_available("tach"):
+                binary_path = self._server._tach_binary or "N/A"
+                return (
+                    f"tach is not available at {binary_path}. "
+                    f"Ensure the virtual environment has tach installed "
+                    f"and --venv-path is configured. Restart the server after installing."
+                )
+
+            try:
+                logger.info(
+                    "Starting tach check",
+                    extra={"project_dir": str(self._server.project_dir)},
+                )
+                binary = self._server._tach_binary
+                assert binary is not None  # guarded by availability check above
+                output = run_tach(
+                    tach_binary=binary,
+                    project_dir=str(self._server.project_dir),
+                )
+                logger.info(
+                    "tach check completed",
+                    extra={"output_length": len(output)},
+                )
+                return output
+
+            except Exception as e:
+                error_msg = f"Unexpected error running tach: {type(e).__name__}: {e}"
+                logger.error(
+                    "tach check failed",
                     extra={
                         "error": str(e),
                         "error_type": type(e).__name__,
