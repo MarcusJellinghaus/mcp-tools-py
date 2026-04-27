@@ -66,6 +66,14 @@ depends_on = [
 ]
 
 [[modules]]
+path = "mcp_tools_py.code_checker_tach"
+layer = "tool_implementation"
+depends_on = [
+    { path = "mcp_tools_py.utils" },
+    { path = "mcp_tools_py.log_utils" }
+]
+
+[[modules]]
 path = "mcp_tools_py.checker_tools"
 layer = "tool_implementation"
 depends_on = [
@@ -75,6 +83,7 @@ depends_on = [
     { path = "mcp_tools_py.code_checker_vulture" },
     { path = "mcp_tools_py.code_checker_ruff" },
     { path = "mcp_tools_py.code_checker_bandit" },
+    { path = "mcp_tools_py.code_checker_tach" },
     { path = "mcp_tools_py.utils" },
     { path = "mcp_tools_py.log_utils" }
 ]

@@ -31,10 +31,12 @@ def mock_server() -> MagicMock:
         "vulture": True,
         "ruff": True,
         "bandit": True,
+        "tach": True,
     }
     server._vulture_binary = "/mock/venv/bin/vulture"
     server._ruff_binary = "/mock/venv/bin/ruff"
     server._bandit_binary = "/mock/venv/bin/bandit"
+    server._tach_binary = "/mock/venv/bin/tach"
     server.vulture_whitelist = "vulture_whitelist.py"
     server._is_tool_available = lambda tool: server._tool_availability.get(tool, False)
     return server
@@ -49,8 +51,8 @@ def checker_tools(mock_server: MagicMock) -> CheckerTools:
 # --- Registration tests ---
 
 
-def test_checker_tools_registers_eight_tools(mock_server: MagicMock) -> None:
-    """Test that CheckerTools.register() registers exactly 8 tools on an MCP server."""
+def test_checker_tools_registers_nine_tools(mock_server: MagicMock) -> None:
+    """Test that CheckerTools.register() registers exactly 9 tools on an MCP server."""
     mock_mcp = MagicMock()
     mock_decorator = MagicMock(side_effect=lambda fn: fn)
     mock_mcp.tool.return_value = mock_decorator
@@ -58,10 +60,10 @@ def test_checker_tools_registers_eight_tools(mock_server: MagicMock) -> None:
     checker = CheckerTools(mock_server)
     checker.register(mock_mcp)
 
-    # 8 tools: run_pylint_check, run_pytest_check, run_mypy_check,
+    # 9 tools: run_pylint_check, run_pytest_check, run_mypy_check,
     # run_lint_imports_check, run_vulture_check, run_ruff_check, run_ruff_fix,
-    # run_bandit_check
-    assert mock_mcp.tool.call_count == 8
+    # run_bandit_check, run_tach_check
+    assert mock_mcp.tool.call_count == 9
 
 
 # --- Pylint formatting tests ---
@@ -563,3 +565,31 @@ def test_ruff_fix_resolution_error_returns_message(mock_server: MagicMock) -> No
         result = run_ruff_fix()
 
     assert "Error resolving target directories" in result
+
+
+# --- Tach handler tests ---
+
+
+def test_tach_unavailable_returns_error(mock_server: MagicMock) -> None:
+    """When tach is not available, return an error message."""
+    mock_server._tool_availability["tach"] = False
+    run_tach_check = _capture_tool(mock_server, "run_tach_check")
+    result = run_tach_check()
+    assert "tach is not available" in result
+
+
+def test_tach_success_returns_raw_output(mock_server: MagicMock) -> None:
+    """When tach succeeds, return the runner's output."""
+    run_tach_check = _capture_tool(mock_server, "run_tach_check")
+
+    with patch(
+        "mcp_tools_py.checker_tools.run_tach",
+        return_value="tach check passed (no output).",
+    ) as mock_runner:
+        result = run_tach_check()
+
+    assert result == "tach check passed (no output)."
+    mock_runner.assert_called_once_with(
+        tach_binary="/mock/venv/bin/tach",
+        project_dir=str(Path("/fake/project")),
+    )
