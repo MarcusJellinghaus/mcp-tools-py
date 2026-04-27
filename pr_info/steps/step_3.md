@@ -6,8 +6,9 @@
 ## WHERE
 
 Modify:
-- `src/mcp_tools_py/checker_tools.py` — import `run_tach_check`, add `_register_tach()` method, call from `register()`.
+- `src/mcp_tools_py/checker_tools.py` — import `run_tach_check`, add `_register_tach()` method, call from `register()`, update class docstring.
 - `tach.toml` — add new `[[modules]]` entry and update `mcp_tools_py.checker_tools.depends_on`.
+- `tests/test_checker_tools.py` — add tach to `mock_server` fixture, update registration count test, add tach handler tests.
 
 ## WHAT
 
@@ -84,7 +85,7 @@ def run_tach_check() -> str:
 - Pattern mirrors `_register_lint_imports` and `_register_vulture`.
 - Zero parameters on the tool (issue requirement).
 - `register()` adds `self._register_tach(mcp)` after `self._register_bandit(mcp)`.
-- Update class docstring of `CheckerTools` to mention tach.
+- The `CheckerTools` class docstring (around line 49 of `src/mcp_tools_py/checker_tools.py`) currently reads `"Registers pylint, pytest, mypy, lint-imports, vulture, ruff, and bandit checker tools on an MCP server."` — it omits the ruff fix variant and is becoming stale. Replace it with one that lists all 9 tools accurately, e.g.: `"Registers pylint, pytest, mypy, lint-imports, vulture, ruff check, ruff fix, bandit, and tach checker tools on an MCP server."`
 
 ## ALGORITHM
 
@@ -103,13 +104,23 @@ return output  # error message on exception, output otherwise
 
 ## Tests
 
-No new unit tests required: runner is covered in step 1, availability is covered in step 2. Existing `test_checker_tools.py` and `test_tool_availability.py` will continue to pass.
+Update `tests/test_checker_tools.py`:
+
+1. **Registration count test** — `test_checker_tools_registers_eight_tools` currently asserts `mock_mcp.tool.call_count == 8`. With tach added, this becomes 9. Update the assertion AND rename the test (e.g., `test_checker_tools_registers_nine_tools`). Also update the in-test comment listing the registered tools.
+
+2. **`mock_server` fixture** — add `"tach": True` to the `_tool_availability` dict and `server._tach_binary = "/mock/venv/bin/tach"` (mirroring the existing `_vulture_binary` style).
+
+3. **Handler tests** — add two tests mirroring `test_vulture_unavailable_returns_error` and `test_vulture_success_returns_raw_output`:
+   - `test_tach_unavailable_returns_error` — set `mock_server._tool_availability["tach"] = False`; capture `run_tach_check`; assert returned string contains `"tach is not available"`.
+   - `test_tach_success_returns_raw_output` — patch `mcp_tools_py.checker_tools.run_tach` (the alias used in the import) to return a fake string; invoke the captured tool; assert the patched runner was called with the expected `tach_binary` and `project_dir` kwargs and the return value matches.
+
+(No changes to `test_tool_availability.py` beyond what step 2 already covers.)
 
 (Optional sanity check: verify `tach check` on the project itself succeeds after the `tach.toml` update — done outside test suite via `tools/tach_check.sh`.)
 
 ## Acceptance
 
-- `run_pytest_check` (fast unit run) — all pass.
+- `run_pytest_check` (fast unit run) — all pass, including the updated `tests/test_checker_tools.py` (renamed registration count test + new tach handler tests).
 - `run_pylint_check`, `run_mypy_check` — clean.
 - `tach check` on the project — passes with the new module declared and listed in `checker_tools.depends_on`.
-- One commit: tach.toml + checker_tools.py.
+- One commit: tach.toml + checker_tools.py + test_checker_tools.py.

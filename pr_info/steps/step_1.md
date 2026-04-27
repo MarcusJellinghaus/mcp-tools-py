@@ -21,9 +21,14 @@ def run_tach_check(tach_binary: str, project_dir: str) -> str:
 
 ```python
 # src/mcp_tools_py/code_checker_tach/__init__.py
+"""Code checker package for running tach architecture boundary checks."""
+
 from mcp_tools_py.code_checker_tach.runners import run_tach_check
+
 __all__ = ["run_tach_check"]
 ```
+
+(Module docstring mirrors `src/mcp_tools_py/code_checker_vulture/__init__.py`'s pattern.)
 
 ## HOW
 
@@ -39,7 +44,8 @@ result = execute_command(command, cwd=project_dir)
 output = result.stdout
 if result.stderr:
     output = output + "\n" + result.stderr if output else result.stderr
-return f"tach check completed:\n{output.strip()}" if output.strip() else "tach check passed (no output)."
+stripped = output.strip()
+return f"tach check completed:\n{stripped}" if stripped else "tach check passed (no output)."
 ```
 
 ## DATA
@@ -62,6 +68,6 @@ Use `MODULE_PATH = "mcp_tools_py.code_checker_tach.runners"` and `@patch(f"{MODU
 
 ## Acceptance
 
-- `mcp__tools-py__run_pytest_check(extra_args=["-n", "auto", "-m", "not git_integration and not claude_cli_integration and not claude_api_integration and not formatter_integration and not github_integration and not langchain_integration"])` — all pass.
+- `mcp__tools-py__run_pytest_check(extra_args=["-n", "auto", "-m", "not integration"])` — all pass.
 - `run_pylint_check`, `run_mypy_check` — clean.
 - One commit: tests + implementation.

@@ -34,6 +34,7 @@ No public API changes outside the new MCP tool. No new dependencies (tach alread
 - `tach.toml` — add `[[modules]]` entry for `mcp_tools_py.code_checker_tach`; add to `mcp_tools_py.checker_tools.depends_on`
 - `.importlinter` — add `code_checker_tach` AND `code_checker_vulture` to layers contract and forbidden-imports contract
 - `tests/test_tool_availability.py` — extend exact-equality dicts with `"tach"` key in `test_all_tools_available` / `test_all_tools_missing`
+- `tests/test_checker_tools.py` — add tach to fixture, update registration count, add tach handler tests
 
 ## Implementation Steps
 

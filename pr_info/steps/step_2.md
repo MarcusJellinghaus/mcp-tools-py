@@ -68,8 +68,7 @@ In `tests/test_tool_availability.py`:
    }
    ```
 2. `TestCheckToolAvailability.test_all_tools_missing` — extend with `"tach": False`.
-
-No new test cases added (per simplification: keep `test_runners.py` as the actual coverage for tach behavior).
+3. Existing per-tool "binary missing" tests (e.g., `test_lint_imports_unavailable_when_binary_missing`, `test_vulture_unavailable_when_no_venv` and the lint-imports/vulture sibling cases around lines 176-220 of `tests/test_tool_availability.py`) should be extended so their assertions also verify `server._tool_availability["tach"] is False` and `server._tach_binary is None` where appropriate. This extends existing tests rather than adding new ones.
 
 ## Acceptance
 
