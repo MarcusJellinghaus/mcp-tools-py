@@ -128,6 +128,7 @@ class TestCheckToolAvailability:
                 "vulture": True,
                 "ruff": True,
                 "bandit": True,
+                "tach": True,
             }
 
     def test_all_tools_missing(self) -> None:
@@ -142,6 +143,7 @@ class TestCheckToolAvailability:
                 "vulture": False,
                 "ruff": False,
                 "bandit": False,
+                "tach": False,
             }
 
     def test_lint_imports_available_when_binary_exists(self) -> None:
@@ -172,6 +174,8 @@ class TestCheckToolAvailability:
             assert server._tool_availability["lint-imports"] is False
             assert server._lint_imports_binary is None
             assert server._tool_availability["vulture"] is False
+            assert server._tool_availability["tach"] is False
+            assert server._tach_binary is None
 
     def test_lint_imports_unavailable_when_binary_missing(self) -> None:
         """When venv_path is set but binary doesn't exist, mark unavailable."""
@@ -199,6 +203,8 @@ class TestCheckToolAvailability:
             assert server._lint_imports_binary is None
             assert server._tool_availability["vulture"] is False
             assert server._vulture_binary is None
+            assert server._tool_availability["tach"] is False
+            assert server._tach_binary is None
 
     def test_vulture_available_when_binary_exists(self) -> None:
         """When venv_path is set and vulture binary exists, mark available."""
@@ -226,6 +232,8 @@ class TestCheckToolAvailability:
 
             assert server._tool_availability["vulture"] is False
             assert server._vulture_binary is None
+            assert server._tool_availability["tach"] is False
+            assert server._tach_binary is None
 
 
 # ---------------------------------------------------------------------------

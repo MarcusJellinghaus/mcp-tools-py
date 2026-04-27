@@ -171,6 +171,23 @@ class ToolServer:
                 "an environment where bandit is installed."
             )
 
+        # tach: check via file existence (not subprocess)
+        tach_available = False
+        tach_binary: Optional[str] = None
+        if self.venv_path:
+            if os.name == "nt":
+                tach_binary = os.path.join(self.venv_path, "Scripts", "tach.exe")
+            else:
+                tach_binary = os.path.join(self.venv_path, "bin", "tach")
+            tach_available = os.path.exists(tach_binary)
+        self._tach_binary: Optional[str] = tach_binary if tach_available else None
+        availability["tach"] = tach_available
+        if not tach_available:
+            logger.warning(
+                "tach not found. Ensure --venv-path points to "
+                "an environment where tach is installed."
+            )
+
         return availability
 
     def _is_tool_available(self, tool_name: str) -> bool:
