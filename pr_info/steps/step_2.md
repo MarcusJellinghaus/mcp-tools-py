@@ -45,7 +45,7 @@ N/A.
 3. Mandatory MCP checks per CLAUDE.md (no Python files were touched, so these should be no-ops, but run them anyway for compliance):
    ```
    mcp__tools-py__run_pylint_check
-   mcp__tools-py__run_pytest_check    (with fast-unit-test marker exclusion)
+   mcp__tools-py__run_pytest_check    (extra_args=["-n", "auto", "-m", "not integration"])
    mcp__tools-py__run_mypy_check
    ```
 
@@ -58,7 +58,7 @@ The actual CI-side validation (workflow parses, action versions resolve) only ha
 > In `.github/workflows/ci.yml`, in **both** the `test` job and the `architecture` job, make these three replacements (so 6 total edits):
 > - `astral-sh/setup-uv@v5` → `astral-sh/setup-uv@v8`
 > - `actions/setup-python@v5` → `actions/setup-python@v6`
-> - `python-version: 3.11` → `python-version: "3.11"`
+> - `python-version: 3.11` → `python-version: "3.11"` (both occurrences in `ci.yml`)
 >
 > In `.github/workflows/publish.yml`, in the `build` job, replace:
 > - `actions/setup-python@v5` → `actions/setup-python@v6`

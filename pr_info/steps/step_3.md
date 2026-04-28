@@ -66,7 +66,7 @@ N/A — declarative workflow.
 2. Mandatory MCP checks per CLAUDE.md (no-op for non-Python files but required):
    ```
    mcp__tools-py__run_pylint_check
-   mcp__tools-py__run_pytest_check    (with fast-unit-test marker exclusion)
+   mcp__tools-py__run_pytest_check    (extra_args=["-n", "auto", "-m", "not integration"])
    mcp__tools-py__run_mypy_check
    ```
 3. Real verification (post-merge, by user — listed in acceptance criteria, not part of this step's commit):

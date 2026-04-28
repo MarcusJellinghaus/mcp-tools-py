@@ -38,7 +38,7 @@ Run all three mandatory MCP checks per CLAUDE.md after editing:
 
 ```
 mcp__tools-py__run_pylint_check
-mcp__tools-py__run_pytest_check    (extra_args ["-n", "auto", "-m", "not git_integration and not claude_cli_integration and not claude_api_integration and not formatter_integration and not github_integration and not langchain_integration"])
+mcp__tools-py__run_pytest_check    (extra_args=["-n", "auto", "-m", "not integration"])
 mcp__tools-py__run_mypy_check
 ```
 
@@ -54,6 +54,6 @@ Expected: all green. Mypy is the meaningful signal here — the bump from `>=1.9
 >
 > Do not touch any other line. Do not modify `src/` or `tests/`.
 >
-> After editing, run all three MCP code-quality checks (`run_pylint_check`, `run_pytest_check` with the standard fast-unit-test marker exclusion, `run_mypy_check`). All must pass. If mypy surfaces new strict-mode regressions caused by the version bump, fix them in this same step. Do not proceed if any check fails.
+> After editing, run all three MCP code-quality checks (`run_pylint_check`, `run_pytest_check` with `extra_args=["-n", "auto", "-m", "not integration"]`, `run_mypy_check`). All must pass. If mypy surfaces new strict-mode regressions caused by the version bump, fix them in this same step. Do not proceed if any check fails.
 >
 > Commit message: `Bump mypy floor to 1.13.0 and add [typecheck] extra (#182)`.
