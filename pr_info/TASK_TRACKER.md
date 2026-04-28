@@ -31,9 +31,9 @@ Detail: [step_1.md](./steps/step_1.md)
 ### Step 2: Bump action versions in existing workflows (`ci.yml`, `publish.yml`)
 Detail: [step_2.md](./steps/step_2.md)
 
-- [ ] Implementation (tests + production code)
-- [ ] Quality checks: pylint, pytest, mypy — fix all issues
-- [ ] Commit message prepared
+- [x] Implementation (tests + production code)
+- [x] Quality checks: pylint, pytest, mypy — fix all issues
+- [x] Commit message prepared
 
 ### Step 3: Create `.github/workflows/notify-downstream.yml`
 Detail: [step_3.md](./steps/step_3.md)
