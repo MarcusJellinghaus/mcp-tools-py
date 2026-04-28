@@ -36,9 +36,9 @@ allowed-tools:
   - mcp__workspace__move_file
 ---
 
-!`mcp__workspace__git status`
-
 # Rebase Branch onto Base Branch
+
+Before starting, call the `mcp__workspace__git` MCP tool with `command="status"` to capture the current working-tree state.
 
 Rebase the current feature branch onto its base branch and resolve conflicts.
 
