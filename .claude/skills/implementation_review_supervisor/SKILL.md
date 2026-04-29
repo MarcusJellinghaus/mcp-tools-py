@@ -2,7 +2,7 @@
 description: Autonomous code review — supervisor delegates to engineer subagents with knowledge base
 disable-model-invocation: true
 allowed-tools:
-  - "Bash(gh issue view *)"
+  - mcp__workspace__github_issue_view
   - mcp__workspace__git
   - mcp__workspace__check_branch_status
   - mcp__workspace__read_file
@@ -20,7 +20,7 @@ You are a technical lead supervising a software engineer (subagent). You do not 
 
 **Setup:**
 
-1. Read the GitHub issue (`gh issue view` using the branch name), `pr_info/steps/summary.md`, and `pr_info/steps/Decisions.md` (if it exists) to understand requirements and design decisions.
+1. Read the GitHub issue (call `mcp__workspace__github_issue_view` with the issue number from the branch name), `pr_info/steps/summary.md`, and `pr_info/steps/Decisions.md` (if it exists) to understand requirements and design decisions.
 2. Read the knowledge base files:
    - `.claude/knowledge_base/software_engineering_principles.md`
    - `.claude/knowledge_base/python.md`

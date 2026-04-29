@@ -18,7 +18,7 @@ allowed-tools:
   - "Bash(git push --force-with-lease *)"
   - "Bash(git rev-parse *)"
   - "Bash(gh run view *)"
-  - "Bash(gh issue view *)"
+  - mcp__workspace__github_issue_view
   - mcp__tools-py__run_format_code
   - mcp__workspace__get_base_branch
   - mcp__tools-py__run_pylint_check
