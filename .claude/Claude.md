@@ -20,7 +20,7 @@ This is enforced by the `mcp_coder_utils_isolation` contract in `.importlinter`.
 
 ## MCP Tools — mandatory
 
-Use MCP tools for **all** operations. Never use `Read`, `Write`, `Edit`, or `Bash` for tasks that have an MCP equivalent.
+Use MCP tools for **all** operations. Never use `Read`, `Write`, `Edit`, `Glob`, `Grep`, or `Bash` for tasks that have an MCP equivalent.
 
 ### Tool mapping
 
@@ -47,10 +47,12 @@ Use MCP tools for **all** operations. Never use `Read`, `Write`, `Edit`, or `Bas
 | Run bandit | `mcp__tools-py__run_bandit_check` |
 | Format code (black+isort) | `mcp__tools-py__run_format_code` |
 | Refactoring | `mcp__tools-py__move_symbol`, `list_symbols`, `find_references` |
-| Git log | `mcp__workspace__git_log` |
-| Git diff | `mcp__workspace__git_diff` |
-| Git status | `mcp__workspace__git_status` |
-| Git merge-base | `mcp__workspace__git_merge_base` |
+| Git (status, log, diff, fetch, etc.) | `mcp__workspace__git` |
+| Get base branch | `mcp__workspace__get_base_branch` |
+| View GitHub issue | `mcp__workspace__github_issue_view` |
+| List GitHub issues | `mcp__workspace__github_issue_list` |
+| View GitHub PR | `mcp__workspace__github_pr_view` |
+| Search GitHub | `mcp__workspace__github_search` |
 
 ## Code quality checks
 
@@ -83,21 +85,22 @@ When debugging test failures, add `"-v", "-s", "--tb=short"` to extra_args.
 
 ## Git operations
 
-**MCP tools (use these for read-only git):**
+**MCP tools (use these for read-only git and GitHub queries):**
 
 ```
-mcp__workspace__git_status
-mcp__workspace__git_diff
-mcp__workspace__git_log
-mcp__workspace__git_merge_base
+mcp__workspace__git           (status, log, diff, fetch, show, merge_base, ls_files, ls_remote, etc.)
+mcp__workspace__github_issue_view
+mcp__workspace__github_issue_list
+mcp__workspace__github_pr_view
+mcp__workspace__github_search
+mcp__workspace__check_branch_status
 ```
 
 **Bash-only (no MCP equivalent):**
 
 ```
-git commit / git fetch / git show / git ls-tree
-gh issue view / gh pr view / gh run view
-mcp-coder check branch-status
+git commit / git checkout / git rebase / git push
+gh run view
 mcp-coder check file-size --max-lines 750
 ```
 
