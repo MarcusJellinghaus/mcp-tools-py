@@ -12,6 +12,8 @@ allowed-tools:
   - mcp__tools-py__run_pylint_check
   - mcp__tools-py__run_pytest_check
   - mcp__tools-py__run_mypy_check
+  - mcp__tools-py__run_vulture_check
+  - mcp__tools-py__run_lint_imports_check
 ---
 
 # Automated Implementation Review (Code Review) / using a supervisor agent
@@ -55,10 +57,11 @@ You are a technical lead supervising a software engineer (subagent). You do not 
 5. Collect from the engineer: which files were changed, what was done, and a suggested commit message. Then launch the **commit agent** with this context. The commit agent should verify only the expected files are modified before committing.
 6. Launch the engineer → `/check_branch_status`
 7. **LOOP: If any code was changed this round, you MUST launch a fresh engineer subagent and repeat from step 1.** Only proceed to step 8 when a round produces zero code changes. Do NOT stop or wait for user input between rounds — the loop is automatic.
-8. Add a `## Final Status` section to the log. Commit and push the log via the **commit agent**.
-9. Launch the engineer → `/check_branch_status` to verify CI, rebase need, and overall readiness. Include the result in the completion message.
-10. Perform any PR-section tasks this skill covers — typically `PR review` or `Code review`. Once done, tick them in `pr_info/TASK_TRACKER.md` and commit via the **commit agent** (separate commit from the log). Leave unrelated tasks like `PR summary` alone.
-11. Notify the user with a short completion message: rounds run, commits produced, whether any issues remain, and branch status (CI, rebase needed).
+8. Run `run_vulture_check` and `run_lint_imports_check` yourself. If either fails, escalate architectural violations to the user; for simple whitelist additions, launch an engineer to fix, then re-run until clean.
+9. Add a `## Final Status` section to the log. Commit and push the log via the **commit agent**.
+10. Launch the engineer → `/check_branch_status` to verify CI, rebase need, and overall readiness. Include the result in the completion message.
+11. Perform any PR-section tasks this skill covers — typically `PR review` or `Code review`. Once done, tick them in `pr_info/TASK_TRACKER.md` and commit via the **commit agent** (separate commit from the log). Leave unrelated tasks like `PR summary` alone.
+12. Notify the user with a short completion message: rounds run, commits produced, whether any issues remain, and branch status (CI, rebase needed).
 
 **Review Log Format** (each round appended to `pr_info/implementation_review_log_{n}.md`):
 
@@ -72,4 +75,4 @@ You are a technical lead supervising a software engineer (subagent). You do not 
 
 **Subagent instructions:** When launching subagents, instruct them to follow CLAUDE.md — especially the MCP tool requirements (use `mcp__workspace__*` tools, not native file tools). Also remind them: no `cd` prefix, approved commands only.
 
-**Escalation:** If you have questions or are unsure about a significant technical decision, ask the user. For borderline Accept/Skip findings, default to better code quality rather than asking — only escalate when the fix has meaningful scope or risk, not for trivial changes in either direction.
+**Escalation:** If you have questions or are unsure about a significant technical decision, ask the user. For borderline Accept/Skip findings, default to better code quality rather than asking — only escalate when the fix has meaningful scope or risk, not for trivial changes in either direction. Import contract or architecture violations (from `run_lint_imports_check`): escalate to the user — fixes may require moving code between layers.

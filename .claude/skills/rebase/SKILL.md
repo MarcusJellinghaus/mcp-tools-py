@@ -61,7 +61,7 @@ If the base branch is not `main` or `master`, ask the user to confirm before pro
 
 ## Workflow
 
-1. `git fetch origin`
+1. Call `mcp__workspace__git` with command `"fetch"` and args `["origin"]`
 2. `git rebase origin/${BASE_BRANCH}`
 3. For each conflict:
    - If file is under `pr_info/`: auto-resolve with `git checkout --theirs <file>` (keep feature branch version), then `git add <file>` — no user input needed
