@@ -20,7 +20,7 @@ This is enforced by the `mcp_coder_utils_isolation` contract in `.importlinter`.
 
 ## MCP Tools — mandatory
 
-Use MCP tools for **all** operations. Never use `Read`, `Write`, `Edit`, or `Bash` for tasks that have an MCP equivalent.
+**Do NOT use native Claude Code file tools** (`Read`, `Write`, `Edit`, `Glob`, `Grep`, `Bash`) for any operation that has an MCP equivalent. Always use the `mcp__workspace__*` tools instead. This applies to all file reading, writing, editing, searching, listing, and git operations. If no MCP equivalent exists, use Bash. Check the tool mapping table below first.
 
 ### Tool mapping
 
@@ -37,6 +37,10 @@ Use MCP tools for **all** operations. Never use `Read`, `Write`, `Edit`, or `Bas
 | Read reference project | `mcp__workspace__read_reference_file` |
 | List reference dir | `mcp__workspace__list_reference_directory` |
 | Get reference projects | `mcp__workspace__get_reference_projects` |
+| Search reference files | `mcp__workspace__search_reference_files` |
+| Check file size | `mcp__workspace__check_file_size` |
+| Check branch status | `mcp__workspace__check_branch_status` |
+| Get base branch | `mcp__workspace__get_base_branch` |
 | Run pytest | `mcp__tools-py__run_pytest_check` |
 | Run pylint | `mcp__tools-py__run_pylint_check` |
 | Run mypy | `mcp__tools-py__run_mypy_check` |
@@ -46,11 +50,13 @@ Use MCP tools for **all** operations. Never use `Read`, `Write`, `Edit`, or `Bas
 | Run ruff fix | `mcp__tools-py__run_ruff_fix` |
 | Run bandit | `mcp__tools-py__run_bandit_check` |
 | Format code (black+isort) | `mcp__tools-py__run_format_code` |
-| Refactoring | `mcp__tools-py__move_symbol`, `list_symbols`, `find_references` |
-| Git log | `mcp__workspace__git_log` |
-| Git diff | `mcp__workspace__git_diff` |
-| Git status | `mcp__workspace__git_status` |
-| Git merge-base | `mcp__workspace__git_merge_base` |
+| Get library source | `mcp__tools-py__get_library_source` |
+| Refactoring | `mcp__tools-py__move_symbol`, `move_module`, `rename_symbol`, `list_symbols`, `find_references` |
+| Git (status, log, diff, fetch, etc.) | `mcp__workspace__git` |
+| `gh issue view` | `mcp__workspace__github_issue_view` |
+| `gh issue list` | `mcp__workspace__github_issue_list` |
+| `gh pr view` | `mcp__workspace__github_pr_view` |
+| `gh search` | `mcp__workspace__github_search` |
 
 ## Code quality checks
 
@@ -83,21 +89,22 @@ When debugging test failures, add `"-v", "-s", "--tb=short"` to extra_args.
 
 ## Git operations
 
-**MCP tools (use these for read-only git):**
+**MCP tools (use these for read-only git and GitHub queries):**
 
 ```
-mcp__workspace__git_status
-mcp__workspace__git_diff
-mcp__workspace__git_log
-mcp__workspace__git_merge_base
+mcp__workspace__git           (status, log, diff, fetch, show, merge_base, ls_files, ls_remote, etc.)
+mcp__workspace__github_issue_view
+mcp__workspace__github_issue_list
+mcp__workspace__github_pr_view
+mcp__workspace__github_search
+mcp__workspace__check_branch_status
 ```
 
 **Bash-only (no MCP equivalent):**
 
 ```
-git commit / git fetch / git show / git ls-tree
-gh issue view / gh pr view / gh run view
-mcp-coder check branch-status
+git commit / git checkout / git rebase / git push
+gh run view
 mcp-coder check file-size --max-lines 750
 ```
 
