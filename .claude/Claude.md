@@ -20,7 +20,7 @@ This is enforced by the `mcp_coder_utils_isolation` contract in `.importlinter`.
 
 ## MCP Tools — mandatory
 
-Use MCP tools for **all** operations. Never use `Read`, `Write`, `Edit`, `Glob`, `Grep`, or `Bash` for tasks that have an MCP equivalent.
+**Do NOT use native Claude Code file tools** (`Read`, `Write`, `Edit`, `Glob`, `Grep`, `Bash`) for any operation that has an MCP equivalent. Always use the `mcp__workspace__*` tools instead. This applies to all file reading, writing, editing, searching, listing, and git operations. If no MCP equivalent exists, use Bash. Check the tool mapping table below first.
 
 ### Tool mapping
 
@@ -37,6 +37,10 @@ Use MCP tools for **all** operations. Never use `Read`, `Write`, `Edit`, `Glob`,
 | Read reference project | `mcp__workspace__read_reference_file` |
 | List reference dir | `mcp__workspace__list_reference_directory` |
 | Get reference projects | `mcp__workspace__get_reference_projects` |
+| Search reference files | `mcp__workspace__search_reference_files` |
+| Check file size | `mcp__workspace__check_file_size` |
+| Check branch status | `mcp__workspace__check_branch_status` |
+| Get base branch | `mcp__workspace__get_base_branch` |
 | Run pytest | `mcp__tools-py__run_pytest_check` |
 | Run pylint | `mcp__tools-py__run_pylint_check` |
 | Run mypy | `mcp__tools-py__run_mypy_check` |
@@ -46,13 +50,13 @@ Use MCP tools for **all** operations. Never use `Read`, `Write`, `Edit`, `Glob`,
 | Run ruff fix | `mcp__tools-py__run_ruff_fix` |
 | Run bandit | `mcp__tools-py__run_bandit_check` |
 | Format code (black+isort) | `mcp__tools-py__run_format_code` |
-| Refactoring | `mcp__tools-py__move_symbol`, `list_symbols`, `find_references` |
+| Get library source | `mcp__tools-py__get_library_source` |
+| Refactoring | `mcp__tools-py__move_symbol`, `move_module`, `rename_symbol`, `list_symbols`, `find_references` |
 | Git (status, log, diff, fetch, etc.) | `mcp__workspace__git` |
-| Get base branch | `mcp__workspace__get_base_branch` |
-| View GitHub issue | `mcp__workspace__github_issue_view` |
-| List GitHub issues | `mcp__workspace__github_issue_list` |
-| View GitHub PR | `mcp__workspace__github_pr_view` |
-| Search GitHub | `mcp__workspace__github_search` |
+| `gh issue view` | `mcp__workspace__github_issue_view` |
+| `gh issue list` | `mcp__workspace__github_issue_list` |
+| `gh pr view` | `mcp__workspace__github_pr_view` |
+| `gh search` | `mcp__workspace__github_search` |
 
 ## Code quality checks
 

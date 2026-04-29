@@ -23,7 +23,8 @@ If no issue number is provided:
 
 ## Instructions
 
-1. Fetch the issue to confirm it exists using `mcp__workspace__github_issue_view`.
+1. Fetch the issue to confirm it exists:
+   Call `mcp__workspace__github_issue_view` with the issue number.
 
 2. Validate that the issue is ready for approval:
    - Issue has been analyzed/discussed

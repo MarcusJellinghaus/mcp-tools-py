@@ -19,7 +19,8 @@ Based on our prior `/issue_analyse` discussion, update the GitHub issue with ref
 **Instructions:**
 1. If no issue context is found from prior analysis, respond: "No issue context found. Please run `/issue_analyse <number>` first."
 
-2. First, fetch the current issue content using `mcp__workspace__github_issue_view`.
+2. First, fetch the current issue content:
+   Call `mcp__workspace__github_issue_view` with the issue number.
 
 3. Draft updated issue text with:
    - Clear, concise title

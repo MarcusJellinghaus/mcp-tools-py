@@ -3,9 +3,6 @@ description: Rebase feature branch onto base branch with conflict resolution
 disable-model-invocation: true
 allowed-tools:
   - mcp__workspace__git
-  - "Bash(git branch *)"
-  - "Bash(git ls-files *)"
-  - "Bash(git fetch *)"
   - "Bash(git rebase *)"
   - "Bash(git add *)"
   - "Bash(git rm *)"
@@ -16,8 +13,6 @@ allowed-tools:
   - "Bash(git restore *)"
   - "Bash(git stash *)"
   - "Bash(git push --force-with-lease *)"
-  - "Bash(git rev-parse *)"
-  - "Bash(gh run view *)"
   - mcp__workspace__github_issue_view
   - mcp__tools-py__run_format_code
   - mcp__workspace__get_base_branch

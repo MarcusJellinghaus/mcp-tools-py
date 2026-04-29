@@ -7,6 +7,10 @@ allowed-tools:
   - "Bash(mcp-coder gh-tool *)"
   - mcp__workspace__read_file
   - mcp__tools-py__run_format_code
+  - mcp__tools-py__run_pylint_check
+  - mcp__tools-py__run_pytest_check
+  - mcp__tools-py__run_mypy_check
+  - mcp__tools-py__run_ruff_check
 ---
 
 # Implement Direct
@@ -23,7 +27,7 @@ If no issue number is provided:
 ## Steps
 
 1. **Fetch issue details**
-   Use `mcp__workspace__github_issue_view` to fetch the issue details.
+   Call `mcp__workspace__github_issue_view` with the issue number.
    Read the issue title, description, and acceptance criteria carefully.
 
 2. **Checkout/create issue branch**
@@ -45,6 +49,7 @@ If no issue number is provided:
    - `mcp__tools-py__run_pylint_check` — fix all issues
    - `mcp__tools-py__run_pytest_check` (with `extra_args: ["-n", "auto"]`) — fix all failures
    - `mcp__tools-py__run_mypy_check` — fix all issues
+   - `mcp__tools-py__run_ruff_check` — fix all issues
 
 6. **Format code**
    Use `mcp__tools-py__run_format_code` to format all code (black + isort).
