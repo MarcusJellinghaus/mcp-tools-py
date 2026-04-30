@@ -74,7 +74,10 @@ def sanitize_extra_args(
 
         cleaned.append(arg)
 
-    # Path detection: check non-flag args for valid paths relative to project_dir
+    # Path detection: shape-then-existence classification.
+    # Shape match: looks like a path if it contains "/", "\", "::", or ends with ".py".
+    # If shape matches, run existence check; missing → "not found" note.
+    # If shape doesn't match, fall back to existence check; missing → silent passthrough.
     has_path_args = False
     if project_dir:
         for arg in cleaned:
@@ -83,16 +86,26 @@ def sanitize_extra_args(
             if os.path.isabs(arg):
                 notes.append(f"Absolute path '{arg}' ignored for path detection.")
                 continue
+            looks_like_path = (
+                "/" in arg or "\\" in arg or "::" in arg or arg.endswith(".py")
+            )
             file_part = arg.split("::", 1)[0] if "::" in arg else arg
-            full_path = os.path.join(project_dir, file_part)
-            if os.path.exists(full_path):
+            exists = os.path.exists(os.path.join(project_dir, file_part))
+            if looks_like_path:
+                if exists:
+                    has_path_args = True
+                    notes.append(
+                        f"Path argument '{arg}' detected; "
+                        f"default test folder not appended."
+                    )
+                else:
+                    notes.append(f"Path '{arg}' not found relative to project_dir.")
+            elif exists:
                 has_path_args = True
                 notes.append(
                     f"Path argument '{arg}' detected; "
                     f"default test folder not appended."
                 )
-            else:
-                notes.append(f"Path '{arg}' not found relative to project_dir.")
 
     return SanitizedArgs(
         cleaned_args=cleaned,
