@@ -132,6 +132,12 @@ packages = [
     "mcp-coder-utils @ git+https://github.com/MarcusJellinghaus/mcp-coder-utils.git",
     "mcp-coder @ git+https://github.com/MarcusJellinghaus/mcp_coder.git",
 ]
+# Installed WITHOUT deps (depend on siblings — avoid downgrading)
+packages-no-deps = []
+
+[tool.mcp-coder.implement]
+format_code = true
+check_type_hints = true
 
 # Include tools directory in the distribution
 [tool.setuptools]
