@@ -41,7 +41,10 @@ Only the body of the path-detection loop changes. No new public symbols, no help
 for arg in cleaned:
     if arg starts with "-": continue
     if isabs(arg): note "Absolute path ... ignored"; continue
-    looks_like_path = "/" in arg or "\" in arg or "::" in arg or arg.endswith(".py")
+    # looks_like_path is True if arg contains a forward slash, contains a backslash,
+    # contains "::", or ends with ".py".
+    looks_like_path = ("/" in arg) or ("\\" in arg) or ("::" in arg) or arg.endswith(".py")
+    # Note: "\\" above is a Python literal for a single backslash character.
     file_part = arg.split("::", 1)[0] if "::" in arg else arg
     exists = os.path.exists(join(project_dir, file_part))
     if looks_like_path:
@@ -86,18 +89,18 @@ Run, in order:
 
 ```
 mcp__tools-py__run_pylint_check
-mcp__tools-py__run_pytest_check(extra_args=["-n", "auto", "-m", "not git_integration and not claude_cli_integration and not claude_api_integration and not formatter_integration and not github_integration and not langchain_integration"])
+mcp__tools-py__run_pytest_check(extra_args=["-n", "auto", "-m", "not integration"])
 mcp__tools-py__run_mypy_check
 ```
 
-All three must pass with no new issues. Then format and commit:
+All three must pass with no new issues. Then format, stage, and commit (ordering: checks → format → stage → commit; `run_format_code` runs before staging so any formatter-only adjustments land in the same commit):
 
 ```
-./tools/format_all.sh
+mcp__tools-py__run_format_code
 git add src/mcp_tools_py/code_checker_pytest/utils.py tests/test_code_checker_pytest/test_extra_args.py
 git commit -m "Fix sanitize_extra_args misclassifying flag values as paths (#145)"
 ```
 
 ## Commit boundary
 
-This step produces **exactly one commit** containing the code change, the 6 new tests, and any formatter-only adjustments from `format_all.sh`.
+This step produces **exactly one commit** containing the code change, the 6 new tests, and any formatter-only adjustments from `run_format_code`.
