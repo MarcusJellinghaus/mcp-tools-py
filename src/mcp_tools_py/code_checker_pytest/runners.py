@@ -206,8 +206,6 @@ def run_tests(
             env["PATH"] = f"{venv_bin}{os.pathsep}{os.environ.get('PATH', '')}"
 
         try:
-            logger.debug("Running command: %s", " ".join(command))
-
             # Execute the subprocess using subprocess_runner
             subprocess_result = execute_command(
                 command=command,
