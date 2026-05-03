@@ -1,4 +1,4 @@
-#!/bin/bash
+#!/usr/bin/env bash
 # Reinstall mcp-tools-py package in development mode (editable install)
 # Usage: source tools/reinstall_local.sh   (from project root; persists venv activation)
 #    or: bash tools/reinstall_local.sh     (does not persist activation to caller)
