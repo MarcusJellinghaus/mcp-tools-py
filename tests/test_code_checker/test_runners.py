@@ -2,6 +2,7 @@
 Tests for the code_checker_pytest runner functionality.
 """
 
+import logging
 import os
 import sys
 import tempfile
@@ -364,6 +365,208 @@ def test_run_tests_default_test_folder_appended(mock_execute: MagicMock) -> None
     )
     test_folder_path = os.path.join("/test/project", "tests")
     assert test_folder_path in called_command
+
+
+@pytest.mark.parametrize(
+    "case_id, returncode, execution_error, timed_out, report_exists, "
+    "label, exc_cls, log_substring",
+    [
+        (
+            "execution_error",
+            0,
+            "subprocess crashed: signal 9",
+            False,
+            True,
+            "subprocess crashed",
+            RuntimeError,
+            None,
+        ),
+        (
+            "subprocess_timeout",
+            0,
+            None,
+            True,
+            True,
+            "Subprocess timed out",
+            TimeoutError,
+            "command timed out after",
+        ),
+        (
+            "internal_error_3",
+            3,
+            None,
+            False,
+            True,
+            "Internal Error",
+            RuntimeError,
+            "internal error (exit 3)",
+        ),
+        (
+            "usage_error_4",
+            4,
+            None,
+            False,
+            True,
+            "Usage Error",
+            ValueError,
+            "usage error (exit 4)",
+        ),
+        (
+            "plugin_error_6",
+            6,
+            None,
+            False,
+            True,
+            "Plugin Error",
+            RuntimeError,
+            "plugin error (exit 6)",
+        ),
+        (
+            "no_report_file",
+            0,
+            None,
+            False,
+            False,
+            "no report file was generated",
+            RuntimeError,
+            "produced no report file",
+        ),
+    ],
+)
+@patch("mcp_tools_py.code_checker_pytest.runners.execute_command")
+def test_run_tests_surfaces_pytest_output_on_error_exit_codes(
+    mock_execute: MagicMock,
+    caplog: pytest.LogCaptureFixture,
+    case_id: str,
+    returncode: int,
+    execution_error: str | None,
+    timed_out: bool,
+    report_exists: bool,
+    label: str,
+    exc_cls: type[Exception],
+    log_substring: str | None,
+) -> None:
+    """All early-raise / exit-code / no-report-file paths must include pytest
+    stdout/stderr in the raised exception AND emit a matching WARNING log
+    record where applicable (no print to stdout)."""
+    mock_result = MagicMock(
+        return_code=returncode,
+        stdout="STDOUT_MARKER_xyz",
+        stderr="STDERR_MARKER_abc",
+        execution_error=execution_error,
+        timed_out=timed_out,
+    )
+    mock_execute.return_value = mock_result
+
+    with (
+        caplog.at_level(
+            logging.WARNING, logger="mcp_tools_py.code_checker_pytest.runners"
+        ),
+        patch(
+            "mcp_tools_py.code_checker_pytest.runners.os.path.isfile",
+            return_value=report_exists,
+        ),
+    ):
+        with pytest.raises(exc_cls) as excinfo:
+            run_tests("/test/project", "tests", python_executable=sys.executable)
+
+    msg = str(excinfo.value)
+    assert label in msg, f"case {case_id}: expected label {label!r} in {msg!r}"
+    assert (
+        "STDERR_MARKER_abc" in msg
+    ), f"case {case_id}: expected STDERR marker in {msg!r}"
+    assert (
+        "STDOUT_MARKER_xyz" in msg
+    ), f"case {case_id}: expected STDOUT marker in {msg!r}"
+
+    if log_substring is not None:
+        matching = [
+            r
+            for r in caplog.records
+            if r.levelno == logging.WARNING and log_substring in r.getMessage().lower()
+        ]
+        assert matching, f"expected WARNING for case {case_id}"
+
+
+@pytest.mark.parametrize(
+    "second_kind, exc_cls, msg_substring, log_substring",
+    [
+        (
+            "install_fail",
+            RuntimeError,
+            "Failed to install the required pytest-json-report plugin",
+            "failed to install pytest-json-report",
+        ),
+        (
+            "retry_timeout",
+            TimeoutError,
+            "Timed out while retrying",
+            "retry timed out",
+        ),
+    ],
+)
+@patch("mcp_tools_py.code_checker_pytest.runners.execute_command")
+def test_run_tests_surfaces_pytest_output_on_install_and_retry_failures(
+    mock_execute: MagicMock,
+    caplog: pytest.LogCaptureFixture,
+    second_kind: str,
+    exc_cls: type[Exception],
+    msg_substring: str,
+    log_substring: str,
+) -> None:
+    """Install-failure (line 271) and retry-timeout (line 289) must include
+    real stdout/stderr in the raised exception AND emit a WARNING."""
+    first = MagicMock(
+        return_code=1,
+        stdout="",
+        stderr="No module named 'pytest_json_report'",
+        execution_error=None,
+        timed_out=False,
+    )
+
+    if second_kind == "install_fail":
+        install_fail = MagicMock(
+            return_code=1,
+            stdout="STDOUT_MARKER_xyz",
+            stderr="STDERR_MARKER_abc",
+            execution_error=None,
+            timed_out=False,
+        )
+        mock_execute.side_effect = [first, install_fail]
+    else:
+        install_ok = MagicMock(
+            return_code=0,
+            stdout="",
+            stderr="",
+            execution_error=None,
+            timed_out=False,
+        )
+        retry_timeout = MagicMock(
+            return_code=None,
+            stdout="STDOUT_MARKER_xyz",
+            stderr="STDERR_MARKER_abc",
+            execution_error=None,
+            timed_out=True,
+        )
+        mock_execute.side_effect = [first, install_ok, retry_timeout]
+
+    with caplog.at_level(
+        logging.WARNING, logger="mcp_tools_py.code_checker_pytest.runners"
+    ):
+        with pytest.raises(exc_cls) as excinfo:
+            run_tests("/test/project", "tests", python_executable=sys.executable)
+
+    msg = str(excinfo.value)
+    assert msg_substring in msg
+    assert "STDERR_MARKER_abc" in msg
+    assert "STDOUT_MARKER_xyz" in msg
+
+    matching = [
+        r
+        for r in caplog.records
+        if r.levelno == logging.WARNING and log_substring in r.getMessage().lower()
+    ]
+    assert matching, f"expected WARNING for branch {second_kind}"
 
 
 @patch("mcp_tools_py.code_checker_pytest.runners.execute_command")
