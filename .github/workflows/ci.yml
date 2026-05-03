@@ -135,6 +135,21 @@ jobs:
       - name: Run ${{ matrix.check.name }}
         run: ${{ matrix.check.cmd }}
 
+  file-size:
+    runs-on: ubuntu-latest
+    name: file-size
+    steps:
+      - uses: actions/checkout@v6
+
+      - name: Install uv
+        uses: astral-sh/setup-uv@v7
+
+      - name: Check file sizes
+        # mcp-coder is run via uvx in an isolated environment.
+        # --with . ensures uvx uses THIS branch's mcp_tools_py instead of
+        # whatever version mcp_coder would resolve as a transitive dependency.
+        run: uvx --from "git+https://github.com/MarcusJellinghaus/mcp_coder.git" --with . mcp-coder check file-size --max-lines 750 --allowlist-file .large-files-allowlist
+
   # Architecture and code quality checks (PR only)
   architecture:
     runs-on: ubuntu-latest
@@ -147,7 +162,6 @@ jobs:
           - {name: "tach", cmd: "tach --version && tach check"}
           - {name: "pycycle", cmd: "pycycle --version && pycycle --here"}
           - {name: "vulture", cmd: "vulture --version && vulture src tests vulture_whitelist.py --min-confidence 60"}
-          - {name: "file-sizes", cmd: "echo 'File size check disabled - mcp-coder not available in CI' && exit 0"}
     name: ${{ matrix.check.name }}
     steps:
       - uses: actions/checkout@v6
