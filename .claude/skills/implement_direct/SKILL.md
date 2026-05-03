@@ -3,14 +3,14 @@ description: Implement a small issue directly without planning phase
 disable-model-invocation: true
 argument-hint: [issue-number]
 allowed-tools:
-  - mcp__workspace__github_issue_view
+  - mcp__mcp-workspace__github_issue_view
   - "Bash(mcp-coder gh-tool *)"
-  - mcp__workspace__read_file
-  - mcp__tools-py__run_format_code
-  - mcp__tools-py__run_pylint_check
-  - mcp__tools-py__run_pytest_check
-  - mcp__tools-py__run_mypy_check
-  - mcp__tools-py__run_ruff_check
+  - mcp__mcp-workspace__read_file
+  - mcp__mcp-tools-py__run_format_code
+  - mcp__mcp-tools-py__run_pylint_check
+  - mcp__mcp-tools-py__run_pytest_check
+  - mcp__mcp-tools-py__run_mypy_check
+  - mcp__mcp-tools-py__run_ruff_check
 ---
 
 # Implement Direct
@@ -27,7 +27,7 @@ If no issue number is provided:
 ## Steps
 
 1. **Fetch issue details**
-   Call `mcp__workspace__github_issue_view` with the issue number.
+   Call `mcp__mcp-workspace__github_issue_view` with the issue number.
    Read the issue title, description, and acceptance criteria carefully.
 
 2. **Checkout/create issue branch**
@@ -46,13 +46,13 @@ If no issue number is provided:
    - Keep changes focused and minimal — only what the issue requires
 
 5. **Run quality checks**
-   - `mcp__tools-py__run_pylint_check` — fix all issues
-   - `mcp__tools-py__run_pytest_check` (with `extra_args: ["-n", "auto"]`) — fix all failures
-   - `mcp__tools-py__run_mypy_check` — fix all issues
-   - `mcp__tools-py__run_ruff_check` — fix all issues
+   - `mcp__mcp-tools-py__run_pylint_check` — fix all issues
+   - `mcp__mcp-tools-py__run_pytest_check` (with `extra_args: ["-n", "auto"]`) — fix all failures
+   - `mcp__mcp-tools-py__run_mypy_check` — fix all issues
+   - `mcp__mcp-tools-py__run_ruff_check` — fix all issues
 
 6. **Format code**
-   Use `mcp__tools-py__run_format_code` to format all code (black + isort).
+   Use `mcp__mcp-tools-py__run_format_code` to format all code (black + isort).
 
 7. **Update issue status**
    ```bash

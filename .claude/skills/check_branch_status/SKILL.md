@@ -2,12 +2,12 @@
 description: Check branch readiness including CI, rebase needs, tasks, and labels
 disable-model-invocation: true
 allowed-tools:
-  - mcp__workspace__check_branch_status
+  - mcp__mcp-workspace__check_branch_status
 ---
 
 # Check Branch Status
 
-Call the `mcp__workspace__check_branch_status` MCP tool with no arguments and report its output.
+Call the `mcp__mcp-workspace__check_branch_status` MCP tool with no arguments and report its output.
 
 Checks CI status, rebase needs, task completion, and GitHub labels. Reports actionable recommendations.
 

@@ -1,6 +1,6 @@
 {
   "mcpServers": {
-    "tools-py": {
+    "mcp-tools-py": {
       "type": "stdio",
       "command": "${VIRTUAL_ENV}\\Scripts\\mcp-tools-py.exe",
       "args": [
@@ -19,7 +19,7 @@
         "PYTHONPATH": "${MCP_CODER_PROJECT_DIR}/src"
       }
     },
-    "workspace": {
+    "mcp-workspace": {
       "type": "stdio",
       "command": "${VIRTUAL_ENV}\\Scripts\\mcp-workspace.exe",
       "args": [
@@ -28,13 +28,13 @@
         "--log-level",
         "INFO",
         "--reference-project",
-        "name=p_coder,path=${USERPROFILE}\\Documents\\GitHub\\mcp_coder,url=https://github.com/MarcusJellinghaus/mcp_coder",
+        "name=mcp_coder,path=${USERPROFILE}\\Documents\\GitHub\\mcp_coder,url=https://github.com/MarcusJellinghaus/mcp_coder",
         "--reference-project",
-        "name=p_config,path=${USERPROFILE}\\Documents\\GitHub\\mcp-config,url=https://github.com/MarcusJellinghaus/mcp-config",
+        "name=mcp-config,path=${USERPROFILE}\\Documents\\GitHub\\mcp-config,url=https://github.com/MarcusJellinghaus/mcp-config",
         "--reference-project",
-        "name=p_workspace,path=${USERPROFILE}\\Documents\\GitHub\\mcp-workspace,url=https://github.com/MarcusJellinghaus/mcp-workspace",
+        "name=mcp-workspace,path=${USERPROFILE}\\Documents\\GitHub\\mcp-workspace,url=https://github.com/MarcusJellinghaus/mcp-workspace",
         "--reference-project",
-        "name=p_coder-utils,path=${USERPROFILE}\\Documents\\GitHub\\mcp-coder-utils,url=https://github.com/MarcusJellinghaus/mcp-coder-utils"
+        "name=mcp-coder-utils,path=${USERPROFILE}\\Documents\\GitHub\\mcp-coder-utils,url=https://github.com/MarcusJellinghaus/mcp-coder-utils"
       ],
       "env": {
         "PYTHONPATH": "${MCP_CODER_VENV_DIR}\\Lib\\"

@@ -4,12 +4,12 @@ disable-model-invocation: true
 argument-hint: "<issue-number>"
 allowed-tools:
   - "Bash(gh issue edit *)"
-  - mcp__workspace__github_issue_view
-  - mcp__workspace__save_file
-  - mcp__workspace__delete_this_file
-  - mcp__workspace__read_file
-  - mcp__workspace__list_directory
-  - mcp__workspace__search_files
+  - mcp__mcp-workspace__github_issue_view
+  - mcp__mcp-workspace__save_file
+  - mcp__mcp-workspace__delete_this_file
+  - mcp__mcp-workspace__read_file
+  - mcp__mcp-workspace__list_directory
+  - mcp__mcp-workspace__search_files
 ---
 
 # Update GitHub Issue
@@ -20,7 +20,7 @@ Based on our prior `/issue_analyse` discussion, update the GitHub issue with ref
 1. If no issue context is found from prior analysis, respond: "No issue context found. Please run `/issue_analyse <number>` first."
 
 2. First, fetch the current issue content:
-   Call `mcp__workspace__github_issue_view` with the issue number.
+   Call `mcp__mcp-workspace__github_issue_view` with the issue number.
 
 3. Draft updated issue text with:
    - Clear, concise title
@@ -28,7 +28,7 @@ Based on our prior `/issue_analyse` discussion, update the GitHub issue with ref
 
 4. Write the issue body to a temp file (avoids bash escaping issues with markdown):
 ```python
-mcp__workspace__save_file(file_path="issue_body_temp.md", content=body_content)
+mcp__mcp-workspace__save_file(file_path="issue_body_temp.md", content=body_content)
 ```
 
 5. Update the issue using `--body-file`:
@@ -38,7 +38,7 @@ gh issue edit <issue_number> --title "NEW_TITLE" --body-file issue_body_temp.md
 
 6. Clean up the temp file:
 ```python
-mcp__workspace__delete_this_file(file_path="issue_body_temp.md")
+mcp__mcp-workspace__delete_this_file(file_path="issue_body_temp.md")
 ```
 
 **Editing Base Branch:**
