@@ -1,59 +1,91 @@
 @echo off
 cls
 setlocal enabledelayedexpansion
-REM Local launcher for Claude Code with MCP servers using active environment
-REM Assumes mcp-tools-py is installed in currently active virtual environment
+REM Two-env aware launcher for Claude Code (developer edition)
+REM Same two-env discovery as claude.bat, plus editable-install verification
+REM Assumes mcp-tools-py is editable-installed (pip install -e .)
 
-REM Check if local .venv exists
-if not exist ".venv\Scripts\activate.bat" (
+REM === Step 0: Project .venv must exist ===
+if not exist "%CD%\.venv\Scripts\activate.bat" (
     echo ERROR: Local virtual environment not found at .venv
-    echo Please run: call tools\reinstall_local.bat
+    echo Please run: tools\reinstall_local.bat
     exit /b 1
 )
 
-REM Get expected virtual environment path
-set "EXPECTED_VENV=%CD%\.venv"
-
-REM Check if wrong virtual environment is activated
-if not "!VIRTUAL_ENV!"=="" (
-    if not "!VIRTUAL_ENV!"=="!EXPECTED_VENV!" (
-        echo INFO: Deactivating wrong virtual environment
-        echo   Current: !VIRTUAL_ENV!
-        echo   Expected: !EXPECTED_VENV!
-        call deactivate 2>nul
-        set "VIRTUAL_ENV="
-    )
-)
-
-REM Activate correct virtual environment if needed
+REM === Step 1: Project env activation ===
+REM Activate .venv first so its mcp-coder install is discoverable on PATH.
+echo Activating project environment: %CD%\.venv
+call "%CD%\.venv\Scripts\activate.bat"
 if "!VIRTUAL_ENV!"=="" (
-    echo Activating local virtual environment...
-    call .venv\Scripts\activate.bat
-    if "!VIRTUAL_ENV!"=="" (
-        echo ERROR: Failed to activate virtual environment
-        echo Please check .venv\Scripts\activate.bat
-        exit /b 1
-    )
-)
-
-REM Check if mcp-tools-py is available in the local environment
-python -c "import mcp_tools_py" 2>nul
-if !errorlevel! neq 0 (
-    echo ERROR: mcp-tools-py not found in local virtual environment
-    echo Local environment: !VIRTUAL_ENV!
-    echo Please run: call tools\reinstall_local.bat
+    echo ERROR: Failed to activate project virtual environment.
+    echo Please check .venv\Scripts\activate.bat
     exit /b 1
 )
 
-REM Set project directories for MCP servers
-set "MCP_CODER_PROJECT_DIR=%CD%"
-set "MCP_CODER_VENV_DIR=%CD%\.venv"
+REM === Step 2: Tool env discovery ===
+REM Determine where mcp-coder is installed (tool env Scripts dir).
+REM For local dev, the project .venv (just activated) IS the tool env.
+set "TOOL_VENV_SCRIPTS="
 
-REM Start Claude Code using the local mcp-tools-py installation
-echo Starting Claude Code with:
-echo VIRTUAL_ENV=!VIRTUAL_ENV!
-echo MCP_CODER_PROJECT_DIR=!MCP_CODER_PROJECT_DIR!
-echo MCP_CODER_VENV_DIR=!MCP_CODER_VENV_DIR!
+REM Find mcp-coder on PATH
+for /f "delims=" %%i in ('where mcp-coder 2^>nul') do (
+    if "!TOOL_VENV_SCRIPTS!"=="" (
+        set "TOOL_VENV_SCRIPTS=%%~dpi"
+        REM Remove trailing backslash
+        if "!TOOL_VENV_SCRIPTS:~-1!"=="\" set "TOOL_VENV_SCRIPTS=!TOOL_VENV_SCRIPTS:~0,-1!"
+    )
+)
+if "!TOOL_VENV_SCRIPTS!"=="" (
+    echo ERROR: Cannot find mcp-coder installation.
+    echo.
+    echo Either:
+    echo   1. Activate the tool environment: path\to\tool\.venv\Scripts\activate.bat
+    echo   2. Ensure mcp-coder is on your PATH: pip install mcp-coder
+    echo   3. Run: tools\reinstall_local.bat
+    exit /b 1
+)
+
+REM === Step 3: Set tool env variables ===
+set "MCP_CODER_VENV_PATH=!TOOL_VENV_SCRIPTS!"
+
+REM Resolve parent directory of Scripts to get venv root
+for %%d in ("!MCP_CODER_VENV_PATH!\..") do set "MCP_CODER_VENV_DIR=%%~fd"
+
+REM === Step 4: Editable install verification ===
+"%CD%\.venv\Scripts\python.exe" -c "from importlib.metadata import distribution as D; u=D('mcp-tools-py').read_text('direct_url.json') or ''; exit(0 if 'dir_info' in u and 'editable' in u else 1)" 2>nul
+if !errorlevel! NEQ 0 (
+    echo WARNING: mcp-tools-py does not appear to be editable-installed from %CD%
+    echo   For development, run: pip install -e .
+    echo   Continuing anyway...
+)
+
+REM === Step 5: MCP tool verification ===
+if not exist "!MCP_CODER_VENV_PATH!\mcp-tools-py.exe" (
+    echo ERROR: mcp-tools-py.exe not found in !MCP_CODER_VENV_PATH!
+    echo Please run: tools\reinstall_local.bat
+    exit /b 1
+)
+if not exist "!MCP_CODER_VENV_PATH!\mcp-workspace.exe" (
+    echo ERROR: mcp-workspace.exe not found in !MCP_CODER_VENV_PATH!
+    echo Please run: tools\reinstall_local.bat
+    exit /b 1
+)
+
+REM === Step 5b: Print MCP server versions ===
+"!MCP_CODER_VENV_PATH!\mcp-workspace.exe" --version
+"!MCP_CODER_VENV_PATH!\mcp-tools-py.exe" --version
+
+REM === Step 6: Set env vars and launch ===
+set "MCP_CODER_PROJECT_DIR=%CD%"
+set "DISABLE_AUTOUPDATER=1"
+set "PATH=!MCP_CODER_VENV_PATH!;!PATH!"
+
+echo Starting Claude Code (developer mode) with:
+echo   Tool env:     !MCP_CODER_VENV_PATH!
+echo   Project env:  !VIRTUAL_ENV!
+echo   Project dir:  !MCP_CODER_PROJECT_DIR!
+echo   Venv dir:     !MCP_CODER_VENV_DIR!
+
 C:\Users\%USERNAME%\.local\bin\claude.exe %*
 
 REM Reset terminal state after Claude exits (workaround for dirty terminal bug)
