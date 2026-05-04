@@ -55,3 +55,24 @@ Branch: 171-run-lint-imports-check-hides-failures-return-code-dropped-output-uns
 - `step_2.md` Boy-Scout bullet: disambiguated — read file first, prefer existing `code_checker_*` enumeration, else single bullet under §1 Key Features.
 
 **Status:** Pending commit (plan files + log committed together).
+
+## Round 3 — 2026-05-04
+
+**Findings:**
+- step_1.md `_parse_warnings`: Round 2's MULTILINE regex still requires `->` and destination on same line, but issue #171 reproduction shows lint-imports wraps the warning across two lines EVEN WITHOUT `--verbose` (`mcp_coder.mcp_workspace_git -> \nmcp_workspace.git_operations.`). Round-2 fix was incomplete. (major — parser correctness regression)
+- step_1.md DATA section claims "(no output)" body for empty subprocess output, but `_format_report` rules don't implement that substitution. (minor — spec inconsistency)
+- step_1.md HOW imports list omits `import re` and `import logging` despite both being used in the new module. (nit — completeness)
+- `_BROKEN_LINE_RE` could in theory match progress chatter containing the word BROKEN; lower priority since `--verbose` is stripped. (nit, no action)
+
+**Decisions:**
+- All 3 recommended changes accepted as straightforward improvements. The regex wrap-aware preprocessing is a spec correctness fix, not a scope change. No design/scope question for user.
+
+**User decisions:** None this round.
+
+**Changes applied** (via `/plan_update`):
+- `step_1.md` `_WARNING_RE`: replaced conditional fallback with wrap-aware preprocessing as primary spec — line joiner glues `No matches for ignored import ...` lines that don't end with `.` to the next non-blank line, then line-anchored MULTILINE regex matches. Added issue-#171 rationale.
+- `step_1.md` `TestParseWarnings`: now mandates both the wrapped fixture (verbatim from issue reproduction) and a single-line variant, both producing `src="mcp_coder.mcp_workspace_git"` / `dst="mcp_workspace.git_operations."`.
+- `step_1.md` `_format_report` rules: added empty-/whitespace-only `raw_body` → `(no output)` substitution. Added PASSED-state empty-body fixture to `TestFormatReport`.
+- `step_1.md` HOW imports list: added `import re` and `import logging`.
+
+**Status:** Pending commit (plan file + log committed together).

@@ -57,12 +57,22 @@ _WARNING_RE = re.compile(
     r"^No matches for ignored import\s+(?P<src>\S[^\n]*?)\s*->\s*(?P<dst>\S[^\n]*?\.)\s*$",
     re.MULTILINE,
 )
-# Note: the naive `\.` with DOTALL stops at the first period in dotted
-# module names like `mcp_coder.mcp_workspace_git`; line-anchored MULTILINE
-# is correct. If `->` may itself land on a continuation line in real
-# lint-imports output, fall back to a two-step approach: (a) split lines,
-# (b) glue header + indented continuation, (c) regex on the glued string
-# with `^...\.$`.
+# Rationale: lint-imports wraps long warning lines even without `--verbose`
+# (see issue #171 reproduction); the joiner is required, not optional.
+#
+# `_parse_warnings` MUST therefore pre-process the combined subprocess
+# output before regex matching:
+#
+#   1. Walk lines in order. Whenever a line starts with
+#      `No matches for ignored import` AND does NOT end with `.` (after
+#      rstrip), join it to the next non-blank line with a single space
+#      separator. Repeat until the joined line ends with `.` or no further
+#      continuation exists.
+#   2. Apply `_WARNING_RE` (line-anchored, MULTILINE) to the joined text.
+#
+# The line-anchored MULTILINE form is also correct against the naive
+# `\.` with DOTALL, which would stop at the first period in dotted module
+# names like `mcp_coder.mcp_workspace_git`.
 
 
 def _strip_verbose_flags(
@@ -114,7 +124,8 @@ __all__ = ["run_lint_imports_check_impl"]
 
 ## HOW — integration points
 
-- Imports: `from mcp_tools_py.utils.subprocess_runner import execute_command`
+- Imports: `import re`, `import logging`,
+  `from mcp_tools_py.utils.subprocess_runner import execute_command`,
   and `from mcp_tools_py.log_utils import log_function_call`.
 - Decorator: apply `@log_function_call` to `run_lint_imports_check_impl`
   (matches `run_bandit_check_impl`).
@@ -148,7 +159,10 @@ __all__ = ["run_lint_imports_check_impl"]
 - if summary: emit "Contracts: N kept, M broken"
 - if state == "BROKEN" and broken: emit "Broken contracts:" + bulleted names
 - if warnings: emit "Warnings:" + bulleted lines
-- emit blank line, then raw_body
+- if `raw_body` (after strip) is empty or whitespace-only, substitute the
+  literal string `(no output)` for the body so the function never returns
+  just a header line
+- emit blank line, then raw_body (or `(no output)` substitute)
 - if total lines > MAX_OUTPUT_LINES: keep first MAX_OUTPUT_LINES lines
   and append _TRUNCATION_MARKER
 ```
@@ -183,16 +197,32 @@ Test classes (one per parsed concern, plus orchestrator):
    ignores `KEPT` lines; de-duplicates if a name appears twice.
 4. `TestParseWarnings` — extracts single warning; multiple warnings;
    warnings interleaved between progress lines (issue's reproduction case).
-   At least one fixture must use a realistic dotted-module example such as
-   `"No matches for ignored import mcp_coder.mcp_workspace_git -> mcp_workspace.git_operations."`
-   so the line-anchored regex (which replaces the buggy DOTALL-`.*?\.`
-   form that stopped at the first period in `mcp_coder.`) is exercised.
+   MUST include both fixtures below — both produce one parsed warning with
+   `src="mcp_coder.mcp_workspace_git"` and
+   `dst="mcp_workspace.git_operations."`:
+
+   - **wrapped form (verbatim from issue #171 reproduction):**
+     ```
+     No matches for ignored import mcp_coder.mcp_workspace_git -> 
+     mcp_workspace.git_operations.
+     ```
+   - **single-line variant:**
+     ```
+     No matches for ignored import mcp_coder.mcp_workspace_git -> mcp_workspace.git_operations.
+     ```
+
+   These exercise the wrap-aware joiner (required, not optional — see
+   `_WARNING_RE` rationale) and the line-anchored regex (which replaces
+   the buggy DOTALL-`.*?\.` form that stopped at the first period in
+   `mcp_coder.`).
 5. `TestClassifyState` — full 3×3 truth table: rc 0/non-zero × summary
    parsed-clean / parsed-broken / None.
 6. `TestFormatReport` — info line on top; state header on top when no info
    line; summary line present; broken list present in BROKEN state;
    warnings always included; line cap appends marker; ERROR fallback shape
-   (header + raw body, no summary, no broken list).
+   (header + raw body, no summary, no broken list); PASSED-state empty-body
+   fixture asserting that whitespace-only `raw_body` is replaced with the
+   literal `(no output)` so the function never returns just a header line.
 7. `TestRunLintImportsCheckImpl` (orchestrator, mocks `execute_command`):
    - clean run → output starts with `=== PASSED ===`
    - broken run (rc=1, summary says `1 broken`) → starts with
