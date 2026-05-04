@@ -1,11 +1,13 @@
 """Checker tools extracted from server.py for pylint, pytest, mypy, lint-imports, and vulture."""
 
 import logging
-import re
 from typing import TYPE_CHECKING, Any, Dict, List, Optional
 
 from mcp_tools_py.code_checker_bandit.reporting import format_bandit_report
 from mcp_tools_py.code_checker_bandit.runners import run_bandit_check_impl
+from mcp_tools_py.code_checker_lint_imports import (
+    run_lint_imports_check_impl,
+)
 from mcp_tools_py.code_checker_mypy import get_mypy_prompt
 from mcp_tools_py.code_checker_pylint import get_pylint_prompt
 from mcp_tools_py.code_checker_pytest.reporting import (
@@ -25,27 +27,11 @@ from mcp_tools_py.code_checker_tach import run_tach_check as run_tach
 from mcp_tools_py.code_checker_vulture import run_vulture_check as run_vulture
 from mcp_tools_py.log_utils import log_function_call
 from mcp_tools_py.utils.project_config import resolve_target_directories
-from mcp_tools_py.utils.subprocess_runner import execute_command
 
 if TYPE_CHECKING:
     from mcp_tools_py.server import FastMCPProtocol, ToolServer
 
 logger = logging.getLogger(__name__)
-
-_BOX_DRAWING_OR_ARROWS = re.compile(r"[\u2500-\u257F▶◀▲▼]")
-_ONLY_DASHES = re.compile(r"^-+$")
-
-
-def _strip_lint_imports_header(raw: str) -> str:
-    """Remove the import-linter ASCII art banner and dashed separators."""
-    lines = raw.splitlines()
-    kept = [
-        line
-        for line in lines
-        if not _BOX_DRAWING_OR_ARROWS.search(line) and not _ONLY_DASHES.match(line)
-    ]
-    result = "\n".join(kept).strip()
-    return result if result else raw
 
 
 class CheckerTools:
@@ -402,45 +388,27 @@ class CheckerTools:
                     Examples: ["--contract", "layers"], ["--verbose"]
 
             Returns:
-                Raw lint-imports output (stdout + stderr combined)
+                Structured report. The first non-empty line is the state
+                header (PASSED / BROKEN / ERROR), so truncation cannot hide
+                failures.
             """
             if not self._server._is_tool_available("lint-imports"):
                 binary_path = self._server._lint_imports_binary or "N/A"
                 return (
                     f"lint-imports is not available at {binary_path}. "
-                    f"Ensure the virtual environment has import-linter installed "
-                    f"and --venv-path is configured. Restart the server after installing."
+                    f"Ensure the virtual environment has import-linter "
+                    f"installed and --venv-path is configured. Restart "
+                    f"the server after installing."
                 )
 
             try:
-                logger.info(
-                    "Starting lint-imports check",
-                    extra={
-                        "project_dir": str(self._server.project_dir),
-                        "extra_args": extra_args,
-                    },
-                )
-
                 binary = self._server._lint_imports_binary
-                assert binary is not None  # guarded by availability check above
-                command = [binary] + (extra_args or [])
-                result = execute_command(command, cwd=str(self._server.project_dir))
-
-                output = result.stdout
-                if result.stderr:
-                    output = output + "\n" + result.stderr if output else result.stderr
-
-                logger.info(
-                    "lint-imports check completed",
-                    extra={
-                        "return_code": result.return_code,
-                        "output_length": len(output),
-                    },
+                assert binary is not None
+                return run_lint_imports_check_impl(
+                    binary,
+                    str(self._server.project_dir),
+                    extra_args,
                 )
-
-                output = _strip_lint_imports_header(output)
-                return output or "lint-imports produced no output."
-
             except Exception as e:
                 error_msg = (
                     f"Unexpected error running lint-imports: "

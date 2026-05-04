@@ -125,7 +125,8 @@ See `pyproject.toml` for version constraints.
 │  ├── mcp_tools_py.refactoring                   │
 │  ├── mcp_tools_py.code_checker_pytest           │
 │  ├── mcp_tools_py.code_checker_pylint           │
-│  └── mcp_tools_py.code_checker_mypy             │
+│  ├── mcp_tools_py.code_checker_mypy             │
+│  └── mcp_tools_py.code_checker_lint_imports     │
 ├─────────────────────────────────────────────────────┤
 │  Utilities Layer                                     │
 │  ├── mcp_tools_py.utils                         │
