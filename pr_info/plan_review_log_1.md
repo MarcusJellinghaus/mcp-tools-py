@@ -1,0 +1,33 @@
+# Plan Review Log 1 — 2026-05-04
+
+Issue: #171
+Branch: 171-run-lint-imports-check-hides-failures-return-code-dropped-output-unstructured
+
+
+
+## Round 1 — 2026-05-04
+
+**Findings:**
+- summary.md §1: deviates from issue's "mirror bandit four-file split" wording; chooses single-file like tach/vulture. Principled but unstated. (minor)
+- step_1.md: `MAX_OUTPUT_LINES = 300` redeclared locally instead of imported from pytest. Justified — pytest's OutputBuilder is record-coupled. (minor / acceptable)
+- step_1.md: Step 1 commit produces unused package (importlinter wiring lands in step 2). Acceptable TDD-in-isolation but relationship not made explicit. (minor)
+- step_2.md `re` import removal: plan said "verify with a search"; verification already done — `re` referenced only by deleted regexes on lines 35-36. (nit)
+- step_1.md Tests: Decision #3 fixture taxonomy (clean/broken/warnings/mixed/malformed) not mapped to test classes for reviewer parity. (minor)
+- step_2.md Done When: only optional smoke check for `run_lint_imports_check`; original symptom (LLM-visible output) deserves required end-to-end verification. (major)
+- step_2.md Done When: missing `run_tach_check` and `run_lint_imports_check` exit checks even though step 2 modifies both `tach.toml` and `.importlinter`. (major)
+- step_2.md: missing one-line update to `docs/architecture/architecture.md` to list the new `code_checker_lint_imports` package. (minor — Boy Scout)
+- Out-of-scope discipline: plan correctly flags 3 items as out-of-scope. (none)
+
+**Decisions:**
+- All 5 recommended changes accepted as straightforward improvements. No design/scope question required user input — deviations from issue wording (single-file split, local MAX_OUTPUT_LINES, raw-body output) are principled and consistent with knowledge base (KISS/YAGNI, planning principles).
+
+**User decisions:** None this round. All changes auto-accepted by supervisor.
+
+**Changes applied** (via `/plan_update`):
+- `step_2.md` — `WHERE — files to modify`: added `docs/architecture/architecture.md` Boy-Scout bullet.
+- `step_2.md` — `WHAT — checker_tools.py` §3: replaced "verify with a search" with explicit "Verified: re referenced only by deleted regexes on lines 35-36".
+- `step_2.md` — `HOW — verification order` step 5 + `Done When`: promoted optional smoke check to required `run_tach_check` and `run_lint_imports_check` (latter must show `=== PASSED ===` first non-empty line).
+- `step_1.md` — `Tests`: appended fixture-taxonomy → test-class mapping (clean / broken / warnings / mixed / malformed).
+- `summary.md` — Architectural / Design Changes §1: added sentence explaining why single-file matches tach/vulture better than bandit's four-file split.
+
+**Status:** Pending commit (plan files + log committed together).

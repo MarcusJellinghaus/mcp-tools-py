@@ -196,6 +196,18 @@ Use `tests.conftest.make_command_result` and patch
 `mcp_tools_py.code_checker_lint_imports.runners.execute_command`,
 matching the pattern in `tests/test_code_checker_tach/test_runners.py`.
 
+### Fixture taxonomy (issue Decision #3) → test classes
+
+- **clean** → `TestClassifyState` PASSED case + `TestRunLintImportsCheckImpl`
+  happy path.
+- **broken** → `TestParseBrokenContracts` + `TestClassifyState` BROKEN case.
+- **warnings** → `TestParseWarnings` + `TestClassifyState` warnings-only
+  PASSED case.
+- **mixed** → orchestrator broken-with-summary in
+  `TestRunLintImportsCheckImpl`.
+- **malformed** → `TestParseSummary` returns None + orchestrator ERROR
+  fallback in `TestRunLintImportsCheckImpl`.
+
 ## Done When
 
 - Files above exist with the listed signatures.

@@ -24,6 +24,9 @@
 - `tests/test_checker_tools.py`
 - `.importlinter`
 - `tach.toml`
+- `docs/architecture/architecture.md` — list the new
+  `code_checker_lint_imports` package alongside the existing
+  `code_checker_*` entries (Boy-Scout doc update).
 
 No new files are created in this step.
 
@@ -49,8 +52,9 @@ No new files are created in this step.
        ...
    ```
 
-3. **Remove `import re`** if and only if `re` is no longer referenced
-   anywhere else in the file (verify with a search before deleting).
+3. **Remove `import re`.** Verified: `re` is referenced only by the two
+   regexes being deleted on lines 35-36 (`_strip_lint_imports_header`).
+   Remove `import re`.
 
 4. **Replace `_register_lint_imports` body** with a thin shim:
 
@@ -207,9 +211,9 @@ Two edits:
    correctly removed) and no `unused-import` warnings in
    `tests/test_checker_tools.py`.
 4. Run mypy. Expect clean.
-5. (Optional sanity) Run `mcp__tools-py__run_lint_imports_check_impl`
-   indirectly via the CI's `lint-imports` step locally if available —
-   confirms the architecture self-registration is correct.
+5. Run `mcp__mcp-tools-py__run_tach_check` and
+   `mcp__mcp-tools-py__run_lint_imports_check` against this repo as the
+   end-to-end smoke check (see `Done When`).
 
 ## ALGORITHM — none
 
@@ -227,4 +231,9 @@ same string/Optional[List[str]] as before.
   defined in `summary.md`.
 - `.importlinter` and `tach.toml` declare the new package.
 - All three quality checks pass (pylint, pytest, mypy).
+- Run `mcp__mcp-tools-py__run_tach_check` against this repo and confirm it
+  passes.
+- Run `mcp__mcp-tools-py__run_lint_imports_check` against this repo and
+  confirm it passes; the first non-empty line of the output must be
+  `=== PASSED ===`.
 - One commit: `refactor: structured output for run_lint_imports_check (#171)`.

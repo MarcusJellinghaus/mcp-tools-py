@@ -23,7 +23,12 @@ review because of this.
    `code_checker_vulture/`. No `models.py` / `parsers.py` / `reporting.py`
    split: lint-imports has too little structure to justify it. (Bandit's
    four-file split exists for grouping/sorting JSON records, which does not
-   apply here.)
+   apply here.) The issue text suggests mirroring `code_checker_bandit/`'s
+   four-file split, but single-file matches `code_checker_tach/` /
+   `code_checker_vulture/` better here: lint-imports has no parsed-message
+   records to group/sort and no JSON shape — it shares the same
+   plain-text-parsing shape as tach/vulture, not the structured-record
+   shape that justifies bandit's split.
 
 2. **Three-state pipeline inside one orchestrator**
    `run_lint_imports_check_impl(binary, project_dir, extra_args) -> str`
