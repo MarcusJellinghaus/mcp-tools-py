@@ -76,3 +76,43 @@ Branch: 171-run-lint-imports-check-hides-failures-return-code-dropped-output-uns
 - `step_1.md` HOW imports list: added `import re` and `import logging`.
 
 **Status:** Pending commit (plan file + log committed together).
+
+
+## Round 4 — 2026-05-04
+
+**Findings:**
+- All Round 1–3 fixes verified in place across `summary.md`, `step_1.md`, `step_2.md`.
+- Wrap-aware `_parse_warnings` joiner spec is consistent: regex rationale, ALGORITHM, and `TestParseWarnings` fixtures (wrapped + single-line) all align and exercise the verbatim issue #171 reproduction.
+- `(no output)` substitution flows coherently: rule in `_format_report`, asserted in DATA section, fixture in `TestFormatReport`, end-to-end coverage in `TestRunLintImportsCheckImpl`.
+- HOW imports list complete (`import re`, `import logging`).
+- Combined-output idiom consistent across spec.
+- Step 2 exit checks (`run_tach_check` + `run_lint_imports_check` with `=== PASSED ===` first-line assertion) present.
+- Step granularity: 2 steps, each one commit, each tangible. Step 2's atomic bundle (wiring + deletion + `.importlinter` + `tach.toml` + architecture doc) is correctly bundled — splitting would break contracts mid-stream.
+- All 13 issue Decisions traceable in the plan.
+
+**Decisions:** No changes needed — plan is internally consistent and addresses all issue requirements.
+
+**User decisions:** None this round.
+
+**Changes applied:** None.
+
+**Status:** No changes — plan stable.
+
+## Final Status
+
+**Rounds run:** 4
+**Commits produced:**
+- `6c66774` — `docs(plan): tighten lint-imports plan after review round 1`
+- `7538ff9` — `docs(plan): fix warning regex spec, polish round 2`
+- `f7a64cd` — `docs(plan): handle wrapped warning lines, fix empty-body rule`
+- (this commit — Final Status log update)
+
+**Plan ready for approval: YES.**
+
+**Summary of evolution:**
+- Round 1 tightened exit checks, added Boy-Scout doc update, mapped fixture taxonomy, made `re`-import verification explicit.
+- Round 2 fixed a parser-correctness bug in `_parse_warnings` (DOTALL → MULTILINE), polished doc-update instruction, simplified combined-output idiom.
+- Round 3 caught that Round 2's fix didn't handle line-wrapped warnings (issue's actual reproduction shape) — made wrap-aware preprocessing the primary spec; added `(no output)` empty-body substitution; completed imports list.
+- Round 4 found no defects — plan stable.
+
+**No design / scope / requirements questions were escalated to the user** — all changes were straightforward improvements applied autonomously per skill guidance.
