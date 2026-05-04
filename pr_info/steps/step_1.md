@@ -54,8 +54,15 @@ _TRUNCATION_MARKER: str = (
 _SUMMARY_RE = re.compile(r"Contracts:\s+(\d+)\s+kept,\s+(\d+)\s+broken")
 _BROKEN_LINE_RE = re.compile(r"^(?P<name>.+?)\s+BROKEN\s+\[", re.MULTILINE)
 _WARNING_RE = re.compile(
-    r"No matches for ignored import\s+\S.*?\.", re.DOTALL
+    r"^No matches for ignored import\s+(?P<src>\S[^\n]*?)\s*->\s*(?P<dst>\S[^\n]*?\.)\s*$",
+    re.MULTILINE,
 )
+# Note: the naive `\.` with DOTALL stops at the first period in dotted
+# module names like `mcp_coder.mcp_workspace_git`; line-anchored MULTILINE
+# is correct. If `->` may itself land on a continuation line in real
+# lint-imports output, fall back to a two-step approach: (a) split lines,
+# (b) glue header + indented continuation, (c) regex on the glued string
+# with `^...\.$`.
 
 
 def _strip_verbose_flags(
@@ -121,8 +128,8 @@ __all__ = ["run_lint_imports_check_impl"]
 1. cleaned_args, stripped = _strip_verbose_flags(extra_args)
    info_line = "[Info: stripped --verbose/-v from extra_args]" if stripped else None
 2. result = execute_command([binary, *cleaned_args], cwd=project_dir)
-3. combined = (result.stdout + "\n" + result.stderr).strip("\n") if result.stderr
-              else result.stdout
+3. combined = "\n".join(s for s in (result.stdout, result.stderr) if s)
+   # handles empty-stdout and empty-stderr cleanly without trailing blank lines.
 4. summary = _parse_summary(combined)
    broken = _parse_broken_contracts(combined)
    warnings = _parse_warnings(combined)
@@ -176,6 +183,10 @@ Test classes (one per parsed concern, plus orchestrator):
    ignores `KEPT` lines; de-duplicates if a name appears twice.
 4. `TestParseWarnings` — extracts single warning; multiple warnings;
    warnings interleaved between progress lines (issue's reproduction case).
+   At least one fixture must use a realistic dotted-module example such as
+   `"No matches for ignored import mcp_coder.mcp_workspace_git -> mcp_workspace.git_operations."`
+   so the line-anchored regex (which replaces the buggy DOTALL-`.*?\.`
+   form that stopped at the first period in `mcp_coder.`) is exercised.
 5. `TestClassifyState` — full 3×3 truth table: rc 0/non-zero × summary
    parsed-clean / parsed-broken / None.
 6. `TestFormatReport` — info line on top; state header on top when no info

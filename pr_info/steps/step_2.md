@@ -27,6 +27,12 @@
 - `docs/architecture/architecture.md` — list the new
   `code_checker_lint_imports` package alongside the existing
   `code_checker_*` entries (Boy-Scout doc update).
+  If the file has a list/section enumerating `code_checker_*` packages,
+  add `code_checker_lint_imports` there. If no such list exists, add a
+  one-line bullet under the section that introduces the checker tools
+  (typically §1 "Key Features" / "Code Quality" or equivalent).
+  Implementer should `read_file` first and pick the closest match —
+  keep the addition to a single bullet line.
 
 No new files are created in this step.
 

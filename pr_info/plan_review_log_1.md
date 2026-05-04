@@ -31,3 +31,27 @@ Branch: 171-run-lint-imports-check-hides-failures-return-code-dropped-output-uns
 - `summary.md` — Architectural / Design Changes §1: added sentence explaining why single-file matches tach/vulture better than bandit's four-file split.
 
 **Status:** Pending commit (plan files + log committed together).
+
+
+## Round 2 — 2026-05-04
+
+**Findings:**
+- step_1.md `_parse_warnings` regex `r"No matches for ignored import\s+\S.*?\."` with DOTALL: non-greedy `.*?\.` stops at the first period; mis-parses dotted module names like `mcp_coder.mcp_workspace_git -> mcp_workspace.git_operations.` from the issue's reproduction case. (major — parser correctness)
+- step_2.md Boy-Scout `docs/architecture/architecture.md` bullet: instruction "list the new package alongside existing entries" too vague — implementer must guess subsection. (minor)
+- step_1.md ALGORITHM step 3 combined-output construction: awkward conditional concat of stderr, drops empty-stdout fallback that the original wrapper had. (minor)
+- step_2.md `_register_lint_imports` shim docstring/logging changes: acceptable, internal log only. (nit)
+- step_2.md smoke check phrasing depends on no flags being passed: holds for the smoke run. (nit)
+- All Round 1 fixes verified in place: tach + lint-imports exit checks, re-import verification explicit, fixture taxonomy mapping, single-file deviation rationale.
+
+**Decisions:**
+- All 3 recommended changes accepted as straightforward improvements (parser bug fix is a spec correction, not a scope change). No design/scope question for user.
+
+**User decisions:** None this round.
+
+**Changes applied** (via `/plan_update`):
+- `step_1.md` `_parse_warnings`: replaced DOTALL pattern with line-anchored `re.MULTILINE` pattern `^No matches for ignored import\s+(?P<src>\S[^\n]*?)\s*->\s*(?P<dst>\S[^\n]*?\.)\s*$`, plus rationale and two-step fallback note.
+- `step_1.md` `TestParseWarnings`: fixture spec now mandates a realistic dotted-module example to exercise the regex fix.
+- `step_1.md` ALGORITHM step 3: replaced conditional concat with `"\n".join(s for s in (result.stdout, result.stderr) if s)`.
+- `step_2.md` Boy-Scout bullet: disambiguated — read file first, prefer existing `code_checker_*` enumeration, else single bullet under §1 Key Features.
+
+**Status:** Pending commit (plan files + log committed together).
