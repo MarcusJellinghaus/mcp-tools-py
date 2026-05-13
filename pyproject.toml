@@ -150,16 +150,13 @@ where = ["src"]
 "*" = ["py.typed"]
 
 # mcp-coder's own [tool.uv.sources] maps mcp-tools-py to a git URL. When uv
-# builds mcp-coder from git, that mapping leaks into resolution and conflicts
-# with the local editable install of this project. The self-source pins the
-# resolution to ".", and override-dependencies strips the URL constraint so
-# uv does not error on the transitive git claim — under `uv sync` (project
-# mode) the root install satisfies the now-unpinned requirement.
+# builds mcp-coder from git that mapping leaks into resolution and conflicts
+# with the root install of this project. Strip the URL constraint so the
+# root install (under `uv sync`) satisfies the now-unpinned requirement.
 [tool.uv]
 override-dependencies = ["mcp-tools-py"]
 
 [tool.uv.sources]
-mcp-tools-py = { path = ".", editable = true }
 mcp-config-tool = { git = "https://github.com/MarcusJellinghaus/mcp-config.git" }
 mcp-coder-utils = { git = "https://github.com/MarcusJellinghaus/mcp-coder-utils.git" }
 mcp-workspace = { git = "https://github.com/MarcusJellinghaus/mcp-workspace.git" }
