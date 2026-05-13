@@ -149,7 +149,12 @@ where = ["src"]
 [tool.setuptools.package-data]
 "*" = ["py.typed"]
 
+# mcp-coder's own [tool.uv.sources] maps mcp-tools-py to a git URL. When uv
+# builds mcp-coder from git, that mapping leaks into resolution and conflicts
+# with the local editable install of this project. Pinning the self-source to
+# "." here is intended to win over the transitive claim under `uv sync`.
 [tool.uv.sources]
+mcp-tools-py = { path = ".", editable = true }
 mcp-config-tool = { git = "https://github.com/MarcusJellinghaus/mcp-config.git" }
 mcp-coder-utils = { git = "https://github.com/MarcusJellinghaus/mcp-coder-utils.git" }
 mcp-workspace = { git = "https://github.com/MarcusJellinghaus/mcp-workspace.git" }
