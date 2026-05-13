@@ -123,7 +123,12 @@ jobs:
           python-version: "3.11"
 
       - name: Install dependencies
-        run: uv pip install --system ".[dev]"
+        run: uv sync --extra dev
+
+      - name: Activate venv
+        run: |
+          echo "VIRTUAL_ENV=$GITHUB_WORKSPACE/.venv" >> $GITHUB_ENV
+          echo "$GITHUB_WORKSPACE/.venv/bin" >> $GITHUB_PATH
 
       - name: Environment info
         run: |
@@ -145,10 +150,9 @@ jobs:
         uses: astral-sh/setup-uv@v7
 
       - name: Check file sizes
-        # mcp-coder is run via uvx in an isolated environment.
-        # --with . ensures uvx uses THIS branch's mcp_tools_py instead of
-        # whatever version mcp_coder would resolve as a transitive dependency.
-        run: uvx --from "git+https://github.com/MarcusJellinghaus/mcp_coder.git" --with . mcp-coder check file-size --max-lines 750 --allowlist-file .large-files-allowlist
+        # mcp-coder is run via uvx in an isolated environment. The check walks the
+        # filesystem only; it does not import mcp_tools_py, so no --with . is needed.
+        run: uvx --from "git+https://github.com/MarcusJellinghaus/mcp_coder.git" mcp-coder check file-size --max-lines 750 --allowlist-file .large-files-allowlist
 
   # Architecture and code quality checks (PR only)
   architecture:
@@ -175,7 +179,12 @@ jobs:
           python-version: "3.11"
 
       - name: Install dependencies
-        run: uv pip install --system ".[dev]"
+        run: uv sync --extra dev
+
+      - name: Activate venv
+        run: |
+          echo "VIRTUAL_ENV=$GITHUB_WORKSPACE/.venv" >> $GITHUB_ENV
+          echo "$GITHUB_WORKSPACE/.venv/bin" >> $GITHUB_PATH
 
       - name: Environment info
         run: |
