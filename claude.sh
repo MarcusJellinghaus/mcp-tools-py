@@ -74,6 +74,8 @@ export MCP_CODER_VENV_PATH
 export MCP_CODER_VENV_DIR
 export MCP_CODER_PROJECT_DIR="$PWD"
 export DISABLE_AUTOUPDATER=1
+# See src/mcp_coder/llm/claude_settings.py for canonical value
+export MCP_TIMEOUT=30000
 export PATH="$MCP_CODER_VENV_PATH:$PATH"
 
 # === Step 6: Platform-specific MCP config override ===
