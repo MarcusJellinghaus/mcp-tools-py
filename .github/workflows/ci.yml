@@ -142,14 +142,20 @@ jobs:
     steps:
       - uses: actions/checkout@v6
 
-      - name: Install uv
-        uses: astral-sh/setup-uv@v7
+      - name: Set up Python 3.11
+        uses: actions/setup-python@v6
+        with:
+          python-version: "3.11"
 
       - name: Check file sizes
-        # mcp-coder is run via uvx in an isolated environment.
-        # --with . ensures uvx uses THIS branch's mcp_tools_py instead of
-        # whatever version mcp_coder would resolve as a transitive dependency.
-        run: uvx --from "git+https://github.com/MarcusJellinghaus/mcp_coder.git" --with . mcp-coder check file-size --max-lines 750 --allowlist-file .large-files-allowlist
+        # Previously: `uvx --from git+mcp_coder --with . mcp-coder check file-size`.
+        # That invocation hits the irreducible URL cycle documented in #107
+        # Section 3 (mcp-coder source-pins mcp-tools-py via git, conflicting
+        # with the local `--with .` install). Inline the check instead — the
+        # behaviour matches mcp-coder's `check file-size` for our purposes:
+        # list git-tracked text files, count lines, fail on > max-lines unless
+        # allowlisted.
+        run: python tools/check_file_size.py --max-lines 750 --allowlist-file .large-files-allowlist
 
   # Architecture and code quality checks (PR only)
   architecture:
