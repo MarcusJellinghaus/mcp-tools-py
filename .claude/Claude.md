@@ -70,6 +70,8 @@ mcp__mcp-tools-py__run_mypy_check
 
 All checks must pass before proceeding.
 
+**Ruff:** use `mcp__mcp-tools-py__run_ruff_check`. Do not call `ruff` directly.
+
 **Pytest:** always use `extra_args: ["-n", "auto"]` for parallel execution.
 
 Available marker: `integration` (requires external resources).
@@ -119,6 +121,14 @@ mcp-coder check file-size --max-lines 750
 ## Writing style
 
 Be concise. If one line works, don't use three.
+
+## Obsidian knowledge base
+
+An Obsidian vault (`obsidian-dev-wiki`) is available as a reference project at `~/Documents/GitHub/obsidian-dev-wiki`.
+
+- **Read first:** At the start of non-trivial tasks, search the vault for relevant context — repo notes, processes, known issues, prior decisions.
+- **Follow processes:** When a task matches a documented process in `Processes/` (e.g. `Chore Implementation.md`), follow those steps.
+- **Write back:** Update the vault when you learn something worth preserving for future sessions.
 
 ## MCP server issues
 
