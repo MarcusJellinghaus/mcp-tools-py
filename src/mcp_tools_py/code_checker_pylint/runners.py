@@ -1,6 +1,4 @@
-"""
-Functions for running pylint analysis and processing results.
-"""
+"""Functions for running pylint analysis and processing results."""
 
 import logging
 import os
@@ -25,8 +23,7 @@ def get_pylint_results(
     extra_args: List[str] | None = None,
     target_directories: List[str] | None = None,
 ) -> PylintResult:
-    """
-    Runs pylint on the specified project directory and returns the results.
+    """Runs pylint on the specified project directory and returns the results.
 
     Args:
         project_dir: The path to the project directory.

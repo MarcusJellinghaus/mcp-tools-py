@@ -1,5 +1,4 @@
-"""
-Code checker package that runs pytest tests and analyzes the results.
+"""Code checker package that runs pytest tests and analyzes the results.
 
 This package provides functionality to run pytest tests on a given project
 and process the test results.

@@ -46,7 +46,11 @@ def list_symbols(project_dir: Path, file_path: str) -> str:
 
 
 def _is_import(name: Any) -> bool:
-    """Check if a jedi Name originates from an import statement."""
+    """Check if a jedi Name originates from an import statement.
+
+    Returns:
+        True if the name is part of an `import` or `from ... import`.
+    """
     tree_name = getattr(getattr(name, "_name", None), "tree_name", None)
     if tree_name is None:
         return False
@@ -59,7 +63,11 @@ def _is_import(name: Any) -> bool:
 
 
 def _filter_top_level(names: List[Any], *, exclude_imports: bool = False) -> List[Any]:
-    """Filter jedi names to top-level symbols only."""
+    """Filter jedi names to top-level symbols only.
+
+    Returns:
+        Names whose parent scope is the module (optionally excluding imports).
+    """
     result: List[Any] = []
     for name in names:
         parent = name.parent()

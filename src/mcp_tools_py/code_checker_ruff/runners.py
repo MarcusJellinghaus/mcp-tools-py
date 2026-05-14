@@ -22,7 +22,11 @@ def _build_ruff_command(
     output_format: str = "json",
     fix: bool = False,
 ) -> list[str]:
-    """Build the ruff CLI command list."""
+    """Build the ruff CLI command list.
+
+    Returns:
+        Command argv ready to pass to `execute_command`.
+    """
     cmd = [ruff_binary, "check"]
     if fix:
         cmd.append("--fix")
@@ -48,6 +52,9 @@ def run_ruff_check_impl(
 
     Returns:
         LLM-formatted report string, or "No issues found" message.
+
+    Raises:
+        FileNotFoundError: If `project_dir` does not exist.
     """
     if not os.path.isdir(project_dir):
         raise FileNotFoundError(f"Project directory not found: {project_dir}")
@@ -92,6 +99,9 @@ def run_ruff_fix_impl(
 
     Returns:
         Report with changed file list + remaining unfixed errors.
+
+    Raises:
+        FileNotFoundError: If `project_dir` does not exist.
     """
     if not os.path.isdir(project_dir):
         raise FileNotFoundError(f"Project directory not found: {project_dir}")

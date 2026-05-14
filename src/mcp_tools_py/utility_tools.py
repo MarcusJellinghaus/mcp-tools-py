@@ -22,6 +22,9 @@ class UtilityTools:
 
             Args:
                 sleep_seconds: Duration to sleep in seconds (0-300, default: 5.0).
+
+            Returns:
+                Confirmation string, or an error message for out-of-range input.
             """
             if sleep_seconds < 0:
                 return "Error: sleep_seconds must be >= 0."

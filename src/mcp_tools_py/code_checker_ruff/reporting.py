@@ -1,5 +1,4 @@
-"""
-Reporting layer for ruff analysis results.
+"""Reporting layer for ruff analysis results.
 
 Groups violations by rule code, sorts by prefix category then frequency,
 and formats LLM-optimized output with max_issues detail/summary control.
@@ -30,7 +29,11 @@ class RuffIssueGroup(NamedTuple):
 
 
 def get_rule_prefix(code: str) -> str:
-    """Extract prefix from rule code: 'D100' -> 'D', 'DOC201' -> 'DOC'."""
+    """Extract prefix from rule code: 'D100' -> 'D', 'DOC201' -> 'DOC'.
+
+    Returns:
+        Leading alphabetic prefix of `code`.
+    """
     prefix = ""
     for char in code:
         if char.isalpha():
@@ -43,7 +46,11 @@ def get_rule_prefix(code: str) -> str:
 def group_and_sort_issues(
     messages: List[RuffMessage],
 ) -> List[RuffIssueGroup]:
-    """Group by code, sort by prefix priority then frequency (descending)."""
+    """Group by code, sort by prefix priority then frequency (descending).
+
+    Returns:
+        Issue groups sorted by rule-prefix priority and frequency.
+    """
     groups: dict[str, list[RuffMessage]] = defaultdict(list)
     for msg in messages:
         groups[msg.code].append(msg)
@@ -65,7 +72,11 @@ def format_ruff_check_report(
     messages: List[RuffMessage],
     max_issues: int = 1,
 ) -> Optional[str]:
-    """Format ruff check results into LLM prompt. Returns None if no issues."""
+    """Format ruff check results into an LLM prompt.
+
+    Returns:
+        Formatted report string, or None if there are no issues.
+    """
     groups = group_and_sort_issues(messages)
     if not groups:
         return None
@@ -110,7 +121,11 @@ def format_ruff_fix_report(
     changed_files: List[str],
     remaining_messages: List[RuffMessage],
 ) -> str:
-    """Format ruff fix results: changed files + remaining error summary."""
+    """Format ruff fix results: changed files + remaining error summary.
+
+    Returns:
+        Multi-line report listing fixes and any unfixed issues.
+    """
     lines: list[str] = [f"Ruff applied fixes to {len(changed_files)} files:"]
     for filepath in changed_files:
         lines.append(f"- {filepath}")

@@ -1,5 +1,4 @@
-"""
-Code checker package that runs pylint analysis and generates smart prompts for LLMs.
+"""Code checker package that runs pylint analysis and generates smart prompts for LLMs.
 
 This package provides functionality to run pylint on a given project
 and process the analysis results.

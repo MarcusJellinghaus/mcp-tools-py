@@ -62,13 +62,15 @@ class CheckerTools:
             target_directories: Optional[List[str]] = None,
             max_issues: int = 1,
         ) -> str:
-            """
-            Run pylint on the project code and generate smart prompts for LLMs.
+            """Run pylint on the project code and generate smart prompts for LLMs.
 
             Args:
                 extra_args: Additional pylint arguments.
                 target_directories: Directories to analyze relative to project_dir. Auto-detected from pyproject.toml when None.
                 max_issues: Number of issue types to show in detail (default: 1). Remaining issues shown as summary counts.
+
+            Returns:
+                Formatted pylint result, or an error message string.
             """
             if not self._server._is_tool_available("pylint"):
                 return (
@@ -136,8 +138,7 @@ class CheckerTools:
             extra_args: Optional[List[str]] = None,
             env_vars: Optional[Dict[str, str]] = None,
         ) -> str:
-            """
-            Run pytest on the project code and generate smart prompts for LLMs.
+            """Run pytest on the project code and generate smart prompts for LLMs.
 
             Args:
                 markers: Optional list of pytest markers to filter tests. Examples: ['slow', 'integration']
@@ -278,8 +279,7 @@ class CheckerTools:
             follow_imports: str | None = None,
             cache_dir: str | None = None,
         ) -> str:
-            """
-            Run mypy type checking on the project code.
+            """Run mypy type checking on the project code.
 
             Args:
                 strict: Use strict mode settings (default: True).
@@ -293,12 +293,9 @@ class CheckerTools:
                     - 'attr-defined': Attribute not defined errors
                     - 'var-annotated': Missing variable annotations
                 target_directories: Optional list of directories to check relative to project_dir.
-                    Auto-detected from pyproject.toml when None.
-                    Examples:
-                    - ["src"] - Check only source code
-                    - ["src", "tests"] - Check both source and tests
-                    - ["mypackage"] - Check custom package
-                    - ["."] - Check entire project
+                    Auto-detected from pyproject.toml when None. For example:
+                    ["src"] (source only), ["src", "tests"] (both),
+                    ["mypackage"] (custom package), ["."] (entire project).
                 follow_imports: How to handle imports during type checking.
                     Options:
                     - 'normal' (default): Follow and type check imported modules
@@ -380,8 +377,7 @@ class CheckerTools:
         def run_lint_imports_check(
             extra_args: Optional[List[str]] = None,
         ) -> str:
-            """
-            Run lint-imports on the project to check import contracts.
+            """Run lint-imports on the project to check import contracts.
 
             Args:
                 extra_args: Additional lint-imports arguments.
@@ -434,8 +430,7 @@ class CheckerTools:
             min_confidence: int = 60,
             extra_args: Optional[List[str]] = None,
         ) -> str:
-            """
-            Run vulture on the project to find unused code.
+            """Run vulture on the project to find unused code.
 
             Args:
                 target_directories: Directories to scan relative to project_dir.
@@ -528,6 +523,9 @@ class CheckerTools:
                 target_directories: Directories to check relative to project_dir. Auto-detected when None.
                 extra_args: Additional ruff CLI flags (e.g. ["--preview"] for DOC rules).
                 max_issues: Number of issue types shown in detail (default: 1).
+
+            Returns:
+                Formatted ruff report, or an error message string.
             """
             if not self._server._is_tool_available("ruff"):
                 binary_path = self._server._ruff_binary or "N/A"
@@ -607,6 +605,9 @@ class CheckerTools:
                 select: Override rule selection. Defaults to project config.
                 target_directories: Directories to fix relative to project_dir. Auto-detected when None.
                 extra_args: Additional ruff CLI flags.
+
+            Returns:
+                Formatted fix report, or an error message string.
             """
             if not self._server._is_tool_available("ruff"):
                 binary_path = self._server._ruff_binary or "N/A"
@@ -683,6 +684,9 @@ class CheckerTools:
                 extra_args: Additional bandit CLI flags.
                 max_issues: Number of issue types to show in detail (default: 1).
                     Remaining issues shown as summary counts.
+
+            Returns:
+                Formatted bandit report, or an error message string.
             """
             if not self._server._is_tool_available("bandit"):
                 binary_path = self._server._bandit_binary or "N/A"
@@ -794,7 +798,11 @@ class CheckerTools:
                 return error_msg
 
     def _format_pylint_result(self, pylint_prompt: Optional[str]) -> str:
-        """Format pylint check result."""
+        """Format pylint check result.
+
+        Returns:
+            User-facing summary of the pylint outcome.
+        """
         if pylint_prompt is None:
             return "Pylint check completed. No issues found that require attention."
         return pylint_prompt
@@ -802,7 +810,11 @@ class CheckerTools:
     def _format_pytest_result_with_details(
         self, test_results: dict[str, Any], show_details: bool
     ) -> str:
-        """Enhanced formatting that respects show_details parameter."""
+        """Enhanced formatting that respects show_details parameter.
+
+        Returns:
+            User-facing summary of the pytest outcome.
+        """
         if not test_results["success"]:
             return f"Error running pytest: {test_results.get('error', 'Unknown error')}"
 
@@ -855,7 +867,11 @@ class CheckerTools:
                 return f"Pytest check completed. All {passed_count} tests passed successfully."
 
     def _format_mypy_result(self, mypy_prompt: str | None) -> str:
-        """Format mypy check result."""
+        """Format mypy check result.
+
+        Returns:
+            User-facing summary of the mypy outcome.
+        """
         if mypy_prompt is None:
             return "Mypy check completed. No type errors found."
         return f"Mypy found type issues that need attention:\n\n{mypy_prompt}"

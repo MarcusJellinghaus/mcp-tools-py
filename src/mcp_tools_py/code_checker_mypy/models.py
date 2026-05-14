@@ -38,5 +38,9 @@ class MypyResult(NamedTuple):
         return {msg.code for msg in self.messages if msg.code}
 
     def get_messages_by_severity(self, severity: str) -> list[MypyMessage]:
-        """Filter messages by severity level."""
+        """Filter messages by severity level.
+
+        Returns:
+            Messages whose `severity` matches the requested level.
+        """
         return [msg for msg in self.messages if msg.severity == severity]

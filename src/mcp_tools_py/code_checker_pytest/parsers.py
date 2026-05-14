@@ -1,6 +1,4 @@
-"""
-Functions for parsing pytest test results and output.
-"""
+"""Functions for parsing pytest test results and output."""
 
 import json
 from dataclasses import fields
@@ -26,8 +24,7 @@ LOG_RECORD_FIELDS = {f.name for f in fields(LogRecord)} - {"extra"}
 
 
 def parse_test_stage(stage_data: Dict[str, Any]) -> StageInfo:
-    """
-    Parse test stage data from the pytest JSON report.
+    """Parse test stage data from the pytest JSON report.
 
     Args:
         stage_data: Dictionary containing test stage data from JSON
@@ -69,8 +66,7 @@ def parse_test_stage(stage_data: Dict[str, Any]) -> StageInfo:
 
 
 def parse_pytest_report(json_data: str) -> PytestReport:
-    """
-    Parse a JSON string into a PytestReport object.
+    """Parse a JSON string into a PytestReport object.
 
     Args:
         json_data: JSON string from pytest json report

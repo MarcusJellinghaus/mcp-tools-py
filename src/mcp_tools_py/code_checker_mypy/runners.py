@@ -43,8 +43,7 @@ def run_mypy_check(
     cache_dir: str | None = None,
     config_file: str | None = None,
 ) -> MypyResult:
-    """
-    Run mypy type checking on project.
+    """Run mypy type checking on project.
 
     Args:
         project_dir: Path to the project directory
@@ -58,6 +57,9 @@ def run_mypy_check(
 
     Returns:
         MypyResult with execution results
+
+    Raises:
+        FileNotFoundError: If `project_dir` does not exist.
     """
     if not os.path.isdir(project_dir):
         raise FileNotFoundError(f"Project directory not found: {project_dir}")

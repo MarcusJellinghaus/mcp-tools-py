@@ -1,6 +1,4 @@
-"""
-Functions for parsing ruff output.
-"""
+"""Functions for parsing ruff output."""
 
 import json
 import logging
@@ -16,8 +14,7 @@ def parse_ruff_json_output(
     raw_output: str,
     project_dir: str,
 ) -> tuple[List[RuffMessage], str | None]:
-    """
-    Parse ruff --output-format=json output into RuffMessage objects.
+    """Parse ruff --output-format=json output into RuffMessage objects.
 
     Args:
         raw_output: Raw JSON output from ruff

@@ -1,13 +1,10 @@
-"""
-Utility functions for pylint code checking.
-"""
+"""Utility functions for pylint code checking."""
 
 import os
 
 
 def normalize_path(path: str, base_dir: str) -> str:
-    """
-    Normalize a path relative to the base directory.
+    """Normalize a path relative to the base directory.
 
     Args:
         path: The path to normalize

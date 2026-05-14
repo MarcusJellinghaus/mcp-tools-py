@@ -1,6 +1,4 @@
-"""
-Functions for generating reports and prompts from pylint analysis results.
-"""
+"""Functions for generating reports and prompts from pylint analysis results."""
 
 import json
 import logging
@@ -37,7 +35,11 @@ class IssueGroup(NamedTuple):
 
 
 def _group_and_sort_issues(messages: list[PylintMessage]) -> list[IssueGroup]:
-    """Group messages by message_id, sort by severity then frequency (descending)."""
+    """Group messages by message_id, sort by severity then frequency (descending).
+
+    Returns:
+        Issue groups sorted highest severity / most-frequent first.
+    """
     groups: dict[str, list[PylintMessage]] = defaultdict(list)
     for msg in messages:
         groups[msg.message_id].append(msg)
@@ -62,8 +64,7 @@ logger = logging.getLogger(__name__)
 
 
 def get_direct_instruction_for_pylint_code(code: str) -> Optional[str]:
-    """
-    Provides a direct instruction for a given Pylint code.
+    """Provides a direct instruction for a given Pylint code.
 
     Args:
         code: The Pylint code (e.g., "R0902", "C0411", "W0612").
@@ -103,8 +104,7 @@ def get_direct_instruction_for_pylint_code(code: str) -> Optional[str]:
 def get_prompt_for_known_pylint_code(
     code: str, project_dir: str, pylint_results: PylintResult
 ) -> Optional[str]:
-    """
-    Generate a prompt for a known pylint code with instructions and details.
+    """Generate a prompt for a known pylint code with instructions and details.
 
     Args:
         code: The pylint code (e.g., "E0602")
@@ -146,8 +146,7 @@ def get_prompt_for_known_pylint_code(
 def get_prompt_for_unknown_pylint_code(
     code: str, project_dir: str, pylint_results: PylintResult
 ) -> str:
-    """
-    Generate a prompt for an unknown pylint code with issue details.
+    """Generate a prompt for an unknown pylint code with issue details.
 
     Args:
         code: The pylint code (e.g., "E0602")
@@ -199,8 +198,7 @@ def get_pylint_prompt(
     target_directories: list[str] | None = None,
     max_issues: int = 1,
 ) -> Optional[str]:
-    """
-    Generate a prompt for fixing pylint issues based on the analysis of a project.
+    """Generate a prompt for fixing pylint issues based on the analysis of a project.
 
     Args:
         project_dir: The path to the project directory to analyze.

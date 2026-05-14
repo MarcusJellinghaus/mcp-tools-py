@@ -60,6 +60,9 @@ def _join_wrapped_warning_lines(combined: str) -> str:
     Walk lines in order; whenever a line starts with the warning prefix
     and does not yet end with '.', glue it to subsequent non-blank lines
     until a '.' terminator is reached or no further continuation exists.
+
+    Returns:
+        The input text with wrapped warning lines re-joined.
     """
     lines = combined.splitlines()
     out: list[str] = []
@@ -128,7 +131,11 @@ def _format_report(
     raw_body: str,
     info_line: str | None,
 ) -> str:
-    """Assemble the final string and apply the line cap."""
+    """Assemble the final string and apply the line cap.
+
+    Returns:
+        Multi-line report text, truncated to `MAX_OUTPUT_LINES`.
+    """
     lines: list[str] = []
 
     if info_line:
@@ -172,6 +179,9 @@ def run_lint_imports_check_impl(
 
     The first non-empty line is always either an info line (when flags
     were stripped) or the state header. Truncation cannot hide it.
+
+    Returns:
+        Structured report (state header + summary + raw output, capped).
     """
     cleaned_args, stripped = _strip_verbose_flags(extra_args)
     info_line = "[Info: stripped --verbose/-v from extra_args]" if stripped else None

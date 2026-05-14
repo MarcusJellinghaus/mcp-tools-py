@@ -1,6 +1,4 @@
-"""
-Data models for pylint analysis results.
-"""
+"""Data models for pylint analysis results."""
 
 from enum import Enum
 from typing import List, NamedTuple, Optional, Set

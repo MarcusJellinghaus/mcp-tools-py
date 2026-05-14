@@ -1,6 +1,4 @@
-"""
-Functions for parsing bandit JSON output.
-"""
+"""Functions for parsing bandit JSON output."""
 
 import json
 import logging
