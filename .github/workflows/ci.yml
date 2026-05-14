@@ -125,7 +125,16 @@ jobs:
           python-version: "3.11"
 
       - name: Install dependencies
-        run: uv pip install --system ".[dev]"
+        # Hoist sibling URL deps to direct requirements so uv accepts them
+        # alongside the local project (see upstream-mypy-check.yml; uv requires
+        # this when transitive packages declare URL deps).
+        run: |
+          uv pip install --system \
+            "mcp-config-tool @ git+https://github.com/MarcusJellinghaus/mcp-config.git" \
+            "mcp-coder-utils @ git+https://github.com/MarcusJellinghaus/mcp-coder-utils.git" \
+            "mcp-workspace @ git+https://github.com/MarcusJellinghaus/mcp-workspace.git" \
+            "mcp-coder @ git+https://github.com/MarcusJellinghaus/mcp_coder.git" \
+            ".[dev]"
 
       - name: Environment info
         run: |
@@ -162,7 +171,13 @@ jobs:
           python-version: "3.11"
 
       - name: Install dependencies
-        run: uv pip install --system ".[dev]"
+        run: |
+          uv pip install --system \
+            "mcp-config-tool @ git+https://github.com/MarcusJellinghaus/mcp-config.git" \
+            "mcp-coder-utils @ git+https://github.com/MarcusJellinghaus/mcp-coder-utils.git" \
+            "mcp-workspace @ git+https://github.com/MarcusJellinghaus/mcp-workspace.git" \
+            "mcp-coder @ git+https://github.com/MarcusJellinghaus/mcp_coder.git" \
+            ".[dev]"
 
       - name: Environment info
         run: |
