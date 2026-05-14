@@ -169,6 +169,16 @@ where = ["src"]
 [tool.setuptools.package-data]
 "*" = ["py.typed"]
 
+[tool.uv]
+# Override transitive references to mcp-tools-py (e.g. mcp-coder pins it to
+# its git URL via its own [tool.uv.sources]). Without this, `uv pip install
+# .[dev]` errors with "conflicting URLs for package mcp-tools-py" — local
+# file:// vs the inherited git+ URL. The bare-name override drops the URL
+# pin so the local checkout is used.
+override-dependencies = [
+    "mcp-tools-py",
+]
+
 [tool.uv.sources]
 mcp-config-tool = { git = "https://github.com/MarcusJellinghaus/mcp-config.git" }
 mcp-coder-utils = { git = "https://github.com/MarcusJellinghaus/mcp-coder-utils.git" }
