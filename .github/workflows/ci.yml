@@ -111,6 +111,7 @@ jobs:
           - {name: "pytest", cmd: "pytest --version && pytest tests"}
           - {name: "mypy", cmd: "mypy --version && mypy --strict src tests"}
           - {name: "ruff-docstrings", cmd: "ruff --version && ruff check src tests"}
+          - {name: "file-size", cmd: "mcp-coder check file-size --max-lines 750 --allowlist-file .large-files-allowlist"}
     name: ${{ matrix.check.name }}
     steps:
       - uses: actions/checkout@v6
@@ -135,27 +136,6 @@ jobs:
 
       - name: Run ${{ matrix.check.name }}
         run: ${{ matrix.check.cmd }}
-
-  file-size:
-    runs-on: ubuntu-latest
-    name: file-size
-    steps:
-      - uses: actions/checkout@v6
-
-      - name: Set up Python 3.11
-        uses: actions/setup-python@v6
-        with:
-          python-version: "3.11"
-
-      - name: Check file sizes
-        # Previously: `uvx --from git+mcp_coder --with . mcp-coder check file-size`.
-        # That invocation hits the irreducible URL cycle documented in #107
-        # Section 3 (mcp-coder source-pins mcp-tools-py via git, conflicting
-        # with the local `--with .` install). Inline the check instead — the
-        # behaviour matches mcp-coder's `check file-size` for our purposes:
-        # list git-tracked text files, count lines, fail on > max-lines unless
-        # allowlisted.
-        run: python tools/check_file_size.py --max-lines 750 --allowlist-file .large-files-allowlist
 
   # Architecture and code quality checks (PR only)
   architecture:
