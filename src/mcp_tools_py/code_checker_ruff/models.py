@@ -1,6 +1,4 @@
-"""
-Data models for ruff analysis results.
-"""
+"""Data models for ruff analysis results."""
 
 from typing import NamedTuple
 

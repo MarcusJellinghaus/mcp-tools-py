@@ -8,8 +8,7 @@ logger = logging.getLogger(__name__)
 
 
 def create_mypy_prompt(result: MypyResult) -> str | None:
-    """
-    Generate LLM-friendly prompt from mypy results.
+    """Generate LLM-friendly prompt from mypy results.
 
     Args:
         result: MypyResult from type checking

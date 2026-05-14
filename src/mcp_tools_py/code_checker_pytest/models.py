@@ -1,6 +1,4 @@
-"""
-Data models for pytest test results and reports.
-"""
+"""Data models for pytest test results and reports."""
 
 from dataclasses import dataclass, field
 from typing import Any, Dict, List, Optional
@@ -8,6 +6,8 @@ from typing import Any, Dict, List, Optional
 
 @dataclass
 class Crash:
+    """Crash details from a pytest failure."""
+
     path: str
     lineno: int
     message: str
@@ -15,6 +15,8 @@ class Crash:
 
 @dataclass
 class TracebackEntry:
+    """Single traceback frame from a pytest failure."""
+
     path: str
     lineno: int
     message: str
@@ -59,11 +61,15 @@ class LogRecord:
 
 @dataclass
 class Log:
+    """Container for a list of log records."""
+
     logs: List[LogRecord]
 
 
 @dataclass
 class StageInfo:
+    """Per-stage info (setup/call/teardown) for a single test."""
+
     duration: float
     outcome: str
     crash: Optional[Crash] = None
@@ -76,6 +82,8 @@ class StageInfo:
 
 @dataclass
 class Test:
+    """Single pytest test result with per-stage info."""
+
     nodeid: str
     lineno: int
     keywords: List[str]
@@ -88,6 +96,8 @@ class Test:
 
 @dataclass
 class CollectorResult:
+    """One item discovered by a pytest collector."""
+
     nodeid: str
     type: str
     lineno: Optional[int] = None
@@ -96,6 +106,8 @@ class CollectorResult:
 
 @dataclass
 class Collector:
+    """A pytest collector and its discovered items."""
+
     nodeid: str
     outcome: str
     result: List[CollectorResult]
@@ -104,6 +116,8 @@ class Collector:
 
 @dataclass
 class Summary:
+    """Aggregate test counts from a pytest run."""
+
     collected: int
     total: int
     deselected: Optional[int] = None
@@ -117,6 +131,8 @@ class Summary:
 
 @dataclass
 class Warning:
+    """A pytest warning emitted during a run."""
+
     message: str
     code: Optional[str] = None
     path: Optional[str] = None
@@ -129,6 +145,8 @@ class Warning:
 
 @dataclass
 class ErrorContext:
+    """Decoded error context for a non-zero pytest exit."""
+
     exit_code: int
     exit_code_meaning: str
     error_message: str
@@ -139,6 +157,8 @@ class ErrorContext:
 
 @dataclass
 class PytestReport:
+    """Top-level pytest-json-report payload parsed into typed fields."""
+
     created: float
     duration: float
     exitcode: int

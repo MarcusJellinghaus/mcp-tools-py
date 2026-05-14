@@ -1,6 +1,4 @@
-"""
-Functions for running pytest tests and processing results.
-"""
+"""Functions for running pytest tests and processing results."""
 
 import logging
 import os
@@ -24,7 +22,11 @@ from mcp_tools_py.utils.subprocess_runner import (
 
 
 def _build_error_detail(output: str, error_output: str) -> str:
-    """Build a stderr/stdout snippet string for error messages."""
+    """Build a stderr/stdout snippet string for error messages.
+
+    Returns:
+        Combined snippet with stderr/stdout sections, possibly empty.
+    """
     stderr_snippet = (
         truncate_stderr(error_output.strip())
         if error_output and error_output.strip()
@@ -45,8 +47,7 @@ logger = logging.getLogger(__name__)
 
 
 class ProcessResult:
-    """
-    Adapter class that mimics subprocess.CompletedProcess interface.
+    """Adapter class that mimics subprocess.CompletedProcess interface.
 
     This class serves as a bridge between our custom CommandResult from
     subprocess_runner and the standard subprocess.CompletedProcess interface
@@ -90,8 +91,7 @@ def run_tests(
     timeout_seconds: int = 300,
     skip_default_test_folder: bool = False,
 ) -> PytestReport:
-    """
-    Run pytest tests in the specified project directory and test folder and returns the results.
+    """Run pytest tests in the specified project directory and test folder and returns the results.
 
     Args:
         project_dir: The path to the project directory
@@ -104,7 +104,7 @@ def run_tests(
         venv_path: Optional path to a virtual environment to activate. When provided, this venv's Python will be used
         keep_temp_files: Whether to keep temporary files after execution (useful for debugging failures)
         timeout_seconds: Maximum time in seconds to wait for test execution. Default is 300 seconds
-
+        skip_default_test_folder: When True, do not append `test_folder` to the pytest command (caller already passed test paths via `extra_args`)
 
     Returns:
         PytestReport: An object containing the results of the test session with the following attributes:
@@ -113,9 +113,11 @@ def run_tests(
         - error_context: Information about any errors that occurred during execution
 
     Raises:
-        Exception: If pytest is not installed or if an error occurs during test execution
+        RuntimeError: For pytest internal errors, plugin errors, missing pytest, or
+            failure to install pytest-json-report.
+        TimeoutError: If pytest execution exceeds `timeout_seconds`.
+        ValueError: For pytest usage errors or when no tests are collected.
     """
-
     # Create a temporary directory for output files
     temp_dir = tempfile.mkdtemp(prefix="pytest_runner_")
     temp_report_file = os.path.join(temp_dir, "pytest_result.json")
@@ -471,8 +473,7 @@ def check_code_with_pytest(
     timeout_seconds: int = 300,
     skip_default_test_folder: bool = False,
 ) -> Dict[str, Any]:
-    """
-    Run pytest on the specified project and return results.
+    """Run pytest on the specified project and return results.
 
     Args:
         project_dir: Path to the project directory
@@ -485,7 +486,7 @@ def check_code_with_pytest(
         venv_path: Optional path to a virtual environment to activate for running tests. When specified, the Python executable from this venv will be used instead of python_executable
         keep_temp_files: Whether to keep temporary files after test execution. Useful for debugging when tests fail
         timeout_seconds: Maximum time in seconds to wait for test execution. Default is 300 seconds
-
+        skip_default_test_folder: When True, do not append `test_folder` to the pytest command (caller already passed test paths via `extra_args`)
 
     Returns:
         Dictionary with test results containing the following keys:

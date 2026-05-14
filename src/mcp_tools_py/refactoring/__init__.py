@@ -37,6 +37,9 @@ class RefactoringTools:
 
             Args:
                 file: File path relative to project root.
+
+            Returns:
+                Formatted listing of top-level symbols, or an error message.
             """
             return jedi_list_symbols(project_dir, file)
 
@@ -48,6 +51,9 @@ class RefactoringTools:
             Args:
                 file: File path relative to project root.
                 symbol_name: Name of the top-level symbol to find.
+
+            Returns:
+                Formatted listing of references, or an error message.
             """
             return jedi_find_references(project_dir, file, symbol_name)
 
@@ -70,6 +76,7 @@ class RefactoringTools:
             dry_run: bool = False,
         ) -> str:
             """Move top-level functions, classes, or variables to another module.
+
             Updates all imports project-wide. Auto-creates destination file and
             missing __init__.py files if needed.
 
@@ -78,6 +85,9 @@ class RefactoringTools:
                 symbol_names: Names of top-level symbols to move.
                 dest_file: Destination file path relative to project root.
                 dry_run: Preview changes without applying (default: False).
+
+            Returns:
+                Formatted summary of changes (or planned changes for dry-run).
             """
             return rope_move_symbol(
                 project_dir,
@@ -103,6 +113,9 @@ class RefactoringTools:
                 symbol_name: Current name of the symbol.
                 new_name: New name for the symbol.
                 dry_run: Preview changes without applying (default: False).
+
+            Returns:
+                Formatted summary of changes (or planned changes for dry-run).
             """
             return rope_rename_symbol(
                 project_dir,
@@ -126,6 +139,9 @@ class RefactoringTools:
                 source_module: Source module path relative to project root.
                 dest_package: Destination package path relative to project root.
                 dry_run: Preview changes without applying (default: False).
+
+            Returns:
+                Formatted summary of changes (or planned changes for dry-run).
             """
             return rope_move_module(
                 project_dir,

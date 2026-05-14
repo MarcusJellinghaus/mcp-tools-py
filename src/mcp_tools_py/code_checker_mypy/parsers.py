@@ -9,8 +9,7 @@ logger = logging.getLogger(__name__)
 
 
 def parse_mypy_json_output(output: str) -> tuple[list[MypyMessage], str | None]:
-    """
-    Parse mypy JSON output into MypyMessage objects.
+    """Parse mypy JSON output into MypyMessage objects.
 
     Mypy outputs one JSON object per line when using --output json.
 

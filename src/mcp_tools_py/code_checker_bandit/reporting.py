@@ -1,5 +1,4 @@
-"""
-Reporting layer for bandit security analysis results.
+"""Reporting layer for bandit security analysis results.
 
 Groups findings by test_id, sorts by severity/confidence/frequency,
 and formats LLM-optimized output with max_issues detail/summary control.
@@ -27,7 +26,11 @@ class BanditIssueGroup(NamedTuple):
 def group_and_sort_issues(
     messages: list[BanditMessage],
 ) -> list[BanditIssueGroup]:
-    """Group by test_id, sort by (severity, confidence, -frequency)."""
+    """Group by test_id, sort by (severity, confidence, -frequency).
+
+    Returns:
+        Issue groups sorted highest severity / confidence / count first.
+    """
     groups: dict[str, list[BanditMessage]] = defaultdict(list)
     for msg in messages:
         groups[msg.test_id].append(msg)
@@ -52,7 +55,11 @@ def format_bandit_report(
     errors: list[str],
     max_issues: int = 1,
 ) -> str | None:
-    """Format bandit results into LLM-optimized report. Returns None if no issues and no errors."""
+    """Format bandit results into an LLM-optimized report.
+
+    Returns:
+        Formatted report string, or None if there are no issues and no errors.
+    """
     sections: list[str] = []
 
     if errors:

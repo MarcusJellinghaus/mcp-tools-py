@@ -1,6 +1,4 @@
-"""
-Functions for parsing pylint output.
-"""
+"""Functions for parsing pylint output."""
 
 import json
 import logging
@@ -14,8 +12,7 @@ logger = logging.getLogger(__name__)
 def parse_pylint_json_output(
     raw_output: str,
 ) -> tuple[List[PylintMessage], str | None]:
-    """
-    Parse pylint JSON output into PylintMessage objects.
+    """Parse pylint JSON output into PylintMessage objects.
 
     Args:
         raw_output: Raw JSON output from pylint

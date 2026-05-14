@@ -19,12 +19,23 @@ T = TypeVar("T")
 
 
 class ToolDecorator(Protocol):
-    def __call__(self, func: Callable[..., T]) -> Callable[..., T]: ...
+    """Protocol for an MCP tool-registration decorator."""
+
+    def __call__(self, func: Callable[..., T]) -> Callable[..., T]:
+        """Register `func` as an MCP tool and return it."""
+        ...
 
 
 class FastMCPProtocol(Protocol):
-    def tool(self) -> ToolDecorator: ...
-    def run(self) -> None: ...
+    """Subset of FastMCP's surface used by ToolServer."""
+
+    def tool(self) -> ToolDecorator:
+        """Return a decorator that registers a tool."""
+        ...
+
+    def run(self) -> None:
+        """Run the MCP server event loop."""
+        ...
 
 
 # Initialize logger
@@ -44,8 +55,7 @@ class ToolServer:
         refactoring_timeout: int = 120,
         vulture_whitelist: str = "vulture_whitelist.py",
     ) -> None:
-        """
-        Initialize the server with the project directory and Python configuration.
+        """Initialize the server with the project directory and Python configuration.
 
         Args:
             project_dir: Path to the project directory to check
@@ -79,7 +89,14 @@ class ToolServer:
         InspectTools().register(self.mcp)
 
     def _resolve_python_executable(self) -> str:
-        """Centralize venv -> python_executable -> sys.executable resolution."""
+        """Centralize venv -> python_executable -> sys.executable resolution.
+
+        Returns:
+            Path to the Python interpreter to use for tool subprocesses.
+
+        Raises:
+            FileNotFoundError: If `venv_path` is set but its python binary is missing.
+        """
         if self.venv_path:
             if os.name == "nt":
                 python = os.path.join(self.venv_path, "Scripts", "python.exe")
@@ -96,7 +113,11 @@ class ToolServer:
             return sys.executable
 
     def _check_tool_availability(self) -> dict[str, bool]:
-        """Check availability of file-existence tools (lint-imports, vulture, ruff, bandit)."""
+        """Check availability of file-existence tools (lint-imports, vulture, ruff, bandit).
+
+        Returns:
+            Mapping of tool name to availability flag.
+        """
         availability: dict[str, bool] = {}
 
         # lint-imports: check via file existence (not subprocess)
@@ -191,7 +212,11 @@ class ToolServer:
         return availability
 
     def _is_tool_available(self, tool_name: str) -> bool:
-        """Check if a tool is available, running subprocess check on first call."""
+        """Check if a tool is available, running subprocess check on first call.
+
+        Returns:
+            True if `python -m <tool_name> --version` succeeds.
+        """
         if tool_name in self._tool_availability:
             return self._tool_availability[tool_name]
         result = execute_command(
@@ -230,8 +255,7 @@ def create_server(
     refactoring_timeout: int = 120,
     vulture_whitelist: str = "vulture_whitelist.py",
 ) -> ToolServer:
-    """
-    Create a new ToolServer instance.
+    """Create a new ToolServer instance.
 
     Args:
         project_dir: Path to the project directory to check

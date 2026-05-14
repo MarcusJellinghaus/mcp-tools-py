@@ -10,7 +10,11 @@ _MAX_LINES = 200
 
 
 def _truncate_output(text: str) -> str:
-    """Truncate output to a maximum number of lines."""
+    """Truncate output to a maximum number of lines.
+
+    Returns:
+        Original text, or text capped at `_MAX_LINES` with a marker.
+    """
     lines = text.splitlines()
     if len(lines) <= _MAX_LINES:
         return text
@@ -26,6 +30,9 @@ def _parse_isort_changed_files(output: str) -> list[str]:
     isort reports changed files as:
     - Normal mode: ``Fixing src/foo.py``
     - Check mode: ``ERROR: src/foo.py Imports are incorrectly sorted ...``
+
+    Returns:
+        Paths of files isort sorted (or would sort).
     """
     files: list[str] = []
     for line in output.splitlines():

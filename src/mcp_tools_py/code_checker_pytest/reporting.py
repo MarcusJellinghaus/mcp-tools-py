@@ -1,6 +1,4 @@
-"""
-Functions for formatting and reporting pytest test results.
-"""
+"""Functions for formatting and reporting pytest test results."""
 
 import logging
 from typing import Any, Dict, List, Optional, Tuple
@@ -17,9 +15,7 @@ FAILED_OUTCOMES = ["failed", "error"]
 
 
 class OutputBuilder:
-    """
-    Helper class to manage output building with line counting and truncation.
-    """
+    """Helper class to manage output building with line counting and truncation."""
 
     def __init__(self, max_lines: int = MAX_OUTPUT_LINES):
         self.parts: List[str] = []
@@ -28,8 +24,7 @@ class OutputBuilder:
         self.truncated = False
 
     def add(self, content: str) -> bool:
-        """
-        Add content to the output, checking line limits.
+        """Add content to the output, checking line limits.
 
         Args:
             content: Content to add
@@ -57,13 +52,16 @@ class OutputBuilder:
         return True
 
     def get_result(self) -> str:
-        """Get the final output string."""
+        """Get the final output string.
+
+        Returns:
+            All appended parts concatenated.
+        """
         return "".join(self.parts)
 
 
 def should_show_details(_test_results: Dict[str, Any], show_details: bool) -> bool:
-    """
-    Determine if detailed output should be shown based on test results and user preference.
+    """Determine if detailed output should be shown based on test results and user preference.
 
     Args:
         _test_results: Dictionary containing test summary information (currently unused)
@@ -82,7 +80,11 @@ def should_show_details(_test_results: Dict[str, Any], show_details: bool) -> bo
 
 
 def _get_failed_collectors(test_session_result: PytestReport) -> List[Collector]:
-    """Extract failed collectors from test session result."""
+    """Extract failed collectors from test session result.
+
+    Returns:
+        Collectors whose outcome is failed or error.
+    """
     if not test_session_result.collectors:
         return []
 
@@ -96,7 +98,11 @@ def _get_failed_collectors(test_session_result: PytestReport) -> List[Collector]
 def _get_failed_tests(
     test_session_result: PytestReport, max_failures: int
 ) -> List[Test]:
-    """Extract and limit failed tests from test session result."""
+    """Extract and limit failed tests from test session result.
+
+    Returns:
+        Up to `max_failures` failed/errored tests.
+    """
     if not test_session_result.tests:
         return []
 
@@ -108,8 +114,7 @@ def _get_failed_tests(
 
 
 def _format_collector_info(collector: Collector, output: OutputBuilder) -> bool:
-    """
-    Format information about a failed collector.
+    """Format information about a failed collector.
 
     Args:
         collector: The failed collector to format
@@ -139,8 +144,7 @@ def _format_collector_info(collector: Collector, output: OutputBuilder) -> bool:
 def _format_test_output(
     test: Test, output: OutputBuilder, include_print_output: bool
 ) -> bool:
-    """
-    Format stdout, stderr, and longrepr output for a test.
+    """Format stdout, stderr, and longrepr output for a test.
 
     Args:
         test: The test to format output for
@@ -171,8 +175,7 @@ def _format_test_output(
 def _format_test_setup_info(
     test: Test, output: OutputBuilder, include_print_output: bool
 ) -> bool:
-    """
-    Format setup information for a failed test.
+    """Format setup information for a failed test.
 
     Args:
         test: The test with failed setup
@@ -225,8 +228,7 @@ def _format_test_setup_info(
 def _format_test_info(
     test: Test, output: OutputBuilder, include_print_output: bool
 ) -> bool:
-    """
-    Format information about a failed test.
+    """Format information about a failed test.
 
     Args:
         test: The failed test to format
@@ -266,8 +268,7 @@ def _format_test_info(
 def _process_failed_collectors(
     failed_collectors: List[Collector], output: OutputBuilder
 ) -> bool:
-    """
-    Process and format all failed collectors.
+    """Process and format all failed collectors.
 
     Args:
         failed_collectors: List of failed collectors
@@ -295,8 +296,7 @@ def _process_failed_tests(
     include_print_output: bool,
     max_number_of_tests_reported: int,
 ) -> bool:
-    """
-    Process and format failed tests.
+    """Process and format failed tests.
 
     Args:
         failed_tests: List of failed tests
@@ -343,8 +343,7 @@ def create_prompt_for_failed_tests(
     max_failures: int = MAX_FAILURES,
     max_output_lines: int = MAX_OUTPUT_LINES,
 ) -> Optional[str]:
-    """
-    Creates a prompt for an LLM based on the failed tests from a test session result.
+    """Creates a prompt for an LLM based on the failed tests from a test session result.
 
     Args:
         test_session_result: The test session result to analyze
@@ -385,8 +384,7 @@ def create_prompt_for_failed_tests(
 def get_detailed_test_summary(
     test_session_result: PytestReport, show_details: bool
 ) -> str:
-    """
-    Enhanced summary that can include additional detail hints.
+    """Enhanced summary that can include additional detail hints.
 
     Args:
         test_session_result: The test session result to summarize
@@ -412,8 +410,7 @@ def get_detailed_test_summary(
 
 
 def get_test_summary(test_session_result: PytestReport) -> str:
-    """
-    Generate a human-readable summary of the test results.
+    """Generate a human-readable summary of the test results.
 
     Args:
         test_session_result: The test session result to summarize

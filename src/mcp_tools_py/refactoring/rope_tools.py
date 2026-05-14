@@ -81,7 +81,11 @@ def read_gitignore_rules(
 
 
 def _build_ignored_resources(project_dir: Path) -> list[str]:
-    """Build rope ignored_resources from .gitignore + hardcoded defaults."""
+    """Build rope ignored_resources from .gitignore + hardcoded defaults.
+
+    Returns:
+        Patterns to pass as rope's `ignored_resources`.
+    """
     patterns = list(_DEFAULT_IGNORED)
 
     gitignore_path = project_dir / ".gitignore"
@@ -115,7 +119,11 @@ def _build_ignored_resources(project_dir: Path) -> list[str]:
 
 @contextmanager
 def _with_rope_project(project_dir: Path) -> Iterator[Project]:
-    """Context manager: open fresh rope Project, yield, close."""
+    """Context manager: open fresh rope Project, yield, close.
+
+    Yields:
+        A configured `rope.base.project.Project` for `project_dir`.
+    """
     ignored = _build_ignored_resources(project_dir)
     project = Project(str(project_dir), ropefolder=None, ignored_resources=ignored)
     project.prefs["prefer_module_from_imports"] = True
@@ -126,7 +134,11 @@ def _with_rope_project(project_dir: Path) -> Iterator[Project]:
 
 
 def _get_top_level_symbols(source: str) -> list[str]:
-    """Parse source and return top-level symbol names."""
+    """Parse source and return top-level symbol names.
+
+    Returns:
+        Names of top-level functions, classes, and assigned variables.
+    """
     try:
         tree = ast.parse(source)
     except SyntaxError:
@@ -148,7 +160,11 @@ def _get_top_level_symbols(source: str) -> list[str]:
 
 
 def _find_symbol_offset(source: str, symbol_name: str) -> int | None:
-    """Find the byte offset of a top-level symbol in source code."""
+    """Find the byte offset of a top-level symbol in source code.
+
+    Returns:
+        Byte offset of `symbol_name`, or None if not found / parse error.
+    """
     try:
         tree = ast.parse(source)
     except SyntaxError:
@@ -201,6 +217,9 @@ def _format_changes(
         dry_run: Whether this is a dry-run preview.
         pre_existing: Paths that existed before the operation. Used in
             non-dry-run mode to distinguish created vs modified files.
+
+    Returns:
+        Multi-line text listing each created/modified path.
     """
     prefix = "[DRY RUN] Would modify" if dry_run else "Modified"
     create_prefix = "[DRY RUN] Would create" if dry_run else "Created"
@@ -248,7 +267,11 @@ def _move_symbol_impl(
     dest_file: str,
     dry_run: bool,
 ) -> str:
-    """Inner implementation of move_symbol — runs inside a subprocess."""
+    """Inner implementation of move_symbol — runs inside a subprocess.
+
+    Returns:
+        Human-readable result, or an error message string.
+    """
     abs_source = project_dir / source_file
     abs_dest = project_dir / dest_file
 
@@ -394,6 +417,9 @@ def _run_rope_subprocess(
     The fix: run rope in a completely separate process with stdin=DEVNULL
     and file-based stdout, using the same execute_command pattern that
     already works for pytest/pylint/mypy in this project.
+
+    Returns:
+        Subprocess result string, or an error message starting with "Error".
     """
     command = [
         sys.executable,
@@ -449,7 +475,11 @@ def move_symbol(
     dry_run: bool = False,
     timeout: int = 120,
 ) -> str:
-    """Move top-level symbols to another module. Updates imports project-wide."""
+    """Move top-level symbols to another module. Updates imports project-wide.
+
+    Returns:
+        Human-readable result, or an error message string.
+    """
     abs_source = project_dir / source_file
     if not abs_source.exists():
         return f"Error: file not found: {source_file}"
@@ -468,7 +498,11 @@ def move_symbol(
 
 
 def _collect_existing_paths(changes: ChangeSet) -> set[str]:
-    """Return the set of resource paths that exist before project.do()."""
+    """Return the set of resource paths that exist before project.do().
+
+    Returns:
+        Resource paths from `changes` that already exist on disk.
+    """
     return {
         change.resource.path for change in changes.changes if change.resource.exists()
     }
@@ -540,7 +574,11 @@ def _rename_symbol_impl(
     new_name: str,
     dry_run: bool,
 ) -> str:
-    """Inner implementation of rename_symbol — runs inside a subprocess."""
+    """Inner implementation of rename_symbol — runs inside a subprocess.
+
+    Returns:
+        Human-readable result, or an error message string.
+    """
     abs_path = project_dir / file_path
     source_text = abs_path.read_text(encoding="utf-8")
 
@@ -579,7 +617,11 @@ def rename_symbol(
     dry_run: bool = False,
     timeout: int = 120,
 ) -> str:
-    """Rename a symbol and update all references project-wide."""
+    """Rename a symbol and update all references project-wide.
+
+    Returns:
+        Human-readable result, or an error message string.
+    """
     abs_path = project_dir / file_path
     if not abs_path.exists():
         return f"Error: file not found: {file_path}"
@@ -609,7 +651,11 @@ def _cleanup_package(abs_pkg: Path, project_dir: Path) -> None:
 
 
 def _is_git_repo(project_dir: Path) -> bool:
-    """Check if project_dir is inside a git repository."""
+    """Check if project_dir is inside a git repository.
+
+    Returns:
+        True if `git rev-parse --git-dir` succeeds in `project_dir`.
+    """
     try:
         result = _subprocess.run(
             ["git", "rev-parse", "--git-dir"],
@@ -623,7 +669,11 @@ def _is_git_repo(project_dir: Path) -> bool:
 
 
 def _is_git_tracked(project_dir: Path, file_path: str) -> bool:
-    """Check if a file is tracked by git (staged or committed)."""
+    """Check if a file is tracked by git (staged or committed).
+
+    Returns:
+        True if `git ls-files --error-unmatch` finds the file (or check fails).
+    """
     try:
         result = _subprocess.run(
             ["git", "ls-files", "--error-unmatch", file_path],
@@ -642,7 +692,11 @@ def _move_module_impl(
     dest_package: str,
     dry_run: bool,
 ) -> str:
-    """Inner implementation of move_module — runs inside a subprocess."""
+    """Inner implementation of move_module — runs inside a subprocess.
+
+    Returns:
+        Human-readable result, or an error message string.
+    """
     abs_dest_pkg = project_dir / dest_package
     abs_source = project_dir / source_module
     created_pkg_for_dry_run = False
@@ -728,7 +782,11 @@ def move_module(
     dry_run: bool = False,
     timeout: int = 120,
 ) -> str:
-    """Move an entire module to a new package. Updates all references."""
+    """Move an entire module to a new package. Updates all references.
+
+    Returns:
+        Human-readable result, or an error message string.
+    """
     abs_source = project_dir / source_module
     if not abs_source.exists():
         return f"Error: file not found: {source_module}"

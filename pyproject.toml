@@ -80,6 +80,27 @@ profile = "black"
 line_length = 88
 float_to_top = true
 
+[tool.ruff]
+target-version = "py311"
+line-length = 88
+
+[tool.ruff.lint]
+# Only enable docstring rules for now
+# preview needed for DOC rules (pydoclint)
+preview = true
+select = ["D", "DOC"]
+ignore = [
+    "D104",  # missing docstring in __init__.py (low value)
+    "D107",  # missing docstring in __init__ method (redundant with class docstring)
+]
+
+[tool.ruff.lint.per-file-ignores]
+"tests/**/*.py" = ["D", "DOC"]
+"src/mcp_tools_py/code_checker_ruff/*.py" = ["DOC502"]
+
+[tool.ruff.lint.pydocstyle]
+convention = "google"
+
 [tool.mypy]
 python_version = "3.11"
 warn_return_any = true

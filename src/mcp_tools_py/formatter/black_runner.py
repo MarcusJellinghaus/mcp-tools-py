@@ -10,7 +10,11 @@ _MAX_LINES = 200
 
 
 def _truncate_output(text: str) -> str:
-    """Truncate output to a maximum number of lines."""
+    """Truncate output to a maximum number of lines.
+
+    Returns:
+        Original text, or text capped at `_MAX_LINES` with a marker.
+    """
     lines = text.splitlines()
     if len(lines) <= _MAX_LINES:
         return text
@@ -26,6 +30,9 @@ def _parse_black_changed_files(output: str) -> list[str]:
     Black reports changed files as:
     - Normal mode: ``reformatted src/foo.py``
     - Check mode: ``would reformat src/foo.py``
+
+    Returns:
+        Paths of files black reformatted (or would reformat).
     """
     files: list[str] = []
     for line in output.splitlines():

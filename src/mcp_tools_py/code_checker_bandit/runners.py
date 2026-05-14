@@ -16,7 +16,11 @@ def _build_bandit_command(
     target_directories: list[str],
     extra_args: list[str] | None = None,
 ) -> list[str]:
-    """Build the bandit CLI command list."""
+    """Build the bandit CLI command list.
+
+    Returns:
+        Command argv ready to pass to `execute_command`.
+    """
     cmd = [bandit_binary, "-f", "json", "-r"]
     cmd.extend(target_directories)
     if extra_args:

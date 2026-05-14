@@ -97,7 +97,11 @@ def _format_results(
     steps: list[str],
     check_only: bool,
 ) -> str:
-    """Format runner results into markdown output."""
+    """Format runner results into markdown output.
+
+    Returns:
+        Markdown report with one `## <step>` section per runner.
+    """
     sections: list[str] = []
     failed_step: str | None = None
 

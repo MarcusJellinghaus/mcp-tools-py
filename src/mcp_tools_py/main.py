@@ -15,8 +15,7 @@ logger = logging.getLogger(__name__)
 
 
 def parse_args() -> argparse.Namespace:
-    """
-    Parse command line arguments.
+    """Parse command line arguments.
 
     Returns:
         Parsed arguments
@@ -113,9 +112,7 @@ Examples:
 
 
 def main() -> None:
-    """
-    Main entry point for the MCP server.
-    """
+    """Main entry point for the MCP server."""
     # Parse command line arguments
     args = parse_args()
 

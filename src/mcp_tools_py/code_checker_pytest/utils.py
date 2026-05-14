@@ -1,6 +1,4 @@
-"""
-Utility functions for code checker pytest operations.
-"""
+"""Utility functions for code checker pytest operations."""
 
 import os
 from typing import List, Optional, Tuple
@@ -116,8 +114,7 @@ def sanitize_extra_args(
 
 
 def get_pytest_exit_code_info(exit_code: int) -> Tuple[str, str]:
-    """
-    Get detailed information and suggestions for pytest exit codes.
+    """Get detailed information and suggestions for pytest exit codes.
 
     Args:
         exit_code: The pytest exit code
@@ -178,8 +175,7 @@ def get_pytest_exit_code_info(exit_code: int) -> Tuple[str, str]:
 
 
 def create_error_context(exit_code: int, error_message: str) -> ErrorContext:
-    """
-    Create a detailed error context object with exit code interpretation.
+    """Create a detailed error context object with exit code interpretation.
 
     Args:
         exit_code: Pytest exit code

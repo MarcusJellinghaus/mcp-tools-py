@@ -110,6 +110,7 @@ jobs:
           - {name: "pylint", cmd: "pylint --version && pylint -E ./src ./tests"}
           - {name: "pytest", cmd: "pytest --version && pytest tests"}
           - {name: "mypy", cmd: "mypy --version && mypy --strict src tests"}
+          - {name: "ruff-docstrings", cmd: "ruff --version && ruff check src tests"}
     name: ${{ matrix.check.name }}
     steps:
       - uses: actions/checkout@v6
