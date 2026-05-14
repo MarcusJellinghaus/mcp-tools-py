@@ -45,7 +45,6 @@ dependencies = [
 [project.optional-dependencies]
 dev = [
     "mcp-workspace",
-    "mcp-coder",
     # Architecture and code quality tools
     "tach>=0.15.0",
     "pycycle>=0.0.8",
@@ -174,7 +173,6 @@ where = ["src"]
 mcp-config-tool = { git = "https://github.com/MarcusJellinghaus/mcp-config.git" }
 mcp-coder-utils = { git = "https://github.com/MarcusJellinghaus/mcp-coder-utils.git" }
 mcp-workspace = { git = "https://github.com/MarcusJellinghaus/mcp-workspace.git" }
-mcp-coder = { git = "https://github.com/MarcusJellinghaus/mcp_coder.git" }
 
 [build-system]
 requires = ["setuptools>=61.0", "setuptools-scm>=8.0"]

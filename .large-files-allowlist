@@ -10,6 +10,7 @@ tests/test_server_params.py
 
 # Core implementation files that may be legitimately large
 src/mcp_tools_py/checker_tools.py
+src/mcp_tools_py/refactoring/rope_tools.py
 src/mcp_tools_py/server.py
 src/mcp_tools_py/utils/data_files.py
 src/mcp_tools_py/utils/subprocess_runner.py
