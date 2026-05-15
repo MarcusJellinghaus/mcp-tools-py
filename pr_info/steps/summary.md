@@ -24,16 +24,16 @@ Ships as **one PR with two commits** (one commit per refactor).
 
 ```
 src/mcp_tools_py/checker_tools/
-├── __init__.py            # exports CheckerTools orchestrator
-├── pylint_tool.py         # register(mcp, server) + _format_pylint_result
-├── pytest_tool.py         # register(mcp, server) + _format_pytest_result_with_details
-├── mypy_tool.py           # register(mcp, server) + _format_mypy_result
-├── lint_imports_tool.py   # register(mcp, server)
-├── vulture_tool.py        # register(mcp, server)
-├── ruff_check_tool.py     # register(mcp, server)
-├── ruff_fix_tool.py       # register(mcp, server)
-├── bandit_tool.py         # register(mcp, server)
-└── tach_tool.py           # register(mcp, server)
+├── __init__.py            # CheckerTools orchestrator (owns _format_* helpers)
+├── pylint_tool.py         # register(mcp, checker_tools)
+├── pytest_tool.py         # register(mcp, checker_tools)
+├── mypy_tool.py           # register(mcp, checker_tools)
+├── lint_imports_tool.py   # register(mcp, checker_tools)
+├── vulture_tool.py        # register(mcp, checker_tools)
+├── ruff_check_tool.py     # register(mcp, checker_tools)
+├── ruff_fix_tool.py       # register(mcp, checker_tools)
+├── bandit_tool.py         # register(mcp, checker_tools)
+└── tach_tool.py           # register(mcp, checker_tools)
 ```
 
 ### Per-tool entry point
@@ -41,12 +41,16 @@ src/mcp_tools_py/checker_tools/
 Each `*_tool.py` exposes a module-level free function:
 
 ```python
-def register(mcp: "FastMCPProtocol", server: "ToolServer") -> None: ...
+def register(mcp: "FastMCPProtocol", checker_tools: "CheckerTools") -> None: ...
 ```
 
 `CheckerTools.register()` (in `__init__.py`) dispatches to each tool's
-`register` function. This drops the `self._server` plumbing of the
-old `_register_*` methods.
+`register` function, passing `self`. Closures access the server via
+`checker_tools._server` and the shared formatter helpers via
+`checker_tools._format_pylint_result(...)` etc. This drops the
+`_register_*` method plumbing while keeping the formatter helpers as
+instance methods of `CheckerTools` (their 40+ test call sites stay
+untouched).
 
 ### Why `_tool` suffix
 
@@ -63,9 +67,17 @@ above the `code_checker_*` implementation layer.
 ### Private formatter helpers
 
 `_format_pylint_result`, `_format_pytest_result_with_details`, and
-`_format_mypy_result` each have exactly **one caller**. Co-locate each
-with its sole caller inside its matching `*_tool.py` as a private
-module-level function. No shared formatters module.
+`_format_mypy_result` stay as **instance methods on `CheckerTools` in
+`__init__.py`**. Reason: they have 40+ instance-method call sites
+across `tests/test_checker_tools.py`, `tests/test_server_params.py`,
+`tests/test_final_validation.py`, and the migrated
+`tests/test_code_checker_pytest/test_reporting.py` /
+`test_runners.py` — all of which must remain unchanged.
+
+The `*_tool.py` register closures call them via the orchestrator
+instance, e.g. `checker_tools._format_pylint_result(prompt)`. No
+shared formatters module; no module-level free functions for these
+helpers.
 
 ### Layer isolation (no `.importlinter` change)
 
@@ -85,13 +97,18 @@ which source module each test exercises:
 ```
 tests/test_code_checker_pytest/
 ├── conftest.py          # NEW — shared fixtures (temp_project_dir, server)
-│                        #       + helpers (_create_focused_project,
-│                        #         _create_large_project, _create_edge_case_project)
+├── _helpers.py          # NEW — project-builder helpers
+│                        #       (_create_focused_project,
+│                        #        _create_large_project, _create_edge_case_project)
 ├── test_reporting.py    # NEW — 9 tests exercising reporting.py
 ├── test_runners.py      # NEW — 2 tests exercising runners.py
 ├── test_extra_args.py        # unchanged
 └── test_integration_env.py   # unchanged
 ```
+
+Helpers live in a sibling `_helpers.py` module (not `conftest.py`) to
+avoid the pytest anti-pattern of importing from a conftest file. The
+leading underscore marks them as intra-package test utilities.
 
 Sub-split fallback: if `test_reporting.py` exceeds 750 lines after move,
 split by source sub-function into `test_reporting_show_details.py`,
@@ -120,18 +137,20 @@ unlikely to be triggered.
 
 **Modified:**
 - `.large-files-allowlist` — remove `src/mcp_tools_py/checker_tools.py`
+- `tests/test_checker_tools.py` — migrate `patch("mcp_tools_py.checker_tools.<symbol>", ...)` sites to per-submodule namespaces (e.g. `…checker_tools.pylint_tool.get_pylint_prompt`, `…checker_tools.vulture_tool.run_vulture`, `…checker_tools.ruff_check_tool.run_ruff_check_impl`, `…checker_tools.ruff_fix_tool.run_ruff_fix_impl`, `…checker_tools.tach_tool.run_tach`, plus the `resolve_target_directories` patches retargeted to each owning `*_tool` submodule)
+- `tests/test_server_params.py` — migrate 13 `patch("mcp_tools_py.checker_tools.check_code_with_pytest", ...)` sites to `…checker_tools.pytest_tool.check_code_with_pytest`; migrate `create_prompt_for_failed_tests`, `get_pylint_prompt`, and `resolve_target_directories` patches to their owning `*_tool` submodules
+- `tests/test_tool_availability.py` — migrate 2 `patch("mcp_tools_py.checker_tools.check_code_with_pytest", ...)` sites to `…checker_tools.pytest_tool.check_code_with_pytest`
+- `tests/test_code_checker_bandit/test_integration.py` — migrate 3 `run_bandit_check_impl` + 3 `resolve_target_directories` patch sites to `…checker_tools.bandit_tool.<symbol>`
 
 **Unchanged (callers still work via `__init__.py` re-export):**
 - `src/mcp_tools_py/server.py`
-- `tests/test_checker_tools.py`
-- `tests/test_server_params.py`
 - `tests/test_final_validation.py`
-- `tests/test_code_checker_bandit/test_integration.py`
 
 ### Commit 2
 
 **Created:**
 - `tests/test_code_checker_pytest/conftest.py`
+- `tests/test_code_checker_pytest/_helpers.py`
 - `tests/test_code_checker_pytest/test_reporting.py`
 - `tests/test_code_checker_pytest/test_runners.py`
 

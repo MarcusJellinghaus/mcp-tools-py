@@ -9,11 +9,13 @@ plus a shared `conftest.py`. One commit.
 Read pr_info/steps/summary.md, then implement Step 2 from
 pr_info/steps/step_2.md. Split
 tests/test_code_checker_pytest/test_integration_formatting.py into:
-- conftest.py (shared fixtures + helpers)
+- conftest.py (shared fixtures only)
+- _helpers.py (project-builder helper functions)
 - test_reporting.py (9 tests exercising reporting.py)
 - test_runners.py (2 tests exercising runners.py)
 
-Delete the original file. Remove both
+Test files import helpers from the sibling `_helpers` module — never
+from `conftest`. Delete the original file. Remove both
 tests/test_code_checker_pytest/test_integration_formatting.py and the
 stale tests/test_code_checker_pytest/test_integration_show_details.py
 entries from .large-files-allowlist. If test_reporting.py still exceeds
@@ -30,6 +32,7 @@ Delete:
 
 Create:
 - `tests/test_code_checker_pytest/conftest.py`
+- `tests/test_code_checker_pytest/_helpers.py`
 - `tests/test_code_checker_pytest/test_reporting.py`
 - `tests/test_code_checker_pytest/test_runners.py`
 
@@ -61,10 +64,10 @@ Tests of marker filtering / runner-behaviour from `code_checker_pytest/runners.p
 1. `test_marker_filtering_with_details`
 2. `test_performance_validation`
 
-### → `conftest.py`
+### → `conftest.py` (fixtures only)
 
-Move these fixtures and helpers out of the class so any test file in
-this directory can use them.
+Move these fixtures out of the class so any test file in this
+directory can use them.
 
 **Fixtures (currently class methods on `TestIntegrationFormatting`):**
 
@@ -83,33 +86,47 @@ def server(temp_project_dir: Path) -> ToolServer:
     return ToolServer(project_dir=temp_project_dir)
 ```
 
-**Helpers (currently class methods, become module-level functions):**
+### → `_helpers.py` (project-builder helpers)
+
+Move these helpers (currently class methods) into a sibling module —
+NOT into `conftest.py`. Importing from a conftest file is a pytest
+anti-pattern (conftest is intended for fixtures + hooks, picked up
+automatically by pytest, not as an importable module).
 
 ```python
+"""Project-builder helpers for code_checker_pytest integration tests."""
+
+from pathlib import Path
+
+
 def _create_focused_project(project_dir: Path) -> None: ...
 def _create_large_project(project_dir: Path) -> None: ...
 def _create_edge_case_project(project_dir: Path) -> None: ...
 ```
 
+The leading underscore marks them as intra-package test utilities.
+
 ## HOW — Integration points
 
 - **Fixtures auto-discovered:** pytest finds `conftest.py` automatically. No `import` in test files.
-- **Helpers explicit-import:** test files use `from tests.test_code_checker_pytest.conftest import _create_focused_project` (or whichever helpers they use). The leading underscore is intentional — they are intra-package test utilities, not public API.
+- **Helpers explicit-import from `_helpers`:** test files use `from tests.test_code_checker_pytest._helpers import _create_focused_project` (or whichever helpers they need). Never import from `conftest.py`.
 - **De-classing helpers:** drop the `self` parameter; callsites `self._create_focused_project(temp_project_dir)` become `_create_focused_project(temp_project_dir)`.
 - **De-classing fixture access:** test functions take `temp_project_dir` and `server` as parameters directly (already the pattern — no `self.server` usage).
-- **Imports per file:** each test file imports only what its tests use (`json`, `time`, `pytest`, `parse_pytest_report`, `CheckerTools`, `ToolServer`, `Path`, etc.).
+- **Imports per file:** each test file imports only what its tests use (`json`, `time`, `pytest`, `parse_pytest_report`, `CheckerTools`, `ToolServer`, `Path`, etc.) plus the helpers from `_helpers`.
 - **Existing helpers `tests/conftest.py`** stays unchanged — it only defines `make_command_result`, which these tests don't use.
 
 ## ALGORITHM — Migration procedure
 
 ```
-1. Create conftest.py with fixtures + 3 helper functions (drop `self`).
-2. Copy 9 reporting-bucket tests into test_reporting.py inside `class TestReporting`.
-3. Copy 2 runners-bucket tests into test_runners.py inside `class TestRunners`.
-4. Replace `self._create_*` → `_create_*` in both files; import helpers from conftest.
-5. Delete test_integration_formatting.py.
-6. Remove 2 entries from .large-files-allowlist.
-7. Run pytest; if test_reporting.py > 750 lines, apply sub-split fallback.
+1. Create conftest.py with the 2 fixtures (temp_project_dir, server).
+2. Create _helpers.py with the 3 helper functions (drop `self`).
+3. Copy 9 reporting-bucket tests into test_reporting.py inside `class TestReporting`.
+4. Copy 2 runners-bucket tests into test_runners.py inside `class TestRunners`.
+5. Replace `self._create_*` → `_create_*` in both files;
+   add `from tests.test_code_checker_pytest._helpers import _create_*` to each.
+6. Delete test_integration_formatting.py.
+7. Remove 2 entries from .large-files-allowlist.
+8. Run pytest; if test_reporting.py > 750 lines, apply sub-split fallback.
 ```
 
 ## DATA — Return values and data structures
@@ -154,8 +171,9 @@ refactor(tests): split test_integration_formatting.py by source mapping
 
 Reorganise the 814-line test_integration_formatting.py into
 per-source-module test files:
-- conftest.py: shared fixtures (temp_project_dir, server) and
-  project-builder helpers
+- conftest.py: shared fixtures (temp_project_dir, server)
+- _helpers.py: project-builder helpers (sibling module to avoid the
+  pytest anti-pattern of importing from conftest.py)
 - test_reporting.py: 9 tests exercising code_checker_pytest/reporting.py
 - test_runners.py: 2 tests exercising code_checker_pytest/runners.py
 
