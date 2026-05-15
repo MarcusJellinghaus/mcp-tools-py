@@ -55,3 +55,37 @@ Plan files under review:
 - `step_1.md` — corrected `test_server_params.py` count 13 → 11; `run_vulture` 3 → 4 with line 345 added; `resolve_target_directories` 11 → 13. All line numbers re-verified against current code.
 
 **Status:** Plan revisions applied — ready to commit; further review round required (changes were made).
+
+## Round 3 — 2026-05-15
+
+**Findings (from engineer review):** None — plan is correct and ready.
+- Re-verified patch-site counts (`run_vulture` 4 sites, `resolve_target_directories` 13 sites, `check_code_with_pytest` 11 sites) against current code: all match.
+- Re-verified 9+2 test allocation in `test_integration_formatting.py`: all method names match.
+- Re-verified stale allowlist entry `test_integration_show_details.py`: file truly absent.
+- Design consistency across `summary.md`, `step_1.md`, `step_2.md` confirmed.
+
+**Decisions:** Accept verdict — no changes.
+
+**User decisions:** None.
+
+**Changes applied:** None.
+
+**Status:** No plan changes this round — loop terminates.
+
+## Final Status
+
+**Rounds run:** 3
+**Verdict:** READY_TO_APPROVE
+**Commits produced on this branch (review):**
+- `03e41ae` — `docs(pr_info): apply review round 1 revisions for #201`
+- `12a4646` — `docs(pr_info): fix patch-site inventory counts (review round 2)`
+- (one more for this final log update)
+
+**Key design pivots locked in:**
+- Formatter helpers (`_format_pylint_result`, `_format_mypy_result`, `_format_pytest_result_with_details`) stay as methods on `CheckerTools` in `__init__.py` (user decision).
+- Per-tool entry point: `register(mcp, checker_tools)` — closures access the orchestrator's `_server` and `_format_*`.
+- Patch-site inventory enumerated for `test_server_params.py` (11), `test_tool_availability.py` (2), `test_checker_tools.py` (20+ across multiple symbols), `test_code_checker_bandit/test_integration.py`.
+- Shared test helpers live in `tests/test_code_checker_pytest/_helpers.py` (not conftest) to avoid the conftest-import anti-pattern; conftest holds fixtures only.
+- existing `.importlinter` carve-out `mcp_tools_py.checker_tools -> mcp_tools_py.server` covers the new package — no changes needed.
+
+**Plan is ready for implementation approval.**
