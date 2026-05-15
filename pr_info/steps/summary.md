@@ -138,7 +138,7 @@ unlikely to be triggered.
 **Modified:**
 - `.large-files-allowlist` — remove `src/mcp_tools_py/checker_tools.py`
 - `tests/test_checker_tools.py` — migrate `patch("mcp_tools_py.checker_tools.<symbol>", ...)` sites to per-submodule namespaces (e.g. `…checker_tools.pylint_tool.get_pylint_prompt`, `…checker_tools.vulture_tool.run_vulture`, `…checker_tools.ruff_check_tool.run_ruff_check_impl`, `…checker_tools.ruff_fix_tool.run_ruff_fix_impl`, `…checker_tools.tach_tool.run_tach`, plus the `resolve_target_directories` patches retargeted to each owning `*_tool` submodule)
-- `tests/test_server_params.py` — migrate 13 `patch("mcp_tools_py.checker_tools.check_code_with_pytest", ...)` sites to `…checker_tools.pytest_tool.check_code_with_pytest`; migrate `create_prompt_for_failed_tests`, `get_pylint_prompt`, and `resolve_target_directories` patches to their owning `*_tool` submodules
+- `tests/test_server_params.py` — migrate 11 `patch("mcp_tools_py.checker_tools.check_code_with_pytest", ...)` sites to `…checker_tools.pytest_tool.check_code_with_pytest`; migrate `create_prompt_for_failed_tests`, `get_pylint_prompt`, and `resolve_target_directories` patches to their owning `*_tool` submodules
 - `tests/test_tool_availability.py` — migrate 2 `patch("mcp_tools_py.checker_tools.check_code_with_pytest", ...)` sites to `…checker_tools.pytest_tool.check_code_with_pytest`
 - `tests/test_code_checker_bandit/test_integration.py` — migrate 3 `run_bandit_check_impl` + 3 `resolve_target_directories` patch sites to `…checker_tools.bandit_tool.<symbol>`
 

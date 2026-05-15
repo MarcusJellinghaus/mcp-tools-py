@@ -34,3 +34,24 @@ Plan files under review:
 - `step_2.md` — helpers move to sibling `_helpers.py`, not `conftest.py`; conftest holds fixtures only.
 
 **Status:** Plan revisions applied — ready to commit; further review round required (changes were made).
+
+## Round 2 — 2026-05-15
+
+**Findings (from engineer review):**
+1. **ACCEPT** — `test_server_params.py` patch-site count says 13, actual is 11 (enumerated line list is correct).
+2. **ACCEPT** — `test_checker_tools.py` inventory: `run_vulture` count is 3, actual is 4 (missing line 345); `resolve_target_directories` text says 11 but list has 13.
+3. **SKIP** — `register(mcp, checker_tools)` threading confirmed correct.
+4. **SKIP** — `_helpers.py` placement confirmed correct (no circular dependency).
+5. **Verdict from engineer:** READY_TO_APPROVE; findings 1–2 are non-blocking inventory tidy-ups.
+
+**Decisions:**
+- Findings 1, 2: auto-accepted (mechanical inventory accuracy fixes; trivial).
+- Findings 3, 4: no action needed.
+
+**User decisions:** None — no escalations needed this round.
+
+**Changes applied:**
+- `summary.md` — corrected `test_server_params.py` count 13 → 11.
+- `step_1.md` — corrected `test_server_params.py` count 13 → 11; `run_vulture` 3 → 4 with line 345 added; `resolve_target_directories` 11 → 13. All line numbers re-verified against current code.
+
+**Status:** Plan revisions applied — ready to commit; further review round required (changes were made).

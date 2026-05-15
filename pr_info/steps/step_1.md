@@ -48,7 +48,7 @@ src/mcp_tools_py/checker_tools/
 Modify:
 - `.large-files-allowlist` — remove the line `src/mcp_tools_py/checker_tools.py`
 - `tests/test_checker_tools.py` — retarget `patch("mcp_tools_py.checker_tools.<symbol>", ...)` sites (see Decision 2 inventory below)
-- `tests/test_server_params.py` — retarget 13 `check_code_with_pytest` patches + `create_prompt_for_failed_tests`, `get_pylint_prompt`, `resolve_target_directories` patches
+- `tests/test_server_params.py` — retarget 11 `check_code_with_pytest` patches + `create_prompt_for_failed_tests`, `get_pylint_prompt`, `resolve_target_directories` patches
 - `tests/test_tool_availability.py` — retarget 2 `check_code_with_pytest` patches
 - `tests/test_code_checker_bandit/test_integration.py` — retarget `run_bandit_check_impl` and `resolve_target_directories` patches
 
@@ -76,7 +76,7 @@ to confirm the full inventory before editing.
 Known sites to migrate (from current search; the implementer must
 re-run the search to catch any drift):
 
-- `tests/test_server_params.py`: 13 `check_code_with_pytest` sites
+- `tests/test_server_params.py`: 11 `check_code_with_pytest` sites
   (lines 30, 205, 238, 267, 296, 324, 358, 424, 570, 623, 644), 4
   `create_prompt_for_failed_tests` sites (lines 298, 326, 360, 426),
   2 `get_pylint_prompt` sites (lines 468, 495), 2
@@ -84,9 +84,9 @@ re-run the search to catch any drift):
 - `tests/test_tool_availability.py`: 2 `check_code_with_pytest`
   sites (lines 454, 486).
 - `tests/test_checker_tools.py`: 1 `create_prompt_for_failed_tests`
-  (line 138); 3 `run_vulture` (195, 215, 235); 1 `get_pylint_prompt`
+  (line 138); 4 `run_vulture` (195, 215, 235, 345); 1 `get_pylint_prompt`
   (281); 1 `get_mypy_prompt` (313); 1 `run_ruff_check_impl` (385);
-  1 `run_ruff_fix_impl` (429); 1 `run_tach` (472); and 11
+  1 `run_ruff_fix_impl` (429); 1 `run_tach` (472); and 13
   `resolve_target_directories` (199, 219, 239, 277, 295, 309, 327,
   341, 360, 389, 404, 433, 448) — retarget each to the owning
   `*_tool` submodule per the test under it.
