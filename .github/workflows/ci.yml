@@ -125,9 +125,10 @@ jobs:
           python-version: "3.11"
 
       - name: Install dependencies
-        # Hoist sibling URL deps to direct requirements so uv accepts them
-        # alongside the local project (see upstream-mypy-check.yml; uv requires
-        # this when transitive packages declare URL deps).
+        # Hoist sibling URL deps to direct requirements: mcp-coder (in [dev])
+        # transitively pins sibling repos via its own [tool.uv.sources], and uv
+        # rejects transitive URL pins unless they are also declared as direct
+        # requirements alongside the local project.
         run: |
           uv pip install --system \
             "mcp-config-tool @ git+https://github.com/MarcusJellinghaus/mcp-config.git" \
@@ -171,6 +172,10 @@ jobs:
           python-version: "3.11"
 
       - name: Install dependencies
+        # Hoist sibling URL deps to direct requirements: mcp-coder (in [dev])
+        # transitively pins sibling repos via its own [tool.uv.sources], and uv
+        # rejects transitive URL pins unless they are also declared as direct
+        # requirements alongside the local project.
         run: |
           uv pip install --system \
             "mcp-config-tool @ git+https://github.com/MarcusJellinghaus/mcp-config.git" \
