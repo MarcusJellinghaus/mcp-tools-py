@@ -451,7 +451,9 @@ class TestToolHandlerShortCircuit:
         with (
             patch("mcp.server.fastmcp.FastMCP") as mock_fastmcp,
             patch("mcp_tools_py.server.execute_command") as mock_exec,
-            patch("mcp_tools_py.checker_tools.check_code_with_pytest") as mock_check,
+            patch(
+                "mcp_tools_py.checker_tools.pytest_tool.check_code_with_pytest"
+            ) as mock_check,
         ):
             registered_tools = _capture_tools(mock_fastmcp)
             mock_exec.return_value = make_command_result(return_code=0, stdout="ok")
@@ -483,7 +485,9 @@ class TestToolHandlerShortCircuit:
         with (
             patch("mcp.server.fastmcp.FastMCP") as mock_fastmcp,
             patch("mcp_tools_py.server.execute_command") as mock_exec,
-            patch("mcp_tools_py.checker_tools.check_code_with_pytest") as mock_check,
+            patch(
+                "mcp_tools_py.checker_tools.pytest_tool.check_code_with_pytest"
+            ) as mock_check,
         ):
             registered_tools = _capture_tools(mock_fastmcp)
             mock_exec.return_value = make_command_result(return_code=0, stdout="ok")

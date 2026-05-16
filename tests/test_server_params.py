@@ -27,7 +27,9 @@ async def test_run_pytest_check_parameters(mock_project_dir: Path) -> None:
     """Test that run_pytest_check properly uses server parameters and passes parameters correctly."""
     with (
         patch("mcp.server.fastmcp.FastMCP") as mock_fastmcp,
-        patch("mcp_tools_py.checker_tools.check_code_with_pytest") as mock_check_pytest,
+        patch(
+            "mcp_tools_py.checker_tools.pytest_tool.check_code_with_pytest"
+        ) as mock_check_pytest,
     ):
         # Setup mocks
         mock_tool = MagicMock()
@@ -202,7 +204,9 @@ async def test_run_pytest_check_with_show_details_true(
     """Test that run_pytest_check properly handles show_details=True parameter."""
     server, mock_tool = mock_server
 
-    with patch("mcp_tools_py.checker_tools.check_code_with_pytest") as mock_check:
+    with patch(
+        "mcp_tools_py.checker_tools.pytest_tool.check_code_with_pytest"
+    ) as mock_check:
         mock_check.return_value = {
             "success": True,
             "summary": {"passed": 3, "failed": 0, "error": 0, "collected": 3},
@@ -235,7 +239,9 @@ async def test_run_pytest_check_with_show_details_false(
     """Test that run_pytest_check properly handles show_details=False parameter."""
     server, mock_tool = mock_server
 
-    with patch("mcp_tools_py.checker_tools.check_code_with_pytest") as mock_check:
+    with patch(
+        "mcp_tools_py.checker_tools.pytest_tool.check_code_with_pytest"
+    ) as mock_check:
         mock_check.return_value = {
             "success": True,
             "summary": {"passed": 5, "failed": 0, "error": 0, "collected": 5},
@@ -264,7 +270,9 @@ async def test_run_pytest_check_backward_compatibility(
     """Test that existing function calls work without show_details parameter."""
     server, mock_tool = mock_server
 
-    with patch("mcp_tools_py.checker_tools.check_code_with_pytest") as mock_check:
+    with patch(
+        "mcp_tools_py.checker_tools.pytest_tool.check_code_with_pytest"
+    ) as mock_check:
         mock_check.return_value = {
             "success": True,
             "summary": {"passed": 8, "failed": 0, "error": 0, "collected": 8},
@@ -293,7 +301,9 @@ async def test_show_details_with_focused_test_run(
     server, mock_tool = mock_server
 
     with (
-        patch("mcp_tools_py.checker_tools.check_code_with_pytest") as mock_check,
+        patch(
+            "mcp_tools_py.checker_tools.pytest_tool.check_code_with_pytest"
+        ) as mock_check,
         patch(
             "mcp_tools_py.checker_tools.create_prompt_for_failed_tests"
         ) as mock_create_prompt,
@@ -321,7 +331,9 @@ async def test_show_details_with_many_failures(
     server, mock_tool = mock_server
 
     with (
-        patch("mcp_tools_py.checker_tools.check_code_with_pytest") as mock_check,
+        patch(
+            "mcp_tools_py.checker_tools.pytest_tool.check_code_with_pytest"
+        ) as mock_check,
         patch(
             "mcp_tools_py.checker_tools.create_prompt_for_failed_tests"
         ) as mock_create_prompt,
@@ -355,7 +367,9 @@ async def test_show_details_output_length_limits(
     }
 
     with (
-        patch("mcp_tools_py.checker_tools.check_code_with_pytest") as mock_check,
+        patch(
+            "mcp_tools_py.checker_tools.pytest_tool.check_code_with_pytest"
+        ) as mock_check,
         patch(
             "mcp_tools_py.checker_tools.create_prompt_for_failed_tests"
         ) as mock_create_prompt,
@@ -421,7 +435,9 @@ async def test_enhanced_reporting_integration_preparation(
 
     # Test that current implementation can handle enhanced reporting calls
     with (
-        patch("mcp_tools_py.checker_tools.check_code_with_pytest") as mock_check,
+        patch(
+            "mcp_tools_py.checker_tools.pytest_tool.check_code_with_pytest"
+        ) as mock_check,
         patch(
             "mcp_tools_py.checker_tools.create_prompt_for_failed_tests"
         ) as mock_create_prompt,
@@ -465,10 +481,10 @@ class TestServerPylintMaxIssues:
         with (
             patch("mcp.server.fastmcp.FastMCP") as mock_fastmcp,
             patch(
-                "mcp_tools_py.checker_tools.get_pylint_prompt"
+                "mcp_tools_py.checker_tools.pylint_tool.get_pylint_prompt"
             ) as mock_get_pylint_prompt,
             patch(
-                "mcp_tools_py.checker_tools.resolve_target_directories",
+                "mcp_tools_py.checker_tools.pylint_tool.resolve_target_directories",
                 return_value=["src"],
             ),
         ):
@@ -492,10 +508,10 @@ class TestServerPylintMaxIssues:
         with (
             patch("mcp.server.fastmcp.FastMCP") as mock_fastmcp,
             patch(
-                "mcp_tools_py.checker_tools.get_pylint_prompt"
+                "mcp_tools_py.checker_tools.pylint_tool.get_pylint_prompt"
             ) as mock_get_pylint_prompt,
             patch(
-                "mcp_tools_py.checker_tools.resolve_target_directories",
+                "mcp_tools_py.checker_tools.pylint_tool.resolve_target_directories",
                 return_value=["src"],
             ),
         ):
@@ -567,7 +583,9 @@ async def test_integration_with_existing_server_parameters(
     assert server.test_folder == "tests"  # default
     assert server.keep_temp_files == False  # default
 
-    with patch("mcp_tools_py.checker_tools.check_code_with_pytest") as mock_check:
+    with patch(
+        "mcp_tools_py.checker_tools.pytest_tool.check_code_with_pytest"
+    ) as mock_check:
         mock_check.return_value = {
             "success": True,
             "summary": {"passed": 3, "failed": 0, "error": 0, "collected": 3},
@@ -620,7 +638,9 @@ async def test_run_pytest_check_never_raises(
     """Test that run_pytest_check returns a string on error, never raises."""
     _server, mock_tool = mock_server
 
-    with patch("mcp_tools_py.checker_tools.check_code_with_pytest") as mock_check:
+    with patch(
+        "mcp_tools_py.checker_tools.pytest_tool.check_code_with_pytest"
+    ) as mock_check:
         mock_check.side_effect = RuntimeError("something broke")
 
         run_pytest_check = _get_tool(mock_tool, "run_pytest_check")
@@ -641,7 +661,9 @@ async def test_run_pytest_check_prepends_dedup_notes(
     """Test that deduplication notes from sanitize_extra_args are prepended to output."""
     _server, mock_tool = mock_server
 
-    with patch("mcp_tools_py.checker_tools.check_code_with_pytest") as mock_check:
+    with patch(
+        "mcp_tools_py.checker_tools.pytest_tool.check_code_with_pytest"
+    ) as mock_check:
         mock_check.return_value = {
             "success": True,
             "summary": {"passed": 5, "failed": 0, "error": 0, "collected": 5},

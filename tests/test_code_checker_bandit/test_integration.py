@@ -4,7 +4,7 @@ from collections.abc import Callable
 from pathlib import Path
 from unittest.mock import MagicMock, patch
 
-from mcp_tools_py.checker_tools import CheckerTools
+from mcp_tools_py.checker_tools import CheckerTools, bandit_tool
 from mcp_tools_py.code_checker_bandit.models import BanditMessage, BanditResult
 
 
@@ -31,7 +31,7 @@ def _register_and_capture(server: MagicMock) -> dict[str, object]:
     mock_mcp.tool.return_value = capture
 
     checker = CheckerTools(server)
-    checker._register_bandit(mock_mcp)
+    bandit_tool.register(mock_mcp, checker)
     return registered
 
 
@@ -71,11 +71,11 @@ def test_bandit_happy_path() -> None:
 
     with (
         patch(
-            "mcp_tools_py.checker_tools.resolve_target_directories",
+            "mcp_tools_py.checker_tools.bandit_tool.resolve_target_directories",
             return_value=["src"],
         ),
         patch(
-            "mcp_tools_py.checker_tools.run_bandit_check_impl",
+            "mcp_tools_py.checker_tools.bandit_tool.run_bandit_check_impl",
             return_value=mock_result,
         ),
     ):
@@ -100,11 +100,11 @@ def test_bandit_error_handling() -> None:
 
     with (
         patch(
-            "mcp_tools_py.checker_tools.resolve_target_directories",
+            "mcp_tools_py.checker_tools.bandit_tool.resolve_target_directories",
             return_value=["src"],
         ),
         patch(
-            "mcp_tools_py.checker_tools.run_bandit_check_impl",
+            "mcp_tools_py.checker_tools.bandit_tool.run_bandit_check_impl",
             return_value=mock_result,
         ),
     ):
@@ -123,11 +123,11 @@ def test_bandit_no_issues_found() -> None:
 
     with (
         patch(
-            "mcp_tools_py.checker_tools.resolve_target_directories",
+            "mcp_tools_py.checker_tools.bandit_tool.resolve_target_directories",
             return_value=["src"],
         ),
         patch(
-            "mcp_tools_py.checker_tools.run_bandit_check_impl",
+            "mcp_tools_py.checker_tools.bandit_tool.run_bandit_check_impl",
             return_value=mock_result,
         ),
     ):

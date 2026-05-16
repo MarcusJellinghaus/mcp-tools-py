@@ -14,6 +14,7 @@ layers =
     mcp_tools_py.utils
 ignore_imports =
     mcp_tools_py.checker_tools -> mcp_tools_py.server
+    mcp_tools_py.checker_tools.** -> mcp_tools_py.server
     mcp_tools_py.formatter.formatter_tools -> mcp_tools_py.server
     mcp_tools_py.refactoring -> mcp_tools_py.server
     mcp_tools_py.utility_tools -> mcp_tools_py.server
