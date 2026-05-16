@@ -2,8 +2,6 @@
 # Files listed here are allowed to exceed the normal size limits
 
 # Large test files with extensive test cases
-tests/test_code_checker_pytest/test_integration_show_details.py
-tests/test_code_checker_pytest/test_integration_formatting.py
 tests/test_code_checker/test_reporting.py
 tests/test_subprocess_runner.py
 tests/test_server_params.py
