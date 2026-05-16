@@ -10,9 +10,9 @@ See [`steps/summary.md`](steps/summary.md) for the overall plan.
 
 See [`steps/step_1.md`](steps/step_1.md).
 
-- [ ] Implementation (tests + production code)
-- [ ] Quality checks: pylint, pytest, mypy — fix all issues
-- [ ] Commit message prepared
+- [x] Implementation (tests + production code)
+- [x] Quality checks: pylint, pytest, mypy — fix all issues
+- [x] Commit message prepared
 
 ### Step 2: Split `tests/test_code_checker_pytest/test_integration_formatting.py` by source mapping
 

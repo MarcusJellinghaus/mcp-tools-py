@@ -192,11 +192,11 @@ def test_vulture_success_returns_raw_output(mock_server: MagicMock) -> None:
 
     with (
         patch(
-            "mcp_tools_py.checker_tools.run_vulture",
+            "mcp_tools_py.checker_tools.vulture_tool.run_vulture",
             return_value="No dead code found!",
         ),
         patch(
-            "mcp_tools_py.checker_tools.resolve_target_directories",
+            "mcp_tools_py.checker_tools.vulture_tool.resolve_target_directories",
             return_value=["src"],
         ),
         patch.object(Path, "exists", return_value=False),
@@ -212,11 +212,11 @@ def test_vulture_failure_returns_raw_output(mock_server: MagicMock) -> None:
 
     with (
         patch(
-            "mcp_tools_py.checker_tools.run_vulture",
+            "mcp_tools_py.checker_tools.vulture_tool.run_vulture",
             return_value="vulture: error: invalid config",
         ),
         patch(
-            "mcp_tools_py.checker_tools.resolve_target_directories",
+            "mcp_tools_py.checker_tools.vulture_tool.resolve_target_directories",
             return_value=["src"],
         ),
         patch.object(Path, "exists", return_value=False),
@@ -232,11 +232,11 @@ def test_vulture_passes_whitelist_to_runner(mock_server: MagicMock) -> None:
 
     with (
         patch(
-            "mcp_tools_py.checker_tools.run_vulture",
+            "mcp_tools_py.checker_tools.vulture_tool.run_vulture",
             return_value="ok",
         ) as mock_runner,
         patch(
-            "mcp_tools_py.checker_tools.resolve_target_directories",
+            "mcp_tools_py.checker_tools.vulture_tool.resolve_target_directories",
             return_value=["src"],
         ),
         patch.object(Path, "exists", return_value=True),
@@ -274,11 +274,11 @@ def test_pylint_auto_detects_directories(mock_server: MagicMock) -> None:
 
     with (
         patch(
-            "mcp_tools_py.checker_tools.resolve_target_directories",
+            "mcp_tools_py.checker_tools.pylint_tool.resolve_target_directories",
             return_value=["src", "tests"],
         ),
         patch(
-            "mcp_tools_py.checker_tools.get_pylint_prompt",
+            "mcp_tools_py.checker_tools.pylint_tool.get_pylint_prompt",
             return_value=None,
         ) as mock_prompt,
     ):
@@ -292,7 +292,7 @@ def test_pylint_resolution_error_returns_message(mock_server: MagicMock) -> None
     run_pylint = _capture_tool(mock_server, "run_pylint_check")
 
     with patch(
-        "mcp_tools_py.checker_tools.resolve_target_directories",
+        "mcp_tools_py.checker_tools.pylint_tool.resolve_target_directories",
         return_value="Error resolving target directories: No target directories found",
     ):
         result = run_pylint()
@@ -306,11 +306,11 @@ def test_mypy_auto_detects_directories(mock_server: MagicMock) -> None:
 
     with (
         patch(
-            "mcp_tools_py.checker_tools.resolve_target_directories",
+            "mcp_tools_py.checker_tools.mypy_tool.resolve_target_directories",
             return_value=["src", "tests"],
         ),
         patch(
-            "mcp_tools_py.checker_tools.get_mypy_prompt",
+            "mcp_tools_py.checker_tools.mypy_tool.get_mypy_prompt",
             return_value=None,
         ) as mock_prompt,
     ):
@@ -324,7 +324,7 @@ def test_mypy_resolution_error_returns_message(mock_server: MagicMock) -> None:
     run_mypy = _capture_tool(mock_server, "run_mypy_check")
 
     with patch(
-        "mcp_tools_py.checker_tools.resolve_target_directories",
+        "mcp_tools_py.checker_tools.mypy_tool.resolve_target_directories",
         return_value="Error resolving target directories: No target directories found",
     ):
         result = run_mypy()
@@ -338,11 +338,11 @@ def test_vulture_auto_detects_directories(mock_server: MagicMock) -> None:
 
     with (
         patch(
-            "mcp_tools_py.checker_tools.resolve_target_directories",
+            "mcp_tools_py.checker_tools.vulture_tool.resolve_target_directories",
             return_value=["src", "tests"],
         ),
         patch(
-            "mcp_tools_py.checker_tools.run_vulture",
+            "mcp_tools_py.checker_tools.vulture_tool.run_vulture",
             return_value="ok",
         ) as mock_runner,
         patch.object(Path, "exists", return_value=False),
@@ -357,7 +357,7 @@ def test_vulture_resolution_error_returns_message(mock_server: MagicMock) -> Non
     run_vulture_fn = _capture_vulture(mock_server)
 
     with patch(
-        "mcp_tools_py.checker_tools.resolve_target_directories",
+        "mcp_tools_py.checker_tools.vulture_tool.resolve_target_directories",
         return_value="Error resolving target directories: No target directories found",
     ):
         result = run_vulture_fn()
@@ -382,11 +382,11 @@ def test_ruff_check_success_delegates_to_impl(mock_server: MagicMock) -> None:
 
     with (
         patch(
-            "mcp_tools_py.checker_tools.run_ruff_check_impl",
+            "mcp_tools_py.checker_tools.ruff_check_tool.run_ruff_check_impl",
             return_value="No ruff issues found.",
         ) as mock_impl,
         patch(
-            "mcp_tools_py.checker_tools.resolve_target_directories",
+            "mcp_tools_py.checker_tools.ruff_check_tool.resolve_target_directories",
             return_value=["src"],
         ),
     ):
@@ -401,7 +401,7 @@ def test_ruff_check_resolution_error_returns_message(mock_server: MagicMock) -> 
     run_ruff_check = _capture_tool(mock_server, "run_ruff_check")
 
     with patch(
-        "mcp_tools_py.checker_tools.resolve_target_directories",
+        "mcp_tools_py.checker_tools.ruff_check_tool.resolve_target_directories",
         return_value="Error resolving target directories: No target directories found",
     ):
         result = run_ruff_check()
@@ -426,11 +426,11 @@ def test_ruff_fix_success_delegates_to_impl(mock_server: MagicMock) -> None:
 
     with (
         patch(
-            "mcp_tools_py.checker_tools.run_ruff_fix_impl",
+            "mcp_tools_py.checker_tools.ruff_fix_tool.run_ruff_fix_impl",
             return_value="No fixable violations found — no files modified.",
         ) as mock_impl,
         patch(
-            "mcp_tools_py.checker_tools.resolve_target_directories",
+            "mcp_tools_py.checker_tools.ruff_fix_tool.resolve_target_directories",
             return_value=["src"],
         ),
     ):
@@ -445,7 +445,7 @@ def test_ruff_fix_resolution_error_returns_message(mock_server: MagicMock) -> No
     run_ruff_fix = _capture_tool(mock_server, "run_ruff_fix")
 
     with patch(
-        "mcp_tools_py.checker_tools.resolve_target_directories",
+        "mcp_tools_py.checker_tools.ruff_fix_tool.resolve_target_directories",
         return_value="Error resolving target directories: No target directories found",
     ):
         result = run_ruff_fix()
@@ -469,7 +469,7 @@ def test_tach_success_returns_raw_output(mock_server: MagicMock) -> None:
     run_tach_check = _capture_tool(mock_server, "run_tach_check")
 
     with patch(
-        "mcp_tools_py.checker_tools.run_tach",
+        "mcp_tools_py.checker_tools.tach_tool.run_tach",
         return_value="tach check passed (no output).",
     ) as mock_runner:
         result = run_tach_check()
