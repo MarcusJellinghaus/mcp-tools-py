@@ -111,7 +111,7 @@ jobs:
           - {name: "pytest", cmd: "pytest --version && pytest tests"}
           - {name: "mypy", cmd: "mypy --version && mypy --strict src tests"}
           - {name: "ruff-docstrings", cmd: "ruff --version && ruff check src tests"}
-          - {name: "file-size", cmd: "mcp-coder check file-size --max-lines 750 --allowlist-file .large-files-allowlist"}
+          - {name: "file-size", cmd: "uvx --from 'git+https://github.com/MarcusJellinghaus/mcp_coder.git' mcp-coder check file-size --max-lines 750 --allowlist-file .large-files-allowlist"}
     name: ${{ matrix.check.name }}
     steps:
       - uses: actions/checkout@v6
@@ -125,17 +125,7 @@ jobs:
           python-version: "3.11"
 
       - name: Install dependencies
-        # Hoist sibling URL deps to direct requirements: mcp-coder (in [dev])
-        # transitively pins sibling repos via its own [tool.uv.sources], and uv
-        # rejects transitive URL pins unless they are also declared as direct
-        # requirements alongside the local project.
-        run: |
-          uv pip install --system \
-            "mcp-config-tool @ git+https://github.com/MarcusJellinghaus/mcp-config.git" \
-            "mcp-coder-utils @ git+https://github.com/MarcusJellinghaus/mcp-coder-utils.git" \
-            "mcp-workspace @ git+https://github.com/MarcusJellinghaus/mcp-workspace.git" \
-            "mcp-coder @ git+https://github.com/MarcusJellinghaus/mcp_coder.git" \
-            ".[dev]"
+        run: uv pip install --system ".[dev]"
 
       - name: Environment info
         run: |
@@ -172,17 +162,7 @@ jobs:
           python-version: "3.11"
 
       - name: Install dependencies
-        # Hoist sibling URL deps to direct requirements: mcp-coder (in [dev])
-        # transitively pins sibling repos via its own [tool.uv.sources], and uv
-        # rejects transitive URL pins unless they are also declared as direct
-        # requirements alongside the local project.
-        run: |
-          uv pip install --system \
-            "mcp-config-tool @ git+https://github.com/MarcusJellinghaus/mcp-config.git" \
-            "mcp-coder-utils @ git+https://github.com/MarcusJellinghaus/mcp-coder-utils.git" \
-            "mcp-workspace @ git+https://github.com/MarcusJellinghaus/mcp-workspace.git" \
-            "mcp-coder @ git+https://github.com/MarcusJellinghaus/mcp_coder.git" \
-            ".[dev]"
+        run: uv pip install --system ".[dev]"
 
       - name: Environment info
         run: |
