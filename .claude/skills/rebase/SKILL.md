@@ -13,7 +13,6 @@ allowed-tools:
   - "Bash(git restore *)"
   - "Bash(git stash *)"
   - "Bash(git push --force-with-lease *)"
-  - mcp__mcp-workspace__github_issue_view
   - mcp__mcp-tools-py__run_format_code
   - mcp__mcp-workspace__get_base_branch
   - mcp__mcp-tools-py__run_pylint_check
@@ -33,7 +32,9 @@ allowed-tools:
 
 # Rebase Branch onto Base Branch
 
-Before starting, call the `mcp__mcp-workspace__git` MCP tool with `command="status"` to capture the current working-tree state.
+## First Step
+
+Call `mcp__mcp-workspace__git` with command `"status"` before doing anything else.
 
 Rebase the current feature branch onto its base branch and resolve conflicts.
 

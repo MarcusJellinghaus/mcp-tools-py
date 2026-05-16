@@ -14,6 +14,7 @@ src/mcp_tools_py/refactoring/rope_tools.py
 src/mcp_tools_py/server.py
 src/mcp_tools_py/utils/data_files.py
 src/mcp_tools_py/utils/subprocess_runner.py
+src/mcp_tools_py/refactoring/rope_tools.py
 
 # Generated artifacts
 docs/architecture/dependencies/pydeps_graph.svg

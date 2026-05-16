@@ -39,6 +39,7 @@ dependencies = [
     "bandit>=1.7.5",
     "black>=24.10.0",
     "isort>=5.13.2",
+    "tach>=0.15.0",
     "mcp-coder-utils"
 ]
 
@@ -46,7 +47,6 @@ dependencies = [
 dev = [
     "mcp-workspace",
     # Architecture and code quality tools
-    "tach>=0.15.0",
     "pycycle>=0.0.8",
     "pydeps>=1.12.0",
     ]
