@@ -46,10 +46,32 @@ class TestSanitizeExtraArgs:
         assert result.cleaned_args == ["-x", "--tb=short"]
         assert result.verbosity == 3
 
-    def test_s_flag_removed_silently(self) -> None:
-        """-s flag is removed silently (always auto-added)."""
+    def test_lone_s_flag_passes_through(self) -> None:
+        """-s flag passes through when xdist is not active."""
         result = sanitize_extra_args(["-s", "-x"], None)
-        assert result.cleaned_args == ["-x"]
+        assert result.cleaned_args == ["-s", "-x"]
+        assert result.verbosity == 2
+        assert result.notes == []
+
+    def test_s_stripped_when_xdist_active(self) -> None:
+        """-s is stripped when -n VALUE (VALUE != "0") is also present."""
+        result = sanitize_extra_args(["-s", "-n", "auto"], None)
+        assert result.cleaned_args == ["-n", "auto"]
+        assert result.verbosity == 2
+        assert len(result.notes) == 1
+        assert "xdist" in result.notes[0]
+
+    def test_s_preserved_with_n_zero(self) -> None:
+        """-s is preserved when -n 0 is used (xdist disabled)."""
+        result = sanitize_extra_args(["-s", "-n", "0"], None)
+        assert result.cleaned_args == ["-s", "-n", "0"]
+        assert result.verbosity == 2
+        assert result.notes == []
+
+    def test_numprocesses_long_form_does_not_trigger_strip(self) -> None:
+        """--numprocesses long form does not trigger -s strip (documented limitation)."""
+        result = sanitize_extra_args(["-s", "--numprocesses", "auto"], None)
+        assert result.cleaned_args == ["-s", "--numprocesses", "auto"]
         assert result.verbosity == 2
         assert result.notes == []
 
@@ -98,7 +120,7 @@ class TestSanitizeExtraArgs:
         result = sanitize_extra_args(
             ["-s", "-vvv", "-m", "slow", "tests", "-x"], ["unit"]
         )
-        assert result.cleaned_args == ["-x"]
+        assert result.cleaned_args == ["-s", "-x"]
         assert result.verbosity == 3
         assert len(result.notes) == 1
         assert "-m flag" in result.notes[0]
