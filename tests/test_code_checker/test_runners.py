@@ -488,6 +488,43 @@ def test_run_tests_surfaces_pytest_output_on_error_exit_codes(
         assert matching, f"expected WARNING for case {case_id}"
 
 
+@patch("mcp_tools_py.code_checker_pytest.runners.execute_command")
+def test_internal_error_3_preserves_internalerror_block_untruncated(
+    mock_execute: MagicMock,
+) -> None:
+    """Exit-3: INTERNALERROR> lines must survive the 500-char truncate_stderr cap."""
+    noise = "X" * 600
+    internalerror_block = "\n".join(
+        [
+            "INTERNALERROR> Traceback (most recent call last):",
+            'INTERNALERROR>   File ".../xdist/dsession.py", line 217, in worker_workerfinished',
+            "INTERNALERROR>     assert not crashitem, (crashitem, node)",
+            "INTERNALERROR> AssertionError: ('tests/workflows/.../test_workflow.py::TestX::test_y', <WorkerController gw4>)",
+        ]
+    )
+    stderr_payload = f"{noise}\n{internalerror_block}\n{noise}"
+
+    mock_execute.return_value = MagicMock(
+        return_code=3,
+        stdout="",
+        stderr=stderr_payload,
+        execution_error=None,
+        timed_out=False,
+    )
+
+    with patch(
+        "mcp_tools_py.code_checker_pytest.runners.os.path.isfile",
+        return_value=True,
+    ):
+        with pytest.raises(RuntimeError) as excinfo:
+            run_tests("/test/project", "tests", python_executable=sys.executable)
+
+    msg = str(excinfo.value)
+    for line in internalerror_block.splitlines():
+        assert line in msg, f"missing INTERNALERROR line: {line!r}"
+    assert "Internal Error" in msg
+
+
 @pytest.mark.parametrize(
     "second_kind, exc_cls, msg_substring, log_substring",
     [

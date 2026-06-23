@@ -357,8 +357,14 @@ def run_tests(
                 # error_context is guaranteed non-None here: returncode != 0 above.
                 assert error_context is not None
                 logger.warning("Pytest internal error (exit 3): %s", combined_output)
+                internal_lines = "\n".join(
+                    line
+                    for line in combined_output.splitlines()
+                    if line.startswith("INTERNALERROR>")
+                )
+                prefix = f"{internal_lines}\n" if internal_lines else ""
                 raise RuntimeError(
-                    f"Internal Error: {error_context.exit_code_meaning}."
+                    f"{prefix}Internal Error: {error_context.exit_code_meaning}."
                     f"{_build_error_detail(output, error_output)}"
                 )
             elif process.returncode == 4:

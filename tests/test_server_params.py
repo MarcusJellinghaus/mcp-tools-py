@@ -70,14 +70,14 @@ async def test_run_pytest_check_parameters(mock_project_dir: Path) -> None:
 
         # Verify check_code_with_pytest was called with correct parameters
         # test_folder and keep_temp_files should come from the server instance
-        # verbosity comes from sanitize_extra_args (default 2), -s is always appended
+        # verbosity comes from sanitize_extra_args (default 2)
         mock_check_pytest.assert_called_once_with(
             project_dir=str(mock_project_dir),
             test_folder="custom_tests",  # From server constructor
             python_executable=_server._resolved_python,  # Resolved by server
             markers=["slow", "integration"],
             verbosity=2,
-            extra_args=["--no-header", "-s"],
+            extra_args=["--no-header"],
             env_vars={"TEST_ENV": "value"},
             venv_path=None,
             keep_temp_files=True,  # From server constructor

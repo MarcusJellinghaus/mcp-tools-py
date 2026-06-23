@@ -90,9 +90,6 @@ def register(mcp: "FastMCPProtocol", checker_tools: "CheckerTools") -> None:
                 extra_args, markers, project_dir=str(server.project_dir)
             )
 
-            # Always add -s for print statement capture
-            final_extra_args = sanitized.cleaned_args + ["-s"]
-
             # Log any deduplication notes
             for note in sanitized.notes:
                 logger.info("extra_args sanitized", extra={"note": note})
@@ -104,7 +101,7 @@ def register(mcp: "FastMCPProtocol", checker_tools: "CheckerTools") -> None:
                 python_executable=server._resolved_python,
                 markers=markers,
                 verbosity=sanitized.verbosity,
-                extra_args=final_extra_args,
+                extra_args=sanitized.cleaned_args,
                 env_vars=env_vars,
                 venv_path=server.venv_path,
                 keep_temp_files=server.keep_temp_files,

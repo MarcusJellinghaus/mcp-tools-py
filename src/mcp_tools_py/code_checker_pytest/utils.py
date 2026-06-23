@@ -22,6 +22,9 @@ def sanitize_extra_args(
           not the combined ``-m=slow`` form.
         - Combined short flags like ``-xvs`` pass through as-is
           (not decomposed into individual flags).
+        - The xdist-aware ``-s`` strip only triggers on the two-arg
+          ``["-n", VALUE]`` form. The ``--numprocesses`` long form passes
+          through unchanged.
 
     Args:
         extra_args: Optional list of extra arguments for pytest.
@@ -53,10 +56,6 @@ def sanitize_extra_args(
             verbosity = arg.count("v")
             continue
 
-        # -s flag: always auto-added, remove silently
-        if arg == "-s":
-            continue
-
         # Bare "tests" or "tests/" path: auto-appended, remove
         if arg in ("tests", "tests/"):
             continue
@@ -71,6 +70,22 @@ def sanitize_extra_args(
             continue
 
         cleaned.append(arg)
+
+    # xdist-aware -s strip: when ["-n", VALUE] with VALUE != "0" is present,
+    # strip -s because xdist's execnet IPC is incompatible with pytest's
+    # disabled capture (causes worker crashes).
+    for i, token in enumerate(cleaned):
+        if token == "-n" and i + 1 < len(cleaned):
+            value = cleaned[i + 1]
+            if value != "0" and "-s" in cleaned:
+                cleaned = [a for a in cleaned if a != "-s"]
+                notes.append(
+                    "Note: -s flag in extra_args was stripped because "
+                    "-n <value> (xdist) is incompatible with -s and causes "
+                    "worker crashes. Use -n 0 (no xdist) or omit -n if you "
+                    "need -s."
+                )
+            break
 
     # Path detection: shape-then-existence classification.
     # Shape match: looks like a path if it contains "/", "\", "::", or ends with ".py".
