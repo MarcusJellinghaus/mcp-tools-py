@@ -15,9 +15,9 @@ import time
 import pytest
 
 # Conservative budget. Claude Code's real limit is ~5s; steady-state startup is
-# ~1s. 3s leaves headroom for slow/cold CI while still catching a regression
+# ~1s. 2s leaves headroom for slow/cold CI while still catching a regression
 # that re-adds a heavy eager import.
-STARTUP_BUDGET_SECONDS = 3.0
+STARTUP_BUDGET_SECONDS = 2.0
 
 # Times the work main() does before the blocking serve loop: import the server
 # module and construct it (which imports FastMCP and registers every tool).
