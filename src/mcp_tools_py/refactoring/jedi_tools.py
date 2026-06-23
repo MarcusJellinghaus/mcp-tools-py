@@ -5,8 +5,6 @@ from __future__ import annotations
 from pathlib import Path
 from typing import Any, List
 
-import jedi  # pylint: disable=import-error
-
 
 def list_symbols(project_dir: Path, file_path: str) -> str:
     """List all top-level symbols in a file.
@@ -18,6 +16,8 @@ def list_symbols(project_dir: Path, file_path: str) -> str:
     Returns:
         Formatted string listing symbols, or error message.
     """
+    import jedi  # pylint: disable=import-error,import-outside-toplevel
+
     abs_path = project_dir / file_path
     if not abs_path.exists():
         return f"Error: file not found: {file_path}"
@@ -89,6 +89,8 @@ def find_references(project_dir: Path, file_path: str, symbol_name: str) -> str:
     Returns:
         Formatted string listing references, or error message.
     """
+    import jedi  # pylint: disable=import-error,import-outside-toplevel
+
     abs_path = project_dir / file_path
     if not abs_path.exists():
         return f"Error: file not found: {file_path}"

@@ -17,14 +17,17 @@ import sys
 from collections.abc import Callable, Iterator
 from contextlib import contextmanager
 from pathlib import Path
-
-import rope.refactor.move  # pylint: disable=import-error
-import rope.refactor.rename  # pylint: disable=import-error
-from igittigitt import IgnoreParser  # pylint: disable=import-error
-from rope.base.change import ChangeSet  # pylint: disable=import-error
-from rope.base.project import Project  # pylint: disable=import-error
+from typing import TYPE_CHECKING
 
 from mcp_tools_py.utils.subprocess_runner import execute_command
+
+if TYPE_CHECKING:
+    # rope and igittigitt are heavy imports pulled in only when a refactoring
+    # operation actually runs (inside the rope_cli subprocess). Importing them
+    # eagerly would slow MCP server startup with no benefit, so the runtime
+    # imports live inside the functions below; these are type-checking only.
+    from rope.base.change import ChangeSet
+    from rope.base.project import Project
 
 logger = logging.getLogger(__name__)
 
@@ -64,6 +67,10 @@ def read_gitignore_rules(
     if not gitignore_path.is_file():
         logger.debug("No .gitignore file found at %s", gitignore_path)
         return None
+
+    from igittigitt import (  # pylint: disable=import-error,import-outside-toplevel
+        IgnoreParser,
+    )
 
     try:
         logger.debug("Parsing gitignore file at %s", gitignore_path)
@@ -124,6 +131,10 @@ def _with_rope_project(project_dir: Path) -> Iterator[Project]:
     Yields:
         A configured `rope.base.project.Project` for `project_dir`.
     """
+    from rope.base.project import (  # pylint: disable=import-error,import-outside-toplevel
+        Project,
+    )
+
     ignored = _build_ignored_resources(project_dir)
     project = Project(str(project_dir), ropefolder=None, ignored_resources=ignored)
     project.prefs["prefer_module_from_imports"] = True
@@ -272,6 +283,8 @@ def _move_symbol_impl(
     Returns:
         Human-readable result, or an error message string.
     """
+    import rope.refactor.move  # pylint: disable=import-error,import-outside-toplevel
+
     abs_source = project_dir / source_file
     abs_dest = project_dir / dest_file
 
@@ -579,6 +592,8 @@ def _rename_symbol_impl(
     Returns:
         Human-readable result, or an error message string.
     """
+    import rope.refactor.rename  # pylint: disable=import-error,import-outside-toplevel
+
     abs_path = project_dir / file_path
     source_text = abs_path.read_text(encoding="utf-8")
 
@@ -697,6 +712,8 @@ def _move_module_impl(
     Returns:
         Human-readable result, or an error message string.
     """
+    import rope.refactor.move  # pylint: disable=import-error,import-outside-toplevel
+
     abs_dest_pkg = project_dir / dest_package
     abs_source = project_dir / source_module
     created_pkg_for_dry_run = False
