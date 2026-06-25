@@ -31,9 +31,9 @@ See [step_1.md](./steps/step_1.md)
 ### Step 2: move_module / move_symbol AttributeError hint hardening
 See [step_2.md](./steps/step_2.md)
 
-- [ ] Implementation: add two tests to `tests/test_refactoring/test_rope_tools.py` (import `_move_module_impl`/`_move_symbol_impl`, patch `create_move` to raise `AttributeError`, assert original text + `Hint:` line + cleanup), then append the hint via `isinstance(exc, AttributeError)` in the existing broad handlers of `_move_module_impl` and `_move_symbol_impl` in `src/mcp_tools_py/refactoring/rope_tools.py`
-- [ ] Quality checks: pylint, pytest, mypy — fix all issues
-- [ ] Commit message prepared
+- [x] Implementation: add two tests to `tests/test_refactoring/test_rope_tools.py` (import `_move_module_impl`/`_move_symbol_impl`, patch `create_move` to raise `AttributeError`, assert original text + `Hint:` line + cleanup), then append the hint via `isinstance(exc, AttributeError)` in the existing broad handlers of `_move_module_impl` and `_move_symbol_impl` in `src/mcp_tools_py/refactoring/rope_tools.py`
+- [x] Quality checks: pylint, pytest, mypy — fix all issues
+- [x] Commit message prepared
 
 ## Pull Request
 

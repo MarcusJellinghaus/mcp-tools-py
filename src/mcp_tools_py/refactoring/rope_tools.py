@@ -409,7 +409,13 @@ def _move_symbol_impl(
             _cleanup_created_files(abs_dest, created_for_dry_run, project_dir)
         else:
             _cleanup_created_files(abs_dest, created_dest, project_dir)
-        return f"Error moving symbol: {exc}"
+        msg = f"Error moving symbol: {exc}"
+        if isinstance(exc, AttributeError):
+            msg += (
+                "\nHint: rope could not analyze the source module. "
+                "Try moving the symbols individually, or move the file manually."
+            )
+        return msg
 
 
 def _run_rope_subprocess(
@@ -789,7 +795,13 @@ def _move_module_impl(
     except Exception as exc:  # pylint: disable=broad-exception-caught
         if created_pkg_for_dry_run:
             _cleanup_package(abs_dest_pkg, project_dir)
-        return f"Error moving module '{source_module}': {exc}"
+        msg = f"Error moving module '{source_module}': {exc}"
+        if isinstance(exc, AttributeError):
+            msg += (
+                "\nHint: rope could not analyze the source module. "
+                "Try move_symbol, or move the file manually."
+            )
+        return msg
 
 
 def move_module(
