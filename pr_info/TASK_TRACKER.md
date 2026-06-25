@@ -24,9 +24,9 @@ This tracks **Feature Implementation** consisting of multiple **Tasks**.
 ### Step 1: Bandit temp-file JSON capture + empty-file guard
 See [step_1.md](./steps/step_1.md)
 
-- [ ] Implementation: rework `tests/test_code_checker_bandit/test_runners.py` to the file seam (assert `-o <file>` in argv, `execute_command` mock `side_effect` writes the report, add empty/missing-file guard test), then update `src/mcp_tools_py/code_checker_bandit/runners.py` (`output_path` arg + `-o <file>` in `_build_bandit_command`; temp-dir lifecycle, read file, anomaly guard, `finally` cleanup in `run_bandit_check_impl`)
-- [ ] Quality checks: pylint, pytest, mypy — fix all issues
-- [ ] Commit message prepared
+- [x] Implementation: rework `tests/test_code_checker_bandit/test_runners.py` to the file seam (assert `-o <file>` in argv, `execute_command` mock `side_effect` writes the report, add empty/missing-file guard test), then update `src/mcp_tools_py/code_checker_bandit/runners.py` (`output_path` arg + `-o <file>` in `_build_bandit_command`; temp-dir lifecycle, read file, anomaly guard, `finally` cleanup in `run_bandit_check_impl`)
+- [x] Quality checks: pylint, pytest, mypy — fix all issues
+- [x] Commit message prepared
 
 ### Step 2: move_module / move_symbol AttributeError hint hardening
 See [step_2.md](./steps/step_2.md)
