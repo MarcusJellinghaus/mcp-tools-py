@@ -101,6 +101,7 @@ def _writing_side_effect(output: str, return_code: int) -> Any:
     """Build an execute_command side_effect that writes ``output`` to the -o path."""
 
     def _write(cmd: list[str], cwd: str | None = None) -> Any:
+        del cwd  # required to match execute_command's signature; intentionally unused
         out = cmd[cmd.index("-o") + 1]
         Path(out).write_text(output, encoding="utf-8")
         return make_command_result(return_code=return_code)
