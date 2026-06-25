@@ -164,6 +164,22 @@ class TestRunBanditCheckImpl:
 
     @patch("os.path.isdir", return_value=True)
     @patch(f"{MODULE_PATH}.execute_command")
+    def test_zero_byte_output_file_is_error(
+        self, mock_exec: Any, _mock_isdir: Any
+    ) -> None:
+        # Successful return code and the JSON file exists but is empty (zero
+        # bytes): also an anomaly, not "no issues". The getsize == 0 branch of
+        # the guard must convert this silent failure into a loud, legible error.
+        mock_exec.side_effect = _writing_side_effect("", return_code=0)
+
+        result = run_bandit_check_impl("/usr/bin/bandit", "/project", ["src"])
+
+        assert result.messages == []
+        assert result.error is not None
+        assert "output file" in result.error
+
+    @patch("os.path.isdir", return_value=True)
+    @patch(f"{MODULE_PATH}.execute_command")
     def test_error_exit_code_gt_1(self, mock_exec: Any, _mock_isdir: Any) -> None:
         mock_exec.return_value = make_command_result(
             return_code=2, stderr="bandit: error: invalid config"
