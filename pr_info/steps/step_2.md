@@ -26,6 +26,10 @@ cleanup and preserves the original text). Append the hint only when the caught
 exception **is an `AttributeError`** — triggered by type via `isinstance`, never
 by a string match.
 
+Note: the two hint strings intentionally differ — `_move_module_impl` suggests
+`move_symbol`, while `_move_symbol_impl` suggests moving symbols individually —
+and they should NOT be collapsed into a single shared constant.
+
 `_move_module_impl`:
 ```python
 except Exception as exc:  # pylint: disable=broad-exception-caught

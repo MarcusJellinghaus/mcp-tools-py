@@ -80,8 +80,10 @@ finally:
 Rework `tests/test_code_checker_bandit/test_runners.py`:
 - `TestBuildBanditCommand`: pass an `output_path` and assert exact argv now
   includes `-o <path>`, e.g.
-  `["/usr/bin/bandit", "-f", "json", "-o", "/tmp/out.json", "-r", "src"]`
-  (plus the extra-args and multi-dir variants).
+  `["/usr/bin/bandit", "-f", "json", "-o", "/tmp/out.json", "-r", "src"]`.
+  ALL existing `test_build_command_*` variants must be updated for the new argv
+  (with `-o <path>`): the basic case, `test_build_command_with_extra_args`, and
+  `test_build_command_multiple_directories`.
 - `TestRunBanditCheckImpl` (`test_no_issues`, `test_with_issues`): replace
   `mock_exec.return_value = make_command_result(..., stdout=output)` with a
   `side_effect` that writes the JSON to the `-o` path it receives, then returns a
@@ -96,9 +98,18 @@ Rework `tests/test_code_checker_bandit/test_runners.py`:
 - New `test_empty_output_file_is_error`: `side_effect` returns
   `return_code=0` **without** writing the file (or writes `""`); assert
   `result.error` is set and `result.messages == []` (anomaly, not "no issues").
+  ALSO assert the error string is human-legible — i.e. it contains an
+  explanatory substring such as `"output file"` (or `"no JSON"`). The whole
+  point of the guard is converting a silent failure into a loud, legible one,
+  so the test must verify the message is meaningful, not just non-empty.
 - Keep `test_error_exit_code_gt_1`, `test_execution_error`, `test_timeout`,
   `test_invalid_project_dir` essentially unchanged (they short-circuit before the
   file read; a no-op `side_effect`/`return_value` is fine since no file is read).
+- Implementation note: the existing `test_no_issues`/`test_with_issues` patch
+  `os.path.isdir` with `return_value=True`; keep it as `return_value` (NOT a
+  blanket `side_effect`), so the real `os.path.exists`/`getsize` calls on the
+  real `mkdtemp` dir continue to work and the empty/missing-file guard is not
+  accidentally masked.
 
 ## VERIFY
 1. `run_pylint_check`
