@@ -2,6 +2,9 @@
 
 import logging
 import os
+import shutil
+import tempfile
+from pathlib import Path
 
 from mcp_tools_py.code_checker_bandit.models import BanditResult
 from mcp_tools_py.code_checker_bandit.parsers import parse_bandit_json_output
@@ -14,6 +17,7 @@ logger = logging.getLogger(__name__)
 def _build_bandit_command(
     bandit_binary: str,
     target_directories: list[str],
+    output_path: str,
     extra_args: list[str] | None = None,
 ) -> list[str]:
     """Build the bandit CLI command list.
@@ -21,7 +25,7 @@ def _build_bandit_command(
     Returns:
         Command argv ready to pass to `execute_command`.
     """
-    cmd = [bandit_binary, "-f", "json", "-r"]
+    cmd = [bandit_binary, "-f", "json", "-o", output_path, "-r"]
     cmd.extend(target_directories)
     if extra_args:
         cmd.extend(extra_args)
@@ -37,6 +41,10 @@ def run_bandit_check_impl(
 ) -> BanditResult:
     """Run bandit and return structured result.
 
+    Bandit writes its JSON report to a temp file via ``-o <file>``; the report
+    is read back from that file rather than stdout, so a Rich progress bar on
+    stdout cannot corrupt the parsed output.
+
     Returns:
         BanditResult with parsed messages, file errors, or execution error.
 
@@ -46,38 +54,62 @@ def run_bandit_check_impl(
     if not os.path.isdir(project_dir):
         raise FileNotFoundError(f"Project directory not found: {project_dir}")
 
-    cmd = _build_bandit_command(bandit_binary, target_directories, extra_args)
-    result = execute_command(cmd, cwd=project_dir)
-
-    if result.execution_error:
-        return BanditResult(
-            return_code=-1, messages=[], errors=[], error=str(result.execution_error)
+    temp_dir = tempfile.mkdtemp(prefix="bandit_runner_")
+    try:
+        output_file = os.path.join(temp_dir, "bandit_result.json")
+        cmd = _build_bandit_command(
+            bandit_binary, target_directories, output_file, extra_args
         )
+        result = execute_command(cmd, cwd=project_dir)
 
-    if result.timed_out:
-        return BanditResult(return_code=-1, messages=[], errors=[], error="timed out")
+        if result.execution_error:
+            return BanditResult(
+                return_code=-1,
+                messages=[],
+                errors=[],
+                error=str(result.execution_error),
+            )
 
-    if result.return_code > 1:
+        if result.timed_out:
+            return BanditResult(
+                return_code=-1, messages=[], errors=[], error="timed out"
+            )
+
+        if result.return_code > 1:
+            return BanditResult(
+                return_code=result.return_code,
+                messages=[],
+                errors=[],
+                error=result.stderr,
+            )
+
+        if not os.path.exists(output_file) or os.path.getsize(output_file) == 0:
+            return BanditResult(
+                return_code=result.return_code,
+                messages=[],
+                errors=[],
+                error=(
+                    "bandit produced no JSON output file "
+                    f"(exit code {result.return_code})"
+                ),
+            )
+
+        content = Path(output_file).read_text(encoding="utf-8")
+        messages, errors, parse_error = parse_bandit_json_output(content, project_dir)
+
+        if parse_error:
+            return BanditResult(
+                return_code=result.return_code,
+                messages=[],
+                errors=[],
+                error=parse_error,
+            )
+
         return BanditResult(
             return_code=result.return_code,
-            messages=[],
-            errors=[],
-            error=result.stderr,
+            messages=messages,
+            errors=errors,
+            raw_output=content,
         )
-
-    messages, errors, parse_error = parse_bandit_json_output(result.stdout, project_dir)
-
-    if parse_error:
-        return BanditResult(
-            return_code=result.return_code,
-            messages=[],
-            errors=[],
-            error=parse_error,
-        )
-
-    return BanditResult(
-        return_code=result.return_code,
-        messages=messages,
-        errors=errors,
-        raw_output=result.stdout,
-    )
+    finally:
+        shutil.rmtree(temp_dir, ignore_errors=True)

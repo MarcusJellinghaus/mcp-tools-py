@@ -339,6 +339,53 @@ def test_move_module_dry_run(sample_project: Path) -> None:
     assert (sample_project / "src" / "foo.py").exists()
 
 
+# --- AttributeError hint hardening tests ---
+
+
+def test_move_module_attribute_error_hint(sample_project: Path) -> None:
+    """When rope raises AttributeError, original text + actionable hint appear."""
+    from unittest.mock import patch
+
+    from mcp_tools_py.refactoring.rope_tools import _move_module_impl
+
+    with patch(
+        "rope.refactor.move.create_move",
+        side_effect=AttributeError("'NoneType' object has no attribute 'is_folder'"),
+    ):
+        result = _move_module_impl(
+            sample_project, "src/foo.py", "src/pkg", dry_run=True
+        )
+    # Original error text preserved for debugging
+    assert "is_folder" in result
+    # Actionable hint appended
+    assert "Hint:" in result
+    assert "move the file manually" in result
+    # The temp dest package created for the dry run was cleaned up
+    assert not (sample_project / "src" / "pkg").exists()
+
+
+def test_move_symbol_attribute_error_hint(sample_project: Path) -> None:
+    """When rope raises AttributeError, original text + actionable hint appear."""
+    from unittest.mock import patch
+
+    from mcp_tools_py.refactoring.rope_tools import _move_symbol_impl
+
+    with patch(
+        "rope.refactor.move.create_move",
+        side_effect=AttributeError("'NoneType' object has no attribute 'is_folder'"),
+    ):
+        result = _move_symbol_impl(
+            sample_project, "src/foo.py", ["my_func"], "src/baz.py", dry_run=True
+        )
+    # Original error text preserved for debugging
+    assert "Error moving symbol:" in result
+    assert "is_folder" in result
+    # Actionable hint appended
+    assert "Hint:" in result
+    # The dry-run dest stub was cleaned up
+    assert not (sample_project / "src" / "baz.py").exists()
+
+
 # --- ropefolder=None and gitignore filtering tests ---
 
 

@@ -1,6 +1,7 @@
 """Tests for code_checker_bandit.runners module."""
 
 import json
+from pathlib import Path
 from typing import Any
 from unittest.mock import patch
 
@@ -52,17 +53,30 @@ class TestBuildBanditCommand:
     """Tests for _build_bandit_command."""
 
     def test_build_command_basic(self) -> None:
-        cmd = _build_bandit_command("/usr/bin/bandit", ["src"])
-        assert cmd == ["/usr/bin/bandit", "-f", "json", "-r", "src"]
+        cmd = _build_bandit_command("/usr/bin/bandit", ["src"], "/tmp/out.json")
+        assert cmd == [
+            "/usr/bin/bandit",
+            "-f",
+            "json",
+            "-o",
+            "/tmp/out.json",
+            "-r",
+            "src",
+        ]
 
     def test_build_command_with_extra_args(self) -> None:
         cmd = _build_bandit_command(
-            "/usr/bin/bandit", ["src"], extra_args=["--severity-level", "high"]
+            "/usr/bin/bandit",
+            ["src"],
+            "/tmp/out.json",
+            extra_args=["--severity-level", "high"],
         )
         assert cmd == [
             "/usr/bin/bandit",
             "-f",
             "json",
+            "-o",
+            "/tmp/out.json",
             "-r",
             "src",
             "--severity-level",
@@ -70,8 +84,29 @@ class TestBuildBanditCommand:
         ]
 
     def test_build_command_multiple_directories(self) -> None:
-        cmd = _build_bandit_command("/usr/bin/bandit", ["src", "lib"])
-        assert cmd == ["/usr/bin/bandit", "-f", "json", "-r", "src", "lib"]
+        cmd = _build_bandit_command("/usr/bin/bandit", ["src", "lib"], "/tmp/out.json")
+        assert cmd == [
+            "/usr/bin/bandit",
+            "-f",
+            "json",
+            "-o",
+            "/tmp/out.json",
+            "-r",
+            "src",
+            "lib",
+        ]
+
+
+def _writing_side_effect(output: str, return_code: int) -> Any:
+    """Build an execute_command side_effect that writes ``output`` to the -o path."""
+
+    def _write(cmd: list[str], cwd: str | None = None) -> Any:
+        del cwd  # required to match execute_command's signature; intentionally unused
+        out = cmd[cmd.index("-o") + 1]
+        Path(out).write_text(output, encoding="utf-8")
+        return make_command_result(return_code=return_code)
+
+    return _write
 
 
 class TestRunBanditCheckImpl:
@@ -81,7 +116,7 @@ class TestRunBanditCheckImpl:
     @patch(f"{MODULE_PATH}.execute_command")
     def test_no_issues(self, mock_exec: Any, _mock_isdir: Any) -> None:
         output = _make_bandit_json()
-        mock_exec.return_value = make_command_result(return_code=0, stdout=output)
+        mock_exec.side_effect = _writing_side_effect(output, return_code=0)
 
         result = run_bandit_check_impl("/usr/bin/bandit", "/project", ["src"])
 
@@ -104,7 +139,7 @@ class TestRunBanditCheckImpl:
                 },
             ]
         )
-        mock_exec.return_value = make_command_result(return_code=1, stdout=output)
+        mock_exec.side_effect = _writing_side_effect(output, return_code=1)
 
         result = run_bandit_check_impl("/usr/bin/bandit", "/project", ["src"])
 
@@ -113,6 +148,36 @@ class TestRunBanditCheckImpl:
         assert result.messages[0].test_id == "B101"
         assert result.messages[0].line_number == 42
         assert result.error is None
+
+    @patch("os.path.isdir", return_value=True)
+    @patch(f"{MODULE_PATH}.execute_command")
+    def test_empty_output_file_is_error(self, mock_exec: Any, _mock_isdir: Any) -> None:
+        # Successful return code but no JSON file written: an anomaly, not
+        # "no issues". The guard must convert this silent failure into a loud,
+        # legible error.
+        mock_exec.return_value = make_command_result(return_code=0)
+
+        result = run_bandit_check_impl("/usr/bin/bandit", "/project", ["src"])
+
+        assert result.messages == []
+        assert result.error is not None
+        assert "output file" in result.error
+
+    @patch("os.path.isdir", return_value=True)
+    @patch(f"{MODULE_PATH}.execute_command")
+    def test_zero_byte_output_file_is_error(
+        self, mock_exec: Any, _mock_isdir: Any
+    ) -> None:
+        # Successful return code and the JSON file exists but is empty (zero
+        # bytes): also an anomaly, not "no issues". The getsize == 0 branch of
+        # the guard must convert this silent failure into a loud, legible error.
+        mock_exec.side_effect = _writing_side_effect("", return_code=0)
+
+        result = run_bandit_check_impl("/usr/bin/bandit", "/project", ["src"])
+
+        assert result.messages == []
+        assert result.error is not None
+        assert "output file" in result.error
 
     @patch("os.path.isdir", return_value=True)
     @patch(f"{MODULE_PATH}.execute_command")
