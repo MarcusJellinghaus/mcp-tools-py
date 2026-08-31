@@ -45,7 +45,7 @@ During the discussion, actively identify constraints and rationale — the "why"
 **Base Branch Handling:**
 If the issue contains a `### Base Branch` section:
 - Display the specified base branch prominently
-- Verify the branch exists: call `mcp__mcp-workspace__git` with command `"ls-remote"` and args `["--heads", "origin", "<branch-name>"]`
+- Verify the branch exists: call `mcp__mcp-workspace__git` with command `"ls_remote"` and args `["--heads", "origin", "<branch-name>"]`
 - If the branch does NOT exist, show a clear warning:
   "⚠️ Warning: Base branch 'X' does not exist on remote. Branch creation will fail."
 - Continue with the analysis (non-blocking error)
