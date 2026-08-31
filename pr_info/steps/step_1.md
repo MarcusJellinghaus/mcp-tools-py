@@ -222,8 +222,8 @@ widened `success`; they are the same scenario with the same mock.
 
 Fixture: a module-level constant holding a **verbatim** warning, prefix
 included. It must contain (a) two warning lines, (b) a path containing a space,
-(c) the indented `warn(...)` source line that `warnings.warn` prints after each
-warning, to prove non-matching lines are ignored.
+(c) an unrelated isort output line, to prove lines without the phrase are
+ignored.
 
 ```python
 _UNPARSABLE_OUTPUT = (
@@ -231,7 +231,7 @@ _UNPARSABLE_OUTPUT = (
     "src\\mcp_tools_py\\code_checker_pytest\\reporting.py due to "
     "'charmap' codec can't encode character in position 23: "
     "character maps to <undefined>\n"
-    '  warn(f"Unable to parse file {file}")\n'
+    "Skipped 2 files\n"
     "<frozen runpy>:88: UserWarning: Unable to parse file "
     "tests\\my dir\\test_black_runner.py due to "
     "'charmap' codec can't encode character in position 4: "
@@ -239,11 +239,23 @@ _UNPARSABLE_OUTPUT = (
 )
 ```
 
+**On the echoed source line.** `warnings.warn` prints the source line of the
+`warn()` call after the message *when it can retrieve it*; isort's real call is
+`warn(f"Unable to parse file {file} due to {error}")`, which contains the phrase
+and would therefore match, yielding a bogus `{file}` path. It does not appear in
+the issue's *Observed behaviour* — the warning is attributed to `<frozen
+runpy>:88`, for which no source is retrievable — so the fixture does not model
+it. Do **not** put a truncated `warn(f"Unable to parse file {file}")` line in
+the fixture instead: dropping `" due to "` makes it non-matching by
+construction, so it would prove nothing about the line it claims to model. The
+probe in DONE WHEN is what settles this against real output; a `{file}` entry
+there means the echo is present and the parser needs a guard.
+
 Assert, from `run_isort(..., check_only=True)` with `return_code=0` and that
 string as stderr:
 
-- `result.unparsable_files` equals the two paths, the spaced one intact and the
-  `warn(...)` line absent;
+- `result.unparsable_files` equals exactly the two paths, the spaced one intact
+  and nothing contributed by the `Skipped 2 files` line;
 - `result.success is False`, despite `return_code == 0`.
 
 The existing tests already assert `success is True` for warning-free runs, so
@@ -294,15 +306,34 @@ remainder in one case. Assert:
 - Both new tests pass; all existing formatter tests still pass.
 - `run_pylint_check`, `run_pytest_check(extra_args=["-n", "auto"])`,
   `run_mypy_check` and `run_ruff_check` are clean.
-- `run_format_code(steps=["isort"], check_only=True)` has been run against this
-  repository and the `ERROR: isort could not read N file(s)` block appears, with
-  N matching the number of warnings isort emits. This repository has 11 live
-  trigger files, so the parser meets real isort output here. It is the only
-  check that the wire format assumption holds: *Observed behaviour* in the issue
-  shows the warning on one line, the appendix shows it wrapped across two, and
-  the parser handles only the single-line form. If no block appears while isort
-  still emits warnings, the message is wrapped and the parser needs reworking —
-  the unit tests cannot detect this.
+- The parser has met **real isort output from the working copy**. Do not use the
+  `run_format_code` MCP tool for this: the running `mcp-tools-py` server process
+  holds the pre-change code, so it would report no block however correct the
+  implementation is. Use a scratch probe against the source tree instead:
+
+  ```python
+  # .scratch/probe_unparsable.py
+  import sys
+
+  sys.path.insert(0, "src")
+  from mcp_tools_py.formatter.isort_runner import run_isort
+
+  result = run_isort(sys.executable, ["src", "tests"], ".", check_only=True)
+  print("warnings:", result.output.count("Unable to parse file"))
+  print("parsed:", len(result.unparsable_files), "success:", result.success)
+  print("\n".join(result.unparsable_files))
+  ```
+
+  Run it with Bash (`python .scratch/probe_unparsable.py`) from the project
+  root. Expected: `parsed` equals `warnings` (11 on this repository today),
+  `success` is `False`, and no listed path contains `{`.
+
+  This is the only check that the wire-format assumption holds: *Observed
+  behaviour* in the issue shows the warning on one line, the appendix shows it
+  wrapped across two, and the parser handles only the single-line form. `parsed:
+  0` while `warnings` is non-zero means the message is wrapped and the parser
+  needs reworking; a `{file}` path means the echoed source line is present (see
+  TESTS) and the parser needs a guard. The unit tests can detect neither.
 - `run_format_code` has been run, and no `.scratch/` directory remains.
 - `pr_info/TASK_TRACKER.md` marks this step complete.
 - One commit.
