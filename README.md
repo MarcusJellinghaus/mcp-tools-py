@@ -199,13 +199,13 @@ mcp-tools-py --help
 
 ## MCP Client Configuration
 
-This server can be easily configured using the [mcp-config](https://github.com/MarcusJellinghaus/mcp-config) Python tool. The mcp-config tool provides:
+This server can be configured with [mcp-config](https://github.com/MarcusJellinghaus/mcp-config), a separate Python tool you install yourself — it is not a dependency of this package. It provides:
 
 - **Interactive setup**: Works with Claude Desktop and VSCode
 - **Configuration management**: Add, remove, and view server configurations
 - **Server repository**: Access to curated MCP server collection
 
-**Prerequisites:** Install Python and the mcp-config tool.
+**Prerequisites:** Install Python, then install mcp-config separately.
 
 **Note:** While other MCP clients like Windsurf and Cursor support MCP servers, they may require manual configuration.
 
@@ -328,16 +328,15 @@ Use `--console-only` to disable file logging for simple development scenarios.
    pip install git+https://github.com/MarcusJellinghaus/mcp-tools-py.git
    ```
 
-2. **Configure with mcp-config:**
+2. **Configure with [mcp-config](https://github.com/MarcusJellinghaus/mcp-config)** (install it separately — it is not pulled in by this package):
    ```bash
    mcp-config
    ```
-   Then select "Add New" and search for this server, or run directly:
-   ```bash
-   mcp-config mcp-tools-py
-   ```
+   Then select "Add New" and search for this server.
 
 This will prompt you for your project directory and automatically configure your MCP client.
+
+**Note:** mcp-config's server registry does not yet carry an entry for `mcp-tools-py`, so use the Manual Setup below if it cannot find this server.
 
 ### Manual Setup
 

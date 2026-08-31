@@ -22,6 +22,15 @@ This is enforced by the `mcp_coder_utils_isolation` contract in `.importlinter`.
 
 **Do NOT use native Claude Code file tools** (`Read`, `Write`, `Edit`, `Glob`, `Grep`, `Bash`) for any operation that has an MCP equivalent. Always use the `mcp__mcp-workspace__*` tools instead. This applies to all file reading, writing, editing, searching, listing, and git operations. If no MCP equivalent exists, use Bash. Check the tool mapping table below first.
 
+**Justify Bash.** Before a Bash command or script, say in chat, on two lines:
+
+- *What it does* — one sentence.
+- *Why MCP doesn't* — which tool you'd have used, and what stops it.
+
+If you can't name the gap, use the MCP tool. Exempt: the approved git/gh commands under Git operations.
+
+**No session scratchpad.** MCP tools can't write outside the project. Temporary files go in `.scratch/`.
+
 ### Tool mapping
 
 | Task | MCP tool |
@@ -50,6 +59,7 @@ This is enforced by the `mcp_coder_utils_isolation` contract in `.importlinter`.
 | Run ruff fix | `mcp__mcp-tools-py__run_ruff_fix` |
 | Run bandit | `mcp__mcp-tools-py__run_bandit_check` |
 | Format code (black+isort) | `mcp__mcp-tools-py__run_format_code` |
+| Check a Python semantic before claiming it | scratch probe — see [Scratch probes](#scratch-probes) |
 | Get library source | `mcp__mcp-tools-py__get_library_source` |
 | Refactoring | `mcp__mcp-tools-py__move_symbol`, `move_module`, `rename_symbol`, `list_symbols`, `find_references` |
 | Git (status, log, diff, fetch, etc.) | `mcp__mcp-workspace__git` |
@@ -57,6 +67,8 @@ This is enforced by the `mcp_coder_utils_isolation` contract in `.importlinter`.
 | `gh issue list` | `mcp__mcp-workspace__github_issue_list` |
 | `gh pr view` | `mcp__mcp-workspace__github_pr_view` |
 | `gh search` | `mcp__mcp-workspace__github_search` |
+
+Sibling repos are readable in full via the reference tools and `git` with `reference_name` (`get_reference_projects` lists them). Check there before asking about another repo.
 
 ## Code quality checks
 
@@ -89,6 +101,17 @@ mcp__mcp-tools-py__run_pytest_check(extra_args=["-n", "auto"], markers=["integra
 
 When debugging test failures, add `"-v", "-s", "--tb=short"` to extra_args.
 
+## Scratch probes
+
+Don't assert Python behaviour you haven't run. Probe it:
+
+```python
+mcp__mcp-workspace__save_file(".scratch/test_probe.py", ...)
+mcp__mcp-tools-py__run_pytest_check(extra_args=["-p", "no:cacheprovider", ".scratch/test_probe.py"])
+```
+
+A path argument scopes the run, so a probe costs seconds. Delete when done — `delete_directory(".scratch", recursive=True)`; CI blocks any PR carrying one. `.scratch/` is not gitignored: the MCP file tools refuse ignored paths.
+
 ## Git operations
 
 **MCP tools (use these for read-only git and GitHub queries):**
@@ -102,11 +125,15 @@ mcp__mcp-workspace__github_search
 mcp__mcp-workspace__check_branch_status
 ```
 
-**Bash-only (no MCP equivalent):**
+**Bash-only (no MCP equivalent).** Use Bash directly. Skills that instruct bash commands (e.g. `git commit`) must also use Bash.
 
 ```
-git commit / git checkout / git rebase / git push
+git commit / add / push / push --force-with-lease / checkout / checkout -b / branch
+git rebase / rm / restore / stash / remote get-url
+gh issue create / edit / comment (labels only via gh-tool set-status)
+gh issue view (cross-repo only — otherwise use the MCP tool)
 gh run view
+mcp-coder gh-tool set-status <label>
 mcp-coder check file-size --max-lines 750
 ```
 
@@ -114,21 +141,41 @@ mcp-coder check file-size --max-lines 750
 
 **Bash discipline:** no `cd` prefix, no `git -C`. Don't chain approved with unapproved commands. Run them separately.
 
-**Commit messages:** standard format, clear and descriptive. No attribution footers.
+**Slash-prefixed `gh` arguments:** prefix with `MSYS_NO_PATHCONV=1` — Git Bash rewrites a leading `/` into a Windows path. Without it `--body "/approve"` posts a path, the Action never fires, and the issue silently fails to transition.
+
+**Commit messages:** standard format. See Writing style for length. No attribution footers.
 
 **Pull requests:** no "Generated with Claude Code" footer. Keep descriptions concise.
 
 ## Writing style
 
-Be concise. If one line works, don't use three.
+Be concise. Shorter is better — chat, commits, PRs, docs, comments alike.
+
+Say it once. Never restate what the reader can already see: the diff, the code, the issue, or my own earlier message. Cut it; don't rephrase it.
+
+If a sentence isn't load-bearing, delete it.
+
+Readable beats short. Cut what I don't need; don't compress what stays — complete sentences, no arrow chains or invented abbreviations. Lead with the outcome.
+
+## Asking questions
+
+Never use the AskUserQuestion tool. Ask questions as plain text in the chat.
 
 ## Obsidian knowledge base
 
-An Obsidian vault (`obsidian-dev-wiki`) is available as a reference project at `~/Documents/GitHub/obsidian-dev-wiki`.
+Shared knowledge base across my repos (`obsidian-dev-wiki`), via the `obsidian-wiki` MCP server.
 
-- **Read first:** At the start of non-trivial tasks, search the vault for relevant context — repo notes, processes, known issues, prior decisions.
-- **Follow processes:** When a task matches a documented process in `Processes/` (e.g. `Chore Implementation.md`), follow those steps.
-- **Write back:** Update the vault when you learn something worth preserving for future sessions.
+**Read at the start of non-trivial work:** `Home.md` (index), the `Repos/<current repo>.md` note, and any `Processes/` note matching the task. If a process note covers the task, follow it rather than improvising.
+
+**Write only what passes all three tests:**
+
+- *durable* — still true in 6 months (not status, versions, or task state)
+- *general* — applies beyond the one issue that produced it
+- *homeless* — no better place already exists
+
+Existing homes, check before writing: code and docstrings; the repo's `docs/`; CLAUDE.md for how-I-work rules; the GitHub issue for a single defect's root cause; git history for what changed when.
+
+**Always write to `Field Notes/`**, for Marcus to promote. Only edit `Repos/`, `Processes/`, or `Plans/` when Marcus explicitly asks for it. If an existing note already covers the topic, name it in the Field Note (`Promote into [[Note Name]]`) instead of editing that note. Follow `Conventions.md` for frontmatter and naming.
 
 ## MCP server issues
 

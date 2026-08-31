@@ -28,6 +28,8 @@
         "${MCP_CODER_PROJECT_DIR}",
         "--log-level",
         "INFO",
+        "--file-size-limit",
+        "750",
         "--reference-project",
         "name=mcp_coder,path=${HOME}/Documents/GitHub/mcp_coder,url=https://github.com/MarcusJellinghaus/mcp_coder",
         "--reference-project",
@@ -42,6 +44,17 @@
       "env": {
         "PYTHONPATH": "${MCP_CODER_VENV_DIR}/lib"
       },
+      "alwaysLoad": true
+    },
+    "obsidian-wiki": {
+      "type": "stdio",
+      "command": "npx",
+      "args": [
+        "-y",
+        "obsidian-mcp",
+        "${HOME}/Documents/GitHub/obsidian-dev-wiki"
+      ],
+      "env": {},
       "alwaysLoad": true
     }
   }
