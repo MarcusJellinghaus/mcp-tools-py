@@ -58,6 +58,8 @@ This is enforced by the `mcp_coder_utils_isolation` contract in `.importlinter`.
 | `gh pr view` | `mcp__mcp-workspace__github_pr_view` |
 | `gh search` | `mcp__mcp-workspace__github_search` |
 
+Sibling repos are readable in full via the reference tools and `git` with `reference_name` (`get_reference_projects` lists them). Check there before asking about another repo.
+
 ## Code quality checks
 
 After making code changes, run:
@@ -114,13 +116,17 @@ mcp-coder check file-size --max-lines 750
 
 **Bash discipline:** no `cd` prefix, no `git -C`. Don't chain approved with unapproved commands. Run them separately.
 
-**Commit messages:** standard format, clear and descriptive. No attribution footers.
+**Commit messages:** standard format. See Writing style for length. No attribution footers.
 
 **Pull requests:** no "Generated with Claude Code" footer. Keep descriptions concise.
 
 ## Writing style
 
-Be concise. If one line works, don't use three.
+Be concise. Shorter is better — chat, commits, PRs, docs, comments alike.
+
+Say it once. Never restate what the reader can already see: the diff, the code, the issue, or my own earlier message. Cut it; don't rephrase it.
+
+If a sentence isn't load-bearing, delete it.
 
 ## Asking questions
 
