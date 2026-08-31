@@ -5,7 +5,6 @@ tools:
   - Bash
   - mcp__mcp-workspace__github_issue_view
   - mcp__mcp-workspace__read_file
-  - mcp__mcp-tools-py__sleep
 permissionMode: bypassPermissions
 ---
 

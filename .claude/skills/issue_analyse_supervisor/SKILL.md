@@ -49,8 +49,8 @@ You are a technical lead supervising a software engineer (subagent). You do not 
 8. **Finalize:**
    - Add a `## Final Status` section to the log.
    - Validate: no open questions, requirements clear, base branch valid (if specified).
-   - Launch the **issue-approver agent** with the issue number. For cross-repo issues include `--repo owner/repo`. The agent will approve, wait 5 seconds for the GitHub Action, then assign to the current GitHub user.
-   - Notify the user with a short completion message: rounds run, decisions made, issue approved and assigned.
+   - Launch the **issue-approver agent** with the issue number. For cross-repo issues include `--repo owner/repo`.
+   - Notify the user with a short completion message: rounds run, decisions made, issue approved.
 
 **Analysis Log Format** (each round appended to the log file):
 
