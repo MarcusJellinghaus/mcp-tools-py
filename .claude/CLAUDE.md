@@ -29,6 +29,8 @@ This is enforced by the `mcp_coder_utils_isolation` contract in `.importlinter`.
 
 If you can't name the gap, use the MCP tool. Exempt: the approved git/gh commands under Git operations.
 
+**No session scratchpad.** MCP tools can't write outside the project. Temporary files go in `.scratch/`.
+
 ### Tool mapping
 
 | Task | MCP tool |
@@ -57,6 +59,7 @@ If you can't name the gap, use the MCP tool. Exempt: the approved git/gh command
 | Run ruff fix | `mcp__mcp-tools-py__run_ruff_fix` |
 | Run bandit | `mcp__mcp-tools-py__run_bandit_check` |
 | Format code (black+isort) | `mcp__mcp-tools-py__run_format_code` |
+| Check a Python semantic before claiming it | scratch probe — see [Scratch probes](#scratch-probes) |
 | Get library source | `mcp__mcp-tools-py__get_library_source` |
 | Refactoring | `mcp__mcp-tools-py__move_symbol`, `move_module`, `rename_symbol`, `list_symbols`, `find_references` |
 | Git (status, log, diff, fetch, etc.) | `mcp__mcp-workspace__git` |
@@ -97,6 +100,17 @@ mcp__mcp-tools-py__run_pytest_check(extra_args=["-n", "auto"], markers=["integra
 ```
 
 When debugging test failures, add `"-v", "-s", "--tb=short"` to extra_args.
+
+## Scratch probes
+
+Don't assert Python behaviour you haven't run. Probe it:
+
+```python
+mcp__mcp-workspace__save_file(".scratch/test_probe.py", ...)
+mcp__mcp-tools-py__run_pytest_check(extra_args=["-p", "no:cacheprovider", ".scratch/test_probe.py"])
+```
+
+A path argument scopes the run, so a probe costs seconds. Delete when done — `delete_directory(".scratch", recursive=True)`; CI blocks any PR carrying one. `.scratch/` is not gitignored: the MCP file tools refuse ignored paths.
 
 ## Git operations
 

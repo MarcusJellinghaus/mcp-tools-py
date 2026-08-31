@@ -74,6 +74,7 @@ jobs:
         ERROR=0
 
         check_forbidden_folder "pr_info" "Temporary PR working folder - should not be in PRs" || ERROR=1
+        check_forbidden_folder ".scratch" "Agent scratch probes (throwaway tests) - delete after the experiment" || ERROR=1
         check_forbidden_folder "tests/mcp_tools_py_manual/sample_project" "Generated sample project for manual testing" || ERROR=1
 
         # Check for forbidden files
