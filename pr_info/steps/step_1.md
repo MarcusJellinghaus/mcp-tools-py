@@ -204,8 +204,10 @@ Known limitation (Windows, piped stdout).
 <isort's own output follows>
 ```
 
-The full list stays visible below the block as isort's own warnings — that is
-why the cap is safe.
+The cap trades completeness for readability: isort's own warnings follow below,
+but they are subject to `_MAX_LINES = 200` truncation, so on the cited 124-file
+repository the paths past the cap appear nowhere. The count in the first line is
+the complete figure; the listed paths are examples, not the full set.
 
 ---
 
@@ -292,6 +294,15 @@ remainder in one case. Assert:
 - Both new tests pass; all existing formatter tests still pass.
 - `run_pylint_check`, `run_pytest_check(extra_args=["-n", "auto"])`,
   `run_mypy_check` and `run_ruff_check` are clean.
+- `run_format_code(steps=["isort"], check_only=True)` has been run against this
+  repository and the `ERROR: isort could not read N file(s)` block appears, with
+  N matching the number of warnings isort emits. This repository has 11 live
+  trigger files, so the parser meets real isort output here. It is the only
+  check that the wire format assumption holds: *Observed behaviour* in the issue
+  shows the warning on one line, the appendix shows it wrapped across two, and
+  the parser handles only the single-line form. If no block appears while isort
+  still emits warnings, the message is wrapped and the parser needs reworking —
+  the unit tests cannot detect this.
 - `run_format_code` has been run, and no `.scratch/` directory remains.
 - `pr_info/TASK_TRACKER.md` marks this step complete.
 - One commit.
