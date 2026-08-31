@@ -1,6 +1,5 @@
 ---
 description: Analyse GitHub issue requirements, feasibility, and implementation approaches
-disable-model-invocation: true
 argument-hint: "<issue-number>"
 allowed-tools:
   - mcp__mcp-workspace__github_issue_view
@@ -58,4 +57,3 @@ If the issue contains a `### Base Branch` section:
 - Questions that need clarification
 - Impact on existing code
 
-**Note:** This skill has `disable-model-invocation` — it can only be run by the user typing `/issue_analyse`.
