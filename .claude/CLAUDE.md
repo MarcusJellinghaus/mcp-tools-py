@@ -22,6 +22,13 @@ This is enforced by the `mcp_coder_utils_isolation` contract in `.importlinter`.
 
 **Do NOT use native Claude Code file tools** (`Read`, `Write`, `Edit`, `Glob`, `Grep`, `Bash`) for any operation that has an MCP equivalent. Always use the `mcp__mcp-workspace__*` tools instead. This applies to all file reading, writing, editing, searching, listing, and git operations. If no MCP equivalent exists, use Bash. Check the tool mapping table below first.
 
+**Justify Bash.** Before a Bash command or script, say in chat, on two lines:
+
+- *What it does* — one sentence.
+- *Why MCP doesn't* — which tool you'd have used, and what stops it.
+
+If you can't name the gap, use the MCP tool. Exempt: the approved git/gh commands under Git operations.
+
 ### Tool mapping
 
 | Task | MCP tool |
@@ -104,11 +111,14 @@ mcp__mcp-workspace__github_search
 mcp__mcp-workspace__check_branch_status
 ```
 
-**Bash-only (no MCP equivalent):**
+**Bash-only (no MCP equivalent).** Use Bash directly. Skills that instruct bash commands (e.g. `git commit`) must also use Bash.
 
 ```
-git commit / git checkout / git rebase / git push
+git commit / add / push / push --force-with-lease / checkout / checkout -b / branch
+git rebase / rm / restore / stash / remote get-url
+gh issue create / edit / comment (labels only via gh-tool set-status)
 gh run view
+mcp-coder gh-tool set-status <label>
 mcp-coder check file-size --max-lines 750
 ```
 
@@ -127,6 +137,8 @@ Be concise. Shorter is better — chat, commits, PRs, docs, comments alike.
 Say it once. Never restate what the reader can already see: the diff, the code, the issue, or my own earlier message. Cut it; don't rephrase it.
 
 If a sentence isn't load-bearing, delete it.
+
+Readable beats short. Cut what I don't need; don't compress what stays — complete sentences, no arrow chains or invented abbreviations. Lead with the outcome.
 
 ## Asking questions
 
