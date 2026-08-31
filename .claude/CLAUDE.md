@@ -131,6 +131,7 @@ mcp__mcp-workspace__check_branch_status
 git commit / add / push / push --force-with-lease / checkout / checkout -b / branch
 git rebase / rm / restore / stash / remote get-url
 gh issue create / edit / comment (labels only via gh-tool set-status)
+gh issue view (cross-repo only — otherwise use the MCP tool)
 gh run view
 mcp-coder gh-tool set-status <label>
 mcp-coder check file-size --max-lines 750
@@ -139,6 +140,8 @@ mcp-coder check file-size --max-lines 750
 **Before every commit:** run `mcp__mcp-tools-py__run_format_code`, then stage and commit.
 
 **Bash discipline:** no `cd` prefix, no `git -C`. Don't chain approved with unapproved commands. Run them separately.
+
+**Slash-prefixed `gh` arguments:** prefix with `MSYS_NO_PATHCONV=1` — Git Bash rewrites a leading `/` into a Windows path. Without it `--body "/approve"` posts a path, the Action never fires, and the issue silently fails to transition.
 
 **Commit messages:** standard format. See Writing style for length. No attribution footers.
 

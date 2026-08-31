@@ -1,10 +1,10 @@
 ---
 description: Approve issue to transition to next workflow status
 disable-model-invocation: true
-argument-hint: "<issue-number>"
+argument-hint: "<issue-number> [--repo owner/repo]"
 allowed-tools:
   - mcp__mcp-workspace__github_issue_view
-  - "Bash(gh issue comment *)"
+  - "Bash(gh issue view *)"
   - "Bash(MSYS_NO_PATHCONV=1 gh issue comment *)"
   - mcp__mcp-workspace__read_file
 ---
@@ -21,10 +21,16 @@ If no issue number is provided:
 2. Read `.vscodeclaude_status.txt` and extract the issue number from the `Issue #NNN` line
 3. If still unknown, ask the user
 
+## Cross-Repo Issues
+
+If a `--repo owner/repo` flag was given, append it to every `gh` command below, and fetch the
+issue with `gh issue view <issue_number> --repo owner/repo` via Bash —
+`mcp__mcp-workspace__github_issue_view` only reaches the current repository.
+
 ## Instructions
 
 1. Fetch the issue to confirm it exists:
-   Call `mcp__mcp-workspace__github_issue_view` with the issue number.
+   Call `mcp__mcp-workspace__github_issue_view` with the issue number (or `gh issue view` for cross-repo).
 
 2. Validate that the issue is ready for approval:
    - Issue has been analyzed/discussed
