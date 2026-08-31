@@ -122,6 +122,10 @@ mcp-coder check file-size --max-lines 750
 
 Be concise. If one line works, don't use three.
 
+## Asking questions
+
+Never use the AskUserQuestion tool. Ask questions as plain text in the chat.
+
 ## Obsidian knowledge base
 
 Shared knowledge base across my repos (`obsidian-dev-wiki`), via the `obsidian-wiki` MCP server.
