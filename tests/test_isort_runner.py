@@ -5,6 +5,21 @@ from unittest.mock import MagicMock, patch
 from mcp_tools_py.formatter.isort_runner import run_isort
 from mcp_tools_py.utils.subprocess_runner import CommandResult
 
+# Verbatim isort warning text (prefix included), with the trigger character
+# described rather than pasted: embedding a real one would make this file
+# unreadable to isort on Windows and invisible to the check it tests.
+_UNPARSABLE_OUTPUT = (
+    "<frozen runpy>:88: UserWarning: Unable to parse file "
+    "src\\mcp_tools_py\\code_checker_pytest\\reporting.py due to "
+    "'charmap' codec can't encode character in position 23: "
+    "character maps to <undefined>\n"
+    "Skipped 2 files\n"
+    "<frozen runpy>:88: UserWarning: Unable to parse file "
+    "tests\\my dir\\test_black_runner.py due to "
+    "'charmap' codec can't encode character in position 4: "
+    "character maps to <undefined>\n"
+)
+
 
 def _make_result(
     return_code: int = 0,
@@ -121,3 +136,18 @@ def test_run_isort_no_files_changed(mock_exec: MagicMock) -> None:
     result = run_isort("/usr/bin/python", ["src"], "/project")
 
     assert result.files_changed == []
+
+
+@patch("mcp_tools_py.formatter.isort_runner.execute_command")
+def test_run_isort_unparsable_files_fail_despite_exit_zero(
+    mock_exec: MagicMock,
+) -> None:
+    mock_exec.return_value = _make_result(return_code=0, stderr=_UNPARSABLE_OUTPUT)
+
+    result = run_isort("/usr/bin/python", ["src"], "/project", check_only=True)
+
+    assert result.unparsable_files == [
+        "src\\mcp_tools_py\\code_checker_pytest\\reporting.py",
+        "tests\\my dir\\test_black_runner.py",
+    ]
+    assert result.success is False

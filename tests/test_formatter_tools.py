@@ -6,7 +6,7 @@ from unittest.mock import MagicMock, patch
 
 import pytest
 
-from mcp_tools_py.formatter.formatter_tools import FormatterTools
+from mcp_tools_py.formatter.formatter_tools import FormatterTools, _format_results
 from mcp_tools_py.formatter.models import FormatterResult
 
 
@@ -39,9 +39,16 @@ def _capture_run_format_code(mock_server: MagicMock) -> Any:
 
 
 def _make_formatter_result(
-    output: str = "output", success: bool = True
+    output: str = "output",
+    success: bool = True,
+    unparsable_files: list[str] | None = None,
 ) -> FormatterResult:
-    return FormatterResult(output=output, success=success, files_changed=[])
+    return FormatterResult(
+        output=output,
+        success=success,
+        files_changed=[],
+        unparsable_files=list(unparsable_files or []),
+    )
 
 
 _RUNNER_PATCH = "mcp_tools_py.formatter.formatter_tools._run_format_code"
@@ -232,6 +239,25 @@ class TestOutput:
 
         assert "## isort" in result
         assert "## black" in result
+
+    def test_unparsable_files_rendered_above_raw_output(self) -> None:
+        """11 unparsable paths — block, cap at 10, and remainder line."""
+        paths = [f"src\\pkg\\module_{i}.py" for i in range(11)]
+        results = {
+            "isort": _make_formatter_result(
+                output="raw isort output", unparsable_files=paths
+            )
+        }
+
+        result = _format_results(results, ["isort"], check_only=True)
+
+        assert result.startswith("## isort")
+        assert "ERROR: isort could not read 11 file(s)" in result
+        assert paths[0] in result
+        assert paths[9] in result
+        assert paths[10] not in result
+        assert "... and 1 more" in result
+        assert result.index(paths[0]) < result.index("raw isort output")
 
 
 class TestToolAvailability:

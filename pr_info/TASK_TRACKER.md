@@ -21,6 +21,6 @@ This tracks **Feature Implementation** consisting of multiple **Tasks**.
 
 ## Tasks
 
-- [ ] [Step 1](./steps/step_1.md) — Detect unparsable files, fail the step, report them
+- [x] [Step 1](./steps/step_1.md) — Detect unparsable files, fail the step, report them
 
 ## Pull Request

@@ -17,6 +17,8 @@ if TYPE_CHECKING:
 
 logger = logging.getLogger(__name__)
 
+_UNPARSABLE_CAP = 10
+
 
 class FormatterTools:
     """Registers formatting tools on an MCP server."""
@@ -92,6 +94,29 @@ class FormatterTools:
             return output
 
 
+def _unparsable_block(step: str, files: list[str]) -> str:
+    """Render a warning block for files a formatter could not read.
+
+    Args:
+        step: Name of the formatter step that skipped the files.
+        files: Paths the formatter reported as unparsable.
+
+    Returns:
+        Multi-line warning text, with the listed paths capped at
+        `_UNPARSABLE_CAP`. No trailing newline.
+    """
+    lines = [
+        f"ERROR: {step} could not read {len(files)} file(s) - "
+        f"they were NOT checked.",
+        "A clean result here does NOT mean CI will pass.",
+        "Known limitation (Windows, piped stdout).",
+    ]
+    lines += [f"  {path}" for path in files[:_UNPARSABLE_CAP]]
+    if len(files) > _UNPARSABLE_CAP:
+        lines.append(f"  ... and {len(files) - _UNPARSABLE_CAP} more")
+    return "\n".join(lines)
+
+
 def _format_results(
     results: dict[str, FormatterResult],
     steps: list[str],
@@ -107,7 +132,11 @@ def _format_results(
 
     for step in steps:
         if step in results:
-            sections.append(f"## {step}\n{results[step].output}")
+            body = results[step].output
+            if results[step].unparsable_files:
+                block = _unparsable_block(step, results[step].unparsable_files)
+                body = f"{block}\n{body}"
+            sections.append(f"## {step}\n{body}")
             if not results[step].success:
                 failed_step = step
 

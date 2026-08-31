@@ -3,10 +3,13 @@
 Invokes isort as a subprocess and returns a FormatterResult.
 """
 
+import re
+
 from mcp_tools_py.formatter.models import FormatterResult
 from mcp_tools_py.utils.subprocess_runner import execute_command
 
 _MAX_LINES = 200
+_UNPARSABLE_RE = re.compile(r"Unable to parse file (.+) due to ")
 
 
 def _truncate_output(text: str) -> str:
@@ -44,6 +47,19 @@ def _parse_isort_changed_files(output: str) -> list[str]:
     return files
 
 
+def _parse_isort_unparsable_files(output: str) -> list[str]:
+    """Parse file paths isort reported it could not read.
+
+    isort warns ``Unable to parse file <path> due to <reason>`` and skips the
+    file, while still exiting 0. The warning is prefixed by the warnings
+    machinery, so the phrase is matched anywhere in the line.
+
+    Returns:
+        Paths of files isort skipped, in the order the warnings appeared.
+    """
+    return _UNPARSABLE_RE.findall(output)
+
+
 def run_isort(
     python_executable: str,
     target_dirs: list[str],
@@ -59,7 +75,8 @@ def run_isort(
         check_only: If True, pass --check-only to only verify sorting.
 
     Returns:
-        FormatterResult with output, success status, and changed files.
+        FormatterResult with output, changed files, and any files isort could
+        not read. success is True only when isort exited 0 and read every file.
     """
     command = [python_executable, "-m", "isort"]
     if check_only:
@@ -75,8 +92,11 @@ def run_isort(
         output_parts.append(result.stderr)
     output = "\n".join(output_parts) if output_parts else ""
 
+    unparsable_files = _parse_isort_unparsable_files(output)
+
     return FormatterResult(
         output=_truncate_output(output),
-        success=result.return_code == 0,
+        success=result.return_code == 0 and not unparsable_files,
         files_changed=_parse_isort_changed_files(output),
+        unparsable_files=unparsable_files,
     )
