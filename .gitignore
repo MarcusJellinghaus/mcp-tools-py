@@ -45,8 +45,12 @@ uv.lock
 # VSCodeClaude session files (auto-generated)
 .vscodeclaude_status.txt
 .vscodeclaude_analysis.json
+.vscodeclaude_session.json
 .vscodeclaude_start.bat
 .vscodeclaude_start.sh
+
+# mcp-coder verify report (auto-generated)
+.mcp_coder_verify.md
 
 # Windows reserved-name artifacts
 nul
