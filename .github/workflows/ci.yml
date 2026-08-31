@@ -111,7 +111,9 @@ jobs:
           - {name: "pytest", cmd: "pytest --version && pytest tests"}
           - {name: "mypy", cmd: "mypy --version && mypy --strict src tests"}
           - {name: "ruff-docstrings", cmd: "ruff --version && ruff check src tests"}
-          - {name: "file-size", cmd: "uvx --from 'git+https://github.com/MarcusJellinghaus/mcp_coder.git' mcp-coder check file-size --max-lines 750 --allowlist-file .large-files-allowlist"}
+          # mcp-coder declares mcp-workspace as a plain name, so uvx resolves it
+          # from PyPI — too old for mcp-coder's imports. Pin it to git as well.
+          - {name: "file-size", cmd: "uvx --from 'git+https://github.com/MarcusJellinghaus/mcp_coder.git' --with 'mcp-workspace @ git+https://github.com/MarcusJellinghaus/mcp-workspace.git' mcp-coder check file-size --max-lines 750 --allowlist-file .large-files-allowlist"}
     name: ${{ matrix.check.name }}
     steps:
       - uses: actions/checkout@v6
