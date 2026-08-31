@@ -14,3 +14,5 @@ Please offer, whenever possible, simple options like
 - B
 - C
 Always just ask ONE question
+
+Mark the option you prefer and say in one sentence why.
