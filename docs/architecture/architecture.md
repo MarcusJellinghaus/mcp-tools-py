@@ -45,7 +45,7 @@ Compared to a general-purpose bash MCP tool, this server offers a more controlle
 
 ### Dependencies
 
-**Runtime**: `mcp`, `mcp[cli]`, `pylint`, `pytest` + `pytest-json-report` + `pytest-xdist`, `mypy`, `jedi`, `rope`, `structlog` + `python-json-logger`, `mcp-config`
+**Runtime**: `mcp`, `mcp[cli]`, `pylint`, `pytest` + `pytest-json-report` + `pytest-xdist`, `mypy`, `jedi`, `rope`, `structlog` + `python-json-logger`
 
 **Development**: `mcp-coder`, `black` + `isort`, `import-linter` + `tach`, `pycycle`, `vulture`, `pydeps`
 

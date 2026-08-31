@@ -43,13 +43,12 @@ echo "[OK] Target environment: $VENV_DIR"
 echo ""
 
 echo "[1/8] Uninstalling existing packages..."
-uv pip uninstall mcp-coder mcp-tools-py mcp-config mcp-workspace --python "$PY" 2>/dev/null || true
+uv pip uninstall mcp-coder mcp-tools-py mcp-workspace --python "$PY" 2>/dev/null || true
 echo "[OK] Packages uninstalled"
 
 echo ""
 echo "[2/8] Installing mcp-tools-py (this project) in editable mode..."
-# Editable install pulls all deps (including mcp-workspace, mcp-config) from
-# PyPI first.
+# Editable install pulls all deps (including mcp-workspace) from PyPI first.
 if ! ( cd "$PROJECT_DIR" && uv pip install -e ".[dev]" --python "$PY" ); then
     echo "[FAIL] Editable installation failed!"
     [ "$_SOURCED" = "1" ] && return 1 || exit 1

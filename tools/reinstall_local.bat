@@ -39,13 +39,12 @@ echo [OK] Target environment: !VENV_DIR!
 echo.
 
 echo [1/8] Uninstalling existing packages...
-uv pip uninstall mcp-coder mcp-tools-py mcp-config mcp-workspace --python "!VENV_SCRIPTS!\python.exe" 2>nul
+uv pip uninstall mcp-coder mcp-tools-py mcp-workspace --python "!VENV_SCRIPTS!\python.exe" 2>nul
 echo [OK] Packages uninstalled
 
 echo.
 echo [2/8] Installing mcp-tools-py (this project) in editable mode...
-REM Editable install pulls all deps (including mcp-workspace,
-REM mcp-config) from PyPI first.
+REM Editable install pulls all deps (including mcp-workspace) from PyPI first.
 pushd "!PROJECT_DIR!"
 uv pip install -e ".[dev]" --python "!VENV_SCRIPTS!\python.exe"
 if !ERRORLEVEL! NEQ 0 (
