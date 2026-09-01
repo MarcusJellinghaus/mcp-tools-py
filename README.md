@@ -111,8 +111,8 @@ mcp-tools-py --project-dir /path/to/project [options]
 | Parameter | Type | Default | Description |
 |-----------|------|---------|-------------|
 | `--log-level` | string | "INFO" | Set logging level. Choices: DEBUG, INFO, WARNING, ERROR, CRITICAL |
-| `--log-file` | string | None | Path for structured JSON logs. If not specified, logs only to console |
-| `--console-only` | flag | False | Log only to console, ignore `--log-file` parameter |
+| `--log-file` | string | None | Path for structured JSON logs. If not specified, logs go to `project_dir/logs/mcp_tools_py_{timestamp}.log` |
+| `--console-only` | flag | False | Log only to console: no default log file, and `--log-file` is ignored |
 
 #### Tool Configuration
 | Parameter | Type | Default | Description |

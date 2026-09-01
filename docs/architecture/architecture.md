@@ -135,7 +135,7 @@ See `pyproject.toml` for version constraints.
 - Each layer may only depend on layers below it
 - `checker_tools` depends on the `code_checker_*` packages, never the reverse; the other registrars (`formatter`, `refactoring`, `utility_tools`, `inspect_library`) depend on none of them
 - Checker modules may NOT depend on each other
-- `utils` may NOT depend on any checker module or `server`
+- `utils` may NOT depend on anything above it: the `code_checker_*` packages, the registrars (`checker_tools`, `formatter`, `refactoring`, `utility_tools`, `inspect_library`) or `server`
 - `mcp_coder_utils` may only be imported by the three shim modules — `log_utils`, `utils/file_utils.py` and `utils/subprocess_runner.py`; every other module imports it through them (`mcp_coder_utils_isolation` contract in `.importlinter`)
 
 ### Checker Module Pattern
@@ -245,7 +245,7 @@ See [dependencies/readme.md](dependencies/readme.md) for tool comparison, curren
 | pycycle | — | Circular dependency detection |
 | vulture | `vulture_whitelist.py` | Dead code detection |
 
-`.importlinter` holds three contracts: the layer contract, a forbidden-imports contract keeping `utils` free of checker and `server` imports, and `mcp_coder_utils_isolation`, which confines `mcp_coder_utils` imports to the three shim modules.
+`.importlinter` holds three contracts: the layer contract, a forbidden-imports contract keeping `utils` free of imports from the `code_checker_*` packages, the registrars (`checker_tools`, `formatter`, `refactoring`, `utility_tools`, `inspect_library`) and `server`, and `mcp_coder_utils_isolation`, which confines `mcp_coder_utils` imports to the three shim modules.
 
 ### CI Pipeline
 
