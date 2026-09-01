@@ -39,7 +39,10 @@ def run_pytest_check(
 - `pytest_tool.py`: inside the existing `try`, add
   `timeout_seconds=server.resolve_timeout("pytest", timeout_seconds)` to the
   `check_code_with_pytest(...)` call. The existing `except Exception` returns a message,
-  so an invalid value comes back as text.
+  so an invalid value comes back as text — `run_pytest_check(timeout_seconds=0)` returns
+  rather than raises. Step 8 gives `run_mypy_check` the same behaviour with an explicit
+  `except ValueError`, because that tool's own `except` re-raises. The two tools sharing
+  this argument must not report a bad value differently.
 - Docstring for the new argument, e.g.:
   *"Maximum seconds to wait for the test run. Overrides the configured limit for this
   call. Must be a positive integer. Defaults to `[tool.mcp-tools-py]` config, then
@@ -85,6 +88,9 @@ result dict's `error`, which `_format_pytest_result_with_details` renders as
   `pyproject.toml`, so resolution yields pytest's built-in
 - `run_pytest_check(timeout_seconds=900)` → `check_code_with_pytest` called with
   `timeout_seconds=900`
+- `run_pytest_check(timeout_seconds=0)` → **returns** a message naming
+  `timeout_seconds`; it does not raise. Same behaviour as
+  `run_mypy_check(timeout_seconds=0)` in step 8
 
 ## LLM PROMPT
 

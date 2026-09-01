@@ -49,10 +49,22 @@ def run_mypy_check(
 - Delete the now-superseded `timed_out` block that currently sits *after* the
   `execution_error` block; do not leave two.
 - `reporting.py`: forward `timeout_seconds=timeout_seconds` to `run_mypy_check`.
-- `mypy_tool.py`: resolve **inside** the existing `try`, as
-  `timeout_seconds=server.resolve_timeout("mypy", timeout_seconds)`. This tool's
-  `except` re-raises, so an invalid value surfaces as an MCP error carrying the
-  `ValueError` message — intended.
+- `mypy_tool.py`: resolve **before** the existing `try`, next to the
+  `resolve_target_directories` call that already returns its failure as text:
+
+  ```python
+  try:
+      resolved_timeout = server.resolve_timeout("mypy", timeout_seconds)
+  except ValueError as exc:
+      return f"Error: {exc}"
+  ```
+
+  Not inside the main `try` — that one re-raises, which would turn
+  `run_mypy_check(timeout_seconds=0)` into an MCP protocol error while the same mistake
+  on `run_pytest_check` comes back as text. Both tools take this argument, so both
+  report a bad value the same way: a returned message. Step 10 states the pytest half.
+  The main `try` keeps re-raising real mypy failures, unchanged. Inside it, pass
+  `timeout_seconds=resolved_timeout` to `get_mypy_prompt(...)`.
 - Docstring for the new argument, e.g.:
   *"Maximum seconds to wait for mypy. Overrides the configured limit for this call.
   Must be a positive integer. Defaults to `[tool.mcp-tools-py]` config, then
@@ -65,18 +77,18 @@ result = execute_command(command, cwd=project_dir, timeout_seconds=timeout_secon
 tool_error = check_tool_missing_error(...)      # unchanged, first
 if tool_error: return MypyResult(...)
 if result.timed_out:
-    return MypyResult(1, [], error=f"Mypy execution timed out after {timeout_seconds} seconds")
+    return MypyResult(1, [], error=f"timed out after {timeout_seconds} seconds")
 if result.execution_error:
     ... unchanged ...
 ```
 
 ## DATA
 
-`MypyResult(return_code=1, messages=[], error="Mypy execution timed out after N seconds")`.
+`MypyResult(return_code=1, messages=[], error="timed out after N seconds")`.
 `reporting.get_mypy_prompt` already prefixes `result.error` with
-`"Mypy execution failed: "`, so the user-visible string becomes
-`Mypy execution failed: Mypy execution timed out after 600 seconds`. That double prefix
-is acceptable; do not restructure the reporting path in this step.
+`"Mypy execution failed: "`, so the user-visible string reads
+`Mypy execution failed: timed out after 600 seconds`. The runner text therefore carries
+no second "Mypy execution" prefix. Do not restructure the reporting path in this step.
 
 ## TESTS (write first)
 
@@ -92,6 +104,9 @@ Tool wiring:
   `timeout_seconds=900`
 - `run_mypy_check()` with no server config → `get_mypy_prompt` called with
   `timeout_seconds=120`
+- `run_mypy_check(timeout_seconds=0)` → **returns** a message naming
+  `timeout_seconds`; it does not raise, and `get_mypy_prompt` is never called. Same
+  behaviour as `run_pytest_check(timeout_seconds=0)` in step 10
 
 ## LLM PROMPT
 
@@ -103,6 +118,10 @@ Tool wiring:
 > hardcoded 120) and to `get_mypy_prompt`, move the `timed_out` check above the
 > `execution_error` check and delete the old one, and add the `timeout_seconds` MCP tool
 > argument in `checker_tools/mypy_tool.py` resolving via
-> `server.resolve_timeout("mypy", timeout_seconds)` inside the existing `try`. Document
+> `server.resolve_timeout("mypy", timeout_seconds)` **before** the existing `try`, with
+> its own `except ValueError` returning the message — so an invalid value comes back as
+> text on both tools that accept the argument, not as an MCP error on mypy alone. Keep
+> the runner's timeout text free of a second "Mypy execution" prefix, since
+> `get_mypy_prompt` already adds one. Document
 > the new argument in the tool docstring. Then run `run_format_code`, `run_pylint_check`,
 > `run_pytest_check(extra_args=["-n","auto"])` and `run_mypy_check`, and commit once.

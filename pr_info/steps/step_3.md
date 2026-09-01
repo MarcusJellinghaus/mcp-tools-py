@@ -1,7 +1,11 @@
 # Step 3 — tach
 
 `run_tach_check` currently returns `"tach check passed (no output)."` when killed by a
-timeout: **a killed check reports green.**
+timeout: **a killed check reports green.** It reports the same false green when
+`execute_command` sets `execution_error` without `timed_out` — the
+`FileNotFoundError` / `PermissionError` / `OSError` path, which also yields empty
+stdout and stderr. Both branches are fixed here; leaving one would keep a false pass in
+the function this step already opens.
 
 ## WHERE
 
@@ -30,7 +34,9 @@ def run_tach_check(
   `timeout_seconds=server.resolve_timeout("tach")` to the `run_tach(...)` call. A
   `ValueError` from a malformed `pyproject.toml` is caught by the existing
   `except Exception` and returned as a message.
-- Do not add `execution_error` handling — this issue scopes to timeouts only.
+- Check `timed_out` **before** `execution_error`: `execute_command` sets both on a
+  timeout, so testing `execution_error` first would shadow the timeout branch — the
+  defect this issue exists to remove elsewhere.
 
 ## ALGORITHM
 
@@ -38,14 +44,16 @@ def run_tach_check(
 result = execute_command(command, cwd=project_dir, timeout_seconds=timeout_seconds)
 if result.timed_out:
     return f"tach check timed out after {timeout_seconds} seconds."
+if result.execution_error:
+    return f"tach check failed to run: {result.execution_error}"
 ... existing stdout/stderr combining unchanged ...
 ```
 
-The new branch goes immediately after `execute_command`, before the output is combined.
+Both new branches go immediately after `execute_command`, before the output is combined.
 
 ## DATA
 
-Return type unchanged (`str`). The timeout message replaces the false
+Return type unchanged (`str`). The two messages replace the false
 `"tach check passed (no output)."`.
 
 ## TESTS (write first)
@@ -53,6 +61,9 @@ Return type unchanged (`str`). The timeout message replaces the false
 In `tests/test_code_checker_tach/test_runners.py`:
 - timeout: `make_command_result(timed_out=True, execution_error="Process timed out after 5 seconds")`
   → result contains `"timed out"` and the configured number, and does **not** contain
+  `"passed"`
+- execution error: `make_command_result(execution_error="FileNotFoundError: tach")`
+  with `timed_out=False` → result contains the error text and does **not** contain
   `"passed"`
 - forwarding: `run_tach_check(binary, dir, timeout_seconds=45)` → the `execute_command`
   mock received `timeout_seconds=45`
@@ -71,6 +82,8 @@ for tach with `timeout_seconds=120` (the fixture's `resolve_timeout` from step 2
 > in production.
 >
 > Then add `timeout_seconds` to `run_tach_check`, forward it to `execute_command`, add
-> the `timed_out` branch, and pass `server.resolve_timeout("tach")` from
+> the `timed_out` branch followed by an `execution_error` branch — a killed or failed
+> tach run must never fall through to `"tach check passed (no output)."` — and pass
+> `server.resolve_timeout("tach")` from
 > `checker_tools/tach_tool.py`. Then run `run_format_code`, `run_pylint_check`,
 > `run_pytest_check(extra_args=["-n","auto"])` and `run_mypy_check`, and commit once.

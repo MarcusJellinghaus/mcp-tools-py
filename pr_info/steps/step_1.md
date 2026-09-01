@@ -67,7 +67,7 @@ return value
 path = join(project_dir, "pyproject.toml")
 if not isfile(path): return {}
 open rb; tomllib.load -> on TOMLDecodeError raise ValueError(f"Invalid pyproject.toml: {exc}")
-section = data.get("tool", {}).get("mcp-tools-py")   # guarded with isinstance(dict)
+section = data.get("tool", {}).get(_CONFIG_SECTION)   # guarded with isinstance(dict)
 return section if isinstance(section, dict) else {}
 ```
 
@@ -76,8 +76,8 @@ return section if isinstance(section, dict) else {}
 ```
 if explicit is not None: return validate_timeout(explicit, "timeout_seconds")
 section = _read_mcp_tools_section(project_dir)
-for key in (f"{tool}-timeout", "check-timeout"):
-    if key in section: return validate_timeout(section[key], f"[tool.mcp-tools-py] {key}")
+for key in (f"{tool}-timeout", _SHARED_TIMEOUT_KEY):
+    if key in section: return validate_timeout(section[key], f"[tool.{_CONFIG_SECTION}] {key}")
 if cli_timeout is not None: return validate_timeout(cli_timeout, "--check-timeout")
 return DEFAULT_PYTEST_TIMEOUT if tool == "pytest" else DEFAULT_CHECK_TIMEOUT
 ```

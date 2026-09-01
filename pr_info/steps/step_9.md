@@ -52,14 +52,17 @@ def get_pylint_prompt(..., max_issues: int = 1,
 ```
 subprocess_result = execute_command(pylint_command, cwd=project_dir, timeout_seconds=timeout_seconds)
 if subprocess_result.timed_out:
-    return PylintResult(1, [], error=f"Pylint execution timed out after {timeout_seconds} seconds", raw_output=None)
+    return PylintResult(1, [], error=f"timed out after {timeout_seconds} seconds", raw_output=None)
 if subprocess_result.execution_error:
     ... unchanged (tool-missing check stays inside) ...
 ```
 
 ## DATA
 
-`PylintResult(return_code=1, messages=[], error="Pylint execution timed out after N seconds", raw_output=None)`.
+`PylintResult(return_code=1, messages=[], error="timed out after N seconds", raw_output=None)`.
+`reporting.py:235` already returns `f"Pylint analysis failed: {pylint_results.error}"`,
+so the user-visible string reads `Pylint analysis failed: timed out after 600 seconds`.
+The runner text carries no second "Pylint" prefix. Same shape as mypy in step 8.
 
 ## TESTS (write first)
 
@@ -82,7 +85,8 @@ Tool wiring: `run_pylint_check()` → `get_pylint_prompt` called with
 > `execution_error` as the summary requires — the runner test should fail against the
 > current dead branch. Then add `timeout_seconds` to `get_pylint_results` (replacing the
 > hardcoded 120) and to `get_pylint_prompt`, move the `timed_out` check above the whole
-> `execution_error` block and delete the old one, and pass
+> `execution_error` block and delete the old one, keep the runner's timeout text free of
+> a second "Pylint" prefix since `get_pylint_prompt` already adds one, and pass
 > `server.resolve_timeout("pylint")` from `checker_tools/pylint_tool.py`.
 >
 > Do **not** add a `timeout_seconds` MCP tool argument — only pytest and mypy get one.

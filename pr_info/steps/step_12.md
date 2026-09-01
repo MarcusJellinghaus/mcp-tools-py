@@ -10,7 +10,9 @@ Docs only. No source or test changes.
 
 ## WHAT — `README.md`
 
-One new row in the existing *Tool Configuration* table:
+Three tables change.
+
+1. §Optional Parameters → *Tool Configuration* — one new row:
 
 | Parameter | Type | Default | Description |
 |-----------|------|---------|-------------|
@@ -18,6 +20,22 @@ One new row in the existing *Tool Configuration* table:
 
 The issue also asks to backfill `--refactoring-timeout` and `--vulture-whitelist`.
 **Both are already present** in that table (added in #226) — verify and leave them alone.
+
+2. §*Pytest Parameters* — this table enumerates every `run_pytest_check` argument, so
+   step 10's new one belongs in it:
+
+| Parameter | Type | Default | Description |
+|-----------|------|---------|-------------|
+| `timeout_seconds` | integer | None (resolved from config, else 300) | Maximum seconds to wait for the test run. Positive integers only |
+
+3. §*Mypy Parameters* — same, for step 8's argument:
+
+| Parameter | Type | Default | Description |
+|-----------|------|---------|-------------|
+| `timeout_seconds` | integer | None (resolved from config, else 120) | Maximum seconds to wait for mypy. Positive integers only |
+
+These two tables are the only per-tool argument documentation in the README; leaving
+them out would ship a documented tool surface that is missing an argument it accepts.
 
 ## WHAT — `docs/pyproject-configuration.md`
 
@@ -94,7 +112,9 @@ Cross-check the ten key names in the docs against `ToolName` in
 
 > Read `pr_info/steps/summary.md` and `pr_info/steps/step_12.md`. Implement step 12 only.
 >
-> Update `README.md` (one new `--check-timeout` row; confirm `--refactoring-timeout` and
+> Update `README.md` (one new `--check-timeout` row in *Tool Configuration*, plus a
+> `timeout_seconds` row in each of the *Pytest Parameters* and *Mypy Parameters* tables;
+> confirm `--refactoring-timeout` and
 > `--vulture-whitelist` are already there and leave them), retitle and extend
 > `docs/pyproject-configuration.md` with the `[tool.mcp-tools-py]` section covering every
 > bullet listed in this step, and extend the `utils/project_config.py` line in
