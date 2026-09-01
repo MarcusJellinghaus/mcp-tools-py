@@ -9,6 +9,7 @@ from mcp_tools_py.code_checker_ruff.reporting import (
     format_ruff_fix_report,
 )
 from mcp_tools_py.log_utils import log_function_call
+from mcp_tools_py.utils.project_config import DEFAULT_CHECK_TIMEOUT
 from mcp_tools_py.utils.subprocess_runner import execute_command
 
 logger = logging.getLogger(__name__)
@@ -47,6 +48,7 @@ def run_ruff_check_impl(
     select: list[str] | None = None,
     extra_args: list[str] | None = None,
     max_issues: int = 1,
+    timeout_seconds: int = DEFAULT_CHECK_TIMEOUT,
 ) -> str:
     """Run ruff check (read-only) and return formatted report.
 
@@ -65,13 +67,13 @@ def run_ruff_check_impl(
         select,
         extra_args,
     )
-    result = execute_command(cmd, cwd=project_dir)
+    result = execute_command(cmd, cwd=project_dir, timeout_seconds=timeout_seconds)
+
+    if result.timed_out:
+        return f"Ruff timed out after {timeout_seconds} seconds."
 
     if result.execution_error:
         return f"Ruff execution error: {result.execution_error}"
-
-    if result.timed_out:
-        return "Ruff timed out."
 
     if result.return_code == 2:
         return f"Ruff error: {result.stderr}"
@@ -91,6 +93,7 @@ def run_ruff_fix_impl(
     target_directories: list[str],
     select: list[str] | None = None,
     extra_args: list[str] | None = None,
+    timeout_seconds: int = DEFAULT_CHECK_TIMEOUT,
 ) -> str:
     """Run ruff check --fix (modifies files) and return fix report.
 
@@ -113,13 +116,15 @@ def run_ruff_fix_impl(
         select,
         extra_args,
     )
-    check_result = execute_command(check_cmd, cwd=project_dir)
+    check_result = execute_command(
+        check_cmd, cwd=project_dir, timeout_seconds=timeout_seconds
+    )
+
+    if check_result.timed_out:
+        return f"Ruff timed out after {timeout_seconds} seconds."
 
     if check_result.execution_error:
         return f"Ruff execution error: {check_result.execution_error}"
-
-    if check_result.timed_out:
-        return "Ruff timed out."
 
     if check_result.return_code == 2:
         return f"Ruff error: {check_result.stderr}"
@@ -141,13 +146,15 @@ def run_ruff_fix_impl(
         extra_args,
         fix=True,
     )
-    fix_result = execute_command(fix_cmd, cwd=project_dir)
+    fix_result = execute_command(
+        fix_cmd, cwd=project_dir, timeout_seconds=timeout_seconds
+    )
+
+    if fix_result.timed_out:
+        return f"Ruff fix timed out after {timeout_seconds} seconds."
 
     if fix_result.execution_error:
         return f"Ruff fix execution error: {fix_result.execution_error}"
-
-    if fix_result.timed_out:
-        return "Ruff fix timed out."
 
     if fix_result.return_code == 2:
         return f"Ruff fix error: {fix_result.stderr}"

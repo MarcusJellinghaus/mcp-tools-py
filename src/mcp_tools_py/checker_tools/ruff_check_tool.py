@@ -73,6 +73,7 @@ def register(mcp: "FastMCPProtocol", checker_tools: "CheckerTools") -> None:
                 select=select,
                 extra_args=extra_args,
                 max_issues=max_issues,
+                timeout_seconds=server.resolve_timeout("ruff"),
             )
 
             logger.info(

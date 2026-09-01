@@ -308,6 +308,47 @@ def test_bandit_passes_resolved_timeout(mock_server: MagicMock) -> None:
     assert mock_runner.call_args[1]["timeout_seconds"] == 120
 
 
+# --- Ruff handler tests ---
+
+
+def test_ruff_check_passes_resolved_timeout(mock_server: MagicMock) -> None:
+    """The resolved timeout is passed to run_ruff_check_impl."""
+    run_ruff_check = _capture_tool(mock_server, "run_ruff_check")
+
+    with (
+        patch(
+            "mcp_tools_py.checker_tools.ruff_check_tool.run_ruff_check_impl",
+            return_value="ok",
+        ) as mock_runner,
+        patch(
+            "mcp_tools_py.checker_tools.ruff_check_tool.resolve_target_directories",
+            return_value=["src"],
+        ),
+    ):
+        run_ruff_check()
+
+    assert mock_runner.call_args[1]["timeout_seconds"] == 120
+
+
+def test_ruff_fix_passes_resolved_timeout(mock_server: MagicMock) -> None:
+    """The resolved timeout is passed to run_ruff_fix_impl."""
+    run_ruff_fix = _capture_tool(mock_server, "run_ruff_fix")
+
+    with (
+        patch(
+            "mcp_tools_py.checker_tools.ruff_fix_tool.run_ruff_fix_impl",
+            return_value="ok",
+        ) as mock_runner,
+        patch(
+            "mcp_tools_py.checker_tools.ruff_fix_tool.resolve_target_directories",
+            return_value=["src"],
+        ),
+    ):
+        run_ruff_fix()
+
+    assert mock_runner.call_args[1]["timeout_seconds"] == 120
+
+
 # --- Auto-detection tests ---
 
 

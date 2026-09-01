@@ -36,6 +36,18 @@ def _make_ruff_json(violations: list[dict[str, Any]]) -> str:
     return json.dumps(items)
 
 
+_FIXABLE_JSON = _make_ruff_json(
+    [
+        {
+            "code": "F401",
+            "message": "Unused import",
+            "filename": "/project/src/a.py",
+            "fix": {"applicability": "safe", "edits": []},
+        },
+    ]
+)
+
+
 class TestBuildRuffCommand:
     """Tests for _build_ruff_command."""
 
@@ -147,15 +159,40 @@ class TestRunRuffCheckImpl:
     @patch("os.path.isdir", return_value=True)
     @patch(f"{MODULE_PATH}.execute_command")
     def test_timeout(self, mock_exec: Any, _mock_isdir: Any) -> None:
-        mock_exec.return_value = make_command_result(timed_out=True)
+        mock_exec.return_value = make_command_result(
+            timed_out=True,
+            execution_error="Command timed out after 30 seconds",
+        )
 
         result = run_ruff_check_impl(
             "/usr/bin/ruff",
             "/project",
             ["src"],
+            timeout_seconds=30,
         )
 
         assert "timed out" in result.lower()
+        assert "30 seconds" in result
+
+    @patch("os.path.isdir", return_value=True)
+    @patch(f"{MODULE_PATH}.execute_command")
+    def test_forwards_timeout(self, mock_exec: Any, _mock_isdir: Any) -> None:
+        """timeout_seconds reaches execute_command."""
+        mock_exec.return_value = make_command_result(return_code=0, stdout="[]")
+
+        run_ruff_check_impl("/usr/bin/ruff", "/project", ["src"], timeout_seconds=45)
+
+        assert mock_exec.call_args[1]["timeout_seconds"] == 45
+
+    @patch("os.path.isdir", return_value=True)
+    @patch(f"{MODULE_PATH}.execute_command")
+    def test_default_timeout(self, mock_exec: Any, _mock_isdir: Any) -> None:
+        """Omitting timeout_seconds uses the shared default."""
+        mock_exec.return_value = make_command_result(return_code=0, stdout="[]")
+
+        run_ruff_check_impl("/usr/bin/ruff", "/project", ["src"])
+
+        assert mock_exec.call_args[1]["timeout_seconds"] == 120
 
     def test_invalid_project_dir(self) -> None:
         """Raise FileNotFoundError when project_dir does not exist."""
@@ -251,15 +288,70 @@ class TestRunRuffFixImpl:
     @patch("os.path.isdir", return_value=True)
     @patch(f"{MODULE_PATH}.execute_command")
     def test_timeout(self, mock_exec: Any, _mock_isdir: Any) -> None:
-        mock_exec.return_value = make_command_result(timed_out=True)
+        mock_exec.return_value = make_command_result(
+            timed_out=True,
+            execution_error="Command timed out after 30 seconds",
+        )
 
         result = run_ruff_fix_impl(
             "/usr/bin/ruff",
             "/project",
             ["src"],
+            timeout_seconds=30,
         )
 
         assert "timed out" in result.lower()
+        assert "30 seconds" in result
+
+    @patch("os.path.isdir", return_value=True)
+    @patch(f"{MODULE_PATH}.execute_command")
+    def test_fix_apply_timeout(self, mock_exec: Any, _mock_isdir: Any) -> None:
+        """A timeout while applying fixes is reported as a fix timeout."""
+        mock_exec.side_effect = [
+            make_command_result(return_code=1, stdout=_FIXABLE_JSON),
+            make_command_result(
+                timed_out=True,
+                execution_error="Command timed out after 30 seconds",
+            ),
+        ]
+
+        result = run_ruff_fix_impl(
+            "/usr/bin/ruff",
+            "/project",
+            ["src"],
+            timeout_seconds=30,
+        )
+
+        assert "fix" in result.lower()
+        assert "timed out" in result.lower()
+        assert "30 seconds" in result
+
+    @patch("os.path.isdir", return_value=True)
+    @patch(f"{MODULE_PATH}.execute_command")
+    def test_forwards_timeout_to_both_calls(
+        self, mock_exec: Any, _mock_isdir: Any
+    ) -> None:
+        """Both the pre-check and the apply call receive timeout_seconds."""
+        mock_exec.side_effect = [
+            make_command_result(return_code=1, stdout=_FIXABLE_JSON),
+            make_command_result(return_code=0, stdout="[]"),
+        ]
+
+        run_ruff_fix_impl("/usr/bin/ruff", "/project", ["src"], timeout_seconds=45)
+
+        assert mock_exec.call_count == 2
+        for call in mock_exec.call_args_list:
+            assert call[1]["timeout_seconds"] == 45
+
+    @patch("os.path.isdir", return_value=True)
+    @patch(f"{MODULE_PATH}.execute_command")
+    def test_default_timeout(self, mock_exec: Any, _mock_isdir: Any) -> None:
+        """Omitting timeout_seconds uses the shared default."""
+        mock_exec.return_value = make_command_result(return_code=0, stdout="[]")
+
+        run_ruff_fix_impl("/usr/bin/ruff", "/project", ["src"])
+
+        assert mock_exec.call_args[1]["timeout_seconds"] == 120
 
     @patch("os.path.isdir", return_value=True)
     @patch(f"{MODULE_PATH}.execute_command")
