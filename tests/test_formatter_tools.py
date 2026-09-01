@@ -21,6 +21,10 @@ def mock_server() -> MagicMock:
         "black": True,
     }
     server._is_tool_available = lambda tool: server._tool_availability.get(tool, False)
+    server.tool_unavailable_message = lambda key, package=None: (
+        f"{key} is not available in /mock/venv/bin. "
+        "Restart the server after installing."
+    )
     server.resolve_timeout = lambda tool, explicit=None: (
         300 if tool == "pytest" else 120
     )

@@ -225,16 +225,35 @@ class ToolServer:
                     logger.info("%s version: %s", tool_name, result.stdout.strip())
 
         if not available:
-            logger.warning(
-                "%s not found in %s. "
-                "Ensure --python-executable and --venv-path point to "
-                "the environment where %s is installed.",
-                tool_name,
-                self._resolved_python,
-                tool_name,
-            )
+            logger.warning("%s", self.tool_unavailable_message(tool_name))
         self._tool_availability[tool_name] = available
         return available
+
+    def tool_unavailable_message(self, key: str, package: Optional[str] = None) -> str:
+        """Build the standard "tool not available" message for `key`.
+
+        Args:
+            key: Tool key as used in `_tool_availability`.
+            package: Distribution name to tell the user to install, when it
+                differs from `key` (import-linter provides `lint-imports`).
+
+        Returns:
+            A message naming --python-executable and the location searched.
+        """
+        name = package or key
+        if _TOOL_MODULES.get(key) is None:
+            searched = os.path.dirname(self._resolved_python)
+            return (
+                f"{key} is not available. No {key} console script was found in "
+                f"{searched}. Ensure --python-executable points to an environment "
+                f"where {name} is installed. Restart the server after installing."
+            )
+        return (
+            f"{key} is not available in the configured Python environment "
+            f"({self._resolved_python}). Ensure --python-executable points to the "
+            f"environment where {name} is installed. "
+            f"Restart the server after installing."
+        )
 
     def resolve_timeout(self, tool: ToolName, explicit: Optional[int] = None) -> int:
         """Resolve the subprocess timeout in seconds for one program.

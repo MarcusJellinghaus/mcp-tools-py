@@ -26,12 +26,7 @@ def register(mcp: "FastMCPProtocol", checker_tools: "CheckerTools") -> None:
             Status line followed by raw JSON output from `tach check --output json`.
         """
         if not server._is_tool_available("tach"):
-            binary_path = server._tool_binaries.get("tach") or "N/A"
-            return (
-                f"tach is not available at {binary_path}. "
-                f"Ensure the virtual environment has tach installed "
-                f"and --venv-path is configured. Restart the server after installing."
-            )
+            return server.tool_unavailable_message("tach")
 
         try:
             logger.info(

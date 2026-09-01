@@ -63,13 +63,7 @@ class FormatterTools:
             # Check tool availability upfront
             for step in resolved_steps:
                 if not self._server._is_tool_available(step):
-                    return (
-                        f"Error: {step} is not available in the configured "
-                        f"Python environment ({self._server._resolved_python}). "
-                        f"Ensure --python-executable and --venv-path point to the "
-                        f"environment where {step} is installed. "
-                        f"Restart the server after installing."
-                    )
+                    return f"Error: {self._server.tool_unavailable_message(step)}"
 
             # Check for line-length conflicts
             warnings = check_line_length_conflicts(

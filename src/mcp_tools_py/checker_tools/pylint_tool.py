@@ -36,12 +36,7 @@ def register(mcp: "FastMCPProtocol", checker_tools: "CheckerTools") -> None:
             Formatted pylint result, or an error message string.
         """
         if not server._is_tool_available("pylint"):
-            return (
-                f"pylint is not available in the configured Python environment "
-                f"({server._resolved_python}). Ensure --python-executable and "
-                f"--venv-path point to the environment where pylint is installed. "
-                f"Restart the server after installing."
-            )
+            return server.tool_unavailable_message("pylint")
 
         resolved = resolve_target_directories(
             str(server.project_dir), target_directories

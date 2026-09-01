@@ -72,12 +72,7 @@ def register(mcp: "FastMCPProtocol", checker_tools: "CheckerTools") -> None:
             run_pytest_check(markers=["integration"])
         """
         if not server._is_tool_available("pytest"):
-            return (
-                f"pytest is not available in the configured Python environment "
-                f"({server._resolved_python}). Ensure --python-executable and "
-                f"--venv-path point to the environment where pytest is installed. "
-                f"Restart the server after installing."
-            )
+            return server.tool_unavailable_message("pytest")
 
         try:
             logger.info(

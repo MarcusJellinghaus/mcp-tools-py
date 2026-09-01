@@ -38,12 +38,7 @@ def register(mcp: "FastMCPProtocol", checker_tools: "CheckerTools") -> None:
             Formatted ruff report, or an error message string.
         """
         if not server._is_tool_available("ruff"):
-            binary_path = server._tool_binaries.get("ruff") or "N/A"
-            return (
-                f"ruff is not available at {binary_path}. "
-                f"Ensure the virtual environment has ruff installed "
-                f"and --venv-path is configured. Restart the server after installing."
-            )
+            return server.tool_unavailable_message("ruff")
 
         resolved = resolve_target_directories(
             str(server.project_dir), target_directories
