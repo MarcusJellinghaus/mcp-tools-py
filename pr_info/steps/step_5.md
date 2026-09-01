@@ -47,7 +47,7 @@ def check_code_with_pytest(
 Call site in `pytest_tool.py`:
 
 ```python
-venv_bin=str(Path(server._resolved_python).parent),   # was venv_path=server.venv_path
+venv_bin=os.path.dirname(server._resolved_python),   # was venv_path=server.venv_path
 ```
 
 ## HOW
@@ -59,10 +59,15 @@ venv_bin=str(Path(server._resolved_python).parent),   # was venv_path=server.ven
 - `runners.py:204/206` already binds a local named `venv_bin`. The new parameter
   **subsumes** that local rather than conflicting with it; delete the local and the
   `os.name` branch around it.
-- `Path(_resolved_python).parent`, **not** `parent.parent` — for a non-venv
-  interpreter (`C:\Python311\python.exe`) `parent.parent` is `C:\`.
+- The interpreter's **own** directory, **not** its parent — for a non-venv
+  interpreter (`C:\Python311\python.exe`) the parent's parent is `C:\`.
+- `os.path.dirname`, not `str(Path(...).parent)`: Steps 2 and 4 derive the same
+  directory with `os.path.dirname` (Decision 15), and the two disagree on Windows
+  for a POSIX-style interpreter path — `str(Path("/custom/python").parent)` is
+  `"\\custom"`, `os.path.dirname` is `"/custom"` — which would break the assertion
+  in test 2 below.
 - Do **not** remove the prepend.
-- `pytest_tool.py` has no `pathlib` import today; add `from pathlib import Path`.
+- `pytest_tool.py` imports neither `os` nor `pathlib` today; add `import os`.
 - Keep `Optional[str] = None` and the `if venv_bin:` guard: other callers, including
   tests, still omit it.
 
@@ -107,8 +112,11 @@ No return-value changes anywhere.
 > "virtual environment root" to "bin/Scripts directory". The `Scripts`/`bin` join
 > currently done inside `run_tests` moves to the call site in
 > `checker_tools/pytest_tool.py:106`, which passes
-> `str(Path(server._resolved_python).parent)` — not `parent.parent`, which for
-> `C:\Python311\python.exe` would give `C:\`. Do not remove the `PATH` prepend.
+> `os.path.dirname(server._resolved_python)` — the interpreter's own directory, not
+> its parent's, which for `C:\Python311\python.exe` would give `C:\`. Use
+> `os.path.dirname` rather than `str(Path(...).parent)`: Steps 2 and 4 use it, and
+> the two disagree on Windows for a POSIX-style path. Do not remove the `PATH`
+> prepend.
 >
 > Watch for three things: `check_code_with_pytest` passes the value to `run_tests`
 > **positionally**, so the rename lands in three places rather than two;

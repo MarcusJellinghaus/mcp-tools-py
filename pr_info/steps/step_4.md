@@ -23,7 +23,7 @@ would merely relocate the misdiagnosis. Depends on Step 3.
 | `formatter/formatter_tools.py` | `:66-72` | helper, `"Error: "` prefix kept |
 | `tests/test_tool_availability.py` | `:546` | assertion now targets the directory |
 | `tests/test_checker_tools.py` | `:186`, `:376`, `:420`, `:464` | `mock_server` must return a real message string |
-| `tests/test_formatter_tools.py` | `:278` | same, for the `black` assertion |
+| `tests/test_formatter_tools.py` | `:125`, `:278` | same, for the `ruff` and `black` assertions |
 | `tests/test_code_checker_bandit/test_integration.py` | `:45` | same, for `_make_mock_server` |
 
 The five startup warnings were absorbed by Step 3's loop; this step covers the
@@ -119,8 +119,12 @@ substrings, so they pass unchanged. If one fails, fix the template, not the test
 
 6. `tests/test_checker_tools.py` — `mock_server` fixture (`:13-40`); assertions at
    `:186` (vulture), `:376` and `:420` (ruff check / ruff fix), `:464` (tach).
-7. `tests/test_formatter_tools.py` — its `mock_server` fixture; assertion at `:278`
-   (black).
+7. `tests/test_formatter_tools.py` — its `mock_server` fixture (`:13-24`);
+   assertions at `:278` (black) and `:125`. The latter,
+   `test_invalid_step_returns_error`, passes `steps=["ruff"]`, which the fixture
+   reports unavailable, so it short-circuits on the message rather than on the
+   runner's `ValueError` and asserts `"ruff" in result` — a `MagicMock` repr
+   contains no `"ruff"`, so the fixture-level fix must cover it too.
 8. `tests/test_code_checker_bandit/test_integration.py` — `_make_mock_server`
    (`:11-19`); assertion at `:45` (bandit).
 
@@ -162,7 +166,7 @@ pick one and apply it consistently across the three files.
 >
 > Three test files use a `MagicMock` server and assert `"<tool> is not available" in
 > result`: `tests/test_checker_tools.py` (`:186`, `:376`, `:420`, `:464`),
-> `tests/test_formatter_tools.py` (`:278`) and
+> `tests/test_formatter_tools.py` (`:125`, `:278`) and
 > `tests/test_code_checker_bandit/test_integration.py` (`:45`). Routing the message
 > through `server.tool_unavailable_message(...)` makes those mocks return a
 > `MagicMock`, and the `in` check raises `TypeError`. Give the fixtures a

@@ -101,12 +101,19 @@ directory instead:
    disk"; assert `"lint-imports" not in server._tool_binaries`.
 3. `test_vulture_unavailable_when_no_venv` → same shape.
 
-**Re-point** — `_X_binary` → `_tool_binaries[...]`:
+**Re-point** — `_X_binary` → `_tool_binaries`. A found path becomes
+`server._tool_binaries[key]`; **an `is None` assertion does not**. An absent key is
+what now means unavailable, so `assert server._tool_binaries["lint-imports"] is None`
+raises `KeyError`. The seven `is None` assertions
+(`:175`, `:178`, `:203`, `:205`, `:207`, `:234`, `:236`) become
+`assert "<key>" not in server._tool_binaries` — or `.get("<key>") is None` — matching
+the Rewrite bullet above:
 
 4. `test_all_tools_available`, `test_lint_imports_available_when_binary_exists`
-   (`:162`), `test_lint_imports_unavailable_when_binary_missing` (`:203,205,207`),
-   `test_vulture_available_when_binary_exists` (`:222`),
-   `test_vulture_unavailable_when_no_venv` (`:234,236`).
+   (`:162`, subscript), `test_lint_imports_unavailable_when_binary_missing`
+   (`:203,205,207`, `not in`), `test_vulture_available_when_binary_exists`
+   (`:222`, subscript), `test_vulture_unavailable_when_no_venv`
+   (`:234,236`, `not in`).
 5. `test_lint_imports_unavailable_returns_error` (`:542`) sets
    `server._lint_imports_binary`; change to `server._tool_binaries`. The message
    assertion at `:546` still holds in this step — Step 4 changes it.
