@@ -6,6 +6,7 @@ import os
 from mcp_tools_py.code_checker_mypy.models import MypyResult
 from mcp_tools_py.code_checker_mypy.parsers import parse_mypy_json_output
 from mcp_tools_py.log_utils import log_function_call
+from mcp_tools_py.utils.project_config import DEFAULT_CHECK_TIMEOUT
 from mcp_tools_py.utils.subprocess_runner import (
     check_tool_missing_error,
     execute_command,
@@ -42,6 +43,7 @@ def run_mypy_check(
     follow_imports: str = "normal",
     cache_dir: str | None = None,
     config_file: str | None = None,
+    timeout_seconds: int = DEFAULT_CHECK_TIMEOUT,
 ) -> MypyResult:
     """Run mypy type checking on project.
 
@@ -54,6 +56,7 @@ def run_mypy_check(
         python_executable: Python interpreter to use (default: sys.executable)
         cache_dir: Custom cache directory for incremental checking
         config_file: Path to custom mypy config file
+        timeout_seconds: Maximum seconds to wait for mypy
 
     Returns:
         MypyResult with execution results
@@ -137,7 +140,7 @@ def run_mypy_check(
 
     # Execute mypy
     result = execute_command(
-        command=command, cwd=project_dir, timeout_seconds=120, env=env
+        command=command, cwd=project_dir, timeout_seconds=timeout_seconds, env=env
     )
 
     # Check for missing mypy module early (before other error handling)
@@ -146,19 +149,20 @@ def run_mypy_check(
     if tool_error:
         return MypyResult(return_code=result.return_code, messages=[], error=tool_error)
 
+    # Report a timeout as a timeout: execute_command sets execution_error too
+    if result.timed_out:
+        return MypyResult(
+            return_code=1,
+            messages=[],
+            error=f"timed out after {timeout_seconds} seconds",
+        )
+
     # Handle execution errors
     if result.execution_error:
         error_msg = result.execution_error
         if stderr.strip():
             error_msg += f" stderr: {truncate_stderr(stderr.strip())}"
         return MypyResult(return_code=result.return_code, messages=[], error=error_msg)
-
-    if result.timed_out:
-        return MypyResult(
-            return_code=1,
-            messages=[],
-            error="Mypy execution timed out after 120 seconds",
-        )
 
     # Combine stdout and stderr for raw output when there are issues
     raw_output = result.stdout

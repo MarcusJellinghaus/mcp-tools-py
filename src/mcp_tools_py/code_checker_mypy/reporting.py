@@ -3,6 +3,7 @@
 import logging
 
 from mcp_tools_py.code_checker_mypy.models import MypyMessage, MypyResult
+from mcp_tools_py.utils.project_config import DEFAULT_CHECK_TIMEOUT
 
 logger = logging.getLogger(__name__)
 
@@ -83,6 +84,7 @@ def get_mypy_prompt(
     target_directories: list[str] | None = None,
     follow_imports: str | None = None,
     cache_dir: str | None = None,
+    timeout_seconds: int = DEFAULT_CHECK_TIMEOUT,
 ) -> str | None:
     """Run mypy and generate an LLM prompt if issues are found.
 
@@ -96,6 +98,7 @@ def get_mypy_prompt(
         target_directories: Directories to check
         follow_imports: How to handle imports ('normal', 'silent', 'skip', 'error')
         cache_dir: Custom cache directory for incremental checking
+        timeout_seconds: Maximum seconds to wait for mypy
 
     Returns:
         LLM prompt string or None if no issues
@@ -110,6 +113,7 @@ def get_mypy_prompt(
         target_directories=target_directories,
         follow_imports=follow_imports or "normal",
         cache_dir=cache_dir,
+        timeout_seconds=timeout_seconds,
     )
 
     if result.error:
