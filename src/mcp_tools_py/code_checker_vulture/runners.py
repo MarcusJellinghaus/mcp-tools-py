@@ -2,6 +2,7 @@
 
 import os
 
+from mcp_tools_py.utils.project_config import DEFAULT_CHECK_TIMEOUT
 from mcp_tools_py.utils.subprocess_runner import execute_command
 
 
@@ -12,6 +13,7 @@ def run_vulture_check(
     min_confidence: int = 60,
     extra_args: list[str] | None = None,
     whitelist_path: str | None = None,
+    timeout_seconds: int = DEFAULT_CHECK_TIMEOUT,
 ) -> str:
     """Run vulture on the specified project directory and return raw output.
 
@@ -22,6 +24,7 @@ def run_vulture_check(
         min_confidence: Minimum confidence for reporting (default: 60).
         extra_args: Additional vulture arguments.
         whitelist_path: Optional absolute path to a vulture whitelist file.
+        timeout_seconds: Maximum seconds to wait for vulture.
 
     Returns:
         Raw vulture output string (stdout + stderr combined), or fallback message.
@@ -37,7 +40,12 @@ def run_vulture_check(
         + (extra_args or [])
     )
 
-    result = execute_command(command, cwd=project_dir)
+    result = execute_command(command, cwd=project_dir, timeout_seconds=timeout_seconds)
+
+    if result.timed_out:
+        return f"vulture timed out after {timeout_seconds} seconds."
+    if result.execution_error:
+        return f"vulture failed to run: {result.execution_error}"
 
     output = result.stdout
     if result.stderr:

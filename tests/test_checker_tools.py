@@ -250,6 +250,26 @@ def test_vulture_passes_whitelist_to_runner(mock_server: MagicMock) -> None:
     assert mock_runner.call_args[1]["whitelist_path"] == whitelist_str
 
 
+def test_vulture_passes_resolved_timeout(mock_server: MagicMock) -> None:
+    """The resolved timeout is passed to run_vulture_check."""
+    run_vulture = _capture_vulture(mock_server)
+
+    with (
+        patch(
+            "mcp_tools_py.checker_tools.vulture_tool.run_vulture",
+            return_value="ok",
+        ) as mock_runner,
+        patch(
+            "mcp_tools_py.checker_tools.vulture_tool.resolve_target_directories",
+            return_value=["src"],
+        ),
+        patch.object(Path, "exists", return_value=False),
+    ):
+        run_vulture()
+
+    assert mock_runner.call_args[1]["timeout_seconds"] == 120
+
+
 # --- Auto-detection tests ---
 
 
