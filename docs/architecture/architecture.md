@@ -221,7 +221,7 @@ See [README.md](../../README.md) for installation, CLI parameters, and MCP clien
 - Installed via `pip install` (end user) or `pip install -e ".[dev]"` (development)
 - Runs as STDIO-based MCP server, launched by the MCP client
 - Requires `--project-dir` pointing to the target codebase
-- Optional: `--venv-path` to use a specific virtual environment for tool execution
+- Optional: `--python-executable` to run the checker tools from a specific environment (the deprecated `--venv-path` still resolves the interpreter)
 
 ---
 
