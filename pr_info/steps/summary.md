@@ -102,6 +102,10 @@ cannot assign five distinct attribute names without `setattr`, which mypy strict
 and vulture both flag. Presence in the dict means available, so the six
 `assert binary is not None` guards disappear.
 
+That invariant has two writers, and both must uphold it: Step 2's fast path (which
+records the script it just found for a `module=None` key) and Step 3's eager loop.
+The dict is therefore created in `__init__` in Step 2, not Step 3.
+
 ### 6. Message construction moves onto the server
 
 Sixteen strings across eleven files name `--venv-path`; after this change every one
@@ -183,8 +187,9 @@ roughly 35 lines against the ~100 it replaces.
 | File | Steps |
 |---|---|
 | `tests/test_tool_availability.py` | 1, 2, 3, 4 |
-| `tests/test_checker_tools.py` | 3 |
-| `tests/test_code_checker_bandit/test_integration.py` | 3 |
+| `tests/test_checker_tools.py` | 3, 4 |
+| `tests/test_formatter_tools.py` | 4 |
+| `tests/test_code_checker_bandit/test_integration.py` | 3, 4 |
 | `tests/test_server_params.py` | 5 |
 | `tests/test_code_checker/test_runners.py` | 5 |
 

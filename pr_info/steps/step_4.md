@@ -22,6 +22,9 @@ would merely relocate the misdiagnosis. Depends on Step 3.
 | `checker_tools/pytest_tool.py` | `:70-75` | helper |
 | `formatter/formatter_tools.py` | `:66-72` | helper, `"Error: "` prefix kept |
 | `tests/test_tool_availability.py` | `:546` | assertion now targets the directory |
+| `tests/test_checker_tools.py` | `:186`, `:376`, `:420`, `:464` | `mock_server` must return a real message string |
+| `tests/test_formatter_tools.py` | `:278` | same, for the `black` assertion |
+| `tests/test_code_checker_bandit/test_integration.py` | `:45` | same, for `_make_mock_server` |
 
 The five startup warnings were absorbed by Step 3's loop; this step covers the
 remaining eleven strings.
@@ -103,9 +106,29 @@ Returns `str`. No state change, no I/O beyond reading `self._resolved_python`.
 5. A guard test that no `--venv-path` string survives in the tool modules is
    optional; a `search_files` sweep at review time is enough.
 
-Existing short-circuit tests (`test_pytest_unavailable_returns_error` etc.) assert
-`"<tool> is not available"` and `"Restart the server"` — both templates preserve
-those, so they should pass unchanged. If one fails, fix the template, not the test.
+The short-circuit tests in `tests/test_tool_availability.py`
+(`test_pytest_unavailable_returns_error` etc.) build a **real** `ToolServer`, and
+both templates preserve the `"<tool> is not available"` / `"Restart the server"`
+substrings, so they pass unchanged. If one fails, fix the template, not the test.
+
+**Fix** — six assertions run against a `MagicMock` server instead, and those do
+**not** pass unchanged. Once the message comes from
+`server.tool_unavailable_message(...)`, a `MagicMock` returns a `MagicMock`, and
+`assert "ruff is not available" in result` raises
+`TypeError: argument of type 'MagicMock' is not iterable`:
+
+6. `tests/test_checker_tools.py` — `mock_server` fixture (`:13-40`); assertions at
+   `:186` (vulture), `:376` and `:420` (ruff check / ruff fix), `:464` (tach).
+7. `tests/test_formatter_tools.py` — its `mock_server` fixture; assertion at `:278`
+   (black).
+8. `tests/test_code_checker_bandit/test_integration.py` — `_make_mock_server`
+   (`:11-19`); assertion at `:45` (bandit).
+
+Give each mock a real return value, e.g.
+`server.tool_unavailable_message = lambda key, package=None: f"{key} is not available in <dir>. Restart the server after installing."`,
+mirroring the existing `server._is_tool_available = lambda tool: ...` line already
+in those fixtures. Building a real `ToolServer` in those tests is also defensible;
+pick one and apply it consistently across the three files.
 
 ## LLM PROMPT
 
@@ -136,6 +159,15 @@ those, so they should pass unchanged. If one fails, fix the template, not the te
 > Write the tests first, including re-pointing
 > `test_lint_imports_unavailable_returns_error`, which currently asserts a binary
 > path appears in the message.
+>
+> Three test files use a `MagicMock` server and assert `"<tool> is not available" in
+> result`: `tests/test_checker_tools.py` (`:186`, `:376`, `:420`, `:464`),
+> `tests/test_formatter_tools.py` (`:278`) and
+> `tests/test_code_checker_bandit/test_integration.py` (`:45`). Routing the message
+> through `server.tool_unavailable_message(...)` makes those mocks return a
+> `MagicMock`, and the `in` check raises `TypeError`. Give the fixtures a
+> `tool_unavailable_message` that returns a real string — alongside the
+> `_is_tool_available` lambda they already set — or build a real `ToolServer`.
 >
 > Then run, in order: `run_format_code`, `run_pylint_check`,
 > `run_pytest_check(extra_args=["-n", "auto", "-m", "not integration"])`,

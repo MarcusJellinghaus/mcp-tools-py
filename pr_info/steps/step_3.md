@@ -28,7 +28,7 @@ regardless of what is installed. Depends on Step 2 (`_script_path`, `_TOOL_MODUL
 class ToolServer:
     def __init__(self, ...) -> None:
         ...
-        self._tool_binaries: dict[str, str] = {}   # before _check_tool_availability()
+        self._tool_binaries: dict[str, str] = {}   # added in Step 2; must stay before _check_tool_availability()
         self._resolved_python = self._resolve_python_executable()
         self._tool_availability = self._check_tool_availability()
 
@@ -45,7 +45,9 @@ Removes: `self._lint_imports_binary`, `self._vulture_binary`, `self._ruff_binary
 
 ## HOW
 
-- `_tool_binaries` **must** be initialised before `_check_tool_availability()` runs.
+- `_tool_binaries` already exists — Step 2 introduced it for the fast path. It
+  **must** stay initialised before `_check_tool_availability()` runs; this step adds
+  the eager loop as its second writer.
 - The loop skips every descriptor with a non-`None` module — the probe group stays
   lazy (#167 made it so deliberately; do not move it back to startup). The script
   group stays eager because file existence is instant.

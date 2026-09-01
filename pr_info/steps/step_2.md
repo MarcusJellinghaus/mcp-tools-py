@@ -9,7 +9,7 @@ This is the fix for the reported symptom. Depends on Step 1.
 
 | File | Change |
 |---|---|
-| `src/mcp_tools_py/server.py` | new module-level `_TOOL_MODULES`, `PROBE_TIMEOUT_SECONDS`; new `ToolServer._script_path`; rewrite `_is_tool_available` (`:214-239`) |
+| `src/mcp_tools_py/server.py` | new module-level `_TOOL_MODULES`, `PROBE_TIMEOUT_SECONDS`; `self._tool_binaries` in `__init__`; new `ToolServer._script_path`; rewrite `_is_tool_available` (`:214-239`) |
 | `tests/test_tool_availability.py` | `TestIsToolAvailable` |
 
 If #227 (issue #219) has landed, `resolve_timeout` sits immediately after
@@ -61,6 +61,15 @@ class ToolServer:
 - `lint-imports` reaching the `module is None` branch is unreachable in practice
   once Step 3 lands, because the eager loop always caches it first. Write the
   branch anyway: it is what makes the absence deliberate rather than accidental.
+- **The fast path must record the binary for script-group keys.** When
+  `_TOOL_MODULES[key] is None` and `_script_path(key)` returns a path, store it in
+  `self._tool_binaries[key]` as well as setting `available = True`. Step 3 deletes
+  the six `assert binary is not None` guards on the strength of "presence in
+  `_tool_binaries` means available" (step_3.md:52); a script-group key that reaches
+  `_is_tool_available` without being in `_tool_availability` would otherwise be
+  reported available with no recorded path and `KeyError` at the run site.
+  `_tool_binaries` therefore has to exist before Step 2's fast path can write to it
+  — initialise it in `__init__` here rather than in Step 3.
 
 ## ALGORITHM
 
@@ -76,7 +85,11 @@ return path if os.path.exists(path) else None
 
 ```
 if tool_name in self._tool_availability: return self._tool_availability[tool_name]
-if self._script_path(tool_name): available = True          # cheapest check first
+script = self._script_path(tool_name)                      # cheapest check first
+if script:
+    available = True
+    if _TOOL_MODULES.get(tool_name) is None:               # script group: record the path
+        self._tool_binaries[tool_name] = script
 else:
     module = _TOOL_MODULES.get(tool_name)
     if module is None: available = False                   # no probe possible
@@ -101,6 +114,9 @@ the code compiles, the existing tests pass, and the bug survives untouched.
 - `_script_path` returns `Optional[str]` — an absolute path, or `None`.
 - `_is_tool_available` returns `bool`; `self._tool_availability` stays
   `dict[str, bool]` (no tri-state).
+- `self._tool_binaries: dict[str, str]` — created empty in `__init__` before
+  `_check_tool_availability()` runs, written by the fast path for script-group keys
+  only. Step 3 adds the eager loop as its second writer.
 
 ## LOGGING
 
@@ -135,9 +151,26 @@ New tests:
    `None`, absent from `_tool_availability` and absent from the script dir →
    `False`, no subprocess.
 
-Existing tests in this class keep passing unchanged: they construct servers whose
-script directory holds no console scripts, so the fast path misses and the probe
-runs as before.
+**Rewrite** — two existing tests in this class break, for the same reason Step 3's
+three do. They construct `_create_server(project_dir=Path("/project"))` with no
+`python_executable`, so `_resolved_python` is `sys.executable` — the project's own
+venv under test — and its script directory holds a real `pytest.exe`. The fast path
+hits and the mocked probe is never called:
+
+6. `test_first_call_runs_subprocess_and_caches` (`:247-268`) — `mock_exec.assert_called_once()`
+   fails, because no subprocess runs at all.
+7. `test_subprocess_failure_marks_unavailable` (`:307-327`) — asserts `False`, gets
+   `True` from the fast path.
+
+Move both onto the `tmp_path` script directory helper, with the directory left
+empty, so the ambient interpreter cannot satisfy the fast path and each test still
+exercises the probe branch it was written for. Do not simply re-point them.
+
+`test_second_call_returns_cached_no_subprocess` and `test_eager_tool_returned_from_cache`
+pre-seed `_tool_availability`, so the cache branch returns before the fast path and
+they pass unchanged. `test_subprocess_success_marks_available` still asserts `True`,
+but only by accident once the fast path hits — move it to the same helper so it
+keeps testing the probe.
 
 ## LLM PROMPT
 
@@ -151,6 +184,13 @@ runs as before.
 > `env={"PYTEST_DISABLE_PLUGIN_AUTOLOAD": "1"}`. A tool with `module=None` never
 > probes and is unavailable.
 >
+> When the fast path finds a script for a `module=None` key, store the path in
+> `self._tool_binaries[key]` as well as returning `True`. Initialise
+> `self._tool_binaries: dict[str, str] = {}` in `__init__` before
+> `_check_tool_availability()` is called. Step 3 deletes the
+> `assert binary is not None` guards on the strength of "in `_tool_binaries` means
+> available", so availability must never be `True` without a recorded path.
+>
 > The predicate order is load-bearing: test `result.timed_out` **first** and fail
 > open on it (cache `True`, log a WARNING). A timeout also sets `execution_error`,
 > so putting the fail-open branch after the `return_code == 0 and not
@@ -163,6 +203,15 @@ runs as before.
 > Write the tests first, using a `tmp_path` script directory rather than patching
 > `os.path.exists`, so the searched directory is pinned and not the ambient
 > interpreter's.
+>
+> Three existing tests in `TestIsToolAvailable` must move onto that helper, not just
+> be re-pointed: `test_first_call_runs_subprocess_and_caches`,
+> `test_subprocess_failure_marks_unavailable` and
+> `test_subprocess_success_marks_available` build a server with no
+> `python_executable`, so `_resolved_python` is `sys.executable` and its script
+> directory holds a real `pytest.exe`. The fast path short-circuits, the mocked
+> probe never runs, and the first two fail outright. An empty `tmp_path` script
+> directory keeps all three exercising the probe branch.
 >
 > Do not touch `_check_tool_availability` (Step 3), any message wording (Step 4),
 > or any `checker_tools/*` module. If `resolve_timeout` exists in `server.py`,
