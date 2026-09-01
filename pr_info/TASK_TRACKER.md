@@ -22,6 +22,6 @@ This tracks **Feature Implementation** consisting of multiple **Tasks**.
 ## Tasks
 
 - [x] [Step 1](./steps/step_1.md) — Correct `docs/architecture/architecture.md`
-- [ ] [Step 2](./steps/step_2.md) — Correct `README.md` "Available Tools"
+- [x] [Step 2](./steps/step_2.md) — Correct `README.md` "Available Tools"
 
 ## Pull Request
