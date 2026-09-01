@@ -151,9 +151,10 @@ when the tool needs them — simple checkers (`vulture`, `tach`, `lint_imports`)
 | `runners.py` | Construct commands, execute subprocesses, orchestrate parse → report |
 | `utils.py` | Module-specific helpers (optional; pytest and pylint only) |
 
-Each checker is exposed by one registrar module, `checker_tools/<tool>_tool.py`, holding a
-single `register(mcp, checker_tools)` function. `checker_tools` was a single module until
-#202 split it per tool.
+Checkers are exposed by registrar modules, `checker_tools/<tool>_tool.py`, each holding a
+single `register(mcp, checker_tools)` function. The eight checker packages have nine
+registrar modules: `code_checker_ruff` backs two of them, `ruff_check_tool.py` and
+`ruff_fix_tool.py`. `checker_tools` was a single module until #202 split it per tool.
 
 ### Module Overview
 

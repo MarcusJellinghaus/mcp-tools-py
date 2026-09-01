@@ -114,6 +114,12 @@ mcp-tools-py --project-dir /path/to/project [options]
 | `--log-file` | string | None | Path for structured JSON logs. If not specified, logs only to console |
 | `--console-only` | flag | False | Log only to console, ignore `--log-file` parameter |
 
+#### Tool Configuration
+| Parameter | Type | Default | Description |
+|-----------|------|---------|-------------|
+| `--refactoring-timeout` | integer | 120 | Timeout in seconds for rope refactoring operations |
+| `--vulture-whitelist` | string | "vulture_whitelist.py" | Path to the vulture whitelist file, relative to project-dir. Auto-included by `run_vulture_check` when the file exists |
+
 ### Notes
 
 - When `--venv-path` is specified, it takes precedence over `--python-executable`
