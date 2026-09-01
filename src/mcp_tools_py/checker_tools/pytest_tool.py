@@ -1,6 +1,7 @@
 """Pytest MCP tool registration."""
 
 import logging
+import os
 from typing import TYPE_CHECKING, Dict, List, Optional
 
 from mcp_tools_py.code_checker_pytest.runners import check_code_with_pytest
@@ -103,7 +104,7 @@ def register(mcp: "FastMCPProtocol", checker_tools: "CheckerTools") -> None:
                 verbosity=sanitized.verbosity,
                 extra_args=sanitized.cleaned_args,
                 env_vars=env_vars,
-                venv_path=server.venv_path,
+                venv_bin=os.path.dirname(server._resolved_python),
                 keep_temp_files=server.keep_temp_files,
                 skip_default_test_folder=sanitized.has_path_args,
                 timeout_seconds=server.resolve_timeout("pytest", timeout_seconds),
