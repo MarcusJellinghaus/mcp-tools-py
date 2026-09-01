@@ -36,11 +36,11 @@ def _positive_timeout(value: str) -> int:
     return parsed
 
 
-def parse_args() -> argparse.Namespace:
-    """Parse command line arguments.
+def _build_parser() -> argparse.ArgumentParser:
+    """Build the command line argument parser.
 
     Returns:
-        Parsed arguments
+        The configured parser
     """
     parser = argparse.ArgumentParser(
         description="MCP Tools Py Server - Run pylint, pytest, and mypy checks on Python code",
@@ -49,7 +49,7 @@ def parse_args() -> argparse.Namespace:
 Examples:
   mcp-tools-py --project-dir /path/to/project
   mcp-tools-py --project-dir . --log-level DEBUG --keep-temp-files
-  mcp-tools-py --project-dir /path/to/project --venv-path .venv --test-folder tests
+  mcp-tools-py --project-dir /path/to/project --python-executable .venv/Scripts/python.exe --test-folder tests
         """,
     )
     parser.add_argument(
@@ -76,12 +76,7 @@ Examples:
     parser.add_argument(
         "--venv-path",
         type=str,
-        help=(
-            "Path to the virtual environment where pytest, pylint, and mypy are installed. "
-            "When specified, the Python executable from this venv will be used "
-            "instead of --python-executable. This should be the tool's own venv, "
-            "not the project's runtime venv"
-        ),
+        help=argparse.SUPPRESS,
     )
     parser.add_argument(
         "--test-folder",
@@ -140,7 +135,16 @@ Examples:
             "Auto-included when the file exists. Default: vulture_whitelist.py"
         ),
     )
-    return parser.parse_args()
+    return parser
+
+
+def parse_args() -> argparse.Namespace:
+    """Parse command line arguments.
+
+    Returns:
+        Parsed arguments
+    """
+    return _build_parser().parse_args()
 
 
 def main() -> None:
@@ -184,6 +188,13 @@ def main() -> None:
             "log_file": log_file,
         },
     )
+
+    if args.venv_path:
+        logger.warning(
+            "--venv-path is deprecated and will be removed; use --python-executable. "
+            "It still resolves the interpreter but no longer affects tool detection.",
+            extra={"venv_path": args.venv_path},
+        )
 
     # Create and run the server
     server = create_server(
