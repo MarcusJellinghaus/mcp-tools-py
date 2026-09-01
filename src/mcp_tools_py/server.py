@@ -250,10 +250,8 @@ class ToolServer:
             explicit: Per-call timeout supplied by the caller, if any.
 
         Returns:
-            Positive number of seconds.
-
-        Raises:
-            ValueError: If pyproject.toml is malformed or a configured value is invalid.
+            Positive number of seconds.  A ``ValueError`` propagates when
+            pyproject.toml is malformed or a configured value is invalid.
         """
         return get_check_timeout(
             str(self.project_dir), tool, explicit, self.check_timeout

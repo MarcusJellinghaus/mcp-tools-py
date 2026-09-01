@@ -283,11 +283,10 @@ def get_check_timeout(
         cli_timeout: Server-level ``--check-timeout`` value, if any.
 
     Returns:
-        The resolved timeout in seconds.
-
-    Raises:
-        ValueError: If pyproject.toml is malformed, or any consulted value
-            is not a positive integer.
+        The resolved timeout in seconds.  A ``ValueError`` from
+        :func:`_read_mcp_tools_section` or :func:`validate_timeout` propagates
+        when pyproject.toml is malformed or a consulted value is not a
+        positive integer.
     """
     if explicit is not None:
         return validate_timeout(explicit, "timeout_seconds")
