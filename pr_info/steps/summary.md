@@ -72,7 +72,7 @@ these are the design decisions worth recording:
 | Path | Step | Change |
 |------|------|--------|
 | `docs/architecture/architecture.md` | 1 | Sections 1, 2, 3, 4, 5, 6 + metadata |
-| `README.md` | 2 | Overview, Scope, Security bullet, Features, Target Directory Auto-Detection, Available Tools |
+| `README.md` | 2 | Overview, Scope, Security bullet, Features, Target Directory Auto-Detection, the three parameter tables, CLI Python Configuration, Environment Configuration, Troubleshooting, Available Tools |
 
 **Created (planning artifacts only):**
 
@@ -108,6 +108,13 @@ The two steps are independent and may be done in either order.
 - `README.md:47` — names pylint, mypy and vulture as the tools that auto-detect target directories; `resolve_target_directories` is also used by ruff check, ruff fix, bandit and `run_format_code`
 - `architecture.md:157` names `CodeCheckerServer`; the class is `ToolServer`
 - `README.md:9-11`, `:19`, `:25-27` — the other two tool inventories
+- `README.md:68` — documents a `verbosity` parameter `run_pytest_check` does not accept;
+  the pylint and mypy tables likewise omit `max_issues` and `cache_dir`. Step 2 points
+  readers at these tables, so it must not point them at stale ones
+- `README.md:104-105`, `:129`, `:151`, `:171` — name pytest, pylint and mypy as the only
+  tools the configured environment must contain; `server.py:_check_tool_availability`
+  also probes `lint-imports`, `vulture`, `ruff`, `bandit` and `tach` as binaries inside
+  `--venv-path`, so the current text yields a silently under-equipped setup
 
 **One per-file addition beyond the issue's seven packages:** `utils/project_config.py`.
 The Module Overview lists `utils/` contents file-by-file, so omitting it leaves that list

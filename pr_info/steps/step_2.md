@@ -10,9 +10,12 @@ Single file: `README.md`. No other file is touched in this step.
 
 ## WHAT
 
-Six edits. The README states its tool inventory in three places today — Overview bullets
-(`:9-11`), Features (`:25-27`), Available Tools (`:416-433`) — all three saying 3 tools.
-After this step it states it in one place, as a 17-row table, and the other two link to it.
+Thirteen edits. The README states its tool inventory in three places today — Overview
+bullets (`:9-11`), Features (`:25-27`), Available Tools (`:416-433`) — all three saying
+3 tools. After this step it states it in one place, as a 17-row table, and the other two
+link to it. The remaining edits correct the parameter tables the Features section points
+at, and the setup sections that name only pytest/pylint/mypy as the tools the configured
+environment must contain.
 
 ## HOW
 
@@ -98,6 +101,105 @@ check, ruff fix, bandit, vulture, and `run_format_code`) auto-detect directories
 `pyproject.toml`:
 ```
 
+### Edit 4b — Pylint Parameters table (`:35-36`)
+
+`run_pylint_check` also takes `max_issues` (`checker_tools/pylint_tool.py:23-26`); the
+table omits it.
+
+Find:
+```
+| `target_directories` | list | None (auto-detected) | Directories to analyze relative to project_dir. Auto-detected from `pyproject.toml` when omitted |
+```
+Replace:
+```
+| `target_directories` | list | None (auto-detected) | Directories to analyze relative to project_dir. Auto-detected from `pyproject.toml` when omitted |
+| `max_issues` | integer | 1 | Number of issue types shown in detail; the rest are summarised as counts |
+```
+
+### Edit 4c — Pytest Parameters table (`:67-69`)
+
+`run_pytest_check` takes only `markers`, `extra_args` and `env_vars`
+(`checker_tools/pytest_tool.py:23-27`) — there is no `verbosity` parameter; verbosity is
+controlled through `extra_args`.
+
+Find:
+```
+| `markers` | list | None | Optional list of pytest markers to filter tests |
+| `verbosity` | integer | 2 | Pytest verbosity level (0-3) |
+| `extra_args` | list | None | Optional list of additional pytest arguments |
+```
+Replace:
+```
+| `markers` | list | None | Optional list of pytest markers to filter tests |
+| `extra_args` | list | None | Optional list of additional pytest arguments; use `-v`/`-vv`/`-vvv` to control verbosity |
+```
+
+### Edit 4d — Mypy Parameters table (`:83`)
+
+`run_mypy_check` also takes `cache_dir` (`checker_tools/mypy_tool.py:23-28`).
+
+Find:
+```
+| `follow_imports` | string | 'normal' | How to handle imports during type checking |
+```
+Replace:
+```
+| `follow_imports` | string | 'normal' | How to handle imports during type checking |
+| `cache_dir` | string | None (`.mypy_cache`) | Custom cache directory for incremental checking |
+```
+
+### Edit 4e — CLI Python Configuration table (`:104-105`)
+
+Both rows name pytest, pylint and mypy only. `server.py:_check_tool_availability` also
+looks for `lint-imports`, `vulture`, `ruff`, `bandit` and `tach` as binaries inside
+`--venv-path`, and black and isort are invoked as `<python> -m black|isort`
+(`formatter/black_runner.py:63`, `formatter/isort_runner.py:64`).
+
+Find:
+```
+| `--python-executable` | string | sys.executable | Path to Python interpreter for running pytest, pylint, and mypy. Should point to the environment where these tools are installed (the tool's own venv), not the project's runtime venv |
+| `--venv-path` | string | None | Path to the virtual environment where pytest, pylint, and mypy are installed. When specified, this venv's Python will be used instead of `--python-executable`. This should be the tool's own venv, not the project's runtime venv |
+```
+Replace:
+```
+| `--python-executable` | string | sys.executable | Path to the Python interpreter used to run pytest, pylint, mypy, black and isort. Should point to the environment where these tools are installed (the tool's own venv), not the project's runtime venv |
+| `--venv-path` | string | None | Path to the virtual environment holding the checker tools. Required for the ones located as binaries: ruff, bandit, vulture, tach and lint-imports. When specified, this venv's Python will be used instead of `--python-executable`. This should be the tool's own venv, not the project's runtime venv |
+```
+
+### Edit 4f — Environment Configuration (`:129`)
+
+Find:
+```
+The `--python-executable` and `--venv-path` options must point to the environment where **pytest, pylint, and mypy are installed** — this is typically the tool's own virtual environment, not your project's runtime venv.
+```
+Replace:
+```
+The `--python-executable` and `--venv-path` options must point to the environment where **the checker tools are installed** — pytest, pylint, mypy, black and isort are run through that interpreter, while ruff, bandit, vulture, tach and lint-imports are located as binaries inside `--venv-path`. This is typically the tool's own virtual environment, not your project's runtime venv.
+```
+
+### Edit 4g — Incorrect Configuration (`:151`)
+
+Find:
+```
+Do **not** point to your project's runtime venv if it doesn't have pytest/pylint/mypy installed:
+```
+Replace:
+```
+Do **not** point to your project's runtime venv if it doesn't have the checker tools installed:
+```
+
+### Edit 4h — Troubleshooting (`:171`)
+
+Find:
+```
+- **"No module named pytest"** (or pylint/mypy): Your `--python-executable` or `--venv-path` points to an environment that doesn't have the required tools installed. Update the configuration to point to the correct environment.
+```
+Replace:
+```
+- **"No module named pytest"** (or pylint/mypy/black/isort): Your `--python-executable` or `--venv-path` points to an environment that doesn't have the required tools installed. Update the configuration to point to the correct environment.
+- **"ruff not found"** (or bandit/vulture/tach/lint-imports) logged at startup: these tools are located as binaries inside `--venv-path`. Set `--venv-path` to an environment where they are installed.
+```
+
 ### Edit 5 — Available Tools (`:412-433`)
 
 Replace the section from the `## Available Tools` heading through the end of the
@@ -156,7 +258,13 @@ TDD does not apply — no code changes. Verify instead:
    subsections are still present and still nested under `## Features`.
 4. No occurrence of `(pylint, pytest, mypy) can be executed` or the three
    `### Run … Check` prose blocks remains.
-5. Run `mcp__mcp-tools-py__run_format_code`, then `run_pylint_check`,
+5. The three parameter tables match the tool signatures: `run_pylint_check`
+   (`extra_args`, `target_directories`, `max_issues`), `run_pytest_check` (`markers`,
+   `extra_args`, `env_vars` — no `verbosity`), `run_mypy_check` (`strict`,
+   `disable_error_codes`, `target_directories`, `follow_imports`, `cache_dir`).
+6. No occurrence of `pytest, pylint, and mypy` or `pytest/pylint/mypy installed` remains
+   in `README.md`.
+7. Run `mcp__mcp-tools-py__run_format_code`, then `run_pylint_check`,
    `run_pytest_check` (`extra_args: ["-n", "auto"]`) and `run_mypy_check`. All must pass.
 
 ## Commit
@@ -167,7 +275,9 @@ docs(readme): list all 17 MCP tools in one table
 The README documented 3 of 17 tools, and did so in three separate
 places that had each drifted. Replaces the per-tool prose with a single
 table and points the Overview and Features sections at it, so a new
-tool costs one row in one place.
+tool costs one row in one place. Also corrects the parameter tables
+(no pytest `verbosity`, missing `max_issues` and `cache_dir`) and the
+setup sections that named only pytest, pylint and mypy.
 
 Refs #224
 ```

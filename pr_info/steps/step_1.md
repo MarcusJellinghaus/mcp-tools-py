@@ -259,7 +259,7 @@ All three tools (pylint, pytest, mypy) follow this same pattern. The pylint and 
 ```
 Replace:
 ```
-All checker tools follow this same pattern. Only pytest parses a JSON report file; the others parse stdout directly.
+All checker tools follow this same pattern. Pytest and bandit write a JSON report to a temporary file and parse that; the other checkers parse stdout directly.
 ```
 
 ---
