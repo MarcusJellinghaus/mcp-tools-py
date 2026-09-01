@@ -42,6 +42,24 @@ class FastMCPProtocol(Protocol):
 # Initialize logger
 logger = logging.getLogger(__name__)
 
+# Timeout for the `python -m <module> --version` availability probe.
+PROBE_TIMEOUT_SECONDS = 30
+
+# Tool key -> module for `python -m <module>`, or None when the tool is only
+# ever run through its console script. The console script is named after the key.
+_TOOL_MODULES: dict[str, Optional[str]] = {
+    "pytest": "pytest",
+    "pylint": "pylint",
+    "mypy": "mypy",
+    "black": "black",
+    "isort": "isort",
+    "lint-imports": None,
+    "vulture": None,
+    "ruff": None,
+    "bandit": None,
+    "tach": None,
+}
+
 
 class ToolServer:
     """MCP server for code checking and formatting tools."""
@@ -83,6 +101,7 @@ class ToolServer:
 
         self.mcp: FastMCPProtocol = FastMCP("MCP Tools Service")
         self._resolved_python = self._resolve_python_executable()
+        self._tool_binaries: dict[str, str] = {}
         self._tool_availability = self._check_tool_availability()
         CheckerTools(self).register(self.mcp)
         FormatterTools(self).register(self.mcp)
@@ -217,22 +236,66 @@ class ToolServer:
 
         return availability
 
-    def _is_tool_available(self, tool_name: str) -> bool:
-        """Check if a tool is available, running subprocess check on first call.
+    def _script_path(self, key: str) -> Optional[str]:
+        """Locate the console script for a tool next to the resolved interpreter.
+
+        Args:
+            key: Tool key, which is also the console-script filename.
 
         Returns:
-            True if `python -m <tool_name> --version` succeeds.
+            Path to the console script, or None when it is not there.
+        """
+        name = f"{key}.exe" if os.name == "nt" else key
+        path = os.path.join(os.path.dirname(self._resolved_python), name)
+        return path if os.path.exists(path) else None
+
+    def _is_tool_available(self, tool_name: str) -> bool:
+        """Check if a tool is available, probing on first call.
+
+        Checks, in order: the cache, a console script next to the resolved
+        interpreter, then `python -m <module> --version`. A probe that times out
+        is assumed available; a tool with no module never probes.
+
+        Args:
+            tool_name: Tool key to look up.
+
+        Returns:
+            True if the tool is available.
         """
         if tool_name in self._tool_availability:
             return self._tool_availability[tool_name]
-        result = execute_command(
-            [self._resolved_python, "-m", tool_name, "--version"],
-            timeout_seconds=10,
-        )
-        available = result.return_code == 0 and not result.execution_error
-        if available:
-            logger.info("%s version: %s", tool_name, result.stdout.strip())
+
+        script = self._script_path(tool_name)
+        module = _TOOL_MODULES.get(tool_name)
+        if script is not None:
+            available = True
+            if module is None:
+                self._tool_binaries[tool_name] = script
+        elif module is None:
+            # Console-script-only tool: file existence is the entire check.
+            available = False
         else:
+            result = execute_command(
+                [self._resolved_python, "-m", module, "--version"],
+                timeout_seconds=PROBE_TIMEOUT_SECONDS,
+                env={"PYTEST_DISABLE_PLUGIN_AUTOLOAD": "1"},
+            )
+            if result.timed_out:
+                available = True
+                logger.warning(
+                    "%s version probe timed out after %s seconds using %s. "
+                    "Assuming %s is available.",
+                    tool_name,
+                    PROBE_TIMEOUT_SECONDS,
+                    self._resolved_python,
+                    tool_name,
+                )
+            else:
+                available = result.return_code == 0 and not result.execution_error
+                if available:
+                    logger.info("%s version: %s", tool_name, result.stdout.strip())
+
+        if not available:
             logger.warning(
                 "%s not found in %s. "
                 "Ensure --python-executable and --venv-path point to "

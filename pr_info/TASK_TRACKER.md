@@ -33,9 +33,9 @@ Details: [step_1.md](./steps/step_1.md)
 
 Details: [step_2.md](./steps/step_2.md)
 
-- [ ] Implementation (tests + production code)
-- [ ] Quality checks: pylint, pytest, mypy — fix all issues
-- [ ] Commit message prepared
+- [x] Implementation (tests + production code)
+- [x] Quality checks: pylint, pytest, mypy — fix all issues
+- [x] Commit message prepared
 
 ### Step 3: Collapse `_check_tool_availability` into a loop; add `_tool_binaries`
 
