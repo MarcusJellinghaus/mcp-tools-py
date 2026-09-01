@@ -8,7 +8,7 @@ Single file: `docs/architecture/architecture.md`. No other file is touched in th
 
 ## WHAT
 
-Twelve edits across sections 1, 2, 3, 5, 6 and the metadata header. Documentation only —
+Thirteen edits across sections 1, 2, 3, 4, 5, 6 and the metadata header. Documentation only —
 no functions, no signatures. Each edit below gives the exact current text and its
 replacement; apply with `mcp__mcp-workspace__edit_file` exact-string matches.
 
@@ -65,7 +65,7 @@ Find:
 ```
 Replace:
 ```
-- **Checker Integrations**: Nine checkers — pylint, pytest, mypy, ruff (check and fix), bandit, vulture, tach, import-linter — each formatting findings as an LLM-actionable prompt
+- **Checker Integrations**: Eight checkers exposed as nine tools — pylint, pytest, mypy, ruff (check and fix), bandit, vulture, tach, import-linter — each formatting findings as an LLM-actionable prompt
 - **Formatting**: black and isort behind a single `run_format_code` tool
 - **Refactoring Tools**: Symbol listing, reference finding, symbol/module moving, and renaming via jedi and rope
 - **Library Inspection**: `get_library_source` resolves a dotted import path to its source
@@ -84,9 +84,9 @@ Find:
 ```
 Replace:
 ```
-**Runtime**: `mcp`, `mcp[cli]`, `pylint`, `pytest` + `pytest-json-report` + `pytest-xdist`, `mypy`, `ruff`, `bandit`, `vulture`, `tach`, `import-linter`, `black`, `isort`, `jedi`, `rope`, `structlog` + `python-json-logger`, `mcp-coder-utils`
+**Runtime**: `mcp`, `mcp[cli]`, `pylint`, `pytest` + `pytest-json-report` + `pytest-asyncio` + `pytest-xdist`, `mypy`, `ruff`, `bandit`, `vulture`, `tach`, `import-linter`, `black`, `isort`, `jedi`, `rope`, `structlog` + `python-json-logger`, `pathspec`, `igittigitt`, `mcp-coder-utils`
 
-**Development**: `mcp-coder`, `mcp-workspace`, `pycycle`, `pydeps`
+**Development**: `mcp-workspace`, `pycycle`, `pydeps`
 ```
 
 Before applying, confirm the dev extra contents against `[project.optional-dependencies]`
@@ -96,6 +96,9 @@ in `pyproject.toml` and adjust the Development line if it lists anything else.
 
 `tools/format_all` does not exist in any extension. `.claude/CLAUDE.md` makes
 `run_format_code` the mandatory pre-commit step; `tools/` has the two scripts separately.
+
+`CONTRIBUTING.md` points at the same missing `tools\format_all.bat` in four places, and is
+deliberately left alone here — see the exclusions in [summary.md](./summary.md#deliberate-scope-decisions).
 
 Find:
 ```
@@ -135,6 +138,20 @@ Replace the whole fenced block, from the opening ``` through the closing ```, wi
 
 The "2 other" line covers `sleep` and `get_library_source`. The Data Flow list directly
 below the diagram stays as it is — it is still accurate.
+
+### Edit 7a — §4 Solution Strategy (`:99`)
+
+The four-file structure is not universal — `vulture`, `tach` and `lint_imports` are
+`runners.py` alone. Without this edit the line contradicts Edit 10 below.
+
+Find:
+```
+- **Consistent Checker Pattern**: Each tool follows `models`/`parsers`/`reporting`/`runners` structure
+```
+Replace:
+```
+- **Consistent Checker Pattern**: Each checker package follows the same `models`/`parsers`/`reporting`/`runners` structure, using only the files its tool needs
+```
 
 ### Edit 8 — §5 Layer diagram (`:115-135`)
 
@@ -176,7 +193,7 @@ Find:
 Replace:
 ```
 - Each layer may only depend on layers below it
-- Registrars depend on the `code_checker_*` packages, never the reverse
+- `checker_tools` depends on the `code_checker_*` packages, never the reverse; the other registrars (`formatter`, `refactoring`, `utility_tools`, `inspect_library`) depend on none of them
 - Checker modules may NOT depend on each other
 - `utils` may NOT depend on any checker module or `server`
 ```
@@ -259,10 +276,11 @@ TDD does not apply — no code changes. Verify instead:
 1. Every module named in the new layer diagram exists in `tach.toml` under
    `layer = "tool_implementation"`, and every such module appears in the diagram.
    13 modules either way.
-2. `tools/black.bat` and `tools/iSort.bat` exist; `tools/format_all` appears nowhere in
-   the repo — `search_files(pattern="format_all")` returns nothing outside `pr_info/`.
-3. No occurrence of `8 MCP tools`, `8 tools`, `3 checker`, or `CodeCheckerServer` remains
-   in the file.
+2. `tools/black.bat` and `tools/iSort.bat` exist, and `tools/format_all` (any extension)
+   does not. `CONTRIBUTING.md` still references `tools\format_all.bat` — that is expected
+   and out of scope, so do not assert a repo-wide absence.
+3. No occurrence of `8 MCP tools`, `8 tools`, `3 checker`, `format_all`, or
+   `CodeCheckerServer` remains in `docs/architecture/architecture.md`.
 4. Run `mcp__mcp-tools-py__run_format_code`, then `run_pylint_check`,
    `run_pytest_check` (`extra_args: ["-n", "auto"]`) and `run_mypy_check`. All must pass —
    they should be untouched by a docs-only change; a failure means a source file was

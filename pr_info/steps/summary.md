@@ -71,8 +71,8 @@ these are the design decisions worth recording:
 
 | Path | Step | Change |
 |------|------|--------|
-| `docs/architecture/architecture.md` | 1 | Sections 1, 2, 3, 5, 6 + metadata |
-| `README.md` | 2 | Overview, Scope, Security bullet, Features, Available Tools |
+| `docs/architecture/architecture.md` | 1 | Sections 1, 2, 3, 4, 5, 6 + metadata |
+| `README.md` | 2 | Overview, Scope, Security bullet, Features, Target Directory Auto-Detection, Available Tools |
 
 **Created (planning artifacts only):**
 
@@ -81,7 +81,8 @@ these are the design decisions worth recording:
 - `pr_info/steps/step_2.md`
 
 **Explicitly not modified:** `src/**`, `tests/**`, `tach.toml`, `.importlinter`,
-`pyproject.toml`, `docs/README.md`, `docs/architecture/architecture-maintenance.md`,
+`pyproject.toml`, `CONTRIBUTING.md`, `docs/README.md`,
+`docs/architecture/architecture-maintenance.md`,
 `docs/architecture/dependencies/readme.md`.
 
 ## Steps
@@ -102,7 +103,9 @@ The two steps are independent and may be done in either order.
 - `architecture.md:13` and `README.md:13` — call vulture/tach/import-linter "planned"; all three ship
 - `architecture.md:17-23` Key Features — three checkers listed
 - `architecture.md:48-50` Dependencies — `ruff`, `bandit`, `vulture`, `tach`, `black`, `isort`, `import-linter` are listed as Development but are in `[project.dependencies]`
+- `architecture.md:99` "Each tool follows `models`/`parsers`/`reporting`/`runners` structure" — `vulture`, `tach` and `lint_imports` are `runners.py` alone
 - `architecture.md:214` "All three tools (pylint, pytest, mypy) follow this same pattern"
+- `README.md:47` — names pylint, mypy and vulture as the tools that auto-detect target directories; `resolve_target_directories` is also used by ruff check, ruff fix, bandit and `run_format_code`
 - `architecture.md:157` names `CodeCheckerServer`; the class is `ToolServer`
 - `README.md:9-11`, `:19`, `:25-27` — the other two tool inventories
 
@@ -111,6 +114,15 @@ The Module Overview lists `utils/` contents file-by-file, so omitting it leaves 
 wrong by omission, and it implements the target-directory auto-detection the README
 documents.
 
-**Excluded:** `architecture.md:263` — the CI "Always" list omits the `ruff-docstrings`
-and `file-size` matrix jobs. That is CI-config drift, not tool-inventory drift, and
-nothing in the corrected text contradicts it. Worth its own issue.
+**Excluded:**
+
+- `architecture.md:263` — the CI "Always" list omits the `ruff-docstrings` and
+  `file-size` matrix jobs. That is CI-config drift, not tool-inventory drift, and nothing
+  in the corrected text contradicts it. Worth its own issue.
+- `CONTRIBUTING.md` — references `tools\format_all.bat` at `:106`, `:224`, `:252` and
+  `:274`, the same missing script as `architecture.md:58`. It also points at
+  `tools\ruff_fix.bat`, `tools\git_status.bat` and `tools\test_cli_installation.bat`,
+  none of which exist either. Fixing only the `format_all` lines would leave the
+  neighbouring lines equally wrong, and fixing all of them is a CONTRIBUTING audit, not
+  tool-inventory drift. Worth its own issue. Step 1's verification therefore checks
+  `format_all` inside `architecture.md` only, not repo-wide.

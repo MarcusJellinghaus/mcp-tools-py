@@ -10,7 +10,7 @@ Single file: `README.md`. No other file is touched in this step.
 
 ## WHAT
 
-Five edits. The README states its tool inventory in three places today — Overview bullets
+Six edits. The README states its tool inventory in three places today — Overview bullets
 (`:9-11`), Features (`:25-27`), Available Tools (`:416-433`) — all three saying 3 tools.
 After this step it states it in one place, as a 17-row table, and the other two link to it.
 
@@ -78,6 +78,24 @@ Replace:
 
 All tools are listed under [Available Tools](#available-tools). The sections below
 document the parameters of the most-used ones.
+```
+
+### Edit 4a — Target Directory Auto-Detection (`:45-48`)
+
+`resolve_target_directories` is imported by `pylint_tool`, `mypy_tool`, `ruff_check_tool`,
+`ruff_fix_tool`, `bandit_tool`, `vulture_tool` and `formatter/formatter_tools.py` — the
+three-tool list is the same drift as the rest of this step.
+
+Find:
+```
+When `target_directories` is not specified, all checker tools (pylint, mypy, vulture)
+auto-detect directories from `pyproject.toml`:
+```
+Replace:
+```
+When `target_directories` is not specified, the tools that accept it (pylint, mypy, ruff
+check, ruff fix, bandit, vulture, and `run_format_code`) auto-detect directories from
+`pyproject.toml`:
 ```
 
 ### Edit 5 — Available Tools (`:412-433`)
