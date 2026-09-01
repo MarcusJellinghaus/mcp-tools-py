@@ -1,6 +1,6 @@
 # MCP Tools Py Architecture Documentation
 
-**Framework**: Arc42 Template | **Version**: 1.2 | **Last Updated**: 2026-09-01
+**Framework**: Arc42 Template | **Version**: 1.3 | **Last Updated**: 2026-09-01
 **Maintainer**: Marcus Jellinghaus | **Review Frequency**: On major changes
 
 ---
@@ -170,7 +170,7 @@ registrar modules: `code_checker_ruff` backs two of them, `ruff_check_tool.py` a
 - **`code_checker_pytest`** — the most complex of them: JSON report parsing, `OutputBuilder`, `show_details` logic, `ProcessResult` adapter
 - **`utils/subprocess_runner.py`** — thin re-export shim over `mcp_coder_utils.subprocess_runner`: `execute_command()`, `CommandResult`, STDIO isolation for Python commands, cross-platform process termination
 - **`utils/file_utils.py`** — thin re-export shim over `mcp_coder_utils.fs`: `read_file()` with encoding fallback
-- **`utils/project_config.py`** — target-directory auto-detection from `pyproject.toml`
+- **`utils/project_config.py`** — target-directory auto-detection from `pyproject.toml`, plus subprocess timeout resolution from `[tool.mcp-tools-py]` (per-tool key, shared key, CLI value, built-in default)
 - **`log_utils.py`** — thin re-export shim over `mcp_coder_utils.log_utils`: `setup_logging()` (console/JSON file), `@log_function_call` decorator
 
 ---

@@ -1,4 +1,76 @@
-# Pylint Configuration via `pyproject.toml`
+# Project Configuration via `pyproject.toml`
+
+The checked project's `pyproject.toml` drives several parts of this server: the
+`[tool.mcp-tools-py]` section it owns itself, plus sections owned by other tools
+that it reads (pylint messages, target directories).
+
+---
+
+## `[tool.mcp-tools-py]` — subprocess timeouts
+
+```toml
+[tool.mcp-tools-py]
+check-timeout = 300
+mypy-timeout = 600
+pytest-timeout = 900
+```
+
+Configuration is opt-in. Without it, every program gets the built-in default:
+120 seconds, or 300 for pytest.
+
+### Precedence
+
+```
+tool argument  →  <tool>-timeout  →  check-timeout  →  --check-timeout  →  built-in
+```
+
+`check-timeout` applies to every program; a `<tool>-timeout` key overrides it for
+that one program. The `--check-timeout` CLI option is server-wide — there are no
+per-tool CLI flags, so a per-project value always wins over it.
+
+### Per-tool keys
+
+`mypy-timeout`, `pylint-timeout`, `pytest-timeout`, `ruff-timeout`,
+`bandit-timeout`, `vulture-timeout`, `tach-timeout`, `lint-imports-timeout`,
+`black-timeout`, `isort-timeout`. Unknown keys in the section are ignored.
+
+### Keys name programs, not MCP tools
+
+A key bounds **one run of one program**, so a single tool call can spend more than
+one budget:
+
+| Tool call | Worst case |
+|-----------|------------|
+| `run_format_code` | `black-timeout` + `isort-timeout` |
+| `run_ruff_fix` | 2 × `ruff-timeout` (a pre-check run, then the apply run) |
+| `run_pytest_check` | 2 × `pytest-timeout` + 60s, when the pytest-json-report plugin is missing and the run is retried |
+
+### Values
+
+Positive integers only. `0` and negative values are rejected with a clear error.
+`0 = disabled` is deliberately unsupported: an unbounded subprocess in an MCP
+server is an unrecoverable hang — nothing else will reap it and the tool call
+simply never returns. Use a large value to approximate "never".
+
+A malformed `pyproject.toml` now fails every tool call, including
+`run_tach_check` and `run_lint_imports_check`, which read no project
+configuration before this setting existed.
+
+### Per-call overrides
+
+`run_mypy_check` and `run_pytest_check` accept a `timeout_seconds` argument that
+outranks everything above. The other tools do not.
+
+### Caveats
+
+**Name collision.** `pytest-timeout` is also the name of a well-known PyPI plugin.
+There is no TOML clash — that plugin reads `[tool.pytest.ini_options] timeout` —
+but the similarity is worth knowing.
+
+**Not a guarantee.** The effective limit is `min(server timeout, harness timeout)`:
+a calling agent's watchdog can cut a tool call short regardless of this setting.
+
+---
 
 ## How pylint reads `pyproject.toml`
 
@@ -101,7 +173,7 @@ Pass an explicit `target_directories` list to override auto-detection.
 
 ---
 
-## Reference
+## Pylint reference
 
 Full list of pylint message codes and categories:
 [pylint messages overview](https://pylint.readthedocs.io/en/stable/messages/messages_overview.html)

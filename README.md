@@ -64,6 +64,7 @@ by passing an explicit list:
 | `markers` | list | None | Optional list of pytest markers to filter tests |
 | `extra_args` | list | None | Optional list of additional pytest arguments; use `-v`/`-vv`/`-vvv` to control verbosity |
 | `env_vars` | dictionary | None | Optional environment variables for the subprocess |
+| `timeout_seconds` | integer | None (resolved from config, else 300) | Maximum seconds to wait for the test run. Positive integers only |
 
 **Note:** Parallel test execution is enabled by default using pytest-xdist (`-n auto`).
 
@@ -78,6 +79,7 @@ The mypy tools expose the following parameters for customization:
 | `target_directories` | list | None (auto-detected) | Directories to check relative to project_dir. Auto-detected from `pyproject.toml` when omitted |
 | `follow_imports` | string | 'normal' | How to handle imports during type checking |
 | `cache_dir` | string | None (`.mypy_cache`) | Custom cache directory for incremental checking |
+| `timeout_seconds` | integer | None (resolved from config, else 120) | Maximum seconds to wait for mypy. Positive integers only |
 
 ## Command Line Interface (CLI)
 
@@ -117,6 +119,7 @@ mcp-tools-py --project-dir /path/to/project [options]
 #### Tool Configuration
 | Parameter | Type | Default | Description |
 |-----------|------|---------|-------------|
+| `--check-timeout` | integer | None (120; pytest 300) | Timeout in seconds for every checker and formatter subprocess. Overridden per tool by `[tool.mcp-tools-py]` in the project's `pyproject.toml` — see [Project configuration](docs/pyproject-configuration.md) |
 | `--refactoring-timeout` | integer | 120 | Timeout in seconds for rope refactoring operations |
 | `--vulture-whitelist` | string | "vulture_whitelist.py" | Path to the vulture whitelist file, relative to project-dir. Auto-included by `run_vulture_check` when the file exists |
 
