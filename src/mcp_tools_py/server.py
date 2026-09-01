@@ -99,22 +99,24 @@ class ToolServer:
             Path to the Python interpreter to use for tool subprocesses.
 
         Raises:
-            FileNotFoundError: If `venv_path` is set but its python binary is missing.
+            FileNotFoundError: If the resolved interpreter does not exist.
         """
         if self.venv_path:
             if os.name == "nt":
                 python = os.path.join(self.venv_path, "Scripts", "python.exe")
             else:
                 python = os.path.join(self.venv_path, "bin", "python")
-            if not os.path.exists(python):
-                raise FileNotFoundError(
-                    f"Python executable not found in virtual environment: {python}"
-                )
-            return python
+            source = "--venv-path"
         elif self.python_executable:
-            return self.python_executable
+            python, source = self.python_executable, "--python-executable"
         else:
-            return sys.executable
+            python, source = sys.executable, "sys.executable"
+
+        if not os.path.exists(python):
+            raise FileNotFoundError(
+                f"Python interpreter not found: {python} (from {source})"
+            )
+        return python
 
     def _check_tool_availability(self) -> dict[str, bool]:
         """Check availability of file-existence tools (lint-imports, vulture, ruff, bandit).

@@ -70,14 +70,30 @@ class TestResolvePythonExecutable:
         ):
             mock_fastmcp.return_value.tool.return_value = MagicMock()
 
-            with pytest.raises(FileNotFoundError):
+            with pytest.raises(FileNotFoundError, match="--venv-path"):
                 _create_server(project_dir=project_dir, venv_path="/my/venv")
+
+    def test_python_executable_not_found_raises(self) -> None:
+        """When python_executable doesn't exist, raise FileNotFoundError."""
+        with (
+            patch("mcp.server.fastmcp.FastMCP") as mock_fastmcp,
+            patch("mcp_tools_py.server.execute_command") as mock_exec,
+        ):
+            mock_fastmcp.return_value.tool.return_value = MagicMock()
+            mock_exec.return_value = make_command_result(return_code=0, stdout="ok")
+
+            with pytest.raises(FileNotFoundError, match="--python-executable"):
+                _create_server(
+                    project_dir=Path("/project"),
+                    python_executable="/no/such/python3.11",
+                )
 
     def test_python_executable_fallback(self) -> None:
         """When no venv_path but python_executable is set, use it directly."""
         with (
             patch("mcp.server.fastmcp.FastMCP") as mock_fastmcp,
             patch("mcp_tools_py.server.execute_command") as mock_exec,
+            patch("mcp_tools_py.server.os.path.exists", return_value=True),
         ):
             mock_fastmcp.return_value.tool.return_value = MagicMock()
             mock_exec.return_value = make_command_result(return_code=0, stdout="ok")
@@ -488,6 +504,7 @@ class TestToolHandlerShortCircuit:
             patch(
                 "mcp_tools_py.checker_tools.pytest_tool.check_code_with_pytest"
             ) as mock_check,
+            patch("mcp_tools_py.server.os.path.exists", return_value=True),
         ):
             registered_tools = _capture_tools(mock_fastmcp)
             mock_exec.return_value = make_command_result(return_code=0, stdout="ok")
