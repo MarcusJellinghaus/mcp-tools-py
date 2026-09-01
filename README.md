@@ -4,27 +4,22 @@ A Model Context Protocol (MCP) server providing code quality checking operations
 
 ## Overview
 
-This MCP server enables AI assistants like Claude (via Claude Desktop), VSCode with GitHub Copilot, or other MCP-compatible clients to run code quality checks on Python projects. The tools provided are:
+This MCP server enables AI assistants like Claude (via Claude Desktop), VSCode with GitHub Copilot, or other MCP-compatible clients to run code quality checks, formatting and refactoring on Python projects. See [Available Tools](#available-tools) for the full list.
 
-- Run pylint checks to identify code quality issues
-- Execute pytest to identify failing tests
-- Run mypy for type checking
-
-**Scope:** This server covers Python projects only. Further Python-specific extensions are planned, including architecture and layering checks (vulture, tach, import-linter) and refactoring tools. Support for other languages can be provided through separate, dedicated MCP servers with similar functionality.
+**Scope:** This server covers Python projects only. Support for other languages can be provided through separate, dedicated MCP servers with similar functionality.
 
 **Why a dedicated MCP server instead of bash access?**
 
 A general-purpose bash MCP tool allows more flexibility, but at the expense of less control. This server takes a more focused approach:
 
-- **Security**: Only a defined set of tools (pylint, pytest, mypy) can be executed. All operations are scoped to the specified `project_dir`.
+- **Security**: Only a defined set of tools can be executed — see [Available Tools](#available-tools). All operations are scoped to the specified `project_dir`.
 - **Context management**: Results are formatted and size-limited to reduce context load on the AI assistant. Output is structured as actionable prompts rather than raw tool output.
 - **Transparency**: The server is open source, and detailed structured logging records every tool call with parameters, timing, and results.
 
 ## Features
 
-- `run_pylint_check`: Run pylint on the project code and generate smart prompts for LLMs
-- `run_pytest_check`: Run pytest on the project code and generate smart prompts for LLMs
-- `run_mypy_check`: Run mypy type checking on the project code
+All tools are listed under [Available Tools](#available-tools). The sections below
+document the parameters of the most-used ones.
 
 ### Pylint Parameters
 
@@ -34,6 +29,7 @@ The pylint tools expose the following parameters for customization:
 |-----------|------|---------|-------------|
 | `extra_args` | list | None | Optional list of additional pylint CLI arguments (e.g. `["--disable=W0611"]`) |
 | `target_directories` | list | None (auto-detected) | Directories to analyze relative to project_dir. Auto-detected from `pyproject.toml` when omitted |
+| `max_issues` | integer | 1 | Number of issue types shown in detail; the rest are summarised as counts |
 
 ### Pylint Configuration
 
@@ -44,8 +40,9 @@ and migration guidance.
 
 ### Target Directory Auto-Detection
 
-When `target_directories` is not specified, all checker tools (pylint, mypy, vulture)
-auto-detect directories from `pyproject.toml`:
+When `target_directories` is not specified, the tools that accept it (pylint, mypy, ruff
+check, ruff fix, bandit, vulture, and `run_format_code`) auto-detect directories from
+`pyproject.toml`:
 
 - **Source dirs** from `[tool.setuptools.packages.find] where` (fallback: `["src"]`)
 - **Test dirs** from `[tool.pytest.ini_options] testpaths` (fallback: `["tests"]`)
@@ -65,8 +62,7 @@ by passing an explicit list:
 | Parameter | Type | Default | Description |
 |-----------|------|---------|-------------|
 | `markers` | list | None | Optional list of pytest markers to filter tests |
-| `verbosity` | integer | 2 | Pytest verbosity level (0-3) |
-| `extra_args` | list | None | Optional list of additional pytest arguments |
+| `extra_args` | list | None | Optional list of additional pytest arguments; use `-v`/`-vv`/`-vvv` to control verbosity |
 | `env_vars` | dictionary | None | Optional environment variables for the subprocess |
 
 **Note:** Parallel test execution is enabled by default using pytest-xdist (`-n auto`).
@@ -81,6 +77,7 @@ The mypy tools expose the following parameters for customization:
 | `disable_error_codes` | list | None | List of mypy error codes to ignore |
 | `target_directories` | list | None (auto-detected) | Directories to check relative to project_dir. Auto-detected from `pyproject.toml` when omitted |
 | `follow_imports` | string | 'normal' | How to handle imports during type checking |
+| `cache_dir` | string | None (`.mypy_cache`) | Custom cache directory for incremental checking |
 
 ## Command Line Interface (CLI)
 
@@ -101,8 +98,8 @@ mcp-tools-py --project-dir /path/to/project [options]
 #### Python Configuration
 | Parameter | Type | Default | Description |
 |-----------|------|---------|-------------|
-| `--python-executable` | string | sys.executable | Path to Python interpreter for running pytest, pylint, and mypy. Should point to the environment where these tools are installed (the tool's own venv), not the project's runtime venv |
-| `--venv-path` | string | None | Path to the virtual environment where pytest, pylint, and mypy are installed. When specified, this venv's Python will be used instead of `--python-executable`. This should be the tool's own venv, not the project's runtime venv |
+| `--python-executable` | string | sys.executable | Path to the Python interpreter used to run pytest, pylint, mypy, black and isort. Should point to the environment where these tools are installed (the tool's own venv), not the project's runtime venv |
+| `--venv-path` | string | None | Path to the virtual environment holding the checker tools. Required for the ones located as binaries: ruff, bandit, vulture, tach and lint-imports. When specified, this venv's Python will be used instead of `--python-executable`. This should be the tool's own venv, not the project's runtime venv |
 
 #### Test Configuration
 | Parameter | Type | Default | Description |
@@ -114,8 +111,14 @@ mcp-tools-py --project-dir /path/to/project [options]
 | Parameter | Type | Default | Description |
 |-----------|------|---------|-------------|
 | `--log-level` | string | "INFO" | Set logging level. Choices: DEBUG, INFO, WARNING, ERROR, CRITICAL |
-| `--log-file` | string | None | Path for structured JSON logs. If not specified, logs only to console |
-| `--console-only` | flag | False | Log only to console, ignore `--log-file` parameter |
+| `--log-file` | string | None | Path for structured JSON logs. If not specified, logs go to `project_dir/logs/mcp_tools_py_{timestamp}.log` |
+| `--console-only` | flag | False | Log only to console: no default log file, and `--log-file` is ignored |
+
+#### Tool Configuration
+| Parameter | Type | Default | Description |
+|-----------|------|---------|-------------|
+| `--refactoring-timeout` | integer | 120 | Timeout in seconds for rope refactoring operations |
+| `--vulture-whitelist` | string | "vulture_whitelist.py" | Path to the vulture whitelist file, relative to project-dir. Auto-included by `run_vulture_check` when the file exists |
 
 ### Notes
 
@@ -126,7 +129,7 @@ mcp-tools-py --project-dir /path/to/project [options]
 
 ## Environment Configuration
 
-The `--python-executable` and `--venv-path` options must point to the environment where **pytest, pylint, and mypy are installed** — this is typically the tool's own virtual environment, not your project's runtime venv.
+The `--python-executable` and `--venv-path` options must point to the environment where **the checker tools are installed** — pytest, pylint, mypy, black and isort are run through that interpreter, while ruff, bandit, vulture, tach and lint-imports are located as binaries inside `--venv-path`. This is typically the tool's own virtual environment, not your project's runtime venv.
 
 ### Correct Configuration
 
@@ -148,7 +151,7 @@ Point to the venv where mcp-tools-py and its tools are installed:
 
 ### Incorrect Configuration
 
-Do **not** point to your project's runtime venv if it doesn't have pytest/pylint/mypy installed:
+Do **not** point to your project's runtime venv if it doesn't have the checker tools installed:
 
 ```json
 {
@@ -168,7 +171,8 @@ This will fail if your project's `.venv` doesn't have the required tools install
 
 ### Troubleshooting
 
-- **"No module named pytest"** (or pylint/mypy): Your `--python-executable` or `--venv-path` points to an environment that doesn't have the required tools installed. Update the configuration to point to the correct environment.
+- **"No module named pytest"** (or pylint/mypy/black/isort): Your `--python-executable` or `--venv-path` points to an environment that doesn't have the required tools installed. Update the configuration to point to the correct environment.
+- **"ruff not found"** (or bandit/vulture/tach/lint-imports) logged at startup: these tools are located as binaries inside `--venv-path`. Set `--venv-path` to an environment where they are installed.
 - **After installing missing tools**, restart the MCP server for changes to take effect. Tool availability is checked at startup and cached for the session.
 
 ## Installation
@@ -312,8 +316,8 @@ Example structured log entries:
   "level": "info",
   "event": "Starting pylint check",
   "project_dir": "/path/to/project",
-  "disable_codes": ["C0114", "C0116"],
-  "target_directories": ["src", "tests"]
+  "target_directories": ["src", "tests"],
+  "max_issues": 1
 }
 ```
 
@@ -411,26 +415,29 @@ npx @modelcontextprotocol/inspector mcp-tools-py --project-dir /path/to/project
 
 ## Available Tools
 
-The server exposes the following MCP tools:
+The server exposes 17 MCP tools.
 
-### Run Pylint Check
-- Runs pylint on the project code and generates smart prompts for LLMs
-- Returns: A string containing either pylint results or a prompt for an LLM to interpret
-- Helps identify code quality issues, style problems, and potential bugs
-- Customizable with parameters for disabling specific pylint codes and targeting specific directories
-- Supports flexible project structures through `target_directories` parameter
+| Tool | What it does |
+|------|--------------|
+| `run_pylint_check` | Static analysis; findings returned as an LLM-actionable prompt |
+| `run_pytest_check` | Runs the test suite, parses the JSON report, summarises failures |
+| `run_mypy_check` | Strict-mode type checking with configurable error codes |
+| `run_ruff_check` | Ruff lint analysis, read-only |
+| `run_ruff_fix` | Applies ruff's safe fixes in place; unsafe fixes are opt-in |
+| `run_bandit_check` | Security lint |
+| `run_vulture_check` | Dead-code detection against `vulture_whitelist.py` |
+| `run_tach_check` | Architectural boundary validation from `tach.toml` |
+| `run_lint_imports_check` | Import-contract validation from `.importlinter` |
+| `run_format_code` | Runs isort then black; `check_only` reports without writing |
+| `list_symbols` | Top-level functions, classes and variables in a file |
+| `find_references` | All references to a symbol across the project |
+| `move_symbol` | Moves top-level symbols to another module, updating imports |
+| `rename_symbol` | Renames a module-level symbol project-wide |
+| `move_module` | Moves a module into another package, updating references |
+| `get_library_source` | Resolves a dotted import path and returns its source |
+| `sleep` | Pauses execution for a given number of seconds |
 
-### Run Pytest Check
-- Runs pytest on the project code and generates smart prompts for LLMs
-- Returns: A string containing either pytest results or a prompt for an LLM to interpret
-- Identifies failing tests and provides detailed information about test failures
-- Customizable with parameters for test selection, environment, and verbosity
-
-### Run Mypy Check
-- Runs mypy type checking on the project code
-- Returns: A string containing mypy results or a prompt for an LLM to interpret
-- Identifies type errors and provides suggestions for better type safety
-- Customizable with parameters for strict mode, error code filtering, and target directories
+Parameters for pylint, pytest and mypy are documented under [Features](#features).
 
 ## Development
 
