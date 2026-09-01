@@ -136,6 +136,7 @@ See `pyproject.toml` for version constraints.
 - `checker_tools` depends on the `code_checker_*` packages, never the reverse; the other registrars (`formatter`, `refactoring`, `utility_tools`, `inspect_library`) depend on none of them
 - Checker modules may NOT depend on each other
 - `utils` may NOT depend on any checker module or `server`
+- `mcp_coder_utils` may only be imported by the three shim modules — `log_utils`, `utils/file_utils.py` and `utils/subprocess_runner.py`; every other module imports it through them (`mcp_coder_utils_isolation` contract in `.importlinter`)
 
 ### Checker Module Pattern
 
@@ -167,10 +168,10 @@ registrar modules: `code_checker_ruff` backs two of them, `ruff_check_tool.py` a
 - **`inspect_library.py`** — `InspectTools`: registers `get_library_source`, resolving a dotted import path to its source
 - **`code_checker_*`** — eight checker packages, one per external tool (pytest, pylint, mypy, ruff, bandit, vulture, tach, lint_imports), each following the Checker Module Pattern above
 - **`code_checker_pytest`** — the most complex of them: JSON report parsing, `OutputBuilder`, `show_details` logic, `ProcessResult` adapter
-- **`utils/subprocess_runner.py`** — `execute_command()`, `CommandResult`, STDIO isolation for Python commands, cross-platform process termination
-- **`utils/file_utils.py`** — `read_file()` with encoding fallback
+- **`utils/subprocess_runner.py`** — thin re-export shim over `mcp_coder_utils.subprocess_runner`: `execute_command()`, `CommandResult`, STDIO isolation for Python commands, cross-platform process termination
+- **`utils/file_utils.py`** — thin re-export shim over `mcp_coder_utils.fs`: `read_file()` with encoding fallback
 - **`utils/project_config.py`** — target-directory auto-detection from `pyproject.toml`
-- **`log_utils.py`** — `setup_logging()` (console/JSON file), `@log_function_call` decorator
+- **`log_utils.py`** — thin re-export shim over `mcp_coder_utils.log_utils`: `setup_logging()` (console/JSON file), `@log_function_call` decorator
 
 ---
 
@@ -179,7 +180,7 @@ registrar modules: `code_checker_ruff` backs two of them, `ruff_check_tool.py` a
 ### Tool Invocation (e.g., `run_pytest_check`)
 
 ```
-MCP Client          server.py              runners.py           subprocess_runner.py
+MCP Client       pytest_tool.py            runners.py           subprocess_runner.py
     │                   │                      │                        │
     │  run_pytest_check │                      │                        │
     │──────────────────►│                      │                        │
@@ -194,12 +195,14 @@ MCP Client          server.py              runners.py           subprocess_runne
     │                   │                      │ parse + format         │
     │                   │  result dict         │                        │
     │                   │◄─────────────────────│                        │
-    │                   │ _format_*_result()   │                        │
+    │                   │ CheckerTools._format_│                        │
+    │                   │ pytest_result_with_  │                        │
+    │                   │ details()            │                        │
     │  formatted string │                      │                        │
     │◄──────────────────│                      │                        │
 ```
 
-All checker tools follow this same pattern. Pytest and bandit write a JSON report to a temporary file and parse that; the other checkers parse stdout directly.
+All checker tools follow this same pattern, each entered through its own registrar module (`checker_tools/<tool>_tool.py`) with the shared result formatters on `CheckerTools`. Pytest and bandit write a JSON report to a temporary file and parse that; the other checkers parse stdout directly.
 
 ### STDIO Isolation (Python Subprocess)
 
@@ -241,6 +244,8 @@ See [dependencies/readme.md](dependencies/readme.md) for tool comparison, curren
 | import-linter | `.importlinter` | Import contract validation |
 | pycycle | — | Circular dependency detection |
 | vulture | `vulture_whitelist.py` | Dead code detection |
+
+`.importlinter` holds three contracts: the layer contract, a forbidden-imports contract keeping `utils` free of checker and `server` imports, and `mcp_coder_utils_isolation`, which confines `mcp_coder_utils` imports to the three shim modules.
 
 ### CI Pipeline
 
