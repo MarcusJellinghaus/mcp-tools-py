@@ -21,6 +21,9 @@ def mock_server() -> MagicMock:
         "black": True,
     }
     server._is_tool_available = lambda tool: server._tool_availability.get(tool, False)
+    server.resolve_timeout = lambda tool, explicit=None: (
+        300 if tool == "pytest" else 120
+    )
     return server
 
 

@@ -12,6 +12,7 @@ from mcp_tools_py.inspect_library import InspectTools
 from mcp_tools_py.log_utils import log_function_call
 from mcp_tools_py.refactoring import RefactoringTools
 from mcp_tools_py.utility_tools import UtilityTools
+from mcp_tools_py.utils.project_config import ToolName, get_check_timeout
 from mcp_tools_py.utils.subprocess_runner import execute_command
 
 # Type definitions for FastMCP
@@ -54,6 +55,7 @@ class ToolServer:
         keep_temp_files: bool = False,
         refactoring_timeout: int = 120,
         vulture_whitelist: str = "vulture_whitelist.py",
+        check_timeout: Optional[int] = None,
     ) -> None:
         """Initialize the server with the project directory and Python configuration.
 
@@ -65,6 +67,7 @@ class ToolServer:
             keep_temp_files: Whether to keep temporary files after test execution. Useful for debugging when tests fail.
             refactoring_timeout: Timeout in seconds for rope refactoring operations.
             vulture_whitelist: Filename for vulture whitelist file. Defaults to 'vulture_whitelist.py'.
+            check_timeout: Server-level timeout in seconds for checker and formatter subprocesses. If None, per-tool configuration or the built-in defaults apply.
         """
         self.project_dir = project_dir
         self.python_executable = python_executable
@@ -73,6 +76,7 @@ class ToolServer:
         self.keep_temp_files = keep_temp_files
         self.refactoring_timeout = refactoring_timeout
         self.vulture_whitelist = vulture_whitelist
+        self.check_timeout = check_timeout
 
         # Import FastMCP
         from mcp.server.fastmcp import FastMCP
@@ -238,6 +242,23 @@ class ToolServer:
         self._tool_availability[tool_name] = available
         return available
 
+    def resolve_timeout(self, tool: ToolName, explicit: Optional[int] = None) -> int:
+        """Resolve the subprocess timeout in seconds for one program.
+
+        Args:
+            tool: Name of the program the timeout applies to.
+            explicit: Per-call timeout supplied by the caller, if any.
+
+        Returns:
+            Positive number of seconds.
+
+        Raises:
+            ValueError: If pyproject.toml is malformed or a configured value is invalid.
+        """
+        return get_check_timeout(
+            str(self.project_dir), tool, explicit, self.check_timeout
+        )
+
     @log_function_call
     def run(self) -> None:
         """Run the MCP server."""
@@ -254,6 +275,7 @@ def create_server(
     keep_temp_files: bool = False,
     refactoring_timeout: int = 120,
     vulture_whitelist: str = "vulture_whitelist.py",
+    check_timeout: Optional[int] = None,
 ) -> ToolServer:
     """Create a new ToolServer instance.
 
@@ -265,6 +287,7 @@ def create_server(
         keep_temp_files: Whether to keep temporary files after test execution. Useful for debugging when tests fail.
         refactoring_timeout: Timeout in seconds for rope refactoring operations.
         vulture_whitelist: Filename for vulture whitelist file. Defaults to 'vulture_whitelist.py'.
+        check_timeout: Server-level timeout in seconds for checker and formatter subprocesses. If None, per-tool configuration or the built-in defaults apply.
 
     Returns:
         A new ToolServer instance
@@ -277,4 +300,5 @@ def create_server(
         keep_temp_files=keep_temp_files,
         refactoring_timeout=refactoring_timeout,
         vulture_whitelist=vulture_whitelist,
+        check_timeout=check_timeout,
     )

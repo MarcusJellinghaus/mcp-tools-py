@@ -3,6 +3,7 @@ Tests for the server functionality with updated parameter exposure.
 """
 
 import inspect
+import textwrap
 from pathlib import Path
 from typing import Any, Dict, Tuple
 from unittest.mock import MagicMock, patch
@@ -682,3 +683,99 @@ async def test_run_pytest_check_prepends_dedup_notes(
         # The note about -m flag should be prepended
         assert "Note:" in result
         assert "-m" in result
+
+
+# Tests for --check-timeout and ToolServer.resolve_timeout
+
+
+class TestCheckTimeoutCli:
+    """Tests for the --check-timeout command line option."""
+
+    def test_default_is_none(self) -> None:
+        """parse_args returns check_timeout=None when the flag is absent."""
+        import sys
+
+        from mcp_tools_py.main import parse_args
+
+        with patch.object(sys, "argv", ["prog", "--project-dir", "/tmp/proj"]):
+            args = parse_args()
+        assert args.check_timeout is None
+
+    def test_accepts_positive_integer(self) -> None:
+        """parse_args accepts --check-timeout 600."""
+        import sys
+
+        from mcp_tools_py.main import parse_args
+
+        with patch.object(
+            sys,
+            "argv",
+            ["prog", "--project-dir", "/tmp/proj", "--check-timeout", "600"],
+        ):
+            args = parse_args()
+        assert args.check_timeout == 600
+
+    @pytest.mark.parametrize("value", ["0", "-1", "abc"])
+    def test_rejects_invalid_value(self, value: str) -> None:
+        """argparse exits when --check-timeout is not a positive integer."""
+        import sys
+
+        from mcp_tools_py.main import parse_args
+
+        with patch.object(
+            sys,
+            "argv",
+            ["prog", "--project-dir", "/tmp/proj", "--check-timeout", value],
+        ):
+            with pytest.raises(SystemExit):
+                parse_args()
+
+
+def _make_server(project_dir: Path, **kwargs: Any) -> Any:
+    """Build a ToolServer with FastMCP and tool availability stubbed out.
+
+    Returns:
+        A ToolServer instance.
+    """
+    with patch("mcp.server.fastmcp.FastMCP") as mock_fastmcp:
+        mock_fastmcp.return_value.tool.return_value = MagicMock()
+
+        from mcp_tools_py.server import ToolServer
+
+        with patch.object(ToolServer, "_check_tool_availability", return_value={}):
+            return ToolServer(project_dir=project_dir, **kwargs)
+
+
+class TestResolveTimeout:
+    """Tests for ToolServer.resolve_timeout."""
+
+    def test_cli_timeout_applies_to_every_tool(self) -> None:
+        """check_timeout from the CLI overrides both built-in defaults."""
+        server = _make_server(Path("/test/project"), check_timeout=45)
+
+        assert server.resolve_timeout("mypy") == 45
+        assert server.resolve_timeout("pytest") == 45
+
+    def test_built_in_defaults_without_configuration(self) -> None:
+        """Without configuration, pytest gets 300 and everything else 120."""
+        server = _make_server(Path("/test/project"))
+
+        assert server.resolve_timeout("mypy") == 120
+        assert server.resolve_timeout("pytest") == 300
+
+    def test_pyproject_value_beats_cli_timeout(self, tmp_path: Path) -> None:
+        """A per-tool pyproject value wins over --check-timeout."""
+        (tmp_path / "pyproject.toml").write_text(textwrap.dedent("""\
+                [tool.mcp-tools-py]
+                mypy-timeout = 600
+                """))
+        server = _make_server(tmp_path, check_timeout=45)
+
+        assert server.resolve_timeout("mypy") == 600
+        assert server.resolve_timeout("pylint") == 45
+
+    def test_explicit_argument_wins(self) -> None:
+        """An explicit per-call value beats the server-level timeout."""
+        server = _make_server(Path("/test/project"), check_timeout=45)
+
+        assert server.resolve_timeout("mypy", 90) == 90
