@@ -36,9 +36,7 @@ def register(mcp: "FastMCPProtocol", checker_tools: "CheckerTools") -> None:
             failures.
         """
         if not server._is_tool_available("lint-imports"):
-            return server.tool_unavailable_message(
-                "lint-imports", package="import-linter"
-            )
+            return server.tool_unavailable_message("lint-imports")
 
         try:
             return run_lint_imports_check_impl(

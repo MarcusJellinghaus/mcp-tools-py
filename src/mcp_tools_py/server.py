@@ -60,6 +60,9 @@ _TOOL_MODULES: dict[str, Optional[str]] = {
     "tach": None,
 }
 
+# Tool key -> distribution to install, when it differs from the key.
+_TOOL_PACKAGES: dict[str, str] = {"lint-imports": "import-linter"}
+
 
 class ToolServer:
     """MCP server for code checking and formatting tools."""
@@ -80,7 +83,7 @@ class ToolServer:
         Args:
             project_dir: Path to the project directory to check
             python_executable: Optional path to Python interpreter to use for running tests. If None, defaults to sys.executable.
-            venv_path: Optional path to a virtual environment to activate for running tests. When specified, the Python executable from this venv will be used instead of python_executable.
+            venv_path: Deprecated, use python_executable instead. Optional path to a virtual environment. When specified, the Python executable from this venv is used instead of python_executable, which is now its only effect: it no longer locates the tools.
             test_folder: Path to the test folder (relative to project_dir). Defaults to 'tests'.
             keep_temp_files: Whether to keep temporary files after test execution. Useful for debugging when tests fail.
             refactoring_timeout: Timeout in seconds for rope refactoring operations.
@@ -144,7 +147,6 @@ class ToolServer:
             Mapping of tool key to availability flag.
         """
         availability: dict[str, bool] = {}
-        script_dir = os.path.dirname(self._resolved_python)
 
         for key, module in _TOOL_MODULES.items():
             if module is not None:
@@ -154,13 +156,7 @@ class ToolServer:
             if path is not None:
                 self._tool_binaries[key] = path
             else:
-                logger.warning(
-                    "%s not found in %s. Ensure --python-executable points to "
-                    "the environment where %s is installed.",
-                    key,
-                    script_dir,
-                    key,
-                )
+                logger.warning("%s", self.tool_unavailable_message(key))
             availability[key] = path is not None
 
         return availability
@@ -234,13 +230,14 @@ class ToolServer:
 
         Args:
             key: Tool key as used in `_tool_availability`.
-            package: Distribution name to tell the user to install, when it
-                differs from `key` (import-linter provides `lint-imports`).
+            package: Distribution name to tell the user to install. Defaults to
+                `_TOOL_PACKAGES`, which maps a key to its distribution when the
+                two differ (import-linter provides `lint-imports`).
 
         Returns:
             A message naming --python-executable and the location searched.
         """
-        name = package or key
+        name = package or _TOOL_PACKAGES.get(key, key)
         if _TOOL_MODULES.get(key) is None:
             searched = os.path.dirname(self._resolved_python)
             return (
@@ -293,7 +290,7 @@ def create_server(
     Args:
         project_dir: Path to the project directory to check
         python_executable: Optional path to Python interpreter to use for running tests. If None, defaults to sys.executable.
-        venv_path: Optional path to a virtual environment to activate for running tests. When specified, the Python executable from this venv will be used instead of python_executable.
+        venv_path: Deprecated, use python_executable instead. Optional path to a virtual environment. When specified, the Python executable from this venv is used instead of python_executable, which is now its only effect: it no longer locates the tools.
         test_folder: Path to the test folder (relative to project_dir). Defaults to 'tests'.
         keep_temp_files: Whether to keep temporary files after test execution. Useful for debugging when tests fail.
         refactoring_timeout: Timeout in seconds for rope refactoring operations.

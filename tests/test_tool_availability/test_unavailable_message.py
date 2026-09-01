@@ -54,3 +54,13 @@ class TestToolUnavailableMessage:
 
         assert "lint-imports is not available" in message
         assert "import-linter is installed" in message
+
+    def test_lint_imports_package_defaults_without_override(
+        self, tmp_path: Path
+    ) -> None:
+        """The distribution name is looked up when no override is passed."""
+        server = self._server(tmp_path)
+
+        message = server.tool_unavailable_message("lint-imports")
+
+        assert "import-linter is installed" in message

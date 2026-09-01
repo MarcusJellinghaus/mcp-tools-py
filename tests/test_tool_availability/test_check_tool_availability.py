@@ -1,8 +1,11 @@
 """Tests for the eager _check_tool_availability pass at server startup."""
 
+import logging
 import os
 from pathlib import Path
 from unittest.mock import MagicMock, patch
+
+import pytest
 
 from tests.test_tool_availability._helpers import _create_server, _dummy_python
 
@@ -145,6 +148,24 @@ class TestCheckToolAvailability:
             assert "vulture" not in server._tool_binaries
             assert server._tool_availability["tach"] is False
             assert "tach" not in server._tool_binaries
+
+    def test_startup_warning_matches_handler_message(
+        self, tmp_path: Path, caplog: pytest.LogCaptureFixture
+    ) -> None:
+        """The startup warning is the handler's message, distribution included."""
+        with patch("mcp.server.fastmcp.FastMCP") as mock_fastmcp:
+            mock_fastmcp.return_value.tool.return_value = MagicMock()
+
+            with caplog.at_level(logging.WARNING, logger="mcp_tools_py.server"):
+                server = _create_server(
+                    project_dir=Path("/project"),
+                    python_executable=_dummy_python(tmp_path),
+                )
+
+            warnings = [record.getMessage() for record in caplog.records]
+            assert server.tool_unavailable_message("ruff") in warnings
+            assert server.tool_unavailable_message("lint-imports") in warnings
+            assert any("import-linter is installed" in text for text in warnings)
 
     def test_scripts_found_without_venv_path(self, tmp_path: Path) -> None:
         """Detection follows the resolved interpreter, not --venv-path."""
