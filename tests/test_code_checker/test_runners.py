@@ -384,10 +384,10 @@ def test_run_tests_default_test_folder_appended(mock_execute: MagicMock) -> None
         (
             "subprocess_timeout",
             0,
-            None,
+            "Process timed out after 300 seconds",
             True,
             True,
-            "Subprocess timed out",
+            "Subprocess timed out after 300 seconds",
             TimeoutError,
             "command timed out after",
         ),
@@ -537,7 +537,7 @@ def test_internal_error_3_preserves_internalerror_block_untruncated(
         (
             "retry_timeout",
             TimeoutError,
-            "Timed out while retrying",
+            "Timed out after 300 seconds while retrying",
             "retry timed out",
         ),
     ],
@@ -582,7 +582,7 @@ def test_run_tests_surfaces_pytest_output_on_install_and_retry_failures(
             return_code=None,
             stdout="STDOUT_MARKER_xyz",
             stderr="STDERR_MARKER_abc",
-            execution_error=None,
+            execution_error="Process timed out after 300 seconds",
             timed_out=True,
         )
         mock_execute.side_effect = [first, install_ok, retry_timeout]

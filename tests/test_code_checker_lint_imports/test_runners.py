@@ -458,3 +458,89 @@ class TestRunLintImportsCheckImpl:
             "layers",
         ]
         assert mock_exec.call_args.kwargs["cwd"] == "/project"
+
+
+class TestRunLintImportsTimeout:
+    """Timeout and execution-error reporting."""
+
+    @patch(f"{MODULE_PATH}.execute_command")
+    def test_timeout_reports_timeout(self, mock_exec: Any) -> None:
+        """A killed run reports the timeout, not a parse failure."""
+        mock_exec.return_value = make_command_result(
+            timed_out=True,
+            execution_error="Process timed out after 45 seconds",
+        )
+
+        result = run_lint_imports_check_impl(
+            lint_imports_binary="/usr/bin/lint-imports",
+            project_dir="/project",
+            timeout_seconds=45,
+        )
+
+        first = next(line for line in result.splitlines() if line.strip())
+        assert "ERROR" in first
+        assert "timed out" in first
+        assert "45" in first
+        assert "could not be parsed" not in result
+
+    @patch(f"{MODULE_PATH}.execute_command")
+    def test_timeout_with_stripped_flags_has_no_info_line(self, mock_exec: Any) -> None:
+        """The state header stays the first non-empty line on a timeout."""
+        mock_exec.return_value = make_command_result(
+            timed_out=True,
+            execution_error="Process timed out after 45 seconds",
+        )
+
+        result = run_lint_imports_check_impl(
+            lint_imports_binary="/usr/bin/lint-imports",
+            project_dir="/project",
+            extra_args=["--verbose"],
+            timeout_seconds=45,
+        )
+
+        assert result.splitlines() == [
+            "=== ERROR: lint-imports timed out after 45 seconds ==="
+        ]
+
+    @patch(f"{MODULE_PATH}.execute_command")
+    def test_execution_error_reports_cause(self, mock_exec: Any) -> None:
+        """An execution error is reported instead of a parse failure."""
+        mock_exec.return_value = make_command_result(
+            timed_out=False,
+            execution_error="FileNotFoundError: lint-imports",
+        )
+
+        result = run_lint_imports_check_impl(
+            lint_imports_binary="/usr/bin/lint-imports",
+            project_dir="/project",
+        )
+
+        first = next(line for line in result.splitlines() if line.strip())
+        assert "ERROR" in first
+        assert "FileNotFoundError: lint-imports" in first
+        assert "could not be parsed" not in result
+
+    @patch(f"{MODULE_PATH}.execute_command")
+    def test_forwards_timeout_seconds(self, mock_exec: Any) -> None:
+        """The configured timeout reaches execute_command."""
+        mock_exec.return_value = make_command_result(return_code=0, stdout=CLEAN_OUTPUT)
+
+        run_lint_imports_check_impl(
+            lint_imports_binary="/usr/bin/lint-imports",
+            project_dir="/project",
+            timeout_seconds=45,
+        )
+
+        assert mock_exec.call_args.kwargs["timeout_seconds"] == 45
+
+    @patch(f"{MODULE_PATH}.execute_command")
+    def test_default_timeout_seconds(self, mock_exec: Any) -> None:
+        """Without an explicit value the shared default is used."""
+        mock_exec.return_value = make_command_result(return_code=0, stdout=CLEAN_OUTPUT)
+
+        run_lint_imports_check_impl(
+            lint_imports_binary="/usr/bin/lint-imports",
+            project_dir="/project",
+        )
+
+        assert mock_exec.call_args.kwargs["timeout_seconds"] == 120

@@ -64,3 +64,54 @@ def test_run_tach_command_construction(mock_exec: Any) -> None:
     cmd = mock_exec.call_args[0][0]
     assert cmd == ["/usr/bin/tach", "check", "--output", "json"]
     assert mock_exec.call_args.kwargs["cwd"] == "/project"
+
+
+@patch(f"{MODULE_PATH}.execute_command")
+def test_run_tach_timeout_reports_timeout(mock_exec: Any) -> None:
+    """A killed run reports the timeout, not a false pass."""
+    mock_exec.return_value = make_command_result(
+        timed_out=True, execution_error="Process timed out after 45 seconds"
+    )
+
+    result = run_tach_check(
+        tach_binary="/usr/bin/tach", project_dir="/project", timeout_seconds=45
+    )
+
+    assert "timed out" in result
+    assert "45" in result
+    assert "passed" not in result
+
+
+@patch(f"{MODULE_PATH}.execute_command")
+def test_run_tach_execution_error_reports_failure(mock_exec: Any) -> None:
+    """An execution error is reported instead of a false pass."""
+    mock_exec.return_value = make_command_result(
+        timed_out=False, execution_error="FileNotFoundError: tach"
+    )
+
+    result = run_tach_check(tach_binary="/usr/bin/tach", project_dir="/project")
+
+    assert "FileNotFoundError: tach" in result
+    assert "passed" not in result
+
+
+@patch(f"{MODULE_PATH}.execute_command")
+def test_run_tach_forwards_timeout_seconds(mock_exec: Any) -> None:
+    """The configured timeout reaches execute_command."""
+    mock_exec.return_value = make_command_result(stdout="output")
+
+    run_tach_check(
+        tach_binary="/usr/bin/tach", project_dir="/project", timeout_seconds=45
+    )
+
+    assert mock_exec.call_args.kwargs["timeout_seconds"] == 45
+
+
+@patch(f"{MODULE_PATH}.execute_command")
+def test_run_tach_default_timeout_seconds(mock_exec: Any) -> None:
+    """Without an explicit value the shared default is used."""
+    mock_exec.return_value = make_command_result(stdout="output")
+
+    run_tach_check(tach_binary="/usr/bin/tach", project_dir="/project")
+
+    assert mock_exec.call_args.kwargs["timeout_seconds"] == 120

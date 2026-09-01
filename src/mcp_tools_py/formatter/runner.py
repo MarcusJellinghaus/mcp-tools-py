@@ -10,6 +10,7 @@ from pathlib import Path
 from mcp_tools_py.formatter.black_runner import run_black
 from mcp_tools_py.formatter.isort_runner import run_isort
 from mcp_tools_py.formatter.models import FormatterResult
+from mcp_tools_py.utils.project_config import DEFAULT_CHECK_TIMEOUT
 
 DEFAULT_STEPS: list[str] = ["isort", "black"]
 
@@ -27,6 +28,7 @@ def run_format_code(
     target_dirs: list[str],
     steps: list[str] | None = None,
     check_only: bool = False,
+    timeouts: dict[str, int] | None = None,
 ) -> dict[str, FormatterResult]:
     """Run code formatters on the project.
 
@@ -37,6 +39,8 @@ def run_format_code(
         steps: Formatter steps to run in order.  Defaults to
             ``["isort", "black"]``.
         check_only: If True, only check formatting without modifying files.
+        timeouts: Per-step timeout in seconds.  Each step gets its own budget;
+            a missing step falls back to :data:`DEFAULT_CHECK_TIMEOUT`.
 
     Returns:
         Dict keyed by step name with :class:`FormatterResult` values,
@@ -58,7 +62,13 @@ def run_format_code(
     results: dict[str, FormatterResult] = {}
     for step in resolved_steps:
         runner = _STEP_RUNNERS[step]
-        result = runner(python_executable, target_dirs, str(project_root), check_only)
+        result = runner(
+            python_executable,
+            target_dirs,
+            str(project_root),
+            check_only,
+            (timeouts or {}).get(step, DEFAULT_CHECK_TIMEOUT),
+        )
         results[step] = result
         if not result.success and not check_only:
             break

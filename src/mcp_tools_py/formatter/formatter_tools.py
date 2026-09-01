@@ -78,12 +78,17 @@ class FormatterTools:
 
             # Delegate to runner
             try:
+                timeouts = {
+                    "isort": self._server.resolve_timeout("isort"),
+                    "black": self._server.resolve_timeout("black"),
+                }
                 results = _run_format_code(
                     self._server._resolved_python,
                     self._server.project_dir,
                     dirs,
                     resolved_steps,
                     check_only,
+                    timeouts=timeouts,
                 )
             except ValueError as exc:
                 return f"Error: {exc}"

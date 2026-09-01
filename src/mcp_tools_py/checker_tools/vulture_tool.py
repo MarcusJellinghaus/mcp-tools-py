@@ -75,6 +75,7 @@ def register(mcp: "FastMCPProtocol", checker_tools: "CheckerTools") -> None:
                 min_confidence=min_confidence,
                 extra_args=extra_args,
                 whitelist_path=whitelist,
+                timeout_seconds=server.resolve_timeout("vulture"),
             )
 
             logger.info(

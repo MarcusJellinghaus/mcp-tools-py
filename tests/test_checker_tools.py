@@ -7,6 +7,7 @@ from unittest.mock import MagicMock, patch
 import pytest
 
 from mcp_tools_py.checker_tools import CheckerTools
+from mcp_tools_py.utils.project_config import validate_timeout
 
 
 @pytest.fixture
@@ -37,6 +38,13 @@ def mock_server() -> MagicMock:
     server._tach_binary = "/mock/venv/bin/tach"
     server.vulture_whitelist = "vulture_whitelist.py"
     server._is_tool_available = lambda tool: server._tool_availability.get(tool, False)
+
+    def resolve_timeout(tool: str, explicit: int | None = None) -> int:
+        if explicit is not None:
+            return validate_timeout(explicit, "timeout_seconds")
+        return 300 if tool == "pytest" else 120
+
+    server.resolve_timeout = resolve_timeout
     return server
 
 
@@ -247,6 +255,105 @@ def test_vulture_passes_whitelist_to_runner(mock_server: MagicMock) -> None:
     assert mock_runner.call_args[1]["whitelist_path"] == whitelist_str
 
 
+def test_vulture_passes_resolved_timeout(mock_server: MagicMock) -> None:
+    """The resolved timeout is passed to run_vulture_check."""
+    run_vulture = _capture_vulture(mock_server)
+
+    with (
+        patch(
+            "mcp_tools_py.checker_tools.vulture_tool.run_vulture",
+            return_value="ok",
+        ) as mock_runner,
+        patch(
+            "mcp_tools_py.checker_tools.vulture_tool.resolve_target_directories",
+            return_value=["src"],
+        ),
+        patch.object(Path, "exists", return_value=False),
+    ):
+        run_vulture()
+
+    assert mock_runner.call_args[1]["timeout_seconds"] == 120
+
+
+# --- Lint-imports handler tests ---
+
+
+def test_lint_imports_passes_resolved_timeout(mock_server: MagicMock) -> None:
+    """The resolved timeout is passed to run_lint_imports_check_impl."""
+    run_lint_imports = _capture_tool(mock_server, "run_lint_imports_check")
+
+    with patch(
+        "mcp_tools_py.checker_tools.lint_imports_tool.run_lint_imports_check_impl",
+        return_value="=== PASSED ===",
+    ) as mock_runner:
+        run_lint_imports()
+
+    assert mock_runner.call_args[0][3] == 120
+
+
+# --- Bandit handler tests ---
+
+
+def test_bandit_passes_resolved_timeout(mock_server: MagicMock) -> None:
+    """The resolved timeout is passed to run_bandit_check_impl."""
+    run_bandit = _capture_tool(mock_server, "run_bandit_check")
+
+    with (
+        patch(
+            "mcp_tools_py.checker_tools.bandit_tool.run_bandit_check_impl",
+        ) as mock_runner,
+        patch(
+            "mcp_tools_py.checker_tools.bandit_tool.resolve_target_directories",
+            return_value=["src"],
+        ),
+    ):
+        mock_runner.return_value.error = None
+        run_bandit()
+
+    assert mock_runner.call_args[1]["timeout_seconds"] == 120
+
+
+# --- Ruff handler tests ---
+
+
+def test_ruff_check_passes_resolved_timeout(mock_server: MagicMock) -> None:
+    """The resolved timeout is passed to run_ruff_check_impl."""
+    run_ruff_check = _capture_tool(mock_server, "run_ruff_check")
+
+    with (
+        patch(
+            "mcp_tools_py.checker_tools.ruff_check_tool.run_ruff_check_impl",
+            return_value="ok",
+        ) as mock_runner,
+        patch(
+            "mcp_tools_py.checker_tools.ruff_check_tool.resolve_target_directories",
+            return_value=["src"],
+        ),
+    ):
+        run_ruff_check()
+
+    assert mock_runner.call_args[1]["timeout_seconds"] == 120
+
+
+def test_ruff_fix_passes_resolved_timeout(mock_server: MagicMock) -> None:
+    """The resolved timeout is passed to run_ruff_fix_impl."""
+    run_ruff_fix = _capture_tool(mock_server, "run_ruff_fix")
+
+    with (
+        patch(
+            "mcp_tools_py.checker_tools.ruff_fix_tool.run_ruff_fix_impl",
+            return_value="ok",
+        ) as mock_runner,
+        patch(
+            "mcp_tools_py.checker_tools.ruff_fix_tool.resolve_target_directories",
+            return_value=["src"],
+        ),
+    ):
+        run_ruff_fix()
+
+    assert mock_runner.call_args[1]["timeout_seconds"] == 120
+
+
 # --- Auto-detection tests ---
 
 
@@ -300,6 +407,50 @@ def test_pylint_resolution_error_returns_message(mock_server: MagicMock) -> None
     assert "Error resolving target directories" in result
 
 
+def test_pylint_passes_default_timeout(mock_server: MagicMock) -> None:
+    """Without configuration the built-in default reaches get_pylint_prompt."""
+    run_pylint = _capture_tool(mock_server, "run_pylint_check")
+
+    with (
+        patch(
+            "mcp_tools_py.checker_tools.pylint_tool.resolve_target_directories",
+            return_value=["src"],
+        ),
+        patch(
+            "mcp_tools_py.checker_tools.pylint_tool.get_pylint_prompt",
+            return_value=None,
+        ) as mock_prompt,
+    ):
+        run_pylint()
+
+    assert mock_prompt.call_args[1]["timeout_seconds"] == 120
+
+
+def test_pylint_invalid_timeout_returns_message(mock_server: MagicMock) -> None:
+    """An invalid configured timeout comes back as text, and pylint is never run."""
+
+    def raising_resolve_timeout(tool: str, explicit: int | None = None) -> int:
+        raise ValueError("pylint-timeout must be a positive integer, got 0")
+
+    mock_server.resolve_timeout = raising_resolve_timeout
+    run_pylint = _capture_tool(mock_server, "run_pylint_check")
+
+    with (
+        patch(
+            "mcp_tools_py.checker_tools.pylint_tool.resolve_target_directories",
+            return_value=["src"],
+        ),
+        patch(
+            "mcp_tools_py.checker_tools.pylint_tool.get_pylint_prompt",
+            return_value=None,
+        ) as mock_prompt,
+    ):
+        result = run_pylint()
+
+    assert "pylint-timeout must be a positive integer" in result
+    mock_prompt.assert_not_called()
+
+
 def test_mypy_auto_detects_directories(mock_server: MagicMock) -> None:
     """Mypy uses resolve_target_directories when no dirs are given."""
     run_mypy = _capture_tool(mock_server, "run_mypy_check")
@@ -330,6 +481,64 @@ def test_mypy_resolution_error_returns_message(mock_server: MagicMock) -> None:
         result = run_mypy()
 
     assert "Error resolving target directories" in result
+
+
+def test_mypy_passes_explicit_timeout(mock_server: MagicMock) -> None:
+    """An explicit timeout_seconds reaches get_mypy_prompt."""
+    run_mypy = _capture_tool(mock_server, "run_mypy_check")
+
+    with (
+        patch(
+            "mcp_tools_py.checker_tools.mypy_tool.resolve_target_directories",
+            return_value=["src"],
+        ),
+        patch(
+            "mcp_tools_py.checker_tools.mypy_tool.get_mypy_prompt",
+            return_value=None,
+        ) as mock_prompt,
+    ):
+        run_mypy(timeout_seconds=900)
+
+    assert mock_prompt.call_args[1]["timeout_seconds"] == 900
+
+
+def test_mypy_passes_default_timeout(mock_server: MagicMock) -> None:
+    """Without configuration the built-in default reaches get_mypy_prompt."""
+    run_mypy = _capture_tool(mock_server, "run_mypy_check")
+
+    with (
+        patch(
+            "mcp_tools_py.checker_tools.mypy_tool.resolve_target_directories",
+            return_value=["src"],
+        ),
+        patch(
+            "mcp_tools_py.checker_tools.mypy_tool.get_mypy_prompt",
+            return_value=None,
+        ) as mock_prompt,
+    ):
+        run_mypy()
+
+    assert mock_prompt.call_args[1]["timeout_seconds"] == 120
+
+
+def test_mypy_invalid_timeout_returns_message(mock_server: MagicMock) -> None:
+    """An invalid timeout_seconds comes back as text, and mypy is never run."""
+    run_mypy = _capture_tool(mock_server, "run_mypy_check")
+
+    with (
+        patch(
+            "mcp_tools_py.checker_tools.mypy_tool.resolve_target_directories",
+            return_value=["src"],
+        ),
+        patch(
+            "mcp_tools_py.checker_tools.mypy_tool.get_mypy_prompt",
+            return_value=None,
+        ) as mock_prompt,
+    ):
+        result = run_mypy(timeout_seconds=0)
+
+    assert "timeout_seconds" in result
+    mock_prompt.assert_not_called()
 
 
 def test_vulture_auto_detects_directories(mock_server: MagicMock) -> None:
@@ -478,4 +687,5 @@ def test_tach_success_returns_raw_output(mock_server: MagicMock) -> None:
     mock_runner.assert_called_once_with(
         tach_binary="/mock/venv/bin/tach",
         project_dir=str(Path("/fake/project")),
+        timeout_seconds=120,
     )

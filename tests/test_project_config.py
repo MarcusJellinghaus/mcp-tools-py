@@ -7,9 +7,13 @@ import textwrap
 import pytest
 
 from mcp_tools_py.utils.project_config import (
+    DEFAULT_CHECK_TIMEOUT,
+    DEFAULT_PYTEST_TIMEOUT,
     check_line_length_conflicts,
+    get_check_timeout,
     get_target_directories,
     resolve_target_directories,
+    validate_timeout,
 )
 
 
@@ -311,3 +315,160 @@ class TestCheckLineLengthConflicts:
 
         result = check_line_length_conflicts(path, ["black"])
         assert result == []
+
+
+class TestValidateTimeout:
+    """Tests for the validate_timeout function."""
+
+    def test_returns_positive_int(self) -> None:
+        """A positive integer is returned unchanged."""
+        assert validate_timeout(45, "timeout_seconds") == 45
+
+    @pytest.mark.parametrize("value", [0, -1])
+    def test_rejects_non_positive(self, value: int) -> None:
+        """Zero and negative values raise ValueError naming the source."""
+        with pytest.raises(ValueError, match="timeout_seconds"):
+            validate_timeout(value, "timeout_seconds")
+
+    @pytest.mark.parametrize("value", ["600", True, 1.5, None])
+    def test_rejects_non_int(self, value: object) -> None:
+        """Non-int values — including bool — raise ValueError."""
+        with pytest.raises(ValueError, match="positive integer"):
+            validate_timeout(value, "timeout_seconds")
+
+
+def _write_pyproject(path: str, body: str) -> None:
+    """Write *body* as pyproject.toml in *path*, dedented."""
+    with open(os.path.join(path, "pyproject.toml"), "w", encoding="utf-8") as f:
+        f.write(textwrap.dedent(body))
+
+
+class TestGetCheckTimeout:
+    """Tests for the get_check_timeout function."""
+
+    def test_no_pyproject_uses_builtin_default(self, tmp_path: object) -> None:
+        """No pyproject.toml and no CLI value falls back to 120."""
+        assert get_check_timeout(str(tmp_path), "mypy") == DEFAULT_CHECK_TIMEOUT
+
+    def test_no_pyproject_pytest_uses_pytest_default(self, tmp_path: object) -> None:
+        """pytest has its own built-in default of 300."""
+        assert get_check_timeout(str(tmp_path), "pytest") == DEFAULT_PYTEST_TIMEOUT
+
+    def test_cli_timeout_beats_builtin(self, tmp_path: object) -> None:
+        """A CLI value is used when no config key is present."""
+        assert get_check_timeout(str(tmp_path), "mypy", cli_timeout=45) == 45
+
+    def test_cli_timeout_beats_pytest_builtin(self, tmp_path: object) -> None:
+        """The CLI value also overrides pytest's higher built-in."""
+        assert get_check_timeout(str(tmp_path), "pytest", cli_timeout=45) == 45
+
+    def test_shared_key_beats_cli_timeout(self, tmp_path: object) -> None:
+        """check-timeout in pyproject.toml outranks --check-timeout."""
+        path = str(tmp_path)
+        _write_pyproject(
+            path,
+            """\
+            [tool.mcp-tools-py]
+            check-timeout = 200
+            """,
+        )
+        assert get_check_timeout(path, "mypy", cli_timeout=45) == 200
+
+    def test_per_tool_key_beats_shared_key(self, tmp_path: object) -> None:
+        """mypy-timeout applies to mypy only; pylint gets check-timeout."""
+        path = str(tmp_path)
+        _write_pyproject(
+            path,
+            """\
+            [tool.mcp-tools-py]
+            check-timeout = 200
+            mypy-timeout = 600
+            """,
+        )
+        assert get_check_timeout(path, "mypy") == 600
+        assert get_check_timeout(path, "pylint") == 200
+
+    def test_explicit_beats_every_configured_value(self, tmp_path: object) -> None:
+        """An explicit per-call value wins over config and CLI."""
+        path = str(tmp_path)
+        _write_pyproject(
+            path,
+            """\
+            [tool.mcp-tools-py]
+            check-timeout = 200
+            mypy-timeout = 600
+            """,
+        )
+        assert get_check_timeout(path, "mypy", explicit=90, cli_timeout=45) == 90
+
+    def test_hyphenated_tool_name_resolves(self, tmp_path: object) -> None:
+        """lint-imports-timeout is found for tool name 'lint-imports'."""
+        path = str(tmp_path)
+        _write_pyproject(
+            path,
+            """\
+            [tool.mcp-tools-py]
+            lint-imports-timeout = 30
+            """,
+        )
+        assert get_check_timeout(path, "lint-imports") == 30
+
+    def test_unknown_key_ignored(self, tmp_path: object) -> None:
+        """An unrecognised key in the section does not affect resolution."""
+        path = str(tmp_path)
+        _write_pyproject(
+            path,
+            """\
+            [tool.mcp-tools-py]
+            nonsense = 1
+            """,
+        )
+        assert get_check_timeout(path, "mypy") == DEFAULT_CHECK_TIMEOUT
+
+    def test_section_not_a_table_treated_as_absent(self, tmp_path: object) -> None:
+        """A non-table [tool] value for the section falls back to defaults."""
+        path = str(tmp_path)
+        _write_pyproject(
+            path,
+            """\
+            [tool]
+            mcp-tools-py = "nope"
+            """,
+        )
+        assert get_check_timeout(path, "mypy") == DEFAULT_CHECK_TIMEOUT
+
+    @pytest.mark.parametrize("value", [0, -1])
+    def test_invalid_explicit_raises(self, tmp_path: object, value: int) -> None:
+        """An invalid explicit value raises ValueError mentioning it."""
+        with pytest.raises(ValueError, match="timeout_seconds"):
+            get_check_timeout(str(tmp_path), "mypy", explicit=value)
+
+    def test_invalid_cli_timeout_raises(self, tmp_path: object) -> None:
+        """An invalid CLI value raises ValueError naming --check-timeout."""
+        with pytest.raises(ValueError, match="--check-timeout"):
+            get_check_timeout(str(tmp_path), "mypy", cli_timeout=0)
+
+    @pytest.mark.parametrize("value", ["0", "-5", '"600"', "true"])
+    def test_invalid_configured_value_raises(
+        self, tmp_path: object, value: str
+    ) -> None:
+        """An invalid value under a known key raises ValueError naming the key."""
+        path = str(tmp_path)
+        _write_pyproject(
+            path,
+            f"""\
+            [tool.mcp-tools-py]
+            mypy-timeout = {value}
+            """,
+        )
+        with pytest.raises(ValueError, match="mypy-timeout"):
+            get_check_timeout(path, "mypy")
+
+    def test_malformed_pyproject_raises(self, tmp_path: object) -> None:
+        """Invalid TOML raises ValueError, not TOMLDecodeError."""
+        path = str(tmp_path)
+        with open(os.path.join(path, "pyproject.toml"), "w", encoding="utf-8") as f:
+            f.write("invalid toml {{{{")
+
+        with pytest.raises(ValueError, match="Invalid pyproject.toml"):
+            get_check_timeout(path, "mypy")

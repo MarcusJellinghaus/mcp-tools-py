@@ -71,6 +71,7 @@ def register(mcp: "FastMCPProtocol", checker_tools: "CheckerTools") -> None:
                 project_dir=str(server.project_dir),
                 target_directories=resolved,
                 extra_args=extra_args,
+                timeout_seconds=server.resolve_timeout("bandit"),
             )
 
             if result.error:

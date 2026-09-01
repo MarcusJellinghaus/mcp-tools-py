@@ -14,6 +14,28 @@ from mcp_tools_py.server import create_server
 logger = logging.getLogger(__name__)
 
 
+def _positive_timeout(value: str) -> int:
+    """Parse --check-timeout as a positive integer.
+
+    Args:
+        value: Raw command line value.
+
+    Returns:
+        The parsed timeout in seconds.
+
+    Raises:
+        argparse.ArgumentTypeError: If the value is not a positive integer.
+    """
+    message = f"--check-timeout must be a positive integer, got {value!r}"
+    try:
+        parsed = int(value)
+    except ValueError as exc:
+        raise argparse.ArgumentTypeError(message) from exc
+    if parsed <= 0:
+        raise argparse.ArgumentTypeError(message)
+    return parsed
+
+
 def parse_args() -> argparse.Namespace:
     """Parse command line arguments.
 
@@ -100,6 +122,16 @@ Examples:
         help="Timeout in seconds for rope refactoring operations (default: 120)",
     )
     parser.add_argument(
+        "--check-timeout",
+        type=_positive_timeout,
+        default=None,
+        help=(
+            "Timeout in seconds for every checker and formatter subprocess "
+            "(default: 120, pytest 300). A per-tool value in [tool.mcp-tools-py] "
+            "in the project's pyproject.toml overrides it"
+        ),
+    )
+    parser.add_argument(
         "--vulture-whitelist",
         type=str,
         default="vulture_whitelist.py",
@@ -162,6 +194,7 @@ def main() -> None:
         keep_temp_files=args.keep_temp_files,
         refactoring_timeout=args.refactoring_timeout,
         vulture_whitelist=args.vulture_whitelist,
+        check_timeout=args.check_timeout,
     )
 
     logger.info("Starting MCP server")

@@ -100,8 +100,11 @@ class TestBuildBanditCommand:
 def _writing_side_effect(output: str, return_code: int) -> Any:
     """Build an execute_command side_effect that writes ``output`` to the -o path."""
 
-    def _write(cmd: list[str], cwd: str | None = None) -> Any:
-        del cwd  # required to match execute_command's signature; intentionally unused
+    def _write(
+        cmd: list[str], cwd: str | None = None, timeout_seconds: int | None = None
+    ) -> Any:
+        # cwd/timeout_seconds match execute_command's signature; intentionally unused
+        del cwd, timeout_seconds
         out = cmd[cmd.index("-o") + 1]
         Path(out).write_text(output, encoding="utf-8")
         return make_command_result(return_code=return_code)
@@ -210,13 +213,44 @@ class TestRunBanditCheckImpl:
     @patch("os.path.isdir", return_value=True)
     @patch(f"{MODULE_PATH}.execute_command")
     def test_timeout(self, mock_exec: Any, _mock_isdir: Any) -> None:
-        mock_exec.return_value = make_command_result(timed_out=True)
+        # execute_command sets timed_out and execution_error together, so the
+        # timeout must be reported even though execution_error is populated.
+        mock_exec.return_value = make_command_result(
+            timed_out=True,
+            execution_error="Process timed out after 45 seconds",
+        )
 
-        result = run_bandit_check_impl("/usr/bin/bandit", "/project", ["src"])
+        result = run_bandit_check_impl(
+            "/usr/bin/bandit", "/project", ["src"], timeout_seconds=45
+        )
 
         assert result.return_code == -1
         assert result.messages == []
-        assert result.error == "timed out"
+        assert result.error is not None
+        assert "timed out" in result.error
+        assert "45" in result.error
+
+    @patch("os.path.isdir", return_value=True)
+    @patch(f"{MODULE_PATH}.execute_command")
+    def test_forwards_timeout_seconds(self, mock_exec: Any, _mock_isdir: Any) -> None:
+        """The configured timeout reaches execute_command."""
+        mock_exec.side_effect = _writing_side_effect(_make_bandit_json(), return_code=0)
+
+        run_bandit_check_impl(
+            "/usr/bin/bandit", "/project", ["src"], timeout_seconds=45
+        )
+
+        assert mock_exec.call_args.kwargs["timeout_seconds"] == 45
+
+    @patch("os.path.isdir", return_value=True)
+    @patch(f"{MODULE_PATH}.execute_command")
+    def test_default_timeout_seconds(self, mock_exec: Any, _mock_isdir: Any) -> None:
+        """Without an explicit value the shared default is used."""
+        mock_exec.side_effect = _writing_side_effect(_make_bandit_json(), return_code=0)
+
+        run_bandit_check_impl("/usr/bin/bandit", "/project", ["src"])
+
+        assert mock_exec.call_args.kwargs["timeout_seconds"] == 120
 
     def test_invalid_project_dir(self) -> None:
         with pytest.raises(FileNotFoundError, match="not-a-real-dir"):

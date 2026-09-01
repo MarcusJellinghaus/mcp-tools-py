@@ -125,3 +125,68 @@ def test_run_vulture_passes_extra_args(mock_exec: Any) -> None:
     cmd = mock_exec.call_args[0][0]
     assert "--exclude" in cmd
     assert "migrations" in cmd
+
+
+@patch(f"{MODULE_PATH}.execute_command")
+def test_run_vulture_timeout_reports_timeout(mock_exec: Any) -> None:
+    """A killed run reports the timeout, not a false 'no output'."""
+    mock_exec.return_value = make_command_result(
+        timed_out=True, execution_error="Process timed out after 45 seconds"
+    )
+
+    result = run_vulture_check(
+        vulture_binary="/usr/bin/vulture",
+        project_dir="/project",
+        target_directories=["src"],
+        timeout_seconds=45,
+    )
+
+    assert "timed out" in result
+    assert "45" in result
+    assert "produced no output" not in result
+
+
+@patch(f"{MODULE_PATH}.execute_command")
+def test_run_vulture_execution_error_reports_failure(mock_exec: Any) -> None:
+    """An execution error is reported instead of a false 'no output'."""
+    mock_exec.return_value = make_command_result(
+        timed_out=False, execution_error="PermissionError: vulture"
+    )
+
+    result = run_vulture_check(
+        vulture_binary="/usr/bin/vulture",
+        project_dir="/project",
+        target_directories=["src"],
+    )
+
+    assert "PermissionError: vulture" in result
+    assert "produced no output" not in result
+
+
+@patch(f"{MODULE_PATH}.execute_command")
+def test_run_vulture_forwards_timeout_seconds(mock_exec: Any) -> None:
+    """The configured timeout reaches execute_command."""
+    mock_exec.return_value = make_command_result(stdout="output")
+
+    run_vulture_check(
+        vulture_binary="/usr/bin/vulture",
+        project_dir="/project",
+        target_directories=["src"],
+        timeout_seconds=45,
+    )
+
+    assert mock_exec.call_args.kwargs["timeout_seconds"] == 45
+
+
+@patch(f"{MODULE_PATH}.execute_command")
+def test_run_vulture_default_timeout_seconds(mock_exec: Any) -> None:
+    """Without an explicit value the shared default is used."""
+    mock_exec.return_value = make_command_result(stdout="output")
+
+    run_vulture_check(
+        vulture_binary="/usr/bin/vulture",
+        project_dir="/project",
+        target_directories=["src"],
+    )
+
+    assert mock_exec.call_args.kwargs["timeout_seconds"] == 120

@@ -24,6 +24,7 @@ def register(mcp: "FastMCPProtocol", checker_tools: "CheckerTools") -> None:
         markers: Optional[List[str]] = None,
         extra_args: Optional[List[str]] = None,
         env_vars: Optional[Dict[str, str]] = None,
+        timeout_seconds: Optional[int] = None,
     ) -> str:
         """Run pytest on the project code and generate smart prompts for LLMs.
 
@@ -34,6 +35,10 @@ def register(mcp: "FastMCPProtocol", checker_tools: "CheckerTools") -> None:
                        Use -v/-vv/-vvv in extra_args to control verbosity.
                        See "Flexible Test Selection" section below for common patterns.
             env_vars: Optional dictionary of environment variables for the subprocess.
+            timeout_seconds: Maximum seconds to wait for the test run. Overrides the
+                configured limit for this call. Must be a positive integer.
+                Defaults to `[tool.mcp-tools-py]` config, then `--check-timeout`,
+                then 300.
 
         Returns:
             A string containing either pytest results or a prompt for an LLM to interpret
@@ -106,6 +111,7 @@ def register(mcp: "FastMCPProtocol", checker_tools: "CheckerTools") -> None:
                 venv_path=server.venv_path,
                 keep_temp_files=server.keep_temp_files,
                 skip_default_test_folder=sanitized.has_path_args,
+                timeout_seconds=server.resolve_timeout("pytest", timeout_seconds),
             )
 
             # Always show detailed failure output

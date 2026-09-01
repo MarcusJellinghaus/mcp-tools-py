@@ -43,6 +43,7 @@ def register(mcp: "FastMCPProtocol", checker_tools: "CheckerTools") -> None:
             output = run_tach(
                 tach_binary=binary,
                 project_dir=str(server.project_dir),
+                timeout_seconds=server.resolve_timeout("tach"),
             )
             logger.info(
                 "tach check completed",
