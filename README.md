@@ -316,8 +316,8 @@ Example structured log entries:
   "level": "info",
   "event": "Starting pylint check",
   "project_dir": "/path/to/project",
-  "disable_codes": ["C0114", "C0116"],
-  "target_directories": ["src", "tests"]
+  "target_directories": ["src", "tests"],
+  "max_issues": 1
 }
 ```
 

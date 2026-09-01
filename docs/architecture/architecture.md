@@ -202,7 +202,7 @@ MCP Client       pytest_tool.py            runners.py           subprocess_runne
     │◄──────────────────│                      │                        │
 ```
 
-All checker tools follow this same pattern, each entered through its own registrar module (`checker_tools/<tool>_tool.py`) with the shared result formatters on `CheckerTools`. Pytest and bandit write a JSON report to a temporary file and parse that; the other checkers parse stdout directly.
+All checker tools follow this same pattern, each entered through its own registrar module (`checker_tools/<tool>_tool.py`). Only pylint, pytest and mypy use the shared result formatters on `CheckerTools`; the other six format through their own package's reporting (for example `bandit_tool.py` calls `format_bandit_report`). Pytest and bandit write a JSON report to a temporary file and parse that; the other checkers parse stdout directly.
 
 ### STDIO Isolation (Python Subprocess)
 
