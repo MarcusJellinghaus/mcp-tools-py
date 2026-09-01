@@ -138,101 +138,30 @@ class ToolServer:
         return python
 
     def _check_tool_availability(self) -> dict[str, bool]:
-        """Check availability of file-existence tools (lint-imports, vulture, ruff, bandit).
+        """Locate the console-script tools next to the resolved interpreter.
 
         Returns:
-            Mapping of tool name to availability flag.
+            Mapping of tool key to availability flag.
         """
         availability: dict[str, bool] = {}
+        script_dir = os.path.dirname(self._resolved_python)
 
-        # lint-imports: check via file existence (not subprocess)
-        lint_imports_available = False
-        binary: Optional[str] = None
-        if self.venv_path:
-            if os.name == "nt":
-                binary = os.path.join(self.venv_path, "Scripts", "lint-imports.exe")
+        for key, module in _TOOL_MODULES.items():
+            if module is not None:
+                # Probe group: detected lazily, on first use.
+                continue
+            path = self._script_path(key)
+            if path is not None:
+                self._tool_binaries[key] = path
             else:
-                binary = os.path.join(self.venv_path, "bin", "lint-imports")
-            lint_imports_available = os.path.exists(binary)
-        self._lint_imports_binary: Optional[str] = (
-            binary if lint_imports_available else None
-        )
-        availability["lint-imports"] = lint_imports_available
-        if not lint_imports_available:
-            logger.warning(
-                "lint-imports not found. Ensure --venv-path points to "
-                "an environment where lint-imports is installed."
-            )
-
-        # vulture: check via file existence (not subprocess)
-        vulture_available = False
-        vulture_binary: Optional[str] = None
-        if self.venv_path:
-            if os.name == "nt":
-                vulture_binary = os.path.join(self.venv_path, "Scripts", "vulture.exe")
-            else:
-                vulture_binary = os.path.join(self.venv_path, "bin", "vulture")
-            vulture_available = os.path.exists(vulture_binary)
-        self._vulture_binary: Optional[str] = (
-            vulture_binary if vulture_available else None
-        )
-        availability["vulture"] = vulture_available
-        if not vulture_available:
-            logger.warning(
-                "vulture not found. Ensure --venv-path points to "
-                "an environment where vulture is installed."
-            )
-
-        # ruff: check via file existence (not subprocess)
-        ruff_available = False
-        ruff_binary: Optional[str] = None
-        if self.venv_path:
-            if os.name == "nt":
-                ruff_binary = os.path.join(self.venv_path, "Scripts", "ruff.exe")
-            else:
-                ruff_binary = os.path.join(self.venv_path, "bin", "ruff")
-            ruff_available = os.path.exists(ruff_binary)
-        self._ruff_binary: Optional[str] = ruff_binary if ruff_available else None
-        availability["ruff"] = ruff_available
-        if not ruff_available:
-            logger.warning(
-                "ruff not found. Ensure --venv-path points to "
-                "an environment where ruff is installed."
-            )
-
-        # bandit: check via file existence (not subprocess)
-        bandit_available = False
-        bandit_binary: Optional[str] = None
-        if self.venv_path:
-            if os.name == "nt":
-                bandit_binary = os.path.join(self.venv_path, "Scripts", "bandit.exe")
-            else:
-                bandit_binary = os.path.join(self.venv_path, "bin", "bandit")
-            bandit_available = os.path.exists(bandit_binary)
-        self._bandit_binary: Optional[str] = bandit_binary if bandit_available else None
-        availability["bandit"] = bandit_available
-        if not bandit_available:
-            logger.warning(
-                "bandit not found. Ensure --venv-path points to "
-                "an environment where bandit is installed."
-            )
-
-        # tach: check via file existence (not subprocess)
-        tach_available = False
-        tach_binary: Optional[str] = None
-        if self.venv_path:
-            if os.name == "nt":
-                tach_binary = os.path.join(self.venv_path, "Scripts", "tach.exe")
-            else:
-                tach_binary = os.path.join(self.venv_path, "bin", "tach")
-            tach_available = os.path.exists(tach_binary)
-        self._tach_binary: Optional[str] = tach_binary if tach_available else None
-        availability["tach"] = tach_available
-        if not tach_available:
-            logger.warning(
-                "tach not found. Ensure --venv-path points to "
-                "an environment where tach is installed."
-            )
+                logger.warning(
+                    "%s not found in %s. Ensure --python-executable points to "
+                    "the environment where %s is installed.",
+                    key,
+                    script_dir,
+                    key,
+                )
+            availability[key] = path is not None
 
         return availability
 

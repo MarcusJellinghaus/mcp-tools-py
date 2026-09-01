@@ -19,7 +19,6 @@ def mock_server() -> MagicMock:
     server.keep_temp_files = False
     server.venv_path = "/mock/venv"
     server._resolved_python = "/usr/bin/python3"
-    server._lint_imports_binary = "/mock/venv/bin/lint-imports"
     server._tool_availability = {
         "pylint": True,
         "pytest": True,
@@ -32,10 +31,13 @@ def mock_server() -> MagicMock:
         "bandit": True,
         "tach": True,
     }
-    server._vulture_binary = "/mock/venv/bin/vulture"
-    server._ruff_binary = "/mock/venv/bin/ruff"
-    server._bandit_binary = "/mock/venv/bin/bandit"
-    server._tach_binary = "/mock/venv/bin/tach"
+    server._tool_binaries = {
+        "lint-imports": "/mock/venv/bin/lint-imports",
+        "vulture": "/mock/venv/bin/vulture",
+        "ruff": "/mock/venv/bin/ruff",
+        "bandit": "/mock/venv/bin/bandit",
+        "tach": "/mock/venv/bin/tach",
+    }
     server.vulture_whitelist = "vulture_whitelist.py"
     server._is_tool_available = lambda tool: server._tool_availability.get(tool, False)
 

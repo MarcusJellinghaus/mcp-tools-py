@@ -167,12 +167,15 @@ class TestCheckToolAvailability:
                 "tach": True,
             }
 
-    def test_all_tools_missing(self) -> None:
-        """When no venv_path is set, all file-existence tools are False."""
+    def test_all_tools_missing(self, tmp_path: Path) -> None:
+        """When no console script sits next to the interpreter, all five are False."""
         with (patch("mcp.server.fastmcp.FastMCP") as mock_fastmcp,):
             mock_fastmcp.return_value.tool.return_value = MagicMock()
 
-            server = _create_server(project_dir=Path("/project"))
+            server = _create_server(
+                project_dir=Path("/project"),
+                python_executable=_dummy_python(tmp_path),
+            )
 
             assert server._tool_availability == {
                 "lint-imports": False,
@@ -181,6 +184,7 @@ class TestCheckToolAvailability:
                 "bandit": False,
                 "tach": False,
             }
+            assert server._tool_binaries == {}
 
     def test_lint_imports_available_when_binary_exists(self) -> None:
         """When venv_path is set and lint-imports binary exists, mark available."""
@@ -195,23 +199,28 @@ class TestCheckToolAvailability:
             server = _create_server(project_dir=project_dir, venv_path="/mock/venv")
 
             assert server._tool_availability["lint-imports"] is True
-            assert server._lint_imports_binary == os.path.join(
+            assert server._tool_binaries["lint-imports"] == os.path.join(
                 "/mock/venv", "Scripts", "lint-imports.exe"
             )
             assert "vulture" in server._tool_availability
 
-    def test_lint_imports_unavailable_when_no_venv(self) -> None:
-        """When no venv_path is configured, lint-imports is unavailable."""
+    def test_lint_imports_unavailable_when_script_not_on_disk(
+        self, tmp_path: Path
+    ) -> None:
+        """When no lint-imports console script is on disk, it is unavailable."""
         with (patch("mcp.server.fastmcp.FastMCP") as mock_fastmcp,):
             mock_fastmcp.return_value.tool.return_value = MagicMock()
 
-            server = _create_server(project_dir=Path("/project"))
+            server = _create_server(
+                project_dir=Path("/project"),
+                python_executable=_dummy_python(tmp_path),
+            )
 
             assert server._tool_availability["lint-imports"] is False
-            assert server._lint_imports_binary is None
+            assert "lint-imports" not in server._tool_binaries
             assert server._tool_availability["vulture"] is False
             assert server._tool_availability["tach"] is False
-            assert server._tach_binary is None
+            assert "tach" not in server._tool_binaries
 
     def test_lint_imports_unavailable_when_binary_missing(self) -> None:
         """When venv_path is set but binary doesn't exist, mark unavailable."""
@@ -236,11 +245,11 @@ class TestCheckToolAvailability:
             server = _create_server(project_dir=project_dir, venv_path="/mock/venv")
 
             assert server._tool_availability["lint-imports"] is False
-            assert server._lint_imports_binary is None
+            assert "lint-imports" not in server._tool_binaries
             assert server._tool_availability["vulture"] is False
-            assert server._vulture_binary is None
+            assert "vulture" not in server._tool_binaries
             assert server._tool_availability["tach"] is False
-            assert server._tach_binary is None
+            assert "tach" not in server._tool_binaries
 
     def test_vulture_available_when_binary_exists(self) -> None:
         """When venv_path is set and vulture binary exists, mark available."""
@@ -255,21 +264,46 @@ class TestCheckToolAvailability:
             server = _create_server(project_dir=project_dir, venv_path="/mock/venv")
 
             assert server._tool_availability["vulture"] is True
-            assert server._vulture_binary == os.path.join(
+            assert server._tool_binaries["vulture"] == os.path.join(
                 "/mock/venv", "Scripts", "vulture.exe"
             )
 
-    def test_vulture_unavailable_when_no_venv(self) -> None:
-        """When no venv_path is configured, vulture is unavailable."""
+    def test_vulture_unavailable_when_script_not_on_disk(self, tmp_path: Path) -> None:
+        """When no vulture console script is on disk, it is unavailable."""
         with (patch("mcp.server.fastmcp.FastMCP") as mock_fastmcp,):
             mock_fastmcp.return_value.tool.return_value = MagicMock()
 
-            server = _create_server(project_dir=Path("/project"))
+            server = _create_server(
+                project_dir=Path("/project"),
+                python_executable=_dummy_python(tmp_path),
+            )
 
             assert server._tool_availability["vulture"] is False
-            assert server._vulture_binary is None
+            assert "vulture" not in server._tool_binaries
             assert server._tool_availability["tach"] is False
-            assert server._tach_binary is None
+            assert "tach" not in server._tool_binaries
+
+    def test_scripts_found_without_venv_path(self, tmp_path: Path) -> None:
+        """Detection follows the resolved interpreter, not --venv-path."""
+        python = _dummy_python(
+            tmp_path, "lint-imports", "vulture", "ruff", "bandit", "tach"
+        )
+        with patch("mcp.server.fastmcp.FastMCP") as mock_fastmcp:
+            mock_fastmcp.return_value.tool.return_value = MagicMock()
+
+            server = _create_server(
+                project_dir=Path("/project"),
+                python_executable=python,
+                venv_path=None,
+            )
+
+            suffix = ".exe" if os.name == "nt" else ""
+            script_dir = os.path.dirname(python)
+            for key in ("lint-imports", "vulture", "ruff", "bandit", "tach"):
+                assert server._tool_availability[key] is True
+                assert server._tool_binaries[key] == os.path.join(
+                    script_dir, f"{key}{suffix}"
+                )
 
 
 # ---------------------------------------------------------------------------
@@ -336,6 +370,7 @@ class TestIsToolAvailable:
                 project_dir=Path("/project"), python_executable=python
             )
             del server._tool_availability["ruff"]
+            del server._tool_binaries["ruff"]
             mock_exec.reset_mock()
 
             assert server._is_tool_available("ruff") is True
@@ -723,7 +758,7 @@ class TestToolHandlerShortCircuit:
                 "lint-imports": False,
                 "ruff": True,
             }
-            server._lint_imports_binary = "/mock/venv/bin/lint-imports"
+            server._tool_binaries = {"lint-imports": "/mock/venv/bin/lint-imports"}
 
             result = registered_tools["run_lint_imports_check"]()
 

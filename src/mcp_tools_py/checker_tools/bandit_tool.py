@@ -39,7 +39,7 @@ def register(mcp: "FastMCPProtocol", checker_tools: "CheckerTools") -> None:
             Formatted bandit report, or an error message string.
         """
         if not server._is_tool_available("bandit"):
-            binary_path = server._bandit_binary or "N/A"
+            binary_path = server._tool_binaries.get("bandit") or "N/A"
             return (
                 f"bandit is not available at {binary_path}. "
                 f"Ensure the virtual environment has bandit installed "
@@ -63,11 +63,8 @@ def register(mcp: "FastMCPProtocol", checker_tools: "CheckerTools") -> None:
                 },
             )
 
-            binary = server._bandit_binary
-            assert binary is not None  # guarded by availability check above
-
             result = run_bandit_check_impl(
-                bandit_binary=binary,
+                bandit_binary=server._tool_binaries["bandit"],
                 project_dir=str(server.project_dir),
                 target_directories=resolved,
                 extra_args=extra_args,
