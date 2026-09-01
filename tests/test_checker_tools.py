@@ -481,4 +481,5 @@ def test_tach_success_returns_raw_output(mock_server: MagicMock) -> None:
     mock_runner.assert_called_once_with(
         tach_binary="/mock/venv/bin/tach",
         project_dir=str(Path("/fake/project")),
+        timeout_seconds=120,
     )
