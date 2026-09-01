@@ -1,6 +1,6 @@
 # MCP Tools Py Architecture Documentation
 
-**Framework**: Arc42 Template | **Version**: 1.1 | **Last Updated**: 2026-03-23
+**Framework**: Arc42 Template | **Version**: 1.2 | **Last Updated**: 2026-09-01
 **Maintainer**: Marcus Jellinghaus | **Review Frequency**: On major changes
 
 ---
@@ -8,17 +8,17 @@
 ## 1. Introduction & Goals
 
 ### System Purpose
-MCP server providing automated code quality checking (pylint, pytest, mypy) and Python refactoring tools (powered by jedi and rope) for Python projects, with LLM-optimized output designed for AI-assisted development workflows.
+MCP server providing automated code quality checking (pylint, pytest, mypy, ruff, bandit, vulture, tach, import-linter), code formatting (black, isort) and Python refactoring tools (powered by jedi and rope) for Python projects, with LLM-optimized output designed for AI-assisted development workflows.
 
-**Scope:** This server covers Python projects only. Further Python-specific extensions are planned, including architecture and layering checks (vulture, tach, import-linter). Support for other languages can be provided through separate, dedicated MCP servers with similar functionality.
+**Scope:** This server covers Python projects only. Support for other languages can be provided through separate, dedicated MCP servers with similar functionality.
 
 Compared to a general-purpose bash MCP tool, this server offers a more controlled approach: only a defined set of tools can be executed, all operations are sandboxed within `project_dir`, output is size-limited to reduce context load, and behavior is transparent via open source code and detailed structured logging.
 
 ### Key Features
-- **Pylint Integration**: Static analysis with configurable rules and LLM-friendly prompts
-- **Pytest Integration**: Test execution with JSON report parsing, failure analysis, and smart detail control
-- **Mypy Integration**: Static type checking with strict mode and configurable error codes
+- **Checker Integrations**: Eight checkers exposed as nine tools — pylint, pytest, mypy, ruff (check and fix), bandit, vulture, tach, import-linter — each formatting findings as an LLM-actionable prompt
+- **Formatting**: black and isort behind a single `run_format_code` tool
 - **Refactoring Tools**: Symbol listing, reference finding, symbol/module moving, and renaming via jedi and rope
+- **Library Inspection**: `get_library_source` resolves a dotted import path to its source
 - **LLM-Optimized Output**: Results formatted as actionable prompts for AI assistants
 - **Subprocess Isolation**: STDIO isolation preventing MCP transport conflicts with Python subprocesses
 
@@ -45,9 +45,9 @@ Compared to a general-purpose bash MCP tool, this server offers a more controlle
 
 ### Dependencies
 
-**Runtime**: `mcp`, `mcp[cli]`, `pylint`, `pytest` + `pytest-json-report` + `pytest-xdist`, `mypy`, `jedi`, `rope`, `structlog` + `python-json-logger`
+**Runtime**: `mcp`, `mcp[cli]`, `pylint`, `pytest` + `pytest-json-report` + `pytest-asyncio` + `pytest-xdist`, `mypy`, `ruff`, `bandit`, `vulture`, `tach`, `import-linter`, `black`, `isort`, `jedi`, `rope`, `structlog` + `python-json-logger`, `pathspec`, `igittigitt`, `mcp-coder-utils`
 
-**Development**: `mcp-coder`, `black` + `isort`, `import-linter` + `tach`, `pycycle`, `vulture`, `pydeps`
+**Development**: `mcp-workspace`, `pycycle`, `pydeps`
 
 See `pyproject.toml` for version constraints.
 
@@ -55,32 +55,31 @@ See `pyproject.toml` for version constraints.
 - **Quality Gates**: All three checks (pylint, pytest, mypy) must pass before proceeding
 - **MCP Tool Usage**: No direct bash commands for code quality (documented in `.claude/CLAUDE.md`)
 - **Architecture Enforcement**: `tach.toml` and `.importlinter` enforce module boundaries
-- **Formatting**: Black + isort via `tools/format_all` before commits
+- **Formatting**: Black + isort via the `run_format_code` MCP tool before commits (`tools/black.bat` and `tools/iSort.bat` run them individually)
 
 ---
 
 ## 3. Context & Scope
 
 ```
-┌─────────────────┐    STDIO/MCP     ┌──────────────────┐    subprocess    ┌─────────────┐
-│   MCP Client    │◄────────────────►│  mcp-tools-py │───────────────►│  pylint     │
-│                 │                   │                   │               │  pytest     │
-│ • Claude Code   │                   │  (MCP Server)     │               │  mypy       │
-│ • Claude Desktop│                   │  8 MCP tools:     │               │             │
-│ • VSCode        │                   │  3 checker +      │               │ (subprocess │
-│ • mcp-coder     │                   │  5 refactoring    │  in-process   │  execution) │
-└─────────────────┘                   └──────────────────┘◄─────────────►┌─────────────┐
-                                                                         │  jedi/rope  │
-                                                                         │ (refactoring│
-                                                                         │  library)   │
-                                                                         └─────────────┘
-                                              │
-                                              ▼
-                                      ┌──────────────┐
-                                      │ Project Dir  │
-                                      │ (target code │
-                                      │  under test) │
-                                      └──────────────┘
+┌─────────────────┐   STDIO/MCP   ┌──────────────────┐   subprocess    ┌─────────────────┐
+│   MCP Client    │◄─────────────►│   mcp-tools-py   │────────────────►│ pylint  pytest  │
+│                 │               │                  │                 │ mypy    ruff    │
+│ • Claude Code   │               │  (MCP Server)    │                 │ bandit  vulture │
+│ • Claude Desktop│               │  17 MCP tools:   │                 │ tach    black   │
+│ • VSCode        │               │  9 checker +     │                 │ isort           │
+│ • mcp-coder     │               │  1 formatter +   │                 │ lint-imports    │
+│                 │               │  5 refactoring + │                 └─────────────────┘
+│                 │               │  2 other         │   in-process    ┌─────────────────┐
+└─────────────────┘               │                  │◄───────────────►│    jedi/rope    │
+                                  └──────────────────┘                 │  (refactoring   │
+                                           │                           │    library)     │
+                                           ▼                           └─────────────────┘
+                                   ┌──────────────┐
+                                   │ Project Dir  │
+                                   │ (target code │
+                                   │  under test) │
+                                   └──────────────┘
 ```
 
 ### Data Flow
@@ -96,7 +95,7 @@ See `pyproject.toml` for version constraints.
 
 ### Key Strategies
 - **Layered Architecture**: Strict dependency direction enforced by tach and import-linter
-- **Consistent Checker Pattern**: Each tool follows `models`/`parsers`/`reporting`/`runners` structure
+- **Consistent Checker Pattern**: Each checker package follows the same `models`/`parsers`/`reporting`/`runners` structure, using only the files its tool needs
 - **Subprocess Isolation**: File-based STDIO redirection to prevent MCP transport conflicts
 - **LLM Prompt Generation**: Results transformed into actionable prompts, not raw output
 
@@ -114,34 +113,35 @@ See `pyproject.toml` for version constraints.
 
 ```
 ┌─────────────────────────────────────────────────────┐
-│  Entry Point Layer                                   │
-│  └── mcp_tools_py.main                          │
+│  Entry Point Layer                                  │
+│  └── mcp_tools_py.main                              │
 ├─────────────────────────────────────────────────────┤
-│  Server Layer                                        │
-│  └── mcp_tools_py.server                        │
+│  Server Layer                                       │
+│  └── mcp_tools_py.server                            │
 ├─────────────────────────────────────────────────────┤
-│  Tool Implementation Layer                           │
-│  ├── mcp_tools_py.checker_tools                 │
-│  ├── mcp_tools_py.refactoring                   │
-│  ├── mcp_tools_py.code_checker_pytest           │
-│  ├── mcp_tools_py.code_checker_pylint           │
-│  ├── mcp_tools_py.code_checker_mypy             │
-│  └── mcp_tools_py.code_checker_lint_imports     │
+│  Tool Implementation Layer                          │
+│  ├── Registrars: checker_tools, formatter,          │
+│  │   refactoring, utility_tools, inspect_library    │
+│  └── Checkers: code_checker_{pytest, pylint, mypy,  │
+│      ruff, bandit, vulture, tach, lint_imports}     │
 ├─────────────────────────────────────────────────────┤
-│  Utilities Layer                                     │
-│  ├── mcp_tools_py.utils                         │
-│  └── mcp_tools_py.log_utils                     │
+│  Utilities Layer                                    │
+│  ├── mcp_tools_py.utils                             │
+│  └── mcp_tools_py.log_utils                         │
 └─────────────────────────────────────────────────────┘
 ```
 
 **Dependency Rules** (enforced by `tach.toml` and `.importlinter`):
 - Each layer may only depend on layers below it
+- `checker_tools` depends on the `code_checker_*` packages, never the reverse; the other registrars (`formatter`, `refactoring`, `utility_tools`, `inspect_library`) depend on none of them
 - Checker modules may NOT depend on each other
 - `utils` may NOT depend on any checker module or `server`
 
 ### Checker Module Pattern
 
-Each checker follows the same internal structure:
+Each checker is a package following the same internal structure. Files are present only
+when the tool needs them — simple checkers (`vulture`, `tach`, `lint_imports`) are
+`runners.py` alone.
 
 | File | Responsibility |
 |------|---------------|
@@ -149,19 +149,26 @@ Each checker follows the same internal structure:
 | `parsers.py` | Parse raw tool output into model objects |
 | `reporting.py` | Format parsed results into LLM-optimized prompts |
 | `runners.py` | Construct commands, execute subprocesses, orchestrate parse → report |
-| `utils.py` | Module-specific helpers (pytest and pylint only) |
+| `utils.py` | Module-specific helpers (optional; pytest and pylint only) |
+
+Each checker is exposed by one registrar module, `checker_tools/<tool>_tool.py`, holding a
+single `register(mcp, checker_tools)` function. `checker_tools` was a single module until
+#202 split it per tool.
 
 ### Module Overview
 
 - **`main.py`** — CLI entry point: argument parsing (`argparse`), logging setup, server creation
-- **`server.py`** — `CodeCheckerServer`: creates FastMCP instance and delegates tool registration to `CheckerTools` and `RefactoringTools`. Exposes 8 tools total (3 checker + 5 refactoring)
-- **`checker_tools.py`** — `CheckerTools`: registers the 3 checker MCP tools (`run_pylint_check`, `run_pytest_check`, `run_mypy_check`), extracted from server.py
+- **`server.py`** — `ToolServer`: creates the FastMCP instance and delegates registration to five registrars — `CheckerTools`, `FormatterTools`, `RefactoringTools`, `UtilityTools`, `InspectTools`. Exposes 17 tools total (9 checker + 1 formatter + 5 refactoring + 1 utility + 1 inspection)
+- **`checker_tools/`** — `CheckerTools`: registers the 9 checker MCP tools, one `<tool>_tool.py` module each
+- **`formatter/`** — `FormatterTools`: registers `run_format_code`; `black_runner.py` and `isort_runner.py` sequenced by `runner.py`
 - **`refactoring/`** — `RefactoringTools`: registers 5 refactoring MCP tools (`list_symbols`, `find_references`, `move_symbol`, `rename_symbol`, `move_module`) powered by jedi and rope
-- **`code_checker_pytest`** — Most complex checker: JSON report parsing, `OutputBuilder`, `show_details` logic, `ProcessResult` adapter
-- **`code_checker_pylint`** — Pylint JSON output parsing and prompt generation
-- **`code_checker_mypy`** — Mypy text output parsing and prompt generation
+- **`utility_tools.py`** — `UtilityTools`: registers `sleep`
+- **`inspect_library.py`** — `InspectTools`: registers `get_library_source`, resolving a dotted import path to its source
+- **`code_checker_*`** — eight checker packages, one per external tool (pytest, pylint, mypy, ruff, bandit, vulture, tach, lint_imports), each following the Checker Module Pattern above
+- **`code_checker_pytest`** — the most complex of them: JSON report parsing, `OutputBuilder`, `show_details` logic, `ProcessResult` adapter
 - **`utils/subprocess_runner.py`** — `execute_command()`, `CommandResult`, STDIO isolation for Python commands, cross-platform process termination
 - **`utils/file_utils.py`** — `read_file()` with encoding fallback
+- **`utils/project_config.py`** — target-directory auto-detection from `pyproject.toml`
 - **`log_utils.py`** — `setup_logging()` (console/JSON file), `@log_function_call` decorator
 
 ---
@@ -191,7 +198,7 @@ MCP Client          server.py              runners.py           subprocess_runne
     │◄──────────────────│                      │                        │
 ```
 
-All three tools (pylint, pytest, mypy) follow this same pattern. The pylint and mypy paths are simpler (no JSON report parsing).
+All checker tools follow this same pattern. Pytest and bandit write a JSON report to a temporary file and parse that; the other checkers parse stdout directly.
 
 ### STDIO Isolation (Python Subprocess)
 
