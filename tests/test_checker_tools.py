@@ -407,6 +407,50 @@ def test_pylint_resolution_error_returns_message(mock_server: MagicMock) -> None
     assert "Error resolving target directories" in result
 
 
+def test_pylint_passes_default_timeout(mock_server: MagicMock) -> None:
+    """Without configuration the built-in default reaches get_pylint_prompt."""
+    run_pylint = _capture_tool(mock_server, "run_pylint_check")
+
+    with (
+        patch(
+            "mcp_tools_py.checker_tools.pylint_tool.resolve_target_directories",
+            return_value=["src"],
+        ),
+        patch(
+            "mcp_tools_py.checker_tools.pylint_tool.get_pylint_prompt",
+            return_value=None,
+        ) as mock_prompt,
+    ):
+        run_pylint()
+
+    assert mock_prompt.call_args[1]["timeout_seconds"] == 120
+
+
+def test_pylint_invalid_timeout_returns_message(mock_server: MagicMock) -> None:
+    """An invalid configured timeout comes back as text, and pylint is never run."""
+
+    def raising_resolve_timeout(tool: str, explicit: int | None = None) -> int:
+        raise ValueError("pylint-timeout must be a positive integer, got 0")
+
+    mock_server.resolve_timeout = raising_resolve_timeout
+    run_pylint = _capture_tool(mock_server, "run_pylint_check")
+
+    with (
+        patch(
+            "mcp_tools_py.checker_tools.pylint_tool.resolve_target_directories",
+            return_value=["src"],
+        ),
+        patch(
+            "mcp_tools_py.checker_tools.pylint_tool.get_pylint_prompt",
+            return_value=None,
+        ) as mock_prompt,
+    ):
+        result = run_pylint()
+
+    assert "pylint-timeout must be a positive integer" in result
+    mock_prompt.assert_not_called()
+
+
 def test_mypy_auto_detects_directories(mock_server: MagicMock) -> None:
     """Mypy uses resolve_target_directories when no dirs are given."""
     run_mypy = _capture_tool(mock_server, "run_mypy_check")

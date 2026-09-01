@@ -134,6 +134,49 @@ class TestPylintNoModuleDetection:
         assert "some pylint subprocess error" in result.error
 
 
+class TestPylintTimeout:
+    """Test that a pylint timeout is reported as a timeout, not a generic failure."""
+
+    @patch("mcp_tools_py.code_checker_pylint.runners.execute_command")
+    def test_timeout_reported_as_timeout(self, mock_exec: Any) -> None:
+        mock_exec.return_value = make_command_result(
+            return_code=1,
+            timed_out=True,
+            execution_error="Process timed out after 5 seconds",
+        )
+        result = get_pylint_results(
+            project_dir=".",
+            python_executable=sys.executable,
+            target_directories=["src"],
+            timeout_seconds=5,
+        )
+        assert result.error is not None
+        assert "timed out" in result.error
+        assert "5 seconds" in result.error
+        assert "Process timed out after" not in result.error
+
+    @patch("mcp_tools_py.code_checker_pylint.runners.execute_command")
+    def test_explicit_timeout_forwarded(self, mock_exec: Any) -> None:
+        mock_exec.return_value = make_command_result(return_code=0, stdout="[]")
+        get_pylint_results(
+            project_dir=".",
+            python_executable=sys.executable,
+            target_directories=["src"],
+            timeout_seconds=600,
+        )
+        assert mock_exec.call_args[1]["timeout_seconds"] == 600
+
+    @patch("mcp_tools_py.code_checker_pylint.runners.execute_command")
+    def test_default_timeout_is_shared_default(self, mock_exec: Any) -> None:
+        mock_exec.return_value = make_command_result(return_code=0, stdout="[]")
+        get_pylint_results(
+            project_dir=".",
+            python_executable=sys.executable,
+            target_directories=["src"],
+        )
+        assert mock_exec.call_args[1]["timeout_seconds"] == 120
+
+
 # ---------------------------------------------------------------------------
 # Mypy runner error transparency
 # ---------------------------------------------------------------------------

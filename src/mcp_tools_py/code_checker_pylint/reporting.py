@@ -12,6 +12,7 @@ from mcp_tools_py.code_checker_pylint.models import (
 from mcp_tools_py.code_checker_pylint.runners import get_pylint_results
 from mcp_tools_py.code_checker_pylint.utils import normalize_path
 from mcp_tools_py.log_utils import log_function_call
+from mcp_tools_py.utils.project_config import DEFAULT_CHECK_TIMEOUT
 
 MAX_LOCATIONS_PER_ISSUE = 50
 
@@ -197,6 +198,7 @@ def get_pylint_prompt(
     extra_args: Optional[list[str]] = None,
     target_directories: list[str] | None = None,
     max_issues: int = 1,
+    timeout_seconds: int = DEFAULT_CHECK_TIMEOUT,
 ) -> Optional[str]:
     """Generate a prompt for fixing pylint issues based on the analysis of a project.
 
@@ -206,6 +208,7 @@ def get_pylint_prompt(
         python_executable: Path to Python interpreter to use for running pylint. Already resolved by server.
         target_directories: Optional list of directories to analyze relative to project_dir.
         max_issues: Number of issue types to show in detail (0 = stats only).
+        timeout_seconds: Maximum seconds to wait for pylint.
 
     Returns:
         A prompt string with issue details and instructions, or None if no issues were found.
@@ -221,6 +224,7 @@ def get_pylint_prompt(
         python_executable=python_executable,
         extra_args=extra_args,
         target_directories=target_directories,
+        timeout_seconds=timeout_seconds,
     )
 
     # Check if there was an error running pylint (e.g., timeout, execution failure)

@@ -7,6 +7,7 @@ from typing import List
 from mcp_tools_py.code_checker_pylint.models import PylintResult
 from mcp_tools_py.code_checker_pylint.parsers import parse_pylint_json_output
 from mcp_tools_py.log_utils import log_function_call
+from mcp_tools_py.utils.project_config import DEFAULT_CHECK_TIMEOUT
 from mcp_tools_py.utils.subprocess_runner import (
     check_tool_missing_error,
     execute_command,
@@ -22,6 +23,7 @@ def get_pylint_results(
     python_executable: str,
     extra_args: List[str] | None = None,
     target_directories: List[str] | None = None,
+    timeout_seconds: int = DEFAULT_CHECK_TIMEOUT,
 ) -> PylintResult:
     """Runs pylint on the specified project directory and returns the results.
 
@@ -32,6 +34,7 @@ def get_pylint_results(
         python_executable: Path to Python executable to use for running pylint. Already resolved by server.
         target_directories: List of directories to analyze relative to project_dir.
             Examples: ["src"], ["src", "tests"], ["mypackage", "tests"], ["."]
+        timeout_seconds: Maximum seconds to wait for pylint.
 
     Returns:
         A PylintResult object containing the results of the pylint run.
@@ -97,8 +100,17 @@ def get_pylint_results(
 
     # Execute the subprocess
     subprocess_result = execute_command(
-        command=pylint_command, cwd=project_dir, timeout_seconds=120
+        command=pylint_command, cwd=project_dir, timeout_seconds=timeout_seconds
     )
+
+    # Report a timeout as a timeout: execute_command sets execution_error too
+    if subprocess_result.timed_out:
+        return PylintResult(
+            return_code=1,
+            messages=[],
+            error=f"timed out after {timeout_seconds} seconds",
+            raw_output=None,
+        )
 
     # Handle subprocess execution errors
     if subprocess_result.execution_error:
@@ -118,14 +130,6 @@ def get_pylint_results(
             return_code=subprocess_result.return_code,
             messages=[],
             error=error_msg,
-            raw_output=None,
-        )
-
-    if subprocess_result.timed_out:
-        return PylintResult(
-            return_code=1,
-            messages=[],
-            error="Pylint execution timed out after 120 seconds",
             raw_output=None,
         )
 

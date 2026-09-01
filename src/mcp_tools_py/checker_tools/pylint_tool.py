@@ -50,6 +50,11 @@ def register(mcp: "FastMCPProtocol", checker_tools: "CheckerTools") -> None:
             return resolved
 
         try:
+            resolved_timeout = server.resolve_timeout("pylint")
+        except ValueError as exc:
+            return f"Error: {exc}"
+
+        try:
             logger.info(
                 "Starting pylint check",
                 extra={
@@ -66,6 +71,7 @@ def register(mcp: "FastMCPProtocol", checker_tools: "CheckerTools") -> None:
                 extra_args=extra_args,
                 target_directories=resolved,
                 max_issues=max_issues,
+                timeout_seconds=resolved_timeout,
             )
 
             result = checker_tools._format_pylint_result(pylint_prompt)
