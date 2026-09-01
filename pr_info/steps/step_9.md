@@ -43,9 +43,21 @@ def get_pylint_prompt(..., max_issues: int = 1,
   stderr is empty and the tool-missing check would return `None` anyway.
 - Delete the now-superseded `timed_out` block that currently follows it.
 - `reporting.py`: forward `timeout_seconds=timeout_seconds` to `get_pylint_results`.
-- `pylint_tool.py`: inside the existing `try`, add
-  `timeout_seconds=server.resolve_timeout("pylint")` to the `get_pylint_prompt(...)`
-  call.
+- `pylint_tool.py`: resolve **before** the existing `try`, next to the
+  `resolve_target_directories` call that already returns its failure as text:
+
+  ```python
+  try:
+      resolved_timeout = server.resolve_timeout("pylint")
+  except ValueError as exc:
+      return f"Error: {exc}"
+  ```
+
+  Not inside the main `try` — that one ends in `except Exception: ... raise`, so a
+  `ValueError` from an invalid `pylint-timeout` or a malformed `pyproject.toml` would
+  escape as an MCP protocol error while every other checker returns text. Same shape as
+  `mypy_tool` in step 8. The main `try` keeps re-raising real pylint failures, unchanged.
+  Inside it, pass `timeout_seconds=resolved_timeout` to `get_pylint_prompt(...)`.
 
 ## ALGORITHM
 
@@ -74,8 +86,12 @@ The runner text carries no second "Pylint" prefix. Same shape as mypy in step 8.
 - forwarding: explicit `timeout_seconds=600` reaches `execute_command`
 - default: omitted → `120`
 
-Tool wiring: `run_pylint_check()` → `get_pylint_prompt` called with
-`timeout_seconds=120` (from the step-2 fixture).
+Tool wiring:
+- `run_pylint_check()` → `get_pylint_prompt` called with `timeout_seconds=120` (from the
+  step-2 fixture)
+- a `resolve_timeout` that raises `ValueError` → `run_pylint_check()` **returns** a
+  message containing the error text; it does not raise, and `get_pylint_prompt` is never
+  called
 
 ## LLM PROMPT
 
@@ -86,8 +102,11 @@ Tool wiring: `run_pylint_check()` → `get_pylint_prompt` called with
 > current dead branch. Then add `timeout_seconds` to `get_pylint_results` (replacing the
 > hardcoded 120) and to `get_pylint_prompt`, move the `timed_out` check above the whole
 > `execution_error` block and delete the old one, keep the runner's timeout text free of
-> a second "Pylint" prefix since `get_pylint_prompt` already adds one, and pass
-> `server.resolve_timeout("pylint")` from `checker_tools/pylint_tool.py`.
+> a second "Pylint" prefix since `get_pylint_prompt` already adds one, and resolve
+> `server.resolve_timeout("pylint")` in `checker_tools/pylint_tool.py` **before** the
+> existing `try`, with its own `except ValueError` returning the message — that `try`
+> ends in `raise`, so resolving inside it would turn an invalid `pylint-timeout` into an
+> MCP protocol error instead of text. Same shape as `mypy_tool` in step 8.
 >
 > Do **not** add a `timeout_seconds` MCP tool argument — only pytest and mypy get one.
 > Then run `run_format_code`, `run_pylint_check`,

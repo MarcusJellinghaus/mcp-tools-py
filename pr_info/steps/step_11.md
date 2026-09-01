@@ -2,7 +2,10 @@
 
 One MCP tool running two programs, so two separate keys: `black-timeout` and
 `isort-timeout`. Both runners currently return `success=False` with empty output on a
-timeout — no reason given.
+timeout — no reason given. They give the same reasonless failure when `execute_command`
+sets `execution_error` without `timed_out` (the `FileNotFoundError` /
+`PermissionError` / `OSError` path, also empty stdout and stderr). Both branches are
+fixed here.
 
 black and isort are one step because the change is coupled: `formatter/runner.py`
 dispatches both through a single positional signature
@@ -69,15 +72,24 @@ if result.timed_out:
         success=False,
         files_changed=[],
     )
+if result.execution_error:
+    return FormatterResult(
+        output=f"black failed to run: {result.execution_error}",      # "isort ..." in isort_runner
+        success=False,
+        files_changed=[],
+    )
 ... existing stdout/stderr combining unchanged ...
 ```
 
-isort's branch returns before `_parse_isort_unparsable_files`, so a timeout is not
-misreported as an unparsable-file failure.
+Check `timed_out` **before** `execution_error`: `execute_command` sets both on a timeout,
+so testing `execution_error` first would shadow the timeout branch.
+
+Both branches return before `_parse_isort_unparsable_files`, so neither a killed nor a
+failed run is misreported as an unparsable-file failure.
 
 ## DATA
 
-`FormatterResult(output=<timeout message>, success=False, files_changed=[])`;
+`FormatterResult(output=<timeout or execution-error message>, success=False, files_changed=[])`;
 `unparsable_files` keeps its `default_factory=list`. `_format_results` renders the output
 under the step's `## <step>` heading, and the existing fail-fast logic still stops the
 sequence when `check_only` is False.
@@ -88,6 +100,9 @@ sequence when `check_only` is False.
 - timeout: `make_command_result(timed_out=True, execution_error="Process timed out after 5 seconds")`
   → `success is False`, `output` contains `"timed out"` and the number,
   `files_changed == []`
+- execution error: `make_command_result(execution_error="FileNotFoundError: black")`
+  with `timed_out=False` → `success is False` and `output` contains the error text, not
+  an empty string
 - forwarding: explicit `timeout_seconds=45` reaches `execute_command`
 - default: omitted → `120`
 
@@ -106,7 +121,9 @@ sequence when `check_only` is False.
 >
 > Write the tests first, setting `timed_out=True` **together with** a non-empty
 > `execution_error` as the summary requires. Then add `timeout_seconds` as the fifth
-> positional parameter of `run_black` and `run_isort` with the `timed_out` branch, add the
+> positional parameter of `run_black` and `run_isort` with the `timed_out` branch
+> followed by an `execution_error` branch — neither a killed nor a failed run may return
+> `success=False` with empty output — add the
 > `timeouts` mapping to `formatter/runner.py` with a per-step lookup at the dispatch, and
 > resolve both `"isort"` and `"black"` in `formatter/formatter_tools.py` inside its
 > existing `try`.

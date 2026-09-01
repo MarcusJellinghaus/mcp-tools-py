@@ -63,14 +63,15 @@ on a malformed `pyproject.toml` or an invalid value — following the
 including `run_tach_check` and `run_lint_imports_check`, which read no project config
 today.
 
-There is deliberately **no** `int | str` companion wrapper. Nine of the ten registrars
+There is deliberately **no** `int | str` companion wrapper. Eight of the ten registrars
 already wrap their work in a `try/except` returning an error message, so calling the
 raising function inside those existing blocks already produces the required behaviour —
-with no `isinstance` check at any of the 13 call sites. `mypy_tool` is the exception: its
-`try` re-raises, so step 8 resolves the timeout ahead of it under a three-line
-`except ValueError` that returns the message. Both tools that accept a per-call
-`timeout_seconds` therefore report an invalid value the same way — as returned text, not
-as an MCP protocol error.
+with no `isinstance` check at any of the 13 call sites. `mypy_tool` and `pylint_tool` are
+the two exceptions: both end in `except Exception: ... raise`, so a `ValueError` raised
+inside their `try` would escape as an MCP protocol error. Steps 8 and 9 therefore resolve
+the timeout **ahead of** that `try`, under a three-line `except ValueError` that returns
+the message. Every tool then reports an invalid configured value, and an invalid per-call
+`timeout_seconds`, the same way — as returned text, not as an MCP protocol error.
 
 `ToolServer.resolve_timeout(tool, explicit=None)` supplies `project_dir` and
 `check_timeout`, so a call site reads `server.resolve_timeout("tach")`, matching the
