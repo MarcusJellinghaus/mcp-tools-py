@@ -83,9 +83,9 @@ This tracks **Feature Implementation** consisting of multiple **Tasks**.
 
 ### Step 11: black and isort ([step_11.md](./steps/step_11.md))
 
-- [ ] Implementation (tests + production code)
-- [ ] Quality checks: pylint, pytest, mypy — fix all issues
-- [ ] Commit message prepared
+- [x] Implementation (tests + production code)
+- [x] Quality checks: pylint, pytest, mypy — fix all issues
+- [x] Commit message prepared
 
 ### Step 12: Documentation ([step_12.md](./steps/step_12.md))
 

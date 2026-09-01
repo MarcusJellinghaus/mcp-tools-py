@@ -4,6 +4,7 @@ from unittest.mock import MagicMock, patch
 
 from mcp_tools_py.formatter.isort_runner import run_isort
 from mcp_tools_py.utils.subprocess_runner import CommandResult
+from tests.conftest import make_command_result
 
 # Verbatim isort warning text (prefix included), with the trigger character
 # described rather than pasted: embedding a real one would make this file
@@ -151,3 +152,49 @@ def test_run_isort_unparsable_files_fail_despite_exit_zero(
         "tests\\my dir\\test_black_runner.py",
     ]
     assert result.success is False
+
+
+@patch("mcp_tools_py.formatter.isort_runner.execute_command")
+def test_run_isort_timeout_reports_reason(mock_exec: MagicMock) -> None:
+    mock_exec.return_value = make_command_result(
+        timed_out=True,
+        execution_error="Process timed out after 5 seconds",
+    )
+
+    result = run_isort("/usr/bin/python", ["src"], "/project", False, 5)
+
+    assert result.success is False
+    assert "timed out" in result.output
+    assert "5" in result.output
+    assert result.files_changed == []
+
+
+@patch("mcp_tools_py.formatter.isort_runner.execute_command")
+def test_run_isort_execution_error_reports_reason(mock_exec: MagicMock) -> None:
+    mock_exec.return_value = make_command_result(
+        execution_error="FileNotFoundError: isort",
+    )
+
+    result = run_isort("/usr/bin/python", ["src"], "/project")
+
+    assert result.success is False
+    assert "FileNotFoundError: isort" in result.output
+    assert result.files_changed == []
+
+
+@patch("mcp_tools_py.formatter.isort_runner.execute_command")
+def test_run_isort_forwards_timeout(mock_exec: MagicMock) -> None:
+    mock_exec.return_value = _make_result()
+
+    run_isort("/usr/bin/python", ["src"], "/project", False, 45)
+
+    assert mock_exec.call_args[1]["timeout_seconds"] == 45
+
+
+@patch("mcp_tools_py.formatter.isort_runner.execute_command")
+def test_run_isort_default_timeout(mock_exec: MagicMock) -> None:
+    mock_exec.return_value = _make_result()
+
+    run_isort("/usr/bin/python", ["src"], "/project")
+
+    assert mock_exec.call_args[1]["timeout_seconds"] == 120

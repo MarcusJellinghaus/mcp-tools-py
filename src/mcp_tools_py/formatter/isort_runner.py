@@ -6,6 +6,7 @@ Invokes isort as a subprocess and returns a FormatterResult.
 import re
 
 from mcp_tools_py.formatter.models import FormatterResult
+from mcp_tools_py.utils.project_config import DEFAULT_CHECK_TIMEOUT
 from mcp_tools_py.utils.subprocess_runner import execute_command
 
 _MAX_LINES = 200
@@ -65,6 +66,7 @@ def run_isort(
     target_dirs: list[str],
     project_dir: str,
     check_only: bool = False,
+    timeout_seconds: int = DEFAULT_CHECK_TIMEOUT,
 ) -> FormatterResult:
     """Run isort on target directories.
 
@@ -73,6 +75,7 @@ def run_isort(
         target_dirs: List of directories to sort imports in.
         project_dir: Root project directory (cwd for subprocess).
         check_only: If True, pass --check-only to only verify sorting.
+        timeout_seconds: Maximum seconds to wait for isort.
 
     Returns:
         FormatterResult with output, changed files, and any files isort could
@@ -83,7 +86,21 @@ def run_isort(
         command.append("--check-only")
     command.extend(target_dirs)
 
-    result = execute_command(command, cwd=project_dir)
+    result = execute_command(command, cwd=project_dir, timeout_seconds=timeout_seconds)
+
+    if result.timed_out:
+        return FormatterResult(
+            output=f"isort timed out after {timeout_seconds} seconds.",
+            success=False,
+            files_changed=[],
+        )
+
+    if result.execution_error:
+        return FormatterResult(
+            output=f"isort failed to run: {result.execution_error}",
+            success=False,
+            files_changed=[],
+        )
 
     output_parts: list[str] = []
     if result.stdout:

@@ -129,3 +129,33 @@ class TestCheckOnlyForwarded:
 
         for call in fake.call_args_list:
             assert call[0][3] is True  # check_only positional arg
+
+
+class TestTimeouts:
+    """Per-step timeout budgets."""
+
+    def test_each_step_receives_its_own_timeout(self) -> None:
+        fake_isort = MagicMock(return_value=_make_result())
+        fake_black = MagicMock(return_value=_make_result())
+
+        runners = {"isort": fake_isort, "black": fake_black}
+        with pytest.MonkeyPatch.context() as mp:
+            mp.setattr("mcp_tools_py.formatter.runner._STEP_RUNNERS", runners)
+            run_format_code(
+                _PYTHON, _PROJECT, _DIRS, timeouts={"isort": 30, "black": 90}
+            )
+
+        assert fake_isort.call_args[0][4] == 30
+        assert fake_black.call_args[0][4] == 90
+
+    def test_missing_timeouts_use_default(self) -> None:
+        fake_isort = MagicMock(return_value=_make_result())
+        fake_black = MagicMock(return_value=_make_result())
+
+        runners = {"isort": fake_isort, "black": fake_black}
+        with pytest.MonkeyPatch.context() as mp:
+            mp.setattr("mcp_tools_py.formatter.runner._STEP_RUNNERS", runners)
+            run_format_code(_PYTHON, _PROJECT, _DIRS)
+
+        assert fake_isort.call_args[0][4] == 120
+        assert fake_black.call_args[0][4] == 120

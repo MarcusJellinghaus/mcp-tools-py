@@ -4,6 +4,7 @@ from unittest.mock import MagicMock, patch
 
 from mcp_tools_py.formatter.black_runner import run_black
 from mcp_tools_py.utils.subprocess_runner import CommandResult
+from tests.conftest import make_command_result
 
 
 def _make_result(
@@ -121,3 +122,49 @@ def test_run_black_no_files_changed(mock_exec: MagicMock) -> None:
     result = run_black("/usr/bin/python", ["src"], "/project")
 
     assert result.files_changed == []
+
+
+@patch("mcp_tools_py.formatter.black_runner.execute_command")
+def test_run_black_timeout_reports_reason(mock_exec: MagicMock) -> None:
+    mock_exec.return_value = make_command_result(
+        timed_out=True,
+        execution_error="Process timed out after 5 seconds",
+    )
+
+    result = run_black("/usr/bin/python", ["src"], "/project", False, 5)
+
+    assert result.success is False
+    assert "timed out" in result.output
+    assert "5" in result.output
+    assert result.files_changed == []
+
+
+@patch("mcp_tools_py.formatter.black_runner.execute_command")
+def test_run_black_execution_error_reports_reason(mock_exec: MagicMock) -> None:
+    mock_exec.return_value = make_command_result(
+        execution_error="FileNotFoundError: black",
+    )
+
+    result = run_black("/usr/bin/python", ["src"], "/project")
+
+    assert result.success is False
+    assert "FileNotFoundError: black" in result.output
+    assert result.files_changed == []
+
+
+@patch("mcp_tools_py.formatter.black_runner.execute_command")
+def test_run_black_forwards_timeout(mock_exec: MagicMock) -> None:
+    mock_exec.return_value = _make_result()
+
+    run_black("/usr/bin/python", ["src"], "/project", False, 45)
+
+    assert mock_exec.call_args[1]["timeout_seconds"] == 45
+
+
+@patch("mcp_tools_py.formatter.black_runner.execute_command")
+def test_run_black_default_timeout(mock_exec: MagicMock) -> None:
+    mock_exec.return_value = _make_result()
+
+    run_black("/usr/bin/python", ["src"], "/project")
+
+    assert mock_exec.call_args[1]["timeout_seconds"] == 120

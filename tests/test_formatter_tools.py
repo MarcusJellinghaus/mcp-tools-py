@@ -263,6 +263,26 @@ class TestOutput:
         assert result.index(paths[0]) < result.index("raw isort output")
 
 
+class TestTimeouts:
+    """Tests for timeout resolution."""
+
+    def test_resolved_timeouts_passed_to_runner(self, mock_server: MagicMock) -> None:
+        """Both black and isort budgets are resolved and forwarded."""
+        run_format = _capture_run_format_code(mock_server)
+
+        mock_runner = MagicMock(
+            return_value={
+                "isort": _make_formatter_result(),
+                "black": _make_formatter_result(),
+            }
+        )
+
+        with patch(_RUNNER_PATCH, mock_runner):
+            run_format(target_directories=["src"])
+
+        assert mock_runner.call_args[1]["timeouts"] == {"isort": 120, "black": 120}
+
+
 class TestToolAvailability:
     """Tests for tool availability checking."""
 

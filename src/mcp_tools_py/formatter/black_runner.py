@@ -4,6 +4,7 @@ Invokes black as a subprocess and returns a FormatterResult.
 """
 
 from mcp_tools_py.formatter.models import FormatterResult
+from mcp_tools_py.utils.project_config import DEFAULT_CHECK_TIMEOUT
 from mcp_tools_py.utils.subprocess_runner import execute_command
 
 _MAX_LINES = 200
@@ -48,6 +49,7 @@ def run_black(
     target_dirs: list[str],
     project_dir: str,
     check_only: bool = False,
+    timeout_seconds: int = DEFAULT_CHECK_TIMEOUT,
 ) -> FormatterResult:
     """Run black on target directories.
 
@@ -56,6 +58,7 @@ def run_black(
         target_dirs: List of directories to format.
         project_dir: Root project directory (cwd for subprocess).
         check_only: If True, pass --check to only verify formatting.
+        timeout_seconds: Maximum seconds to wait for black.
 
     Returns:
         FormatterResult with output, success status, and changed files.
@@ -65,7 +68,21 @@ def run_black(
         command.append("--check")
     command.extend(target_dirs)
 
-    result = execute_command(command, cwd=project_dir)
+    result = execute_command(command, cwd=project_dir, timeout_seconds=timeout_seconds)
+
+    if result.timed_out:
+        return FormatterResult(
+            output=f"black timed out after {timeout_seconds} seconds.",
+            success=False,
+            files_changed=[],
+        )
+
+    if result.execution_error:
+        return FormatterResult(
+            output=f"black failed to run: {result.execution_error}",
+            success=False,
+            files_changed=[],
+        )
 
     output_parts: list[str] = []
     if result.stdout:
