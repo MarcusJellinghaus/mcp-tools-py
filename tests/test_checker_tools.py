@@ -286,6 +286,28 @@ def test_lint_imports_passes_resolved_timeout(mock_server: MagicMock) -> None:
     assert mock_runner.call_args[0][3] == 120
 
 
+# --- Bandit handler tests ---
+
+
+def test_bandit_passes_resolved_timeout(mock_server: MagicMock) -> None:
+    """The resolved timeout is passed to run_bandit_check_impl."""
+    run_bandit = _capture_tool(mock_server, "run_bandit_check")
+
+    with (
+        patch(
+            "mcp_tools_py.checker_tools.bandit_tool.run_bandit_check_impl",
+        ) as mock_runner,
+        patch(
+            "mcp_tools_py.checker_tools.bandit_tool.resolve_target_directories",
+            return_value=["src"],
+        ),
+    ):
+        mock_runner.return_value.error = None
+        run_bandit()
+
+    assert mock_runner.call_args[1]["timeout_seconds"] == 120
+
+
 # --- Auto-detection tests ---
 
 

@@ -9,6 +9,7 @@ from pathlib import Path
 from mcp_tools_py.code_checker_bandit.models import BanditResult
 from mcp_tools_py.code_checker_bandit.parsers import parse_bandit_json_output
 from mcp_tools_py.log_utils import log_function_call
+from mcp_tools_py.utils.project_config import DEFAULT_CHECK_TIMEOUT
 from mcp_tools_py.utils.subprocess_runner import execute_command
 
 logger = logging.getLogger(__name__)
@@ -38,12 +39,20 @@ def run_bandit_check_impl(
     project_dir: str,
     target_directories: list[str],
     extra_args: list[str] | None = None,
+    timeout_seconds: int = DEFAULT_CHECK_TIMEOUT,
 ) -> BanditResult:
     """Run bandit and return structured result.
 
     Bandit writes its JSON report to a temp file via ``-o <file>``; the report
     is read back from that file rather than stdout, so a Rich progress bar on
     stdout cannot corrupt the parsed output.
+
+    Args:
+        bandit_binary: Path to the bandit executable.
+        project_dir: Directory to run bandit in.
+        target_directories: Directories to analyze.
+        extra_args: Additional bandit CLI flags.
+        timeout_seconds: Maximum seconds to wait for bandit.
 
     Returns:
         BanditResult with parsed messages, file errors, or execution error.
@@ -60,7 +69,15 @@ def run_bandit_check_impl(
         cmd = _build_bandit_command(
             bandit_binary, target_directories, output_file, extra_args
         )
-        result = execute_command(cmd, cwd=project_dir)
+        result = execute_command(cmd, cwd=project_dir, timeout_seconds=timeout_seconds)
+
+        if result.timed_out:
+            return BanditResult(
+                return_code=-1,
+                messages=[],
+                errors=[],
+                error=f"timed out after {timeout_seconds} seconds",
+            )
 
         if result.execution_error:
             return BanditResult(
@@ -68,11 +85,6 @@ def run_bandit_check_impl(
                 messages=[],
                 errors=[],
                 error=str(result.execution_error),
-            )
-
-        if result.timed_out:
-            return BanditResult(
-                return_code=-1, messages=[], errors=[], error="timed out"
             )
 
         if result.return_code > 1:
