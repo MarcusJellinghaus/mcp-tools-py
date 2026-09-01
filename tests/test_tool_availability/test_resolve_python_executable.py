@@ -76,6 +76,25 @@ class TestResolvePythonExecutable:
                     python_executable="/no/such/python3.11",
                 )
 
+    def test_bare_name_resolved_on_path(self) -> None:
+        """A name without a directory part is looked up on PATH."""
+        with (
+            patch("mcp.server.fastmcp.FastMCP") as mock_fastmcp,
+            patch("mcp_tools_py.server.execute_command") as mock_exec,
+            patch(
+                "mcp_tools_py.server.shutil.which", return_value="/usr/bin/python3"
+            ) as mock_which,
+        ):
+            mock_fastmcp.return_value.tool.return_value = MagicMock()
+            mock_exec.return_value = make_command_result(return_code=0, stdout="ok")
+
+            server = _create_server(
+                project_dir=Path("/project"), python_executable="python3"
+            )
+
+            assert server._resolved_python == "/usr/bin/python3"
+            mock_which.assert_called_once_with("python3")
+
     def test_python_executable_fallback(self) -> None:
         """When no venv_path but python_executable is set, use it directly."""
         with (

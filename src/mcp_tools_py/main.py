@@ -67,9 +67,12 @@ Examples:
         "--python-executable",
         type=str,
         help=(
-            "Path to Python interpreter for running pytest, pylint, and mypy. "
-            "Should point to the environment where these tools are installed "
-            "(the tool's own venv), not the project's runtime venv. "
+            "Path to the Python interpreter that runs the checker tools. "
+            "pytest, pylint, mypy, black and isort run through it, while ruff, "
+            "bandit, vulture, tach and lint-imports are located next to it, so "
+            "it should point to the environment where they are installed (the "
+            "tool's own venv), not the project's runtime venv. A path that "
+            "neither exists nor resolves on PATH fails at startup. "
             "Defaults to the current Python interpreter (sys.executable)"
         ),
     )

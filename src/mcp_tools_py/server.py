@@ -2,6 +2,7 @@
 
 import logging
 import os
+import shutil
 import sys
 from pathlib import Path
 from typing import Callable, Optional, Protocol, TypeVar
@@ -117,11 +118,16 @@ class ToolServer:
     def _resolve_python_executable(self) -> str:
         """Centralize venv -> python_executable -> sys.executable resolution.
 
+        A name without a directory part is looked up on PATH, so
+        `--python-executable python3` resolves to the interpreter a subprocess
+        would have started.
+
         Returns:
             Path to the Python interpreter to use for tool subprocesses.
 
         Raises:
-            FileNotFoundError: If the resolved interpreter does not exist.
+            FileNotFoundError: If the resolved interpreter neither exists nor
+                is found on PATH.
         """
         if self.venv_path:
             if os.name == "nt":
@@ -135,9 +141,12 @@ class ToolServer:
             python, source = sys.executable, "sys.executable"
 
         if not os.path.exists(python):
-            raise FileNotFoundError(
-                f"Python interpreter not found: {python} (from {source})"
-            )
+            on_path = shutil.which(python)
+            if on_path is None:
+                raise FileNotFoundError(
+                    f"Python interpreter not found: {python} (from {source})"
+                )
+            return on_path
         return python
 
     def _check_tool_availability(self) -> dict[str, bool]:
@@ -225,19 +234,19 @@ class ToolServer:
         self._tool_availability[tool_name] = available
         return available
 
-    def tool_unavailable_message(self, key: str, package: Optional[str] = None) -> str:
+    def tool_unavailable_message(self, key: str) -> str:
         """Build the standard "tool not available" message for `key`.
 
         Args:
             key: Tool key as used in `_tool_availability`.
-            package: Distribution name to tell the user to install. Defaults to
-                `_TOOL_PACKAGES`, which maps a key to its distribution when the
-                two differ (import-linter provides `lint-imports`).
 
         Returns:
             A message naming --python-executable and the location searched.
+            The distribution to install comes from `_TOOL_PACKAGES`, which maps
+            a key to its distribution when the two differ (import-linter
+            provides `lint-imports`).
         """
-        name = package or _TOOL_PACKAGES.get(key, key)
+        name = _TOOL_PACKAGES.get(key, key)
         if _TOOL_MODULES.get(key) is None:
             searched = os.path.dirname(self._resolved_python)
             return (

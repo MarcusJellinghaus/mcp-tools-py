@@ -45,22 +45,18 @@ class TestToolUnavailableMessage:
         assert "--venv-path" not in message
 
     def test_lint_imports_message_names_import_linter(self, tmp_path: Path) -> None:
-        """The package override names the distribution, not the tool."""
-        server = self._server(tmp_path)
-
-        message = server.tool_unavailable_message(
-            "lint-imports", package="import-linter"
-        )
-
-        assert "lint-imports is not available" in message
-        assert "import-linter is installed" in message
-
-    def test_lint_imports_package_defaults_without_override(
-        self, tmp_path: Path
-    ) -> None:
-        """The distribution name is looked up when no override is passed."""
+        """The package map names the distribution, not the tool."""
         server = self._server(tmp_path)
 
         message = server.tool_unavailable_message("lint-imports")
 
+        assert "lint-imports is not available" in message
         assert "import-linter is installed" in message
+
+    def test_unmapped_tool_installs_under_its_own_name(self, tmp_path: Path) -> None:
+        """A tool absent from the package map is installed under its key."""
+        server = self._server(tmp_path)
+
+        message = server.tool_unavailable_message("ruff")
+
+        assert "ruff is installed" in message

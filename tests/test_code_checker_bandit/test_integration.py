@@ -18,7 +18,7 @@ def _make_mock_server(bandit_available: bool = True) -> MagicMock:
     )
     server._tool_availability = {"bandit": bandit_available}
     server._is_tool_available = lambda tool: server._tool_availability.get(tool, False)
-    server.tool_unavailable_message = lambda key, package=None: (
+    server.tool_unavailable_message = lambda key: (
         f"{key} is not available in /mock/venv/bin. "
         "Restart the server after installing."
     )

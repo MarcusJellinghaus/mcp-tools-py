@@ -100,7 +100,7 @@ mcp-tools-py --project-dir /path/to/project [options]
 #### Python Configuration
 | Parameter | Type | Default | Description |
 |-----------|------|---------|-------------|
-| `--python-executable` | string | sys.executable | Path to the Python interpreter that runs the checker tools. Should point to the environment where they are installed (the tool's own venv), not the project's runtime venv. Must exist: a path that does not resolve fails at startup |
+| `--python-executable` | string | sys.executable | Path to the Python interpreter that runs the checker tools. Should point to the environment where they are installed (the tool's own venv), not the project's runtime venv. A bare name is looked up on PATH; a path that neither exists nor resolves fails at startup |
 | `--venv-path` | string | None | **Deprecated**, hidden from `--help`. Still accepted, and still resolves the interpreter (taking precedence over `--python-executable`), but no longer used to locate tools. Use `--python-executable` instead |
 
 #### Test Configuration
@@ -134,7 +134,7 @@ mcp-tools-py --project-dir /path/to/project [options]
 
 `--python-executable` must point to the environment where **the checker tools are installed** — pytest, pylint, mypy, black and isort are run through that interpreter, while ruff, bandit, vulture, tach and lint-imports are console scripts located next to it. This is typically the tool's own virtual environment, not your project's runtime venv.
 
-Both examples below build that path by interpolating an environment variable, so an unset or stale variable leaves `--python-executable` pointing nowhere. The server then fails at startup with a `FileNotFoundError` naming the flag, rather than starting up and reporting every tool as missing.
+The first example below builds that path by interpolating an environment variable, so an unset or stale variable leaves `--python-executable` pointing nowhere. The server then fails at startup with a `FileNotFoundError` naming the flag, rather than starting up and reporting every tool as missing. A bare interpreter name such as `python3` is looked up on PATH instead.
 
 ### Correct Configuration
 
