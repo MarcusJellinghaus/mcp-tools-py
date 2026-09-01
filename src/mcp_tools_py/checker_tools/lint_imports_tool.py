@@ -51,6 +51,7 @@ def register(mcp: "FastMCPProtocol", checker_tools: "CheckerTools") -> None:
                 binary,
                 str(server.project_dir),
                 extra_args,
+                server.resolve_timeout("lint-imports"),
             )
         except Exception as e:
             error_msg = (

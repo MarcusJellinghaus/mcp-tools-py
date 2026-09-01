@@ -270,6 +270,22 @@ def test_vulture_passes_resolved_timeout(mock_server: MagicMock) -> None:
     assert mock_runner.call_args[1]["timeout_seconds"] == 120
 
 
+# --- Lint-imports handler tests ---
+
+
+def test_lint_imports_passes_resolved_timeout(mock_server: MagicMock) -> None:
+    """The resolved timeout is passed to run_lint_imports_check_impl."""
+    run_lint_imports = _capture_tool(mock_server, "run_lint_imports_check")
+
+    with patch(
+        "mcp_tools_py.checker_tools.lint_imports_tool.run_lint_imports_check_impl",
+        return_value="=== PASSED ===",
+    ) as mock_runner:
+        run_lint_imports()
+
+    assert mock_runner.call_args[0][3] == 120
+
+
 # --- Auto-detection tests ---
 
 

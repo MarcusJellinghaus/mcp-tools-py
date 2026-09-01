@@ -4,6 +4,7 @@ import logging
 import re
 
 from mcp_tools_py.log_utils import log_function_call
+from mcp_tools_py.utils.project_config import DEFAULT_CHECK_TIMEOUT
 from mcp_tools_py.utils.subprocess_runner import execute_command
 
 logger = logging.getLogger(__name__)
@@ -174,11 +175,18 @@ def run_lint_imports_check_impl(
     lint_imports_binary: str,
     project_dir: str,
     extra_args: list[str] | None = None,
+    timeout_seconds: int = DEFAULT_CHECK_TIMEOUT,
 ) -> str:
     """Run lint-imports and return an LLM-optimised structured report.
 
     The first non-empty line is always either an info line (when flags
     were stripped) or the state header. Truncation cannot hide it.
+
+    Args:
+        lint_imports_binary: Path to the lint-imports executable.
+        project_dir: Directory to run lint-imports in.
+        extra_args: Additional lint-imports arguments.
+        timeout_seconds: Maximum seconds to wait for lint-imports.
 
     Returns:
         Structured report (state header + summary + raw output, capped).
@@ -187,7 +195,12 @@ def run_lint_imports_check_impl(
     info_line = "[Info: stripped --verbose/-v from extra_args]" if stripped else None
 
     command = [lint_imports_binary] + cleaned_args
-    result = execute_command(command, cwd=project_dir)
+    result = execute_command(command, cwd=project_dir, timeout_seconds=timeout_seconds)
+
+    if result.timed_out:
+        return f"=== ERROR: lint-imports timed out after {timeout_seconds} seconds ==="
+    if result.execution_error:
+        return f"=== ERROR: lint-imports failed to run: {result.execution_error} ==="
 
     combined = "\n".join(s for s in (result.stdout, result.stderr) if s)
 
