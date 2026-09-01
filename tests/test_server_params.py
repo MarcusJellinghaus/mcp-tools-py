@@ -83,6 +83,7 @@ async def test_run_pytest_check_parameters(mock_project_dir: Path) -> None:
             venv_path=None,
             keep_temp_files=True,  # From server constructor
             skip_default_test_folder=False,
+            timeout_seconds=300,  # Built-in pytest default
         )
 
         # Verify the result is properly formatted
@@ -779,3 +780,54 @@ class TestResolveTimeout:
         server = _make_server(Path("/test/project"), check_timeout=45)
 
         assert server.resolve_timeout("mypy", 90) == 90
+
+
+def _capture_pytest_tool() -> Any:
+    """Register the checker tools and return the run_pytest_check tool.
+
+    Returns:
+        The registered run_pytest_check function.
+    """
+    with patch("mcp.server.fastmcp.FastMCP") as mock_fastmcp:
+        mock_tool = MagicMock()
+        mock_fastmcp.return_value.tool.return_value = mock_tool
+
+        from mcp_tools_py.server import ToolServer
+
+        with patch.object(ToolServer, "_check_tool_availability", return_value={}):
+            server = ToolServer(project_dir=Path("/fake/project/dir"))
+            server._is_tool_available = lambda tool_name: True  # type: ignore[method-assign]
+
+    return _get_tool(mock_tool, "run_pytest_check")
+
+
+class TestPytestTimeoutArgument:
+    """Tests for the run_pytest_check timeout_seconds argument."""
+
+    def test_explicit_timeout_reaches_the_runner(self) -> None:
+        """An explicit timeout_seconds reaches check_code_with_pytest."""
+        run_pytest_check = _capture_pytest_tool()
+
+        with patch(
+            "mcp_tools_py.checker_tools.pytest_tool.check_code_with_pytest"
+        ) as mock_check_pytest:
+            mock_check_pytest.return_value = {
+                "success": True,
+                "summary": {"passed": 1, "failed": 0, "error": 0},
+                "test_results": MagicMock(),
+            }
+            run_pytest_check(timeout_seconds=900)
+
+        assert mock_check_pytest.call_args[1]["timeout_seconds"] == 900
+
+    def test_invalid_timeout_returns_message(self) -> None:
+        """An invalid timeout_seconds comes back as text, and pytest is never run."""
+        run_pytest_check = _capture_pytest_tool()
+
+        with patch(
+            "mcp_tools_py.checker_tools.pytest_tool.check_code_with_pytest"
+        ) as mock_check_pytest:
+            result = run_pytest_check(timeout_seconds=0)
+
+        assert "timeout_seconds" in result
+        mock_check_pytest.assert_not_called()

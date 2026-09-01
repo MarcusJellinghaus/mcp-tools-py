@@ -221,13 +221,8 @@ def run_tests(
                 subprocess_result.return_code,
             )
 
-            # Handle subprocess execution errors
-            if subprocess_result.execution_error:
-                detail = _build_error_detail(
-                    subprocess_result.stdout, subprocess_result.stderr
-                )
-                raise RuntimeError(f"{subprocess_result.execution_error}{detail}")
-
+            # Handle subprocess execution errors — a timeout also sets
+            # execution_error, so it must be checked first.
             if subprocess_result.timed_out:
                 logger.warning(
                     "Command timed out after %s seconds: %s",
@@ -238,8 +233,15 @@ def run_tests(
                     subprocess_result.stdout, subprocess_result.stderr
                 )
                 raise TimeoutError(
-                    f"Subprocess timed out: {' '.join(command)}.{detail}"
+                    f"Subprocess timed out after {timeout_seconds} seconds: "
+                    f"{' '.join(command)}.{detail}"
                 )
+
+            if subprocess_result.execution_error:
+                detail = _build_error_detail(
+                    subprocess_result.stdout, subprocess_result.stderr
+                )
+                raise RuntimeError(f"{subprocess_result.execution_error}{detail}")
 
             process = ProcessResult(
                 subprocess_result.return_code,
@@ -306,7 +308,8 @@ def run_tests(
                             retry_result.stdout, retry_result.stderr
                         )
                         raise TimeoutError(
-                            "Timed out while retrying the test after installing "
+                            f"Timed out after {timeout_seconds} seconds while "
+                            "retrying the test after installing "
                             f"pytest-json-report.{detail}"
                         )
 
