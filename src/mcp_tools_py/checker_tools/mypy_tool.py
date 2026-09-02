@@ -21,7 +21,6 @@ def register(mcp: "FastMCPProtocol", checker_tools: "CheckerTools") -> None:
     @mcp.tool()
     @log_function_call
     def run_mypy_check(
-        strict: bool = True,
         disable_error_codes: list[str] | None = None,
         target_directories: list[str] | None = None,
         follow_imports: str | None = None,
@@ -30,10 +29,11 @@ def register(mcp: "FastMCPProtocol", checker_tools: "CheckerTools") -> None:
     ) -> str:
         """Run mypy type checking on the project code.
 
+        mypy reads the project's `[tool.mypy]` configuration; the server adds only
+        output-formatting flags. A project with no mypy config is checked at mypy's
+        defaults and will report "passed".
+
         Args:
-            strict: Use strict mode settings (default: True).
-                When True, applies comprehensive type checking with flags like
-                --strict, --warn-redundant-casts, --warn-unused-ignores, etc.
             disable_error_codes: Optional list of mypy error codes to ignore.
                 Common codes to disable:
                 - 'import': Import-related errors
@@ -45,9 +45,11 @@ def register(mcp: "FastMCPProtocol", checker_tools: "CheckerTools") -> None:
                 Auto-detected from pyproject.toml when None. For example:
                 ["src"] (source only), ["src", "tests"] (both),
                 ["mypackage"] (custom package), ["."] (entire project).
-            follow_imports: How to handle imports during type checking.
+            follow_imports: How to handle imports during type checking. Nothing is
+                sent by default and the project's `[tool.mypy]` decides; supplying a
+                value overrides it for this call and splits the mypy cache.
                 Options:
-                - 'normal' (default): Follow and type check imported modules
+                - 'normal': Follow and type check imported modules
                 - 'silent': Follow imports but suppress errors in imported modules
                 - 'skip': Don't follow imports, only check specified files
                 - 'error': Error if imports cannot be followed
@@ -81,7 +83,6 @@ def register(mcp: "FastMCPProtocol", checker_tools: "CheckerTools") -> None:
                 "Starting mypy check",
                 extra={
                     "project_dir": str(server.project_dir),
-                    "strict": strict,
                     "disable_error_codes": disable_error_codes,
                     "target_directories": resolved,
                 },
@@ -91,7 +92,6 @@ def register(mcp: "FastMCPProtocol", checker_tools: "CheckerTools") -> None:
             mypy_prompt = get_mypy_prompt(
                 str(server.project_dir),
                 python_executable=server._resolved_python,
-                strict=strict,
                 disable_error_codes=disable_error_codes,
                 target_directories=resolved,
                 follow_imports=follow_imports,

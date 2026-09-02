@@ -1,7 +1,7 @@
 name: Upstream mypy check
 
 # Triggered by repository_dispatch when mcp-coder-utils' main branch changes.
-# Runs mypy --strict against this repo with the latest mcp-coder-utils from main.
+# Runs mypy against this repo with the latest mcp-coder-utils from main.
 # On failure: standard GitHub Actions email + red icon in the Actions tab.
 
 on:
@@ -34,5 +34,5 @@ jobs:
             "mcp-coder-utils @ git+https://github.com/MarcusJellinghaus/mcp-coder-utils.git" \
             ".[typecheck]"
 
-      - name: Run mypy --strict
-        run: mypy --strict src tests
+      - name: Run mypy
+        run: mypy src tests

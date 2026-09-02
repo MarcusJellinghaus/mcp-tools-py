@@ -182,19 +182,19 @@ state without relying on git.
 
 ## Test 3: `run_mypy_check`
 
-### 3a — Strict mode (default)
+### 3a — Default (project config decides)
 
 | Field | Value |
 |-------|-------|
 | **Call** | `run_mypy_check(target_directories=["tests/mcp_tools_py_manual/sample_project"])` |
-| **Expected** | Strict type checking on sample project. Reports any type issues. |
+| **Expected** | Type checking at this repo's `[tool.mypy]` settings. Reports any type issues. |
 
-### 3b — Non-strict
+### 3b — Config-driven strictness
 
 | Field | Value |
 |-------|-------|
-| **Call** | `run_mypy_check(strict=False, target_directories=["tests/mcp_tools_py_manual/sample_project"])` |
-| **Expected** | Relaxed checking. Fewer or no errors compared to strict. |
+| **Call** | Comment out `strict = true` in this repo's `[tool.mypy]`, re-run the 3a call, then restore it |
+| **Expected** | Fewer or no errors than 3a — the server sends no strictness flags of its own. |
 
 ### 3c — Disable specific error codes
 

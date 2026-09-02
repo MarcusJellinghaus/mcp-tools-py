@@ -15,47 +15,27 @@ from mcp_tools_py.utils.subprocess_runner import (
 
 logger = logging.getLogger(__name__)
 
-# Default strict flags from tools/mypy.bat
-STRICT_FLAGS = [
-    "--strict",
-    "--warn-redundant-casts",
-    "--warn-unused-ignores",
-    "--warn-unreachable",
-    "--disallow-any-generics",
-    "--disallow-untyped-defs",
-    "--disallow-incomplete-defs",
-    "--check-untyped-defs",
-    "--disallow-untyped-decorators",
-    "--no-implicit-optional",
-    "--warn-return-any",
-    "--no-implicit-reexport",
-    "--strict-optional",
-]
-
 
 @log_function_call
 def run_mypy_check(
     project_dir: str,
     python_executable: str,
-    strict: bool = True,
     disable_error_codes: list[str] | None = None,
     target_directories: list[str] | None = None,
-    follow_imports: str = "normal",
+    follow_imports: str | None = None,
     cache_dir: str | None = None,
-    config_file: str | None = None,
     timeout_seconds: int = DEFAULT_CHECK_TIMEOUT,
 ) -> MypyResult:
     """Run mypy type checking on project.
 
     Args:
         project_dir: Path to the project directory
-        strict: Use strict mode settings (default: True)
         disable_error_codes: List of error codes to ignore (e.g., ['import', 'arg-type'])
         target_directories: Directories to check (auto-detected from pyproject.toml when None)
-        follow_imports: How to handle imports ('normal', 'silent', 'skip', 'error')
+        follow_imports: How to handle imports ('normal', 'silent', 'skip', 'error');
+            omitted from the command line when None
         python_executable: Python interpreter to use (default: sys.executable)
         cache_dir: Custom cache directory for incremental checking
-        config_file: Path to custom mypy config file
         timeout_seconds: Maximum seconds to wait for mypy
 
     Returns:
@@ -97,24 +77,16 @@ def run_mypy_check(
         "--no-color-output",
         "--show-column-numbers",
         "--show-error-codes",
-        "--namespace-packages",  # Handle src layout properly
-        "--explicit-package-bases",  # Fix duplicate module names issue
     ]
-
-    # Add strict flags if requested
-    if strict:
-        command.extend(STRICT_FLAGS)
-
-    # Add config file if specified
-    if config_file and os.path.exists(os.path.join(project_dir, config_file)):
-        command.extend(["--config-file", config_file])
 
     # Add cache directory
     if cache_dir:
         command.extend(["--cache-dir", cache_dir])
 
-    # Add follow imports setting
-    command.extend(["--follow-imports", follow_imports])
+    # Add follow imports setting only when asked: it is cache-affecting, and
+    # otherwise the project's [tool.mypy] decides
+    if follow_imports:
+        command.extend(["--follow-imports", follow_imports])
 
     # Disable specific error codes
     if disable_error_codes:
@@ -128,15 +100,15 @@ def run_mypy_check(
         "Starting mypy check",
         extra={
             "project_dir": project_dir,
-            "strict": strict,
             "targets": mypy_targets,
             "command": " ".join(command),
         },
     )
 
-    # Set MYPYPATH to src directory to handle module resolution correctly
+    # MYPY_NUM_WORKERS forces mypy's native parser and is cache-affecting, so an
+    # ambient value would silently split the cache
     env = os.environ.copy()
-    env["MYPYPATH"] = os.path.join(project_dir, "src")
+    env.pop("MYPY_NUM_WORKERS", None)
 
     # Execute mypy
     result = execute_command(

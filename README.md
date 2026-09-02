@@ -74,10 +74,9 @@ The mypy tools expose the following parameters for customization:
 
 | Parameter | Type | Default | Description |
 |-----------|------|---------|-------------|
-| `strict` | boolean | True | Use strict mode settings |
 | `disable_error_codes` | list | None | List of mypy error codes to ignore |
 | `target_directories` | list | None (auto-detected) | Directories to check relative to project_dir. Auto-detected from `pyproject.toml` when omitted |
-| `follow_imports` | string | 'normal' | How to handle imports during type checking |
+| `follow_imports` | string | None (no flag sent; the project's `[tool.mypy]` decides) | How to handle imports during type checking |
 | `cache_dir` | string | None (`.mypy_cache`) | Custom cache directory for incremental checking |
 | `timeout_seconds` | integer | None (resolved from config, else 120) | Maximum seconds to wait for mypy. Positive integers only |
 
@@ -433,7 +432,7 @@ The server exposes 17 MCP tools.
 |------|--------------|
 | `run_pylint_check` | Static analysis; findings returned as an LLM-actionable prompt |
 | `run_pytest_check` | Runs the test suite, parses the JSON report, summarises failures |
-| `run_mypy_check` | Strict-mode type checking with configurable error codes |
+| `run_mypy_check` | Type checking driven by the project's `[tool.mypy]`, with configurable error codes |
 | `run_ruff_check` | Ruff lint analysis, read-only |
 | `run_ruff_fix` | Applies ruff's safe fixes in place; unsafe fixes are opt-in |
 | `run_bandit_check` | Security lint |

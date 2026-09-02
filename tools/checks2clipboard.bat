@@ -139,9 +139,9 @@ if %PYTEST_EXIT_CODE% equ 0 (
     exit /b %PYTEST_EXIT_CODE%
 )
 
-REM Run mypy with strict checks if Pylint and Pytest passed or only had skipped tests
+REM Run mypy if Pylint and Pytest passed or only had skipped tests
 echo Running Mypy type checking...
-python -m mypy --strict src tests > checks_output.txt 2>&1
+python -m mypy src tests > checks_output.txt 2>&1
 set MYPY_EXIT_CODE=%errorlevel%
 
 REM Check mypy results

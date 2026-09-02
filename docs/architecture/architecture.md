@@ -250,5 +250,5 @@ See [dependencies/readme.md](dependencies/readme.md) for tool comparison, curren
 ### CI Pipeline
 
 Matrix-based (`.github/workflows/ci.yml`, `fail-fast: false`):
-- **Always**: black, isort, pylint (`-E`), pytest, mypy (strict)
+- **Always**: black, isort, pylint (`-E`), pytest, mypy
 - **PR only**: import-linter, tach, pycycle, vulture

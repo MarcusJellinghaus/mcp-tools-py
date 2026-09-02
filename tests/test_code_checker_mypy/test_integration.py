@@ -45,7 +45,6 @@ greet(123)  # Type error: expected str, got int
         result = run_mypy_check(
             project_dir=tmpdir,
             python_executable=sys.executable,
-            strict=True,
             target_directories=["."],
         )
 
@@ -83,7 +82,6 @@ first_item: Optional[str] = process_list(["hello", "world"])
         result = run_mypy_check(
             project_dir=tmpdir,
             python_executable=sys.executable,
-            strict=True,
             target_directories=["."],
         )
 
@@ -106,7 +104,6 @@ def process_data() -> None:
         result = run_mypy_check(
             project_dir=tmpdir,
             python_executable=sys.executable,
-            strict=True,
             target_directories=["."],
         )
 
@@ -143,7 +140,6 @@ result: int = func1(42)
         result = run_mypy_check(
             project_dir=tmpdir,
             python_executable=sys.executable,
-            strict=True,
             target_directories=["."],
         )
 
@@ -167,7 +163,6 @@ def func(x: int) -> int:
         result1 = run_mypy_check(
             project_dir=tmpdir,
             python_executable=sys.executable,
-            strict=True,
             target_directories=["."],
         )
         assert result1.return_code == 1
@@ -177,7 +172,6 @@ def func(x: int) -> int:
         result2 = run_mypy_check(
             project_dir=tmpdir,
             python_executable=sys.executable,
-            strict=True,
             target_directories=["."],
             disable_error_codes=["import"],
         )
@@ -188,34 +182,33 @@ def func(x: int) -> int:
         assert not any("import" in (msg.code or "") for msg in result2.messages)
 
 
-def test_mypy_strict_vs_non_strict() -> None:
-    """Test difference between strict and non-strict modes."""
-    with tempfile.TemporaryDirectory() as tmpdir:
-        test_file = Path(tmpdir) / "test_strict.py"
-        test_file.write_text("""
-# Missing type annotations - only caught in strict mode
+UNANNOTATED_SOURCE = """
 def func(x, y):
     return x + y
+"""
 
-# This is always an error
-result = func("string", 123)
-""")
 
-        # Run in strict mode
-        strict_result = run_mypy_check(
+def test_mypy_strictness_comes_from_project_config() -> None:
+    """The checked project's [tool.mypy] decides strictness, not the server."""
+    with tempfile.TemporaryDirectory() as tmpdir:
+        (Path(tmpdir) / "unannotated.py").write_text(UNANNOTATED_SOURCE)
+        (Path(tmpdir) / "pyproject.toml").write_text("[tool.mypy]\nstrict = true\n")
+
+        configured = run_mypy_check(
             project_dir=tmpdir,
             python_executable=sys.executable,
-            strict=True,
             target_directories=["."],
         )
 
-        # Run in non-strict mode
-        non_strict_result = run_mypy_check(
+    with tempfile.TemporaryDirectory() as tmpdir:
+        (Path(tmpdir) / "unannotated.py").write_text(UNANNOTATED_SOURCE)
+
+        unconfigured = run_mypy_check(
             project_dir=tmpdir,
             python_executable=sys.executable,
-            strict=False,
             target_directories=["."],
         )
 
-        # Strict mode should find more issues
-        assert len(strict_result.messages) >= len(non_strict_result.messages)
+    assert "no-untyped-def" in {msg.code for msg in configured.messages if msg.code}
+    assert unconfigured.messages == []
+    assert unconfigured.return_code == 0
