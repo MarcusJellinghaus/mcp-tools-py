@@ -1,6 +1,8 @@
 """Test mypy runner functionality."""
 
+import os
 import sys
+from datetime import datetime
 from pathlib import Path
 from typing import Any
 from unittest.mock import patch
@@ -8,6 +10,7 @@ from unittest.mock import patch
 import pytest
 
 from mcp_tools_py.code_checker_mypy import run_mypy_check
+from mcp_tools_py.code_checker_mypy.runners import _describe_cache, _resolve_cache_dir
 from tests.conftest import make_command_result
 
 
@@ -146,3 +149,105 @@ class TestMypyCommandConstruction:
             ("--disable-error-code", "import"),
             ("--disable-error-code", "arg-type"),
         ]
+
+
+class TestMypyTimeoutMessage:
+    """A timeout reports cache state, the exact command and how to retry."""
+
+    @staticmethod
+    def _timeout_error(tmp_path: Path, mock_exec: Any, **kwargs: Any) -> str:
+        """Run the checker against a timing-out mypy, return the error text."""
+        mock_exec.return_value = make_command_result(return_code=1, timed_out=True)
+        result = run_mypy_check(
+            project_dir=str(tmp_path),
+            python_executable=sys.executable,
+            target_directories=["."],
+            timeout_seconds=7,
+            **kwargs,
+        )
+        assert result.error is not None
+        return result.error
+
+    @patch("mcp_tools_py.code_checker_mypy.runners.execute_command")
+    def test_timeout_message_is_actionable(
+        self, mock_exec: Any, tmp_path: Path
+    ) -> None:
+        error = self._timeout_error(tmp_path, mock_exec)
+
+        assert "7 seconds" in error
+        assert os.path.join(str(tmp_path), ".mypy_cache") in error
+        assert str(tmp_path) in error
+        assert sys.executable in error
+        assert "mypy" in error
+        assert "timeout_seconds" in error
+
+    @patch("mcp_tools_py.code_checker_mypy.runners.execute_command")
+    def test_timeout_message_reports_cache_state(
+        self, mock_exec: Any, tmp_path: Path
+    ) -> None:
+        cache = tmp_path / "cache"
+        cache.mkdir()
+        (cache / "data.json").write_text("x" * 30, encoding="utf-8")
+
+        error = self._timeout_error(tmp_path, mock_exec, cache_dir="cache")
+
+        assert str(cache) in error
+        assert "30 bytes" in error
+
+    @patch("mcp_tools_py.code_checker_mypy.runners.execute_command")
+    def test_timeout_message_omits_size_when_cache_unresolved(
+        self, mock_exec: Any, tmp_path: Path
+    ) -> None:
+        (tmp_path / "mypy.ini").write_text("[mypy]\n", encoding="utf-8")
+
+        error = self._timeout_error(tmp_path, mock_exec)
+
+        assert "bytes" not in error
+        assert "mypy config" in error
+
+    def test_describe_cache_missing_directory(self, tmp_path: Path) -> None:
+        missing = str(tmp_path / "nope")
+
+        description = _describe_cache(missing)
+
+        assert missing in description
+        assert "does not exist" in description
+
+    def test_describe_cache_reports_size_and_mtime(self, tmp_path: Path) -> None:
+        cache_file = tmp_path / "data.json"
+        cache_file.write_text("y" * 12, encoding="utf-8")
+        expected_mtime = datetime.fromtimestamp(cache_file.stat().st_mtime).isoformat()
+
+        description = _describe_cache(str(tmp_path))
+
+        assert "12 bytes" in description
+        assert "1 files" in description
+        assert expected_mtime in description
+
+    def test_resolve_cache_dir_defaults_to_mypy_cache(self, tmp_path: Path) -> None:
+        assert _resolve_cache_dir(str(tmp_path), None) == os.path.join(
+            str(tmp_path), ".mypy_cache"
+        )
+
+    def test_resolve_cache_dir_reads_pyproject(self, tmp_path: Path) -> None:
+        (tmp_path / "pyproject.toml").write_text(
+            '[tool.mypy]\ncache_dir = "x"\n', encoding="utf-8"
+        )
+
+        assert _resolve_cache_dir(str(tmp_path), None) == os.path.join(
+            str(tmp_path), "x"
+        )
+
+    def test_resolve_cache_dir_gives_up_on_ini_config(self, tmp_path: Path) -> None:
+        (tmp_path / "mypy.ini").write_text("[mypy]\n", encoding="utf-8")
+
+        assert _resolve_cache_dir(str(tmp_path), None) is None
+
+    def test_resolve_cache_dir_explicit_argument_wins(self, tmp_path: Path) -> None:
+        (tmp_path / "pyproject.toml").write_text(
+            '[tool.mypy]\ncache_dir = "x"\n', encoding="utf-8"
+        )
+
+        assert _resolve_cache_dir(str(tmp_path), "chosen") == os.path.join(
+            str(tmp_path), "chosen"
+        )

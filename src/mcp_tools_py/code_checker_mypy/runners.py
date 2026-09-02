@@ -2,6 +2,9 @@
 
 import logging
 import os
+import tomllib
+from datetime import datetime
+from pathlib import Path
 
 from mcp_tools_py.code_checker_mypy.models import MypyResult
 from mcp_tools_py.code_checker_mypy.parsers import parse_mypy_json_output
@@ -14,6 +17,81 @@ from mcp_tools_py.utils.subprocess_runner import (
 )
 
 logger = logging.getLogger(__name__)
+
+
+def _resolve_cache_dir(project_dir: str, cache_dir: str | None) -> str | None:
+    """Resolve the cache directory mypy will actually use, or None if unknown.
+
+    Mypy consults ``mypy.ini``, ``.mypy.ini``, ``pyproject.toml`` and
+    ``setup.cfg`` in that order. Only ``pyproject.toml`` is parsed here; when an
+    INI-format config could own the setting the answer is None rather than a
+    guess.
+
+    Args:
+        project_dir: Path to the project directory, which is mypy's cwd.
+        cache_dir: Cache directory passed on the command line, if any.
+
+    Returns:
+        The cache directory path, or None when it cannot be determined.
+    """
+    if cache_dir:
+        return os.path.join(project_dir, cache_dir)
+
+    for ini_name in ("mypy.ini", ".mypy.ini"):
+        if os.path.isfile(os.path.join(project_dir, ini_name)):
+            return None
+
+    pyproject_path = os.path.join(project_dir, "pyproject.toml")
+    if os.path.isfile(pyproject_path):
+        try:
+            with open(pyproject_path, "rb") as f:
+                toml_data = tomllib.load(f)
+        except (OSError, tomllib.TOMLDecodeError):
+            return None
+        tool_section = toml_data.get("tool")
+        mypy_section = (
+            tool_section.get("mypy") if isinstance(tool_section, dict) else None
+        )
+        if isinstance(mypy_section, dict):
+            configured = mypy_section.get("cache_dir", ".mypy_cache")
+            if not isinstance(configured, str):
+                return None
+            return os.path.join(project_dir, configured)
+
+    if os.path.isfile(os.path.join(project_dir, "setup.cfg")):
+        return None
+
+    return os.path.join(project_dir, ".mypy_cache")
+
+
+def _describe_cache(cache_path: str) -> str:
+    """Describe a mypy cache directory: existence, total bytes, newest mtime.
+
+    Args:
+        cache_path: Path to the cache directory.
+
+    Returns:
+        A single line of facts about the directory.
+    """
+    if not os.path.isdir(cache_path):
+        return f"{cache_path} (does not exist)"
+
+    try:
+        # A killed mypy can leave the cache mid-write, so files may vanish
+        # between rglob and stat
+        stats = [f.stat() for f in Path(cache_path).rglob("*") if f.is_file()]
+    except OSError as exc:
+        return f"{cache_path} (unreadable: {exc})"
+
+    if not stats:
+        return f"{cache_path} (empty)"
+
+    total_bytes = sum(s.st_size for s in stats)
+    newest = datetime.fromtimestamp(max(s.st_mtime for s in stats)).isoformat()
+    return (
+        f"{cache_path} ({total_bytes} bytes across {len(stats)} files, "
+        f"newest {newest})"
+    )
 
 
 @log_function_call
@@ -123,10 +201,31 @@ def run_mypy_check(
 
     # Report a timeout as a timeout: execute_command sets execution_error too
     if result.timed_out:
+        cache_path = _resolve_cache_dir(project_dir, cache_dir)
+        cache_line = (
+            f"Cache: {_describe_cache(cache_path)}"
+            if cache_path is not None
+            else "Cache: the cache directory is set by the project's mypy config "
+            "and was not resolved."
+        )
         return MypyResult(
             return_code=1,
             messages=[],
-            error=f"timed out after {timeout_seconds} seconds",
+            error="\n".join(
+                [
+                    f"timed out after {timeout_seconds} seconds",
+                    cache_line,
+                    "A killed run leaves a partial cache; comparing size and mtime "
+                    "across runs shows whether successive runs make progress.",
+                    f"Command: {' '.join(command)}",
+                    f"cwd: {project_dir}",
+                    f"interpreter: {python_executable}",
+                    "A cold mypy cache on a large project can take longer than "
+                    "the limit.",
+                    f"Retry with a larger timeout_seconds "
+                    f"(this run used {timeout_seconds}).",
+                ]
+            ),
         )
 
     # Handle execution errors

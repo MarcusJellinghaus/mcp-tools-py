@@ -111,6 +111,16 @@ def test_format_mypy_result_with_issues(checker_tools: CheckerTools) -> None:
     assert prompt in result
 
 
+def test_format_mypy_result_failure_keeps_its_own_headline(
+    checker_tools: CheckerTools,
+) -> None:
+    """A failure prompt already names itself and is returned as-is."""
+    prompt = "Mypy execution failed: timed out after 120 seconds"
+    result = checker_tools._format_mypy_result(prompt)
+    assert result == prompt
+    assert "Mypy found type issues" not in result
+
+
 # --- Pytest formatting tests ---
 
 

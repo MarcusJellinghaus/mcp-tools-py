@@ -123,6 +123,9 @@ class CheckerTools:
         """
         if mypy_prompt is None:
             return "Mypy check completed. No type errors found."
+        # A failure already names itself -- don't announce it as type issues
+        if mypy_prompt.startswith("Mypy execution failed:"):
+            return mypy_prompt
         return f"Mypy found type issues that need attention:\n\n{mypy_prompt}"
 
 
