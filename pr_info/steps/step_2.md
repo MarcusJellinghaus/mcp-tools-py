@@ -10,7 +10,9 @@ signature change, no plumbing.
 | File | Change |
 |------|--------|
 | `src/mcp_tools_py/code_checker_mypy/runners.py` | One private helper + the `if result.timed_out:` branch |
+| `src/mcp_tools_py/checker_tools/__init__.py` | `_format_mypy_result` (`:130`) — the headline |
 | `tests/test_code_checker_mypy/test_runners.py` | Two tests |
+| `tests/test_checker_tools.py` | `_format_mypy_result` tests (`:96-107`) — one added, the existing two keep passing |
 | `tests/test_error_transparency.py` | `TestMypyTimeout` (`:220-239`) — existing coverage of this branch; must keep passing |
 
 `TestMypyTimeout::test_timeout_reported_as_timeout` already asserts the branch reports
@@ -58,6 +60,21 @@ Message content, in order:
 4. that a cold mypy cache on a large project can take longer than the limit
 5. `Retry with a larger timeout_seconds (this run used {timeout_seconds}).`
 
+### `checker_tools/__init__.py` — the headline
+
+`_format_mypy_result` (`:130`) returns `f"Mypy found type issues that need attention:\n\n{mypy_prompt}"`
+for every non-`None` prompt, so the honest message above arrives under a false headline.
+`get_mypy_prompt` already prefixes any failure with `Mypy execution failed:`, so branching
+on that prefix needs no change to its `str | None` contract:
+
+```python
+if mypy_prompt.startswith("Mypy execution failed:"):
+    return mypy_prompt
+```
+
+The failure text is returned as-is — it already names itself. The two existing branches
+are untouched.
+
 **Do not use `format_command`** from the subprocess shim here, despite it being the
 obvious reuse: it truncates at 200 characters, and a truncated command line defeats the
 reproducibility this message exists to provide. `" ".join(command)` matches what the two
@@ -74,8 +91,8 @@ preferred. No new imports from `mcp_coder_utils` — checked, it has no director
 utility, so this small helper is not a duplicate.
 
 The message travels out unchanged: `reporting.get_mypy_prompt` prefixes it with
-`Mypy execution failed:` and `CheckerTools._format_mypy_result` wraps it. Multi-line text
-passes through both untouched.
+`Mypy execution failed:`, and with the change above `CheckerTools._format_mypy_result`
+returns it as-is. Multi-line text passes through both untouched.
 
 ## ALGORITHM — `_describe_cache`
 
@@ -109,6 +126,12 @@ with `make_command_result` from `tests/conftest.py` — this time
    reports a byte count and a timestamp. Build the cache dir under `tmp_path` and pass it
    as `cache_dir`.
 
+3. **`test_format_mypy_result_failure_keeps_its_own_headline`** in
+   `tests/test_checker_tools.py`, beside the two existing `_format_mypy_result` tests
+   (`:96-107`): a prompt starting `Mypy execution failed:` comes back without
+   `Mypy found type issues`. `test_format_mypy_result_with_issues` (`:103`) must keep
+   passing unchanged — a real type-issue prompt still gets the headline.
+
 Do not assert the word "warm" is absent — assert the positive facts instead.
 
 ## VERIFICATION
@@ -126,10 +149,11 @@ mcp__mcp-tools-py__run_mypy_check
 > top of step 1.
 >
 > This is the issue's steps 2 and 3 together — one `if result.timed_out:` branch in
-> `runners.py` plus one private `_describe_cache` helper. Do not add a module, change any
-> signature, or touch `_format_mypy_result`.
+> `runners.py`, one private `_describe_cache` helper, and a two-line early return in
+> `_format_mypy_result` so a failure keeps its own headline. Do not add a module and do
+> not change any signature.
 >
-> Write both tests first. Use `" ".join(command)`, not `format_command` — that helper
+> Write all three tests first. Use `" ".join(command)`, not `format_command` — that helper
 > truncates at 200 characters and would make the reported command unreproducible.
 >
 > The cache description must state facts only (exists / bytes / newest mtime) and must

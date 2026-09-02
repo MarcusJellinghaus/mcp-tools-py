@@ -66,6 +66,12 @@ it is closed in the same pass that drops the `MYPYPATH` assignment.
 result.timed_out:` branch plus one private helper in `runners.py`, because that function
 already holds the command, cwd, interpreter, cache dir and resolved timeout.
 
+**The headline is fixed too.** `_format_mypy_result` wraps every prompt in "Mypy found
+type issues that need attention:", so a timeout reaches the client under a headline that
+is simply false — the same dishonesty step 2 exists to remove, one line above the honest
+text. No contract change is needed: `get_mypy_prompt` already prefixes any failure with
+`Mypy execution failed:`, so `_format_mypy_result` branches on that prefix.
+
 ## Files created / modified
 
 No new source modules or packages. No new dependencies.
@@ -86,6 +92,7 @@ No new source modules or packages. No new dependencies.
 | 1 | `docs/architecture/architecture.md` | `:253` CI matrix |
 | 2 | `src/mcp_tools_py/code_checker_mypy/runners.py` | Timeout branch + `_describe_cache` helper |
 | 2 | `tests/test_code_checker_mypy/test_runners.py` | Timeout message tests |
+| 2 | `src/mcp_tools_py/checker_tools/__init__.py` | `_format_mypy_result` (`:130`) stops announcing a failure as type issues |
 | 2 | `tests/test_error_transparency.py` | `TestMypyTimeout` already covers the branch — keep it passing, don't duplicate it |
 | 3 | `docs/pyproject-configuration.md` | New `## How mypy reads pyproject.toml` |
 | 3 | `README.md` | New `### Mypy Configuration` pointer |
@@ -107,9 +114,8 @@ silently lax or the config is written but not obeyed.
 
 - `-n` / parallel checking — rejected, see the issue's *Why `-n` is out of scope*.
 - A `warm_mypy_cache` tool, auto-warm at startup, `dmypy`, `--follow-imports=skip`.
-- `_format_mypy_result` prefixes a timeout with "Mypy found type issues that need
-  attention". Fixing it honestly means changing `get_mypy_prompt`'s return contract; the
-  message itself opens with `Mypy execution failed:`, which reads unambiguously.
+(Nothing else. The `_format_mypy_result` headline is fixed in step 2 — see
+*Architectural / design changes*.)
 
 ## Measurements (issue step zero)
 

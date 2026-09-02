@@ -164,8 +164,9 @@ Assertions:
 | Case | Expect |
 |------|--------|
 | default call | no `--strict`, no `--namespace-packages`, no `--explicit-package-bases`, no `--follow-imports` |
-| default call | `"MYPYPATH" not in env`, `"MYPY_NUM_WORKERS" not in env` |
+| default call, both vars cleared with `monkeypatch.delenv(..., raising=False)` | `"MYPYPATH" not in env`, `"MYPY_NUM_WORKERS" not in env` |
 | ambient `MYPY_NUM_WORKERS` set via `monkeypatch.setenv` | still absent from `env` |
+| ambient `MYPYPATH` set via `monkeypatch.setenv` | `env["MYPYPATH"]` is that value, not `<project>/src` |
 | `follow_imports="silent"` | `["--follow-imports", "silent"]` present |
 | `disable_error_codes=["import", "arg-type"]` | one `--disable-error-code` pair each |
 
@@ -201,9 +202,15 @@ mcp__mcp-tools-py__run_mypy_check
 mcp__mcp-tools-py__run_lint_imports_check
 ```
 
-`run_mypy_check` must pass **through the new code path** — i.e. reading this repo's
-freshly migrated `[tool.mypy]` with no flags of its own. That is the migration's own
-proof. Expect it to be clean: the server has been enforcing these flags all along.
+The MCP `run_mypy_check` above does **not** exercise the new code: `.mcp.json` launches
+the server from `${MCP_CODER_VENV_PATH}\mcp-tools-py.exe` at session start, so the running
+process keeps the pre-edit modules and still sends `--strict`. It is a regression check,
+not proof of the migration.
+
+The proof comes from fresh processes: pytest (which imports the edited `src`, and whose
+`test_run_mypy_check_on_project` runs real mypy on this repo through the new code path)
+and CI's `mypy src tests`, which reads the freshly migrated `[tool.mypy]` with no flags of
+its own. Expect both clean: the server has been enforcing these flags all along.
 
 Additional manual check the issue asks for: **re-verify the flag equivalence on the
 declared floor, `mypy>=1.13.0`** (`pyproject.toml:29`), not only on the installed
