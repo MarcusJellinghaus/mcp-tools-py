@@ -53,8 +53,9 @@ Content:
    remaining way a caller can re-open the trap this change closes. Also state that the
    mypy version, installed plugins and interpreter are part of the cache key, so warming
    from a different venv fails as silently as warming with the wrong flags. Do **not**
-   imply the two no-op flags (`--namespace-packages`, `--show-error-codes`) do any work;
-   they are mypy defaults and are kept only as tidying.
+   imply `--show-error-codes` does any work; it is already mypy's default and is kept
+   only as tidying. `--namespace-packages` is removed in step 1 — it must not appear in
+   this table at all.
 7. Why local scripts and CI must drop `--strict` too: any `--strict` on any command line
    beats the config and re-splits the cache.
 

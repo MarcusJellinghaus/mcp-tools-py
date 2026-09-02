@@ -9,7 +9,7 @@ signature change, no plumbing.
 
 | File | Change |
 |------|--------|
-| `src/mcp_tools_py/code_checker_mypy/runners.py` | One private helper + the `if result.timed_out:` branch |
+| `src/mcp_tools_py/code_checker_mypy/runners.py` | Two private helpers + the `if result.timed_out:` branch |
 | `src/mcp_tools_py/checker_tools/__init__.py` | `_format_mypy_result` (`:130`) — the headline |
 | `tests/test_code_checker_mypy/test_runners.py` | Two tests |
 | `tests/test_checker_tools.py` | `_format_mypy_result` tests (`:96-107`) — one added, the existing two keep passing |
@@ -25,37 +25,46 @@ and the retry hint.
 
 ## WHAT
 
-### `runners.py` — one helper
+### `runners.py` — two helpers
 
 ```python
+def _resolve_cache_dir(project_dir: str, cache_dir: str | None) -> str | None:
+    """Resolve the cache directory mypy will actually use, or None if unknown."""
+
+
 def _describe_cache(cache_path: str) -> str:
     """Describe a mypy cache directory: existence, total bytes, newest mtime."""
 ```
 
-Facts only. It must **not** call the cache "warm": a killed run leaves a partial cache
-that looks identical from outside. Size and mtime across successive calls are what make
-the issue's measurement 2 readable.
+`_describe_cache` states facts only. It must **not** call the cache "warm": a killed run
+leaves a partial cache that looks identical from outside. Size and mtime across
+successive calls are what make the issue's measurement 2 readable.
+
+`_resolve_cache_dir` exists because `cache_dir` is a `[tool.mypy]` key like any other.
+After step 1 the project owns it, so the server cannot assume `.mypy_cache`: reporting a
+path mypy may never have written would be exactly the kind of confident-but-wrong
+statement step 2 exists to remove. It returns `None` when it cannot say, and the message
+then names the config that owns the setting instead of guessing a path.
 
 ### `runners.py` — the timeout branch
 
-Replaces the current body of `if result.timed_out:` (`:146-152`), which returns only
+Replaces the current body of `if result.timed_out:` (`:152-158`), which returns only
 `f"timed out after {timeout_seconds} seconds"`.
 
 ```python
 if result.timed_out:
-    cache_path = os.path.join(project_dir, cache_dir or ".mypy_cache")
+    cache_path = _resolve_cache_dir(project_dir, cache_dir)
     return MypyResult(return_code=1, messages=[], error="\n".join([...]))
 ```
-
-`os.path.join` already does the right thing for an absolute `cache_dir`, and mypy's own
-default is `.mypy_cache` relative to cwd — which is `project_dir`.
 
 Message content, in order:
 
 1. `timed out after {timeout_seconds} seconds`
-2. `Cache: {_describe_cache(cache_path)}`, followed by one line saying a killed run leaves
-   a partial cache and that comparing size and mtime across runs shows whether successive
-   runs are making progress
+2. when `cache_path` is not `None`, `Cache: {_describe_cache(cache_path)}`; when it is,
+   one line saying the cache directory is set by the project's mypy config and was not
+   resolved, with **no** size or mtime. Either way, followed by one line saying a killed
+   run leaves a partial cache and that comparing size and mtime across runs shows
+   whether successive runs are making progress
 3. `Command: {" ".join(command)}`, then `cwd:` and `interpreter:` on their own lines
 4. that a cold mypy cache on a large project can take longer than the limit
 5. `Retry with a larger timeout_seconds (this run used {timeout_seconds}).`
@@ -86,13 +95,35 @@ and no second lookup.
 
 ## HOW
 
-Needs `from datetime import datetime` in `runners.py`; `os` and `Path`/`os.walk` as
-preferred. No new imports from `mcp_coder_utils` — checked, it has no directory-size
-utility, so this small helper is not a duplicate.
+Needs `from datetime import datetime` and `import tomllib` in `runners.py`; `os` and
+`Path`/`os.walk` as preferred. `tomllib` is stdlib on the declared floor (3.11) and
+`utils/project_config.py:249-264` already reads `pyproject.toml` this way — read the
+`[tool.mypy]` table directly rather than widening that module's `[tool.mcp-tools-py]`
+helper. No new imports from `mcp_coder_utils` — checked, it has no directory-size
+utility, so these small helpers are not duplicates.
 
 The message travels out unchanged: `reporting.get_mypy_prompt` prefixes it with
 `Mypy execution failed:`, and with the change above `CheckerTools._format_mypy_result`
 returns it as-is. Multi-line text passes through both untouched.
+
+## ALGORITHM — `_resolve_cache_dir`
+
+Mypy's config discovery order is `mypy.ini`, `.mypy.ini`, `pyproject.toml`, `setup.cfg`,
+all relative to cwd — which is `project_dir`. Only `pyproject.toml` is parsed here; the
+INI formats resolve to `None` rather than to a guess.
+
+```
+if cache_dir:                        return os.path.join(project_dir, cache_dir)
+if mypy.ini or .mypy.ini exists:     return None      # wins over pyproject, not parsed
+if pyproject.toml has [tool.mypy]:   return os.path.join(project_dir,
+                                            its cache_dir or ".mypy_cache")
+if setup.cfg exists:                 return None      # consulted next, not parsed
+return os.path.join(project_dir, ".mypy_cache")       # mypy's documented default
+```
+
+`os.path.join` already does the right thing for an absolute value. A malformed
+`pyproject.toml` or a non-string `cache_dir` returns `None` too: a timeout report is the
+wrong place to raise.
 
 ## ALGORITHM — `_describe_cache`
 
@@ -110,7 +141,8 @@ leave the cache mid-write, so files may vanish between `rglob` and `stat`.
 ## DATA
 
 `MypyResult(return_code=1, messages=[], error=<multi-line str>)` — the same shape the
-branch returns today, only the `error` text grows. `_describe_cache` returns one line.
+branch returns today, only the `error` text grows. `_describe_cache` returns one line;
+`_resolve_cache_dir` returns a path or `None`.
 
 ## TESTS (write first)
 
@@ -125,6 +157,12 @@ with `make_command_result` from `tests/conftest.py` — this time
    `_describe_cache`: a missing directory says so; a directory holding a known file
    reports a byte count and a timestamp. Build the cache dir under `tmp_path` and pass it
    as `cache_dir`.
+
+   Same test function family covers `_resolve_cache_dir`, parametrized over `tmp_path`
+   projects: no config → `.mypy_cache` under the project; `[tool.mypy] cache_dir = "x"`
+   in `pyproject.toml` → `x` under the project, **not** `.mypy_cache`; a `mypy.ini`
+   present → `None`; an explicit `cache_dir` argument wins over all of them. Assert that
+   the `None` case produces a message with no byte count.
 
 3. **`test_format_mypy_result_failure_keeps_its_own_headline`** in
    `tests/test_checker_tools.py`, beside the two existing `_format_mypy_result` tests
@@ -149,16 +187,18 @@ mcp__mcp-tools-py__run_mypy_check
 > top of step 1.
 >
 > This is the issue's steps 2 and 3 together — one `if result.timed_out:` branch in
-> `runners.py`, one private `_describe_cache` helper, and a two-line early return in
-> `_format_mypy_result` so a failure keeps its own headline. Do not add a module and do
-> not change any signature.
+> `runners.py`, two private helpers (`_resolve_cache_dir`, `_describe_cache`), and a
+> two-line early return in `_format_mypy_result` so a failure keeps its own headline. Do
+> not add a module and do not change any signature.
 >
 > Write all three tests first. Use `" ".join(command)`, not `format_command` — that helper
 > truncates at 200 characters and would make the reported command unreproducible.
 >
 > The cache description must state facts only (exists / bytes / newest mtime) and must
 > never call the cache warm: a killed run leaves a partial cache that looks the same from
-> outside.
+> outside. Do not hardcode `.mypy_cache`: after step 1 the project's `[tool.mypy]` owns
+> `cache_dir` too, so resolve it, and when it cannot be resolved say so instead of
+> reporting size and mtime for a path mypy may never have written.
 >
 > Use MCP tools for all file and git operations. Run `run_format_code` before committing,
 > then pylint, pytest (`-n auto`) and mypy.

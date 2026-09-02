@@ -90,7 +90,7 @@ No new source modules or packages. No new dependencies.
 | 1 | `README.md` | Delete `strict` row `:77`; fix the `follow_imports` default `:80`; fix `:427` |
 | 1 | `tests/mcp_tools_py_manual/TEST_PLAN.md` | Tests 3a/3b (`:185-197`) reference the removed `strict` parameter |
 | 1 | `docs/architecture/architecture.md` | `:253` CI matrix |
-| 2 | `src/mcp_tools_py/code_checker_mypy/runners.py` | Timeout branch + `_describe_cache` helper |
+| 2 | `src/mcp_tools_py/code_checker_mypy/runners.py` | Timeout branch + `_resolve_cache_dir` / `_describe_cache` helpers |
 | 2 | `tests/test_code_checker_mypy/test_runners.py` | Timeout message tests |
 | 2 | `src/mcp_tools_py/checker_tools/__init__.py` | `_format_mypy_result` (`:130`) stops announcing a failure as type issues |
 | 2 | `tests/test_error_transparency.py` | `TestMypyTimeout` already covers the branch — keep it passing, don't duplicate it |
