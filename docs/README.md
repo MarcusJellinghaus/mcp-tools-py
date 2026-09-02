@@ -15,7 +15,7 @@ Complete documentation for MCP Tools Py.
 
 ### Configuration
 
-- **[Pylint Configuration](pyproject-configuration.md)** — How pylint reads `pyproject.toml`, migration from old defaults, `extra_args` overrides
+- **[Project Configuration](pyproject-configuration.md)** — How pylint and mypy read `pyproject.toml`, `[tool.mcp-tools-py]` subprocess timeouts, migration from the old defaults, per-call overrides
 
 ### Setup & Configuration (Planned)
 

@@ -77,8 +77,16 @@ The mypy tools expose the following parameters for customization:
 | `disable_error_codes` | list | None | List of mypy error codes to ignore |
 | `target_directories` | list | None (auto-detected) | Directories to check relative to project_dir. Auto-detected from `pyproject.toml` when omitted |
 | `follow_imports` | string | None (no flag sent; the project's `[tool.mypy]` decides) | How to handle imports during type checking |
-| `cache_dir` | string | None (`.mypy_cache`) | Custom cache directory for incremental checking |
+| `cache_dir` | string | None (no flag sent; `[tool.mypy] cache_dir` decides, else `.mypy_cache`) | Custom cache directory for incremental checking |
 | `timeout_seconds` | integer | None (resolved from config, else 120) | Maximum seconds to wait for mypy. Positive integers only |
+
+### Mypy Configuration
+
+Mypy reads your project's `pyproject.toml` automatically, and `[tool.mypy]` is the
+single source of truth for the flag set — the tool adds only output-formatting flags.
+A project with no `[tool.mypy]` section is checked at mypy's defaults and still reports
+"passed". See [docs/pyproject-configuration.md](docs/pyproject-configuration.md) for
+migration guidance and the effect on mypy's cache.
 
 ## Command Line Interface (CLI)
 

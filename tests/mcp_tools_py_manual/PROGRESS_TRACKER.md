@@ -36,8 +36,8 @@
 
 | # | Test | Status | Duration | Notes |
 |---|------|--------|----------|-------|
-| 3a | Strict mode (default) | ⬜ | | |
-| 3b | Non-strict | ⬜ | | |
+| 3a | Default (project config decides) | ⬜ | | |
+| 3b | Config-driven strictness | ⬜ | | |
 | 3c | Disable error codes | ⬜ | | |
 | 3d | Follow imports: skip | ⬜ | | |
 

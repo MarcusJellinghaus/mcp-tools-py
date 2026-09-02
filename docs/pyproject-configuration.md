@@ -1,8 +1,9 @@
 # Project Configuration via `pyproject.toml`
 
 The checked project's `pyproject.toml` drives several parts of this server: the
-`[tool.mcp-tools-py]` section it owns itself, plus sections owned by other tools
-that it reads (pylint messages, target directories).
+`[tool.mcp-tools-py]` section it owns itself, the sections the checkers read for
+themselves (`[tool.pylint]`, `[tool.mypy]`), and the keys it reads to auto-detect
+target directories.
 
 ---
 
@@ -126,7 +127,93 @@ Mix and match to suit your project's standards.
 
 ---
 
-## One-off overrides with `extra_args`
+## How mypy reads `pyproject.toml`
+
+When the MCP tool invokes mypy (via `python -m mypy`), the project directory is
+mypy's working directory, so mypy finds `pyproject.toml` by itself. It looks for
+`mypy.ini`, `.mypy.ini`, `pyproject.toml` and `setup.cfg`, in that order, and
+takes the first one that carries a mypy section. It does **not** walk up the
+directory tree: a config file above the project directory is never read.
+
+**The MCP tool adds only output-formatting flags** — no strictness, no import
+resolution, no per-module settings of its own. `[tool.mypy]` is the single source
+of truth for the flag set mypy runs with.
+
+> **There is no floor.** A project with no `[tool.mypy]` section is checked at
+> mypy's defaults: bodies of unannotated functions are not checked at all. The run
+> reports "passed" and nothing warns you that almost nothing was verified. If you
+> want strict checking, you have to ask for it.
+
+### Replicating the old strict default
+
+Earlier versions of this tool passed a hardcoded strictness set on every run. To
+get that checking back, put it in your `pyproject.toml`:
+
+```toml
+[tool.mypy]
+strict = true
+warn_unreachable = true
+```
+
+### Import resolution is yours too — and it fails loudly
+
+`mypy_path`, `namespace_packages` and `explicit_package_bases` are no longer
+supplied either. Unlike the missing strictness above, you will notice, in one of
+two quite different ways:
+
+- **`import-not-found` / `import-untyped` errors.** Mypy runs and checks your
+  code, but reports every import it could not resolve.
+- **`Duplicate module named ...`, exit code 2.** The build fails before checking
+  anything, so the run reports an error rather than a type result. This is the
+  usual outcome for a `src/` layout with no `explicit_package_bases`.
+
+A `src/` layout typically needs:
+
+```toml
+[tool.mypy]
+mypy_path = "src"
+namespace_packages = true
+explicit_package_bases = true
+```
+
+### Sharing mypy's cache
+
+Mypy discards its incremental cache whenever a cache-affecting option changes, so
+a run with a different flag set pays for a full cold rebuild. The flags this
+server passes are chosen to stay out of that set:
+
+| Flag | Sent | Cache-affecting |
+|------|------|-----------------|
+| `--output json` | every call | No |
+| `--no-color-output` | every call | No |
+| `--show-column-numbers` | every call | No |
+| `--show-error-codes` | every call (already mypy's default; kept for explicitness) | No |
+| `--cache-dir` | when `cache_dir` is passed | No |
+| `--follow-imports` | when `follow_imports` is passed | **Yes** |
+| `--disable-error-code` | when `disable_error_codes` is passed | **Yes** |
+
+So by default a tool run and a plain `mypy` run in your shell share one cache.
+
+**Passing `follow_imports` or `disable_error_codes` splits it.** Both are
+cache-affecting, so a call that supplies either invalidates the cache against
+every run that does not supply the same value — alternating between the two costs
+a cold rebuild each way. Use them for one-off narrowing, not routinely; put the
+lasting choice in `[tool.mypy]` instead.
+
+The mypy version, the installed plugins and the interpreter are part of the cache
+key too. Warming the cache from a different virtualenv fails just as silently as
+warming it with the wrong flags.
+
+### Local scripts and CI
+
+Any flag on the command line beats the config file, so a script or CI job still
+passing `--strict` re-splits the cache against every other run — including the one
+the MCP tool makes. Collapse them to plain `mypy src tests` and let `[tool.mypy]`
+decide.
+
+---
+
+## One-off pylint overrides with `extra_args`
 
 To suppress a specific code for a single run without changing `pyproject.toml`,
 pass `extra_args` to the MCP tool:
