@@ -42,12 +42,19 @@ Content:
    `import-not-found`, or as a hard rc=2 `Duplicate module named` build failure that
    checks nothing at all — so it looks nothing like the silent laxness of item 3. Both
    failure modes must be described, and described as different.
-6. The cache table: which flags the server still passes, that none of them are in
-   `OPTIONS_AFFECTING_CACHE`, why a mismatched flag set silently discards the cache, and
-   that the mypy version, installed plugins and interpreter are part of the cache key too
-   — so warming from a different venv fails as silently as warming with the wrong flags.
-   Do **not** imply the two no-op flags (`--namespace-packages`, `--show-error-codes`) do
-   any work; they are mypy defaults and are kept only as tidying.
+6. The cache table: which flags the server still passes, and why a mismatched flag set
+   silently discards the cache. The flags passed on **every** call — `--output json`,
+   `--no-color-output`, `--show-column-numbers`, `--show-error-codes`, `--cache-dir` —
+   are cache-neutral: none of them is in `OPTIONS_AFFECTING_CACHE`. The two
+   caller-supplied ones are **not**: `follow_imports` and `disable_error_code` are both
+   in `OPTIONS_AFFECTING_CACHE` (verified against the installed mypy, 50 entries), so
+   passing `follow_imports` or `disable_error_codes` splits the cache against every run
+   that does not pass the same value. Warn about that explicitly — it is the one
+   remaining way a caller can re-open the trap this change closes. Also state that the
+   mypy version, installed plugins and interpreter are part of the cache key, so warming
+   from a different venv fails as silently as warming with the wrong flags. Do **not**
+   imply the two no-op flags (`--namespace-packages`, `--show-error-codes`) do any work;
+   they are mypy defaults and are kept only as tidying.
 7. Why local scripts and CI must drop `--strict` too: any `--strict` on any command line
    beats the config and re-splits the cache.
 

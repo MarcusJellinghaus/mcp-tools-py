@@ -25,9 +25,12 @@ builds `[python, "-m", "pylint", "--output-format=json"]` plus caller args plus 
 with no hardcoded rule or severity flags. Mypy becomes consistent with that decision
 rather than taking a new one.
 
-The resulting split is what makes cache sharing work: the flags the server still passes
-are exactly the ones **outside** `OPTIONS_AFFECTING_CACHE`, and the ones that affect the
-cache belong entirely to the project's config.
+The resulting split is what makes cache sharing work: the flags the server passes on
+**every** call are exactly the ones **outside** `OPTIONS_AFFECTING_CACHE`, and the ones
+that affect the cache belong to the project's config — or, for the two per-call overrides
+in the table below, to a caller who explicitly asks for them. `follow_imports` and
+`disable_error_code` are both in `OPTIONS_AFFECTING_CACHE`, so supplying either still
+splits the cache; that is why neither is sent by default.
 
 | Concern | Owner after this change |
 |---------|------------------------|
@@ -78,10 +81,12 @@ No new source modules or packages. No new dependencies.
 | 1 | `tools/mypy.bat`, `tools/checks2clipboard.bat` | Collapse to `mypy src tests` |
 | 1 | `.github/workflows/ci.yml`, `.github/workflows/upstream-mypy-check.yml` | Collapse to `mypy src tests` (plus job `name:` and header comment) |
 | 1 | `CONTRIBUTING.md` | `:217` command; `:121` wording |
-| 1 | `README.md` | Delete `strict` row `:77`; fix `:427` |
+| 1 | `README.md` | Delete `strict` row `:77`; fix the `follow_imports` default `:80`; fix `:427` |
+| 1 | `tests/mcp_tools_py_manual/TEST_PLAN.md` | Tests 3a/3b (`:185-197`) reference the removed `strict` parameter |
 | 1 | `docs/architecture/architecture.md` | `:253` CI matrix |
 | 2 | `src/mcp_tools_py/code_checker_mypy/runners.py` | Timeout branch + `_describe_cache` helper |
 | 2 | `tests/test_code_checker_mypy/test_runners.py` | Timeout message tests |
+| 2 | `tests/test_error_transparency.py` | `TestMypyTimeout` already covers the branch — keep it passing, don't duplicate it |
 | 3 | `docs/pyproject-configuration.md` | New `## How mypy reads pyproject.toml` |
 | 3 | `README.md` | New `### Mypy Configuration` pointer |
 | 3 | `docs/README.md` | `:18` index entry stops being pylint-only |
@@ -110,7 +115,16 @@ silently lax or the config is written but not obeyed.
 
 - **Measurement 1** — whether a call longer than 120s returns at all, or the calling
   harness caps it. Not reproducible from a session scoped to this repo; it needs a
-  server pointed at a large project. Run it before or alongside step 1; it does not
-  block any step.
+  server pointed at a large project, so it stays deferred rather than running as step
+  zero.
+  - *Owner:* whoever implements step 1, from an `mcp-coder` session (729 files, where
+    the problem was measured).
+  - *Trigger:* before opening the PR for step 1 — the result belongs in its description.
+  - *Acceptance criterion:* one `run_mypy_check(timeout_seconds=400)` call on a cold
+    cache either returns a result (the harness does not cap us — our own 120s default
+    was the whole problem, and the *Fallback* section stays unneeded) or is killed at
+    some limit below 400s (the harness caps us — record the observed limit, since the
+    step 2 retry hint is then bounded by it).
+  - It blocks no step: step 1 stands on cache sharing regardless of the outcome.
 - **Measurement 2** — whether killed runs converge. Needs no code: after step 2 ships,
   call the tool three times on a cold cache and read the size/mtime line.

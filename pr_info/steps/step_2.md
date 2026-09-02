@@ -11,6 +11,15 @@ signature change, no plumbing.
 |------|--------|
 | `src/mcp_tools_py/code_checker_mypy/runners.py` | One private helper + the `if result.timed_out:` branch |
 | `tests/test_code_checker_mypy/test_runners.py` | Two tests |
+| `tests/test_error_transparency.py` | `TestMypyTimeout` (`:220-239`) — existing coverage of this branch; must keep passing |
+
+`TestMypyTimeout::test_timeout_reported_as_timeout` already asserts the branch reports
+`timed out`, names the limit (`5 seconds`) and does **not** leak the raw
+`Process timed out after` string from `execute_command`. That last assertion constrains
+the new message: `timed out after {timeout_seconds} seconds` must not be prefixed with
+`Process`. Leave the class as it is and do not restate its assertions in the two new
+tests — those cover what it does not: the cache line, the command/cwd/interpreter block
+and the retry hint.
 
 ## WHAT
 
@@ -88,8 +97,9 @@ branch returns today, only the `error` text grows. `_describe_cache` returns one
 
 ## TESTS (write first)
 
-Same faked `execute_command` helper as step 1, this time returning
-`CommandResult(return_code=1, stdout="", stderr="", timed_out=True)`.
+Same patching pattern as step 1 — `@patch("mcp_tools_py.code_checker_mypy.runners.execute_command")`
+with `make_command_result` from `tests/conftest.py` — this time
+`make_command_result(return_code=1, timed_out=True)`.
 
 1. **`test_timeout_message_is_actionable`** — assert `result.error` contains: the timeout
    value, the resolved cache path, `cwd`, the interpreter path, `mypy` from the command,

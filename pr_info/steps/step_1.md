@@ -14,7 +14,7 @@ first is a no-op, removing the flags first makes this repo's type checking silen
 | `tests/test_code_checker_mypy/test_runners.py` | 2 call sites + new test |
 | `tests/test_code_checker_mypy/test_integration.py` | 8 call sites + replaced test |
 | `tools/mypy.bat`, `tools/checks2clipboard.bat`, `.github/workflows/ci.yml`, `.github/workflows/upstream-mypy-check.yml`, `CONTRIBUTING.md` | The five hardcoded flag sites |
-| `README.md`, `docs/architecture/architecture.md`, `CONTRIBUTING.md` | Text made accurate by the removal |
+| `README.md`, `docs/architecture/architecture.md`, `CONTRIBUTING.md`, `tests/mcp_tools_py_manual/TEST_PLAN.md` | Text made accurate by the removal |
 
 ## WHAT
 
@@ -78,9 +78,15 @@ output-formatting flags. A project with no mypy config is checked at mypy's
 defaults and will report "passed".
 ```
 
-The two internal docstrings (`runners.py`, `reporting.py`) only lose their `strict:`
-line — they stay plain parameter lists. Restating the policy in all three re-creates the
-three-way drift the issue documents.
+Also update the `follow_imports` block (`:48-53`), which currently says
+`'normal' (default)`. After this change nothing is sent by default and the project's
+`[tool.mypy]` decides; the parameter overrides it for that one call — and, being
+cache-affecting, splits the cache when supplied.
+
+The two internal docstrings (`runners.py`, `reporting.py`) lose their `strict:` line —
+plus `config_file:` (`runners.py:58`), which goes with the parameter, and the same
+`follow_imports` correction. They stay plain parameter lists: restating the policy in all
+three re-creates the three-way drift the issue documents.
 
 ### The five hardcoded flag sites — all become `mypy src tests`
 
@@ -99,8 +105,14 @@ not resolve either.
 ### Text made inaccurate by the removal
 
 - `README.md:77` — delete the `strict` table row.
+- `README.md:80` — the `follow_imports | string | 'normal'` row: the default is now
+  None, i.e. no flag is sent and the project's `[tool.mypy]` decides.
 - `README.md:427` — "Strict-mode type checking with configurable error codes" →
   type checking driven by the project's `[tool.mypy]`.
+- `tests/mcp_tools_py_manual/TEST_PLAN.md:185-197` — test 3a is titled "Strict mode
+  (default)" and test 3b calls `run_mypy_check(strict=False, ...)`, which no longer
+  exists. Retitle 3a to the config-driven behaviour and replace 3b with a case that
+  exercises the same thing from a project's `[tool.mypy]`.
 - `CONTRIBUTING.md:121` — "(mypy strict compliance)" → the config's settings.
 - `docs/architecture/architecture.md:253` — "mypy (strict)" → "mypy".
 
@@ -124,8 +136,10 @@ command += mypy_targets
 env = os.environ.copy(); env.pop("MYPY_NUM_WORKERS", None)
 ```
 
-Every flag left here is outside `OPTIONS_AFFECTING_CACHE`, which is what lets the server
-share a cache with a plain `mypy` run.
+Every flag passed **unconditionally** is outside `OPTIONS_AFFECTING_CACHE`, which is what
+lets a default call share a cache with a plain `mypy` run. The two conditionals emitted
+above — `--follow-imports` and `--disable-error-code` — *are* in it, which is exactly why
+they are sent only when the caller asks for them: supplying either splits the cache.
 
 ## DATA
 
@@ -135,15 +149,13 @@ share a cache with a plain `mypy` run.
 
 ### 1. `test_runners.py` — the command line and env, one parametrized test
 
-No test anywhere currently asserts mypy's constructed command line. Fake
-`execute_command`, capture `command` and `env`, assert in one place:
+No test anywhere currently asserts mypy's constructed command line. Use the pattern the
+existing mypy tests already use — `@patch("mcp_tools_py.code_checker_mypy.runners.execute_command")`
+with `make_command_result` from `tests/conftest.py` (as `tests/test_error_transparency.py`
+does) — and read `command` and `env` off `mock_exec.call_args`. Do not add a local fake or
+build `CommandResult` by hand.
 
-```python
-def _capture(tmp_path: Path, **kwargs: object) -> tuple[list[str], dict[str, str]]:
-    """Run run_mypy_check with execute_command faked; return (command, env)."""
-```
-
-The fake returns `CommandResult(return_code=0, stdout="", stderr="", timed_out=False)`.
+`make_command_result()` already defaults to a clean success result.
 `run_mypy_check` validates that target directories exist, so use `tmp_path` with
 `target_directories=["."]`.
 
