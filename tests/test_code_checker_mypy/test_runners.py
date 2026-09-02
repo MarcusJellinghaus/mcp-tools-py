@@ -91,6 +91,40 @@ class TestMypyCommandConstruction:
         command, _ = self._run(mock_exec, tmp_path)
         assert flag not in command
 
+    @pytest.mark.parametrize(
+        "flag",
+        ["--no-color-output", "--show-column-numbers", "--show-error-codes"],
+    )
+    @patch("mcp_tools_py.code_checker_mypy.runners.execute_command")
+    def test_default_call_sends_output_flag(
+        self, mock_exec: Any, tmp_path: Path, flag: str
+    ) -> None:
+        command, _ = self._run(mock_exec, tmp_path)
+        assert flag in command
+
+    @patch("mcp_tools_py.code_checker_mypy.runners.execute_command")
+    def test_default_call_sends_json_output(
+        self, mock_exec: Any, tmp_path: Path
+    ) -> None:
+        command, _ = self._run(mock_exec, tmp_path)
+
+        index = command.index("--output")
+        assert command[index + 1] == "json"
+
+    @patch("mcp_tools_py.code_checker_mypy.runners.execute_command")
+    def test_cache_dir_sent_when_requested(
+        self, mock_exec: Any, tmp_path: Path
+    ) -> None:
+        command, _ = self._run(mock_exec, tmp_path, cache_dir="cache")
+
+        index = command.index("--cache-dir")
+        assert command[index + 1] == "cache"
+
+    @patch("mcp_tools_py.code_checker_mypy.runners.execute_command")
+    def test_cache_dir_omitted_by_default(self, mock_exec: Any, tmp_path: Path) -> None:
+        command, _ = self._run(mock_exec, tmp_path)
+        assert "--cache-dir" not in command
+
     @patch("mcp_tools_py.code_checker_mypy.runners.execute_command")
     def test_default_call_sets_neither_mypy_env_var(
         self, mock_exec: Any, tmp_path: Path, monkeypatch: pytest.MonkeyPatch
@@ -203,7 +237,7 @@ class TestMypyTimeoutMessage:
         error = self._timeout_error(tmp_path, mock_exec)
 
         assert "bytes" not in error
-        assert "mypy config" in error
+        assert "could not be resolved" in error
 
     def test_describe_cache_missing_directory(self, tmp_path: Path) -> None:
         missing = str(tmp_path / "nope")
@@ -224,9 +258,13 @@ class TestMypyTimeoutMessage:
         assert "1 files" in description
         assert expected_mtime in description
 
-    def test_resolve_cache_dir_defaults_to_mypy_cache(self, tmp_path: Path) -> None:
-        assert _resolve_cache_dir(str(tmp_path), None) == os.path.join(
-            str(tmp_path), ".mypy_cache"
+    def test_resolve_cache_dir_defaults_to_mypy_cache_uncertainly(
+        self, tmp_path: Path
+    ) -> None:
+        """With no local config, the default path is an assumption, not a fact."""
+        assert _resolve_cache_dir(str(tmp_path), None) == (
+            os.path.join(str(tmp_path), ".mypy_cache"),
+            False,
         )
 
     def test_resolve_cache_dir_reads_pyproject(self, tmp_path: Path) -> None:
@@ -234,20 +272,22 @@ class TestMypyTimeoutMessage:
             '[tool.mypy]\ncache_dir = "x"\n', encoding="utf-8"
         )
 
-        assert _resolve_cache_dir(str(tmp_path), None) == os.path.join(
-            str(tmp_path), "x"
+        assert _resolve_cache_dir(str(tmp_path), None) == (
+            os.path.join(str(tmp_path), "x"),
+            True,
         )
 
     def test_resolve_cache_dir_gives_up_on_ini_config(self, tmp_path: Path) -> None:
         (tmp_path / "mypy.ini").write_text("[mypy]\n", encoding="utf-8")
 
-        assert _resolve_cache_dir(str(tmp_path), None) is None
+        assert _resolve_cache_dir(str(tmp_path), None) == (None, False)
 
     def test_resolve_cache_dir_explicit_argument_wins(self, tmp_path: Path) -> None:
         (tmp_path / "pyproject.toml").write_text(
             '[tool.mypy]\ncache_dir = "x"\n', encoding="utf-8"
         )
 
-        assert _resolve_cache_dir(str(tmp_path), "chosen") == os.path.join(
-            str(tmp_path), "chosen"
+        assert _resolve_cache_dir(str(tmp_path), "chosen") == (
+            os.path.join(str(tmp_path), "chosen"),
+            True,
         )

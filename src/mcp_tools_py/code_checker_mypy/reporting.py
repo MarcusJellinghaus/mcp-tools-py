@@ -7,6 +7,9 @@ from mcp_tools_py.utils.project_config import DEFAULT_CHECK_TIMEOUT
 
 logger = logging.getLogger(__name__)
 
+# Prefix that marks a prompt as a failure rather than a list of type issues
+MYPY_FAILURE_PREFIX = "Mypy execution failed:"
+
 
 def create_mypy_prompt(result: MypyResult) -> str | None:
     """Generate LLM-friendly prompt from mypy results.
@@ -115,6 +118,6 @@ def get_mypy_prompt(
     )
 
     if result.error:
-        return f"Mypy execution failed: {result.error}"
+        return f"{MYPY_FAILURE_PREFIX} {result.error}"
 
     return create_mypy_prompt(result)

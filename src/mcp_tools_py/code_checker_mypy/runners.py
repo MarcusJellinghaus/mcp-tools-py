@@ -19,27 +19,32 @@ from mcp_tools_py.utils.subprocess_runner import (
 logger = logging.getLogger(__name__)
 
 
-def _resolve_cache_dir(project_dir: str, cache_dir: str | None) -> str | None:
-    """Resolve the cache directory mypy will actually use, or None if unknown.
+def _resolve_cache_dir(
+    project_dir: str, cache_dir: str | None
+) -> tuple[str | None, bool]:
+    """Resolve the cache directory mypy will use, and whether that is certain.
 
     Mypy consults ``mypy.ini``, ``.mypy.ini``, ``pyproject.toml`` and
     ``setup.cfg`` in that order. Only ``pyproject.toml`` is parsed here; when an
     INI-format config could own the setting the answer is None rather than a
-    guess.
+    guess. With no local config at all, mypy falls back to a user-level config
+    that may set ``cache_dir``, so ``.mypy_cache`` is returned as an assumption.
 
     Args:
         project_dir: Path to the project directory, which is mypy's cwd.
         cache_dir: Cache directory passed on the command line, if any.
 
     Returns:
-        The cache directory path, or None when it cannot be determined.
+        A ``(path, certain)`` pair. ``path`` is None when nothing can be said;
+        ``certain`` is False when the path is mypy's default rather than a
+        resolved setting.
     """
     if cache_dir:
-        return os.path.join(project_dir, cache_dir)
+        return os.path.join(project_dir, cache_dir), True
 
     for ini_name in ("mypy.ini", ".mypy.ini"):
         if os.path.isfile(os.path.join(project_dir, ini_name)):
-            return None
+            return None, False
 
     pyproject_path = os.path.join(project_dir, "pyproject.toml")
     if os.path.isfile(pyproject_path):
@@ -47,7 +52,7 @@ def _resolve_cache_dir(project_dir: str, cache_dir: str | None) -> str | None:
             with open(pyproject_path, "rb") as f:
                 toml_data = tomllib.load(f)
         except (OSError, tomllib.TOMLDecodeError):
-            return None
+            return None, False
         tool_section = toml_data.get("tool")
         mypy_section = (
             tool_section.get("mypy") if isinstance(tool_section, dict) else None
@@ -55,13 +60,13 @@ def _resolve_cache_dir(project_dir: str, cache_dir: str | None) -> str | None:
         if isinstance(mypy_section, dict):
             configured = mypy_section.get("cache_dir", ".mypy_cache")
             if not isinstance(configured, str):
-                return None
-            return os.path.join(project_dir, configured)
+                return None, False
+            return os.path.join(project_dir, configured), True
 
     if os.path.isfile(os.path.join(project_dir, "setup.cfg")):
-        return None
+        return None, False
 
-    return os.path.join(project_dir, ".mypy_cache")
+    return os.path.join(project_dir, ".mypy_cache"), False
 
 
 def _describe_cache(cache_path: str) -> str:
@@ -76,21 +81,31 @@ def _describe_cache(cache_path: str) -> str:
     if not os.path.isdir(cache_path):
         return f"{cache_path} (does not exist)"
 
+    stats: list[os.stat_result] = []
+    skipped = 0
     try:
-        # A killed mypy can leave the cache mid-write, so files may vanish
-        # between rglob and stat
-        stats = [f.stat() for f in Path(cache_path).rglob("*") if f.is_file()]
+        for entry in Path(cache_path).rglob("*"):
+            # A killed mypy can leave the cache mid-write, so an entry may
+            # vanish or be unreadable -- skip it, not the whole report
+            try:
+                if entry.is_file():
+                    stats.append(entry.stat())
+            except OSError:
+                skipped += 1
     except OSError as exc:
-        return f"{cache_path} (unreadable: {exc})"
+        if not stats:
+            return f"{cache_path} (unreadable: {exc})"
+        skipped += 1  # the walk stopped early; report what was counted
 
     if not stats:
         return f"{cache_path} (empty)"
 
     total_bytes = sum(s.st_size for s in stats)
     newest = datetime.fromtimestamp(max(s.st_mtime for s in stats)).isoformat()
+    skipped_note = f", {skipped} skipped" if skipped else ""
     return (
-        f"{cache_path} ({total_bytes} bytes across {len(stats)} files, "
-        f"newest {newest})"
+        f"{cache_path} ({total_bytes} bytes across {len(stats)} files"
+        f"{skipped_note}, newest {newest})"
     )
 
 
@@ -201,13 +216,16 @@ def run_mypy_check(
 
     # Report a timeout as a timeout: execute_command sets execution_error too
     if result.timed_out:
-        cache_path = _resolve_cache_dir(project_dir, cache_dir)
-        cache_line = (
-            f"Cache: {_describe_cache(cache_path)}"
-            if cache_path is not None
-            else "Cache: the cache directory is set by the project's mypy config "
-            "and was not resolved."
-        )
+        cache_path, cache_certain = _resolve_cache_dir(project_dir, cache_dir)
+        if cache_path is None:
+            cache_line = "Cache: the cache directory could not be resolved."
+        elif cache_certain:
+            cache_line = f"Cache: {_describe_cache(cache_path)}"
+        else:
+            cache_line = (
+                f"Cache (assumed, mypy's default location): "
+                f"{_describe_cache(cache_path)}"
+            )
         return MypyResult(
             return_code=1,
             messages=[],
