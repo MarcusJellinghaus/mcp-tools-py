@@ -1,9 +1,14 @@
 """Test mypy reporting functionality."""
 
+import sys
+from pathlib import Path
+from unittest.mock import patch
+
 import pytest
 
 from mcp_tools_py.code_checker_mypy.models import MypyMessage, MypyResult
-from mcp_tools_py.code_checker_mypy.reporting import create_mypy_prompt
+from mcp_tools_py.code_checker_mypy.reporting import create_mypy_prompt, get_mypy_prompt
+from tests.conftest import make_command_result
 
 
 def test_create_mypy_prompt_no_messages() -> None:
@@ -209,3 +214,24 @@ def test_mypy_result_methods() -> None:
     notes = result.get_messages_by_severity("note")
     assert len(notes) == 1
     assert notes[0].message == "Note 1"
+
+
+@pytest.mark.parametrize("follow_imports", [None, "silent"])
+def test_get_mypy_prompt_forwards_follow_imports_unchanged(
+    tmp_path: Path, follow_imports: str | None
+) -> None:
+    """get_mypy_prompt passes follow_imports down without coercing None."""
+    with patch("mcp_tools_py.code_checker_mypy.runners.execute_command") as mock_exec:
+        mock_exec.return_value = make_command_result()
+        get_mypy_prompt(
+            str(tmp_path),
+            python_executable=sys.executable,
+            target_directories=["."],
+            follow_imports=follow_imports,
+        )
+
+    command = mock_exec.call_args.kwargs["command"]
+    if follow_imports is None:
+        assert "--follow-imports" not in command
+    else:
+        assert command[command.index("--follow-imports") + 1] == follow_imports
