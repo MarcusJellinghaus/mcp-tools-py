@@ -66,7 +66,8 @@ def run_format_code(
 
     Raises:
         ValueError: If any step name is not in :data:`_VALID_STEPS`.
-    """
+            Raised by :func:`validate_steps` and propagated to callers.
+    """  # noqa: DOC502 - propagated from validate_steps, not raised here.
     resolved_steps = steps or DEFAULT_STEPS
     validate_steps(resolved_steps)
 

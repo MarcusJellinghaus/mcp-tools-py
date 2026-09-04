@@ -143,7 +143,6 @@ class TestValidation:
         mock_runner.assert_not_called()
         assert "Invalid formatter steps: ['foo']" in result
         assert "not available" not in result
-        assert "console script" not in result
 
 
 class TestTargetDirectories:

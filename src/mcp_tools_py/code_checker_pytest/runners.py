@@ -148,7 +148,6 @@ def run_tests(
 
     try:
         # Construct the pytest command
-        # NOTE: venv_bin parameter is still accepted for PATH adjustment below.
         command = [
             python_executable,
             "-m",
