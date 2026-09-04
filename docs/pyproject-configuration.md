@@ -212,9 +212,9 @@ choice, and honouring it keeps tool runs in the same cache as your shell runs.
 Only the `cache_dir` argument overrides it.
 
 `MYPY_NUM_WORKERS` is the one mypy environment variable the server does remove
-before running. It forces mypy's native parser, which is cache-affecting, so an
-ambient value would split the cache with nothing on the command line naming the
-cause.
+before running. A non-zero value forces mypy's native parser, which is
+cache-affecting, so an ambient value would split the cache with nothing on the
+command line naming the cause.
 
 The mypy version, the installed plugins and the interpreter are part of the cache
 key too. Warming the cache from a different virtualenv fails just as silently as
