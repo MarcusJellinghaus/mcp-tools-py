@@ -32,8 +32,8 @@ def register(mcp: "FastMCPProtocol", checker_tools: "CheckerTools") -> None:
         mypy reads the project's `[tool.mypy]` configuration; the server adds only
         output-formatting flags, unless you pass `follow_imports`, `cache_dir` or
         `disable_error_codes`. A project with no mypy config of its own is checked
-        at mypy's defaults, or at a parent directory's config if one is in scope,
-        and will report "passed".
+        at mypy's defaults, or at a parent directory's config or the user-level
+        `~/.mypy.ini` if either is present, and will report "passed".
 
         Args:
             disable_error_codes: Optional list of mypy error codes to ignore.

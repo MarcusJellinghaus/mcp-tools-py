@@ -86,7 +86,8 @@ Mypy reads your project's `pyproject.toml` automatically, and `[tool.mypy]` is t
 single source of truth for the flag set — the tool adds only output-formatting flags,
 unless you pass `follow_imports`, `cache_dir` or `disable_error_codes`. A project with
 no `[tool.mypy]` section of its own is checked at mypy's defaults — or at a parent
-directory's config, if one is in scope — and still reports "passed". See
+directory's config or the user-level `~/.mypy.ini`, if either is present — and still
+reports "passed". See
 [docs/pyproject-configuration.md](docs/pyproject-configuration.md) for migration
 guidance and the effect on mypy's cache.
 
