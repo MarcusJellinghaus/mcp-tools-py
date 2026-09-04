@@ -3,6 +3,7 @@ Tests for the server functionality with updated parameter exposure.
 """
 
 import inspect
+import os
 import textwrap
 from pathlib import Path
 from typing import Any, Dict, Tuple
@@ -80,7 +81,7 @@ async def test_run_pytest_check_parameters(mock_project_dir: Path) -> None:
             verbosity=2,
             extra_args=["--no-header"],
             env_vars={"TEST_ENV": "value"},
-            venv_path=None,
+            venv_bin=os.path.dirname(_server._resolved_python),
             keep_temp_files=True,  # From server constructor
             skip_default_test_folder=False,
             timeout_seconds=300,  # Built-in pytest default

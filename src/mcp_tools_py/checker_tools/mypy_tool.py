@@ -63,12 +63,7 @@ def register(mcp: "FastMCPProtocol", checker_tools: "CheckerTools") -> None:
             A string containing mypy results or a prompt for an LLM to interpret
         """
         if not server._is_tool_available("mypy"):
-            return (
-                f"mypy is not available in the configured Python environment "
-                f"({server._resolved_python}). Ensure --python-executable and "
-                f"--venv-path point to the environment where mypy is installed. "
-                f"Restart the server after installing."
-            )
+            return server.tool_unavailable_message("mypy")
 
         resolved = resolve_target_directories(
             str(server.project_dir), target_directories

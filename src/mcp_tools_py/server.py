@@ -2,6 +2,7 @@
 
 import logging
 import os
+import shutil
 import sys
 from pathlib import Path
 from typing import Callable, Optional, Protocol, TypeVar
@@ -42,6 +43,27 @@ class FastMCPProtocol(Protocol):
 # Initialize logger
 logger = logging.getLogger(__name__)
 
+# Timeout for the `python -m <module> --version` availability probe.
+PROBE_TIMEOUT_SECONDS = 30
+
+# Tool key -> module for `python -m <module>`, or None when the tool is only
+# ever run through its console script. The console script is named after the key.
+_TOOL_MODULES: dict[str, Optional[str]] = {
+    "pytest": "pytest",
+    "pylint": "pylint",
+    "mypy": "mypy",
+    "black": "black",
+    "isort": "isort",
+    "lint-imports": None,
+    "vulture": None,
+    "ruff": None,
+    "bandit": None,
+    "tach": None,
+}
+
+# Tool key -> distribution to install, when it differs from the key.
+_TOOL_PACKAGES: dict[str, str] = {"lint-imports": "import-linter"}
+
 
 class ToolServer:
     """MCP server for code checking and formatting tools."""
@@ -62,7 +84,7 @@ class ToolServer:
         Args:
             project_dir: Path to the project directory to check
             python_executable: Optional path to Python interpreter to use for running tests. If None, defaults to sys.executable.
-            venv_path: Optional path to a virtual environment to activate for running tests. When specified, the Python executable from this venv will be used instead of python_executable.
+            venv_path: Deprecated, use python_executable instead. Optional path to a virtual environment. When specified, the Python executable from this venv is used instead of python_executable, which is now its only effect: it no longer locates the tools.
             test_folder: Path to the test folder (relative to project_dir). Defaults to 'tests'.
             keep_temp_files: Whether to keep temporary files after test execution. Useful for debugging when tests fail.
             refactoring_timeout: Timeout in seconds for rope refactoring operations.
@@ -83,6 +105,7 @@ class ToolServer:
 
         self.mcp: FastMCPProtocol = FastMCP("MCP Tools Service")
         self._resolved_python = self._resolve_python_executable()
+        self._tool_binaries: dict[str, str] = {}
         self._tool_availability = self._check_tool_availability()
         CheckerTools(self).register(self.mcp)
         FormatterTools(self).register(self.mcp)
@@ -95,152 +118,148 @@ class ToolServer:
     def _resolve_python_executable(self) -> str:
         """Centralize venv -> python_executable -> sys.executable resolution.
 
+        A name without a directory part is looked up on PATH, so
+        `--python-executable python3` resolves to the interpreter a subprocess
+        would have started.
+
         Returns:
             Path to the Python interpreter to use for tool subprocesses.
 
         Raises:
-            FileNotFoundError: If `venv_path` is set but its python binary is missing.
+            FileNotFoundError: If the resolved interpreter neither exists nor
+                is found on PATH.
         """
         if self.venv_path:
             if os.name == "nt":
                 python = os.path.join(self.venv_path, "Scripts", "python.exe")
             else:
                 python = os.path.join(self.venv_path, "bin", "python")
-            if not os.path.exists(python):
-                raise FileNotFoundError(
-                    f"Python executable not found in virtual environment: {python}"
-                )
-            return python
+            source = "--venv-path"
         elif self.python_executable:
-            return self.python_executable
+            python, source = self.python_executable, "--python-executable"
         else:
-            return sys.executable
+            python, source = sys.executable, "sys.executable"
+
+        if not os.path.exists(python):
+            on_path = shutil.which(python)
+            if on_path is None:
+                raise FileNotFoundError(
+                    f"Python interpreter not found: {python} (from {source})"
+                )
+            return on_path
+        return python
 
     def _check_tool_availability(self) -> dict[str, bool]:
-        """Check availability of file-existence tools (lint-imports, vulture, ruff, bandit).
+        """Locate the console-script tools next to the resolved interpreter.
 
         Returns:
-            Mapping of tool name to availability flag.
+            Mapping of tool key to availability flag.
         """
         availability: dict[str, bool] = {}
 
-        # lint-imports: check via file existence (not subprocess)
-        lint_imports_available = False
-        binary: Optional[str] = None
-        if self.venv_path:
-            if os.name == "nt":
-                binary = os.path.join(self.venv_path, "Scripts", "lint-imports.exe")
+        for key, module in _TOOL_MODULES.items():
+            if module is not None:
+                # Probe group: detected lazily, on first use.
+                continue
+            path = self._script_path(key)
+            if path is not None:
+                self._tool_binaries[key] = path
             else:
-                binary = os.path.join(self.venv_path, "bin", "lint-imports")
-            lint_imports_available = os.path.exists(binary)
-        self._lint_imports_binary: Optional[str] = (
-            binary if lint_imports_available else None
-        )
-        availability["lint-imports"] = lint_imports_available
-        if not lint_imports_available:
-            logger.warning(
-                "lint-imports not found. Ensure --venv-path points to "
-                "an environment where lint-imports is installed."
-            )
-
-        # vulture: check via file existence (not subprocess)
-        vulture_available = False
-        vulture_binary: Optional[str] = None
-        if self.venv_path:
-            if os.name == "nt":
-                vulture_binary = os.path.join(self.venv_path, "Scripts", "vulture.exe")
-            else:
-                vulture_binary = os.path.join(self.venv_path, "bin", "vulture")
-            vulture_available = os.path.exists(vulture_binary)
-        self._vulture_binary: Optional[str] = (
-            vulture_binary if vulture_available else None
-        )
-        availability["vulture"] = vulture_available
-        if not vulture_available:
-            logger.warning(
-                "vulture not found. Ensure --venv-path points to "
-                "an environment where vulture is installed."
-            )
-
-        # ruff: check via file existence (not subprocess)
-        ruff_available = False
-        ruff_binary: Optional[str] = None
-        if self.venv_path:
-            if os.name == "nt":
-                ruff_binary = os.path.join(self.venv_path, "Scripts", "ruff.exe")
-            else:
-                ruff_binary = os.path.join(self.venv_path, "bin", "ruff")
-            ruff_available = os.path.exists(ruff_binary)
-        self._ruff_binary: Optional[str] = ruff_binary if ruff_available else None
-        availability["ruff"] = ruff_available
-        if not ruff_available:
-            logger.warning(
-                "ruff not found. Ensure --venv-path points to "
-                "an environment where ruff is installed."
-            )
-
-        # bandit: check via file existence (not subprocess)
-        bandit_available = False
-        bandit_binary: Optional[str] = None
-        if self.venv_path:
-            if os.name == "nt":
-                bandit_binary = os.path.join(self.venv_path, "Scripts", "bandit.exe")
-            else:
-                bandit_binary = os.path.join(self.venv_path, "bin", "bandit")
-            bandit_available = os.path.exists(bandit_binary)
-        self._bandit_binary: Optional[str] = bandit_binary if bandit_available else None
-        availability["bandit"] = bandit_available
-        if not bandit_available:
-            logger.warning(
-                "bandit not found. Ensure --venv-path points to "
-                "an environment where bandit is installed."
-            )
-
-        # tach: check via file existence (not subprocess)
-        tach_available = False
-        tach_binary: Optional[str] = None
-        if self.venv_path:
-            if os.name == "nt":
-                tach_binary = os.path.join(self.venv_path, "Scripts", "tach.exe")
-            else:
-                tach_binary = os.path.join(self.venv_path, "bin", "tach")
-            tach_available = os.path.exists(tach_binary)
-        self._tach_binary: Optional[str] = tach_binary if tach_available else None
-        availability["tach"] = tach_available
-        if not tach_available:
-            logger.warning(
-                "tach not found. Ensure --venv-path points to "
-                "an environment where tach is installed."
-            )
+                logger.warning("%s", self.tool_unavailable_message(key))
+            availability[key] = path is not None
 
         return availability
 
-    def _is_tool_available(self, tool_name: str) -> bool:
-        """Check if a tool is available, running subprocess check on first call.
+    def _script_path(self, key: str) -> Optional[str]:
+        """Locate the console script for a tool next to the resolved interpreter.
+
+        Args:
+            key: Tool key, which is also the console-script filename.
 
         Returns:
-            True if `python -m <tool_name> --version` succeeds.
+            Path to the console script, or None when it is not there.
+        """
+        name = f"{key}.exe" if os.name == "nt" else key
+        path = os.path.join(os.path.dirname(self._resolved_python), name)
+        return path if os.path.exists(path) else None
+
+    def _is_tool_available(self, tool_name: str) -> bool:
+        """Check if a tool is available, probing on first call.
+
+        Checks, in order: the cache, a console script next to the resolved
+        interpreter, then `python -m <module> --version`. A probe that times out
+        is assumed available; a tool with no module never probes.
+
+        Args:
+            tool_name: Tool key to look up.
+
+        Returns:
+            True if the tool is available.
         """
         if tool_name in self._tool_availability:
             return self._tool_availability[tool_name]
-        result = execute_command(
-            [self._resolved_python, "-m", tool_name, "--version"],
-            timeout_seconds=10,
-        )
-        available = result.return_code == 0 and not result.execution_error
-        if available:
-            logger.info("%s version: %s", tool_name, result.stdout.strip())
+
+        script = self._script_path(tool_name)
+        module = _TOOL_MODULES.get(tool_name)
+        if script is not None:
+            available = True
+            if module is None:
+                self._tool_binaries[tool_name] = script
+        elif module is None:
+            # Console-script-only tool: file existence is the entire check.
+            available = False
         else:
-            logger.warning(
-                "%s not found in %s. "
-                "Ensure --python-executable and --venv-path point to "
-                "the environment where %s is installed.",
-                tool_name,
-                self._resolved_python,
-                tool_name,
+            result = execute_command(
+                [self._resolved_python, "-m", module, "--version"],
+                timeout_seconds=PROBE_TIMEOUT_SECONDS,
+                env={"PYTEST_DISABLE_PLUGIN_AUTOLOAD": "1"},
             )
+            if result.timed_out:
+                available = True
+                logger.warning(
+                    "%s version probe timed out after %s seconds using %s. "
+                    "Assuming %s is available.",
+                    tool_name,
+                    PROBE_TIMEOUT_SECONDS,
+                    self._resolved_python,
+                    tool_name,
+                )
+            else:
+                available = result.return_code == 0 and not result.execution_error
+                if available:
+                    logger.info("%s version: %s", tool_name, result.stdout.strip())
+
+        if not available:
+            logger.warning("%s", self.tool_unavailable_message(tool_name))
         self._tool_availability[tool_name] = available
         return available
+
+    def tool_unavailable_message(self, key: str) -> str:
+        """Build the standard "tool not available" message for `key`.
+
+        Args:
+            key: Tool key as used in `_tool_availability`.
+
+        Returns:
+            A message naming --python-executable and the location searched.
+            The distribution to install comes from `_TOOL_PACKAGES`, which maps
+            a key to its distribution when the two differ (import-linter
+            provides `lint-imports`).
+        """
+        name = _TOOL_PACKAGES.get(key, key)
+        if _TOOL_MODULES.get(key) is None:
+            searched = os.path.dirname(self._resolved_python)
+            return (
+                f"{key} is not available. No {key} console script was found in "
+                f"{searched}. Ensure --python-executable points to an environment "
+                f"where {name} is installed. Restart the server after installing."
+            )
+        return (
+            f"{key} is not available in the configured Python environment "
+            f"({self._resolved_python}). Ensure --python-executable points to the "
+            f"environment where {name} is installed. "
+            f"Restart the server after installing."
+        )
 
     def resolve_timeout(self, tool: ToolName, explicit: Optional[int] = None) -> int:
         """Resolve the subprocess timeout in seconds for one program.
@@ -280,7 +299,7 @@ def create_server(
     Args:
         project_dir: Path to the project directory to check
         python_executable: Optional path to Python interpreter to use for running tests. If None, defaults to sys.executable.
-        venv_path: Optional path to a virtual environment to activate for running tests. When specified, the Python executable from this venv will be used instead of python_executable.
+        venv_path: Deprecated, use python_executable instead. Optional path to a virtual environment. When specified, the Python executable from this venv is used instead of python_executable, which is now its only effect: it no longer locates the tools.
         test_folder: Path to the test folder (relative to project_dir). Defaults to 'tests'.
         keep_temp_files: Whether to keep temporary files after test execution. Useful for debugging when tests fail.
         refactoring_timeout: Timeout in seconds for rope refactoring operations.

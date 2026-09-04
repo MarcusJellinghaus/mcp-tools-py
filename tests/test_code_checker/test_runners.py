@@ -16,6 +16,7 @@ from mcp_tools_py.code_checker_pytest import (
     check_code_with_pytest,
     run_tests,
 )
+from tests.conftest import make_command_result
 
 from .test_code_checker_pytest_common import _cleanup_test_project, _create_test_project
 
@@ -125,6 +126,25 @@ def test_run_tests_no_tests_found() -> None:
             _cleanup_test_project(test_dir)
 
 
+@patch("mcp_tools_py.code_checker_pytest.runners.execute_command")
+def test_run_tests_prepends_venv_bin_verbatim(mock_execute: MagicMock) -> None:
+    """venv_bin lands at the front of PATH as given, with no Scripts/bin appended."""
+    mock_execute.return_value = make_command_result(
+        return_code=1, execution_error="stopped before parsing"
+    )
+
+    with pytest.raises(RuntimeError):
+        run_tests(
+            "/test/project",
+            "tests",
+            python_executable=sys.executable,
+            venv_bin="/some/bin",
+        )
+
+    env = mock_execute.call_args.kwargs["env"]
+    assert env["PATH"] == f"/some/bin{os.pathsep}{os.environ.get('PATH', '')}"
+
+
 @patch("mcp_tools_py.code_checker_pytest.runners.run_tests")
 def test_check_code_with_pytest(mock_run_tests: MagicMock) -> None:
     """Test the full check_code_with_pytest function."""
@@ -226,7 +246,7 @@ def test_check_code_with_pytest_with_custom_parameters(
         3,  # verbosity
         extra_args,
         custom_env,
-        None,  # venv_path
+        None,  # venv_bin
         True,  # keep_temp_files
         300,  # timeout_seconds (default value)
         skip_default_test_folder=False,

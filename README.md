@@ -100,8 +100,8 @@ mcp-tools-py --project-dir /path/to/project [options]
 #### Python Configuration
 | Parameter | Type | Default | Description |
 |-----------|------|---------|-------------|
-| `--python-executable` | string | sys.executable | Path to the Python interpreter used to run pytest, pylint, mypy, black and isort. Should point to the environment where these tools are installed (the tool's own venv), not the project's runtime venv |
-| `--venv-path` | string | None | Path to the virtual environment holding the checker tools. Required for the ones located as binaries: ruff, bandit, vulture, tach and lint-imports. When specified, this venv's Python will be used instead of `--python-executable`. This should be the tool's own venv, not the project's runtime venv |
+| `--python-executable` | string | sys.executable | Path to the Python interpreter that runs the checker tools. Should point to the environment where they are installed (the tool's own venv), not the project's runtime venv. A bare name is looked up on PATH; a path that neither exists nor resolves fails at startup |
+| `--venv-path` | string | None | **Deprecated**, hidden from `--help`. Still accepted, and still resolves the interpreter (taking precedence over `--python-executable`), but no longer used to locate tools. Use `--python-executable` instead |
 
 #### Test Configuration
 | Parameter | Type | Default | Description |
@@ -125,18 +125,20 @@ mcp-tools-py --project-dir /path/to/project [options]
 
 ### Notes
 
-- When `--venv-path` is specified, it takes precedence over `--python-executable`
+- When the deprecated `--venv-path` is specified, it takes precedence over `--python-executable`. Resolving the interpreter is now its only effect
 - The `--console-only` flag is useful during development to avoid creating log files
 - Log files are created in JSON format for structured analysis
 - Temporary files are automatically cleaned up unless `--keep-temp-files` is specified
 
 ## Environment Configuration
 
-The `--python-executable` and `--venv-path` options must point to the environment where **the checker tools are installed** — pytest, pylint, mypy, black and isort are run through that interpreter, while ruff, bandit, vulture, tach and lint-imports are located as binaries inside `--venv-path`. This is typically the tool's own virtual environment, not your project's runtime venv.
+`--python-executable` must point to the environment where **the checker tools are installed** — pytest, pylint, mypy, black and isort are run through that interpreter, while ruff, bandit, vulture, tach and lint-imports are console scripts located next to it. This is typically the tool's own virtual environment, not your project's runtime venv.
+
+The first example below builds that path by interpolating an environment variable, so an unset or stale variable leaves `--python-executable` pointing nowhere. The server then fails at startup with a `FileNotFoundError` naming the flag, rather than starting up and reporting every tool as missing. A bare interpreter name such as `python3` is looked up on PATH instead.
 
 ### Correct Configuration
 
-Point to the venv where mcp-tools-py and its tools are installed:
+Point to the venv where mcp-tools-py and its tools are installed, here on Windows:
 
 ```json
 {
@@ -145,11 +147,17 @@ Point to the venv where mcp-tools-py and its tools are installed:
             "command": "mcp-tools-py",
             "args": [
                 "--project-dir", "/path/to/your/project",
-                "--venv-path", "${VIRTUAL_ENV}"
+                "--python-executable", "${VIRTUAL_ENV}\\Scripts\\python.exe"
             ]
         }
     }
 }
+```
+
+On macOS and Linux the interpreter sits in `bin` instead:
+
+```text
+                "--python-executable", "${VIRTUAL_ENV}/bin/python"
 ```
 
 ### Incorrect Configuration
@@ -163,7 +171,7 @@ Do **not** point to your project's runtime venv if it doesn't have the checker t
             "command": "mcp-tools-py",
             "args": [
                 "--project-dir", "/path/to/your/project",
-                "--venv-path", "/path/to/your/project/.venv"
+                "--python-executable", "/path/to/your/project/.venv/bin/python"
             ]
         }
     }
@@ -174,9 +182,10 @@ This will fail if your project's `.venv` doesn't have the required tools install
 
 ### Troubleshooting
 
-- **"No module named pytest"** (or pylint/mypy/black/isort): Your `--python-executable` or `--venv-path` points to an environment that doesn't have the required tools installed. Update the configuration to point to the correct environment.
-- **"ruff not found"** (or bandit/vulture/tach/lint-imports) logged at startup: these tools are located as binaries inside `--venv-path`. Set `--venv-path` to an environment where they are installed.
-- **After installing missing tools**, restart the MCP server for changes to take effect. Tool availability is checked at startup and cached for the session.
+- **"Python interpreter not found"** at startup: `--python-executable` points at a path that doesn't exist — usually because the environment variable it interpolates is unset. The message names the flag that supplied the path.
+- **"No module named pytest"** (or pylint/mypy/black/isort): Your `--python-executable` points to an environment that doesn't have the required tools installed. Update the configuration to point to the correct environment.
+- **"ruff is not available"** (or bandit/vulture/tach/lint-imports): these tools are console scripts, looked for next to `--python-executable`. The message names the directory searched; point `--python-executable` at an environment where they are installed. A bare name such as `python3` resolving to a system interpreter reports all five as unavailable, because they are not installed next to it.
+- **After installing missing tools**, restart the MCP server for changes to take effect. The console-script tools are located at startup; pytest, pylint, mypy, black and isort are checked on first use. Both results are cached for the session.
 
 ## Installation
 

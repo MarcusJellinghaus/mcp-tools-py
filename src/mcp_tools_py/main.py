@@ -36,20 +36,21 @@ def _positive_timeout(value: str) -> int:
     return parsed
 
 
-def parse_args() -> argparse.Namespace:
-    """Parse command line arguments.
+def _build_parser() -> argparse.ArgumentParser:
+    """Build the command line argument parser.
 
     Returns:
-        Parsed arguments
+        The configured parser
     """
     parser = argparse.ArgumentParser(
         description="MCP Tools Py Server - Run pylint, pytest, and mypy checks on Python code",
         formatter_class=argparse.RawDescriptionHelpFormatter,
-        epilog="""
+        epilog=r"""
 Examples:
   mcp-tools-py --project-dir /path/to/project
   mcp-tools-py --project-dir . --log-level DEBUG --keep-temp-files
-  mcp-tools-py --project-dir /path/to/project --venv-path .venv --test-folder tests
+  mcp-tools-py --project-dir . --python-executable /path/to/tools-venv/bin/python --test-folder tests
+  mcp-tools-py --project-dir . --python-executable C:\path\to\tools-venv\Scripts\python.exe
         """,
     )
     parser.add_argument(
@@ -67,21 +68,19 @@ Examples:
         "--python-executable",
         type=str,
         help=(
-            "Path to Python interpreter for running pytest, pylint, and mypy. "
-            "Should point to the environment where these tools are installed "
-            "(the tool's own venv), not the project's runtime venv. "
+            "Path to the Python interpreter that runs the checker tools. "
+            "pytest, pylint, mypy, black and isort run through it, while ruff, "
+            "bandit, vulture, tach and lint-imports are located next to it, so "
+            "it should point to the environment where they are installed (the "
+            "tool's own venv), not the project's runtime venv. A path that "
+            "neither exists nor resolves on PATH fails at startup. "
             "Defaults to the current Python interpreter (sys.executable)"
         ),
     )
     parser.add_argument(
         "--venv-path",
         type=str,
-        help=(
-            "Path to the virtual environment where pytest, pylint, and mypy are installed. "
-            "When specified, the Python executable from this venv will be used "
-            "instead of --python-executable. This should be the tool's own venv, "
-            "not the project's runtime venv"
-        ),
+        help=argparse.SUPPRESS,
     )
     parser.add_argument(
         "--test-folder",
@@ -140,7 +139,16 @@ Examples:
             "Auto-included when the file exists. Default: vulture_whitelist.py"
         ),
     )
-    return parser.parse_args()
+    return parser
+
+
+def parse_args() -> argparse.Namespace:
+    """Parse command line arguments.
+
+    Returns:
+        Parsed arguments
+    """
+    return _build_parser().parse_args()
 
 
 def main() -> None:
@@ -152,7 +160,8 @@ def main() -> None:
     project_dir = Path(args.project_dir)
     if not project_dir.exists() or not project_dir.is_dir():
         print(
-            f"Error: Project directory does not exist or is not a directory: {project_dir}"
+            f"Error: Project directory does not exist or is not a directory: {project_dir}",
+            file=sys.stderr,
         )
         sys.exit(1)
 
@@ -185,17 +194,28 @@ def main() -> None:
         },
     )
 
+    if args.venv_path:
+        logger.warning(
+            "--venv-path is deprecated and will be removed; use --python-executable. "
+            "It still resolves the interpreter but no longer affects tool detection.",
+            extra={"venv_path": args.venv_path},
+        )
+
     # Create and run the server
-    server = create_server(
-        project_dir,
-        python_executable=args.python_executable,
-        venv_path=args.venv_path,
-        test_folder=args.test_folder,
-        keep_temp_files=args.keep_temp_files,
-        refactoring_timeout=args.refactoring_timeout,
-        vulture_whitelist=args.vulture_whitelist,
-        check_timeout=args.check_timeout,
-    )
+    try:
+        server = create_server(
+            project_dir,
+            python_executable=args.python_executable,
+            venv_path=args.venv_path,
+            test_folder=args.test_folder,
+            keep_temp_files=args.keep_temp_files,
+            refactoring_timeout=args.refactoring_timeout,
+            vulture_whitelist=args.vulture_whitelist,
+            check_timeout=args.check_timeout,
+        )
+    except FileNotFoundError as exc:
+        print(f"Error: {exc}", file=sys.stderr)
+        sys.exit(1)
 
     logger.info("Starting MCP server")
     logger.debug("About to call server.run()", extra={"project_dir": str(project_dir)})

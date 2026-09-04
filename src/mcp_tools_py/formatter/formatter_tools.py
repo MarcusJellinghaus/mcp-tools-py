@@ -6,6 +6,7 @@ from typing import TYPE_CHECKING
 from mcp_tools_py.formatter.models import FormatterResult
 from mcp_tools_py.formatter.runner import DEFAULT_STEPS
 from mcp_tools_py.formatter.runner import run_format_code as _run_format_code
+from mcp_tools_py.formatter.runner import validate_steps
 from mcp_tools_py.log_utils import log_function_call
 from mcp_tools_py.utils.project_config import (
     check_line_length_conflicts,
@@ -52,6 +53,13 @@ class FormatterTools:
             """
             resolved_steps = steps or DEFAULT_STEPS
 
+            # Reject unknown steps before they reach the availability check,
+            # which would otherwise report them as uninstalled tools.
+            try:
+                validate_steps(resolved_steps)
+            except ValueError as exc:
+                return f"Error: {exc}"
+
             # Resolve target directories
             resolved = resolve_target_directories(
                 str(self._server.project_dir), target_directories
@@ -63,13 +71,7 @@ class FormatterTools:
             # Check tool availability upfront
             for step in resolved_steps:
                 if not self._server._is_tool_available(step):
-                    return (
-                        f"Error: {step} is not available in the configured "
-                        f"Python environment ({self._server._resolved_python}). "
-                        f"Ensure --python-executable and --venv-path point to the "
-                        f"environment where {step} is installed. "
-                        f"Restart the server after installing."
-                    )
+                    return f"Error: {self._server.tool_unavailable_message(step)}"
 
             # Check for line-length conflicts
             warnings = check_line_length_conflicts(

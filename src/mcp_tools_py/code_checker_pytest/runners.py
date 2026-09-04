@@ -86,7 +86,7 @@ def run_tests(
     verbosity: int = 2,
     extra_args: Optional[List[str]] = None,
     env_vars: Optional[Dict[str, str]] = None,
-    venv_path: Optional[str] = None,
+    venv_bin: Optional[str] = None,
     keep_temp_files: bool = False,
     timeout_seconds: int = 300,
     skip_default_test_folder: bool = False,
@@ -101,7 +101,7 @@ def run_tests(
         verbosity: Integer for pytest verbosity level (0-3). Default is 2. Higher values provide more detailed output
         extra_args: Optional list of additional pytest arguments. Examples: ['-xvs', '--no-header', '--durations=10']
         env_vars: Optional dictionary of environment variables to set for the subprocess. Example: {'DEBUG': '1'}
-        venv_path: Optional path to a virtual environment to activate. When provided, this venv's Python will be used
+        venv_bin: Optional bin/Scripts directory to prepend to PATH. This is the directory the interpreter lives in, not a virtual environment root
         keep_temp_files: Whether to keep temporary files after execution (useful for debugging failures)
         timeout_seconds: Maximum time in seconds to wait for test execution. Default is 300 seconds
         skip_default_test_folder: When True, do not append `test_folder` to the pytest command (caller already passed test paths via `extra_args`)
@@ -129,7 +129,7 @@ def run_tests(
             "test_folder": test_folder,
             "markers": markers,
             "verbosity": verbosity,
-            "venv_path": venv_path,
+            "venv_bin": venv_bin,
         },
     )
 
@@ -148,7 +148,6 @@ def run_tests(
 
     try:
         # Construct the pytest command
-        # NOTE: venv_path parameter is still accepted for PATH adjustment below.
         command = [
             python_executable,
             "-m",
@@ -198,13 +197,9 @@ def run_tests(
         current_depth = int(os.environ.get("PYTEST_SUBPROCESS_DEPTH", "0"))
         env["PYTEST_SUBPROCESS_DEPTH"] = str(current_depth + 1)
 
-        # If using a virtual environment, adjust PATH to prioritize it
-        if venv_path:
-            if os.name == "nt":  # Windows
-                venv_bin = os.path.join(venv_path, "Scripts")
-            else:  # Unix-like systems
-                venv_bin = os.path.join(venv_path, "bin")
-
+        # Prepend the interpreter's bin/Scripts directory so tests find its
+        # console scripts
+        if venv_bin:
             env["PATH"] = f"{venv_bin}{os.pathsep}{os.environ.get('PATH', '')}"
 
         try:
@@ -477,7 +472,7 @@ def check_code_with_pytest(
     verbosity: int = 2,
     extra_args: Optional[List[str]] = None,
     env_vars: Optional[Dict[str, str]] = None,
-    venv_path: Optional[str] = None,
+    venv_bin: Optional[str] = None,
     keep_temp_files: bool = False,
     timeout_seconds: int = 300,
     skip_default_test_folder: bool = False,
@@ -492,7 +487,7 @@ def check_code_with_pytest(
         verbosity: Integer for pytest verbosity level (0-3), default 2. Higher values provide more detailed output
         extra_args: Optional list of additional pytest arguments. Examples: ['-xvs', '--no-header']
         env_vars: Optional dictionary of environment variables for the subprocess. Example: {'DEBUG': '1', 'PYTHONPATH': '/custom/path'}
-        venv_path: Optional path to a virtual environment to activate for running tests. When specified, the Python executable from this venv will be used instead of python_executable
+        venv_bin: Optional bin/Scripts directory to prepend to PATH. This is the directory the interpreter lives in, not a virtual environment root
         keep_temp_files: Whether to keep temporary files after test execution. Useful for debugging when tests fail
         timeout_seconds: Maximum time in seconds to wait for test execution. Default is 300 seconds
         skip_default_test_folder: When True, do not append `test_folder` to the pytest command (caller already passed test paths via `extra_args`)
@@ -524,7 +519,7 @@ def check_code_with_pytest(
             verbosity,
             extra_args,
             env_vars,
-            venv_path,
+            venv_bin,
             keep_temp_files,
             timeout_seconds,
             skip_default_test_folder=skip_default_test_folder,

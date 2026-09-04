@@ -36,19 +36,11 @@ def register(mcp: "FastMCPProtocol", checker_tools: "CheckerTools") -> None:
             failures.
         """
         if not server._is_tool_available("lint-imports"):
-            binary_path = server._lint_imports_binary or "N/A"
-            return (
-                f"lint-imports is not available at {binary_path}. "
-                f"Ensure the virtual environment has import-linter "
-                f"installed and --venv-path is configured. Restart "
-                f"the server after installing."
-            )
+            return server.tool_unavailable_message("lint-imports")
 
         try:
-            binary = server._lint_imports_binary
-            assert binary is not None
             return run_lint_imports_check_impl(
-                binary,
+                server._tool_binaries["lint-imports"],
                 str(server.project_dir),
                 extra_args,
                 server.resolve_timeout("lint-imports"),

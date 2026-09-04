@@ -1,6 +1,7 @@
 """Pytest MCP tool registration."""
 
 import logging
+import os
 from typing import TYPE_CHECKING, Dict, List, Optional
 
 from mcp_tools_py.code_checker_pytest.runners import check_code_with_pytest
@@ -72,12 +73,7 @@ def register(mcp: "FastMCPProtocol", checker_tools: "CheckerTools") -> None:
             run_pytest_check(markers=["integration"])
         """
         if not server._is_tool_available("pytest"):
-            return (
-                f"pytest is not available in the configured Python environment "
-                f"({server._resolved_python}). Ensure --python-executable and "
-                f"--venv-path point to the environment where pytest is installed. "
-                f"Restart the server after installing."
-            )
+            return server.tool_unavailable_message("pytest")
 
         try:
             logger.info(
@@ -108,7 +104,7 @@ def register(mcp: "FastMCPProtocol", checker_tools: "CheckerTools") -> None:
                 verbosity=sanitized.verbosity,
                 extra_args=sanitized.cleaned_args,
                 env_vars=env_vars,
-                venv_path=server.venv_path,
+                venv_bin=os.path.dirname(server._resolved_python),
                 keep_temp_files=server.keep_temp_files,
                 skip_default_test_folder=sanitized.has_path_args,
                 timeout_seconds=server.resolve_timeout("pytest", timeout_seconds),

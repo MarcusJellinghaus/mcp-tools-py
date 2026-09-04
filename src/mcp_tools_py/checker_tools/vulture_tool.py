@@ -37,12 +37,7 @@ def register(mcp: "FastMCPProtocol", checker_tools: "CheckerTools") -> None:
             Raw vulture output (stdout + stderr combined)
         """
         if not server._is_tool_available("vulture"):
-            binary_path = server._vulture_binary or "N/A"
-            return (
-                f"vulture is not available at {binary_path}. "
-                f"Ensure the virtual environment has vulture installed "
-                f"and --venv-path is configured. Restart the server after installing."
-            )
+            return server.tool_unavailable_message("vulture")
 
         resolved = resolve_target_directories(
             str(server.project_dir), target_directories
@@ -61,15 +56,12 @@ def register(mcp: "FastMCPProtocol", checker_tools: "CheckerTools") -> None:
                 },
             )
 
-            binary = server._vulture_binary
-            assert binary is not None  # guarded by availability check above
-
             project_dir = server.project_dir
             whitelist_path = project_dir / server.vulture_whitelist
             whitelist = str(whitelist_path) if whitelist_path.exists() else None
 
             output = run_vulture(
-                vulture_binary=binary,
+                vulture_binary=server._tool_binaries["vulture"],
                 project_dir=str(project_dir),
                 target_directories=resolved,
                 min_confidence=min_confidence,
