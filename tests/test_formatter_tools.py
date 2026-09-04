@@ -117,19 +117,33 @@ class TestStepOrdering:
 class TestValidation:
     """Tests for input validation."""
 
-    def test_invalid_step_returns_error(self, mock_server: MagicMock) -> None:
+    def test_runner_value_error_returns_error(self, mock_server: MagicMock) -> None:
         """Runner raises ValueError, wrapper returns error string."""
         run_format = _capture_run_format_code(mock_server)
 
-        mock_runner = MagicMock(
-            side_effect=ValueError("Invalid formatter steps: ['ruff']")
-        )
+        mock_runner = MagicMock(side_effect=ValueError("bad timeout"))
 
         with patch(_RUNNER_PATCH, mock_runner):
-            result = run_format(steps=["ruff"], target_directories=["src"])
+            result = run_format(steps=["black"], target_directories=["src"])
 
         assert "Error" in result
-        assert "ruff" in result
+        assert "bad timeout" in result
+
+    def test_unknown_step_reported_as_invalid_not_missing(
+        self, mock_server: MagicMock
+    ) -> None:
+        """An unknown step is rejected before the availability check runs."""
+        run_format = _capture_run_format_code(mock_server)
+
+        mock_runner = MagicMock()
+
+        with patch(_RUNNER_PATCH, mock_runner):
+            result = run_format(steps=["foo"], target_directories=["src"])
+
+        mock_runner.assert_not_called()
+        assert "Invalid formatter steps: ['foo']" in result
+        assert "not available" not in result
+        assert "console script" not in result
 
 
 class TestTargetDirectories:

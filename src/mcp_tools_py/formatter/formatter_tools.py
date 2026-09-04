@@ -6,6 +6,7 @@ from typing import TYPE_CHECKING
 from mcp_tools_py.formatter.models import FormatterResult
 from mcp_tools_py.formatter.runner import DEFAULT_STEPS
 from mcp_tools_py.formatter.runner import run_format_code as _run_format_code
+from mcp_tools_py.formatter.runner import validate_steps
 from mcp_tools_py.log_utils import log_function_call
 from mcp_tools_py.utils.project_config import (
     check_line_length_conflicts,
@@ -51,6 +52,13 @@ class FormatterTools:
                 Formatted output with markdown headers per step.
             """
             resolved_steps = steps or DEFAULT_STEPS
+
+            # Reject unknown steps before they reach the availability check,
+            # which would otherwise report them as uninstalled tools.
+            try:
+                validate_steps(resolved_steps)
+            except ValueError as exc:
+                return f"Error: {exc}"
 
             # Resolve target directories
             resolved = resolve_target_directories(

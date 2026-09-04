@@ -7,7 +7,14 @@ from unittest.mock import MagicMock
 
 
 def _create_server(**kwargs: Any) -> Any:
-    """Create a ToolServer with mocked FastMCP and execute_command."""
+    """Construct a real ToolServer from the given keyword arguments.
+
+    Mocks nothing: each caller sets up whatever patches it needs around
+    the call.
+
+    Returns:
+        The constructed ToolServer.
+    """
     from mcp_tools_py.server import ToolServer
 
     return ToolServer(**kwargs)

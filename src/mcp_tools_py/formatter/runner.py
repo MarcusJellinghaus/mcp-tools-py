@@ -22,6 +22,24 @@ _STEP_RUNNERS: dict[str, Callable[..., FormatterResult]] = {
 }
 
 
+def validate_steps(steps: list[str]) -> None:
+    """Reject step names that are not known formatters.
+
+    Args:
+        steps: Formatter step names to check.
+
+    Raises:
+        ValueError: If any step name is not in :data:`_VALID_STEPS`.
+    """
+    invalid = [s for s in steps if s not in _VALID_STEPS]
+    if invalid:
+        msg = (
+            f"Invalid formatter steps: {invalid}. "
+            f"Valid steps are: {sorted(_VALID_STEPS)}"
+        )
+        raise ValueError(msg)
+
+
 def run_format_code(
     python_executable: str,
     project_root: Path,
@@ -50,14 +68,7 @@ def run_format_code(
         ValueError: If any step name is not in :data:`_VALID_STEPS`.
     """
     resolved_steps = steps or DEFAULT_STEPS
-
-    invalid = [s for s in resolved_steps if s not in _VALID_STEPS]
-    if invalid:
-        msg = (
-            f"Invalid formatter steps: {invalid}. "
-            f"Valid steps are: {sorted(_VALID_STEPS)}"
-        )
-        raise ValueError(msg)
+    validate_steps(resolved_steps)
 
     results: dict[str, FormatterResult] = {}
     for step in resolved_steps:
