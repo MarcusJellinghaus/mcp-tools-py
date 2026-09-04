@@ -83,8 +83,9 @@ The mypy tools expose the following parameters for customization:
 ### Mypy Configuration
 
 Mypy reads your project's `pyproject.toml` automatically, and `[tool.mypy]` is the
-single source of truth for the flag set — the tool adds only output-formatting flags.
-A project with no `[tool.mypy]` section is checked at mypy's defaults and still reports
+single source of truth for the flag set — the tool adds only output-formatting flags,
+unless you pass `follow_imports`, `cache_dir` or `disable_error_codes`. A project with
+no `[tool.mypy]` section is checked at mypy's defaults and still reports
 "passed". See [docs/pyproject-configuration.md](docs/pyproject-configuration.md) for
 migration guidance and the effect on mypy's cache.
 

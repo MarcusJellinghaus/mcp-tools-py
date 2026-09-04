@@ -136,8 +136,10 @@ takes the first one that carries a mypy section. It does **not** walk up the
 directory tree: a config file above the project directory is never read.
 
 **The MCP tool adds only output-formatting flags** — no strictness, no import
-resolution, no per-module settings of its own. `[tool.mypy]` is the single source
-of truth for the flag set mypy runs with.
+resolution, no per-module settings of its own — unless you pass one of its
+optional parameters (`follow_imports`, `cache_dir`, `disable_error_codes`), each
+of which sends the corresponding flag for that one call. Otherwise `[tool.mypy]`
+is the single source of truth for the flag set mypy runs with.
 
 > **There is no floor.** A project with no `[tool.mypy]` section is checked at
 > mypy's defaults: bodies of unannotated functions are not checked at all. The run
@@ -163,10 +165,10 @@ two quite different ways:
 
 - **`import-not-found` / `import-untyped` errors.** Mypy runs and checks your
   code, but reports every import it could not resolve.
-- **`Duplicate module named ...`, exit code 2.** The build fails before checking
-  anything, so the run reports an error rather than a type result. It takes a
-  narrower shape: the same module basename under two roots, neither carrying an
-  `__init__.py`, so mypy cannot tell the two files apart.
+- **`Duplicate module named ...`, exit code 2.** Any two files under the targeted
+  roots that resolve to the same module name trigger it — `__init__.py` in both
+  roots does not prevent it. The build fails before checking anything, so the run
+  reports an error rather than a type result.
 
 A `src/` layout typically needs:
 
