@@ -99,15 +99,16 @@ Delete `_tool_availability`, `_is_tool_available`, `_resolved_python` and the fi
 outside the registrars still calls it — otherwise delete that too and let
 `ToolContext.resolve_timeout` be the single implementation.
 
-Each of those four names has readers in the test suite, and every one of them must move in
-this commit:
+Each of those removed names has readers in the test suite, and every one of them must move
+in this commit:
 
 | Removed name | Readers | Fix |
 |---|---|---|
 | `_check_tool_availability` (renamed) | `tests/test_server_params.py:52,104,141,411,746,797` — `patch.object(ToolServer, "_check_tool_availability", return_value={})` | `patch.object` raises `AttributeError` on a missing attribute. Repoint at `_warn_missing_console_scripts` with `return_value=None`; it stores nothing, so the patch is only suppressing startup warnings. |
 | `_is_tool_available` | `tests/test_server_params.py:58,108,145,415,500,527,799` — `_server._is_tool_available = lambda tool_name: True  # type: ignore[method-assign]` | The method is gone, so both the assignment and its `type: ignore` are wrong (mypy's `--warn-unused-ignores` flags the latter). Replace with a `ToolContext` whose availability answers `True`: patch `mcp_tools_py.utils.tool_context.get_environment_info` to return an `EnvironmentInfo` marking every probed module importable, from the shared fixture added below. |
 | `_resolved_python` | `tests/test_tool_availability.py:44,61,90,103` (`TestResolvePythonExecutable`), `tests/test_tool_availability.py:520` (`test_resolved_python_passed_to_pytest_runner`, in `TestToolHandlerShortCircuit`) and `tests/test_server_params.py:78` | `TestResolvePythonExecutable` becomes assertions on `server.environment.interpreter`, which is what step 1 already rewrote most of them to; finish the conversion here and drop the class's dependence on the removed alias. `:520` asserts `call_kwargs.kwargs["python_executable"] == server._resolved_python` — change the right-hand side to `str(server.context.environment.interpreter)`; the test's point (the *resolved* interpreter reaches the runner, not the raw `python_executable` argument) is unchanged, and its name stays accurate enough to keep. `test_server_params.py:78` asserts `python_executable=_server._resolved_python` in the `check_code_with_pytest` kwargs — change to `str(_server.context.environment.interpreter)`, matching what `pytest_tool.py` now passes. |
-| the five `_<tool>_binary` | `tests/test_tool_availability.py:542`, and the three mock fixtures below | Covered by the fixture migration. |
+| `_tool_availability` | `tests/test_tool_availability.py` — `TestCheckToolAvailability` (`:126-235`), `TestIsToolAvailable` (`:267,280,327,347`), `TestToolHandlerShortCircuit` (`:384,409,434,468,505,533`); `tests/test_checker_tools.py:23,40,191,582,626,670`; `tests/test_formatter_tools.py:19,23,291` | The dict is gone; availability is `ToolContext.is_tool_available`. Two classes are deleted and two rewritten — see the fixture migration below. |
+| the five `_<tool>_binary` | `tests/test_tool_availability.py:162,175,178,203,205,207,222,234,542`, and the three mock fixtures below | `:542` keeps its assertion against `unavailable_message`; the rest belong to `TestCheckToolAvailability`, which is deleted. Otherwise covered by the fixture migration. |
 
 ## HOW — the nine tool modules
 
@@ -169,14 +170,46 @@ red the moment the registrars change, so they move in this same commit:
   creating or omitting binary files and by patching `get_environment_info`, not by
   writing `_tool_availability`. The five `_*_binary` attributes and `venv_path`
   disappear from the fixture.
-- `tests/test_tool_availability.py` — `TestToolHandlerShortCircuit` (`:371-547`) sets
-  `server._tool_availability` directly; convert to the same mechanism. `:542` sets
-  `_lint_imports_binary` and asserts the path appears in the message — keep that
-  assertion against `unavailable_message`. `TestResolvePythonExecutable` (`:26-103`) is
-  the other class in this file that touches removed state: `:44`, `:61` and `:90` read
-  `_resolved_python`, so they become `server.environment.interpreter` assertions, and
-  `:103` becomes `Path(sys.executable)`. Keep the class — it still tests resolution
-  order, which is now `PythonEnvironment.resolve`'s contract as seen through the server.
+- `tests/test_tool_availability.py` — **all four classes in this file read state this step
+  deletes.** Two are rewritten in place and two go away:
+
+  - `TestToolHandlerShortCircuit` (`:371-547`) sets `server._tool_availability` directly;
+    convert to the same mechanism. `:542` sets `_lint_imports_binary` and asserts the path
+    appears in the message — keep that assertion against `unavailable_message`.
+  - `TestResolvePythonExecutable` (`:26-103`): `:44`, `:61` and `:90` read
+    `_resolved_python`, so they become `server.environment.interpreter` assertions, and
+    `:103` becomes `Path(sys.executable)`. Keep the class — it still tests resolution
+    order, which is now `PythonEnvironment.resolve`'s contract as seen through the server.
+  - **`TestCheckToolAvailability` (`:111-236`, seven tests) — delete the class.** Every
+    assertion in it reads `server._tool_availability` (`:126`, `:141`, `:161`, `:165`,
+    `:174`, `:176`, `:177`, `:202`, `:204`, `:206`, `:221`, `:233`, `:235`) or one of the
+    five `_<tool>_binary` attributes (`:162`, `:175`, `:178`, `:203`, `:205`, `:207`,
+    `:222`, `:234`), and `_check_tool_availability` no longer returns a dict. Its subject
+    survives in two places, so nothing is lost — but move what is missing before deleting:
+    - "binary present / absent" (`test_lint_imports_available_when_binary_exists`,
+      `test_lint_imports_unavailable_when_binary_missing`, `test_vulture_available_when_binary_exists`,
+      and the two `_when_no_venv` tests step 1 rewrote) is `PythonEnvironment.binary()`
+      hit/miss — already covered by `tests/test_python_environment.py` tests 6-8.
+    - "all five at once" (`test_all_tools_available`, `test_all_tools_missing`) is
+      `ToolContext.is_tool_available`; add a case to `tests/test_tool_context.py` case 1
+      parametrized over `CONSOLE_SCRIPT_TOOLS`, so the five-name coverage is not lost.
+    - The one behaviour neither covers is that the **server warns at startup**. Add one
+      test in `tests/test_server_params.py`: construct a server whose `bin_dir` is an empty
+      `tmp_path`, assert `_warn_missing_console_scripts` logs a warning naming each of the
+      five tools (`caplog`), and assert the server stores no availability attribute.
+  - **`TestIsToolAvailable` (`:244-347`, five tests) — delete the class and move its
+    behaviours to `tests/test_tool_context.py`.** All five call `server._is_tool_available(...)`
+    (`:264`, `:283`, `:302`, `:324`, `:344`) or read `server._tool_availability`
+    (`:267`, `:280`, `:327`, `:347`); step 2 repointed them at `get_environment_info`, and
+    this step removes the method they exercise. The four behaviours they assert map onto
+    `ToolContext.is_tool_available` one for one: first call probes; a second call runs no
+    further subprocess (assert the patched `get_environment_info` was called once across
+    two `is_tool_available` calls — the caching now lives in its `lru_cache`, not on the
+    server); a console-script tool never probes (case 1); a failed probe answers `False`.
+    Fold them into cases 1-2 rather than adding a fifth near-duplicate class.
+
+  Update the module docstring at `:1` — it names `_resolve_python_executable` and
+  `_check_tool_availability`, neither of which exists after this step.
 - `tests/test_server_params.py` — the six `_check_tool_availability` patches and the seven
   `_is_tool_available` assignments listed in the table above. This file is not a
   `ToolContext` fixture holder; it constructs real servers, so it needs the patch targets
@@ -198,9 +231,13 @@ Prefer one shared `ToolContext` fixture (in `tests/conftest.py`) over three near
 > Write `tests/test_tool_context.py` first, then add `utils/tool_context.py`, then convert
 > `CheckerTools`, the nine `*_tool.py` modules and `FormatterTools` to take a
 > `ToolContext`, then strip the corresponding state from `server.py`, then migrate the
-> three mock-server fixtures and fix every reader of the four removed names — the table in
+> three mock-server fixtures and fix every reader of the removed names — the table in
 > the step lists them, including `tests/test_server_params.py` and
 > `TestResolvePythonExecutable`; they must all move in this commit or pytest goes red.
+> In `tests/test_tool_availability.py`, delete `TestCheckToolAvailability` and
+> `TestIsToolAvailable` — they test methods that no longer exist — after folding the
+> behaviours the step names into `tests/test_tool_context.py` and the new startup-warning
+> test.
 > Delete
 > the last two `.importlinter` `ignore_imports` entries and the now-empty `ignore_imports`
 > key. Do not touch `RefactoringTools`, `InspectTools` or `UtilityTools` — step 7 owns
