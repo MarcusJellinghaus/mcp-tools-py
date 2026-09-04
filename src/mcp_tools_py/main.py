@@ -49,7 +49,7 @@ def _build_parser() -> argparse.ArgumentParser:
 Examples:
   mcp-tools-py --project-dir /path/to/project
   mcp-tools-py --project-dir . --log-level DEBUG --keep-temp-files
-  mcp-tools-py --project-dir /path/to/project --python-executable .venv/Scripts/python.exe --test-folder tests
+  mcp-tools-py --project-dir /path/to/project --python-executable /path/to/tools-venv/bin/python --test-folder tests
         """,
     )
     parser.add_argument(
@@ -200,16 +200,20 @@ def main() -> None:
         )
 
     # Create and run the server
-    server = create_server(
-        project_dir,
-        python_executable=args.python_executable,
-        venv_path=args.venv_path,
-        test_folder=args.test_folder,
-        keep_temp_files=args.keep_temp_files,
-        refactoring_timeout=args.refactoring_timeout,
-        vulture_whitelist=args.vulture_whitelist,
-        check_timeout=args.check_timeout,
-    )
+    try:
+        server = create_server(
+            project_dir,
+            python_executable=args.python_executable,
+            venv_path=args.venv_path,
+            test_folder=args.test_folder,
+            keep_temp_files=args.keep_temp_files,
+            refactoring_timeout=args.refactoring_timeout,
+            vulture_whitelist=args.vulture_whitelist,
+            check_timeout=args.check_timeout,
+        )
+    except FileNotFoundError as exc:
+        print(f"Error: {exc}")
+        sys.exit(1)
 
     logger.info("Starting MCP server")
     logger.debug("About to call server.run()", extra={"project_dir": str(project_dir)})

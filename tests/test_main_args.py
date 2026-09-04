@@ -65,3 +65,32 @@ class TestVenvPathDeprecation:
         assert epilog is not None
         assert "--python-executable" in epilog
         assert "--venv-path" not in epilog
+
+
+class TestMissingInterpreter:
+    """Test the startup failure for an unresolvable --python-executable."""
+
+    def test_missing_interpreter_exits_with_message(
+        self, tmp_path: Path, capsys: pytest.CaptureFixture[str]
+    ) -> None:
+        argv = [
+            "mcp-tools-py",
+            "--project-dir",
+            str(tmp_path),
+            "--console-only",
+            "--python-executable",
+            str(tmp_path / "missing" / "python"),
+        ]
+        with (
+            patch("sys.argv", argv),
+            patch("mcp_tools_py.main.setup_logging"),
+            patch(
+                "mcp_tools_py.main.create_server",
+                side_effect=FileNotFoundError("Python interpreter not found: x"),
+            ),
+            pytest.raises(SystemExit) as exc_info,
+        ):
+            main()
+
+        assert exc_info.value.code == 1
+        assert "Python interpreter not found" in capsys.readouterr().out

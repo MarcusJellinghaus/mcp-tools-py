@@ -138,7 +138,7 @@ The first example below builds that path by interpolating an environment variabl
 
 ### Correct Configuration
 
-Point to the venv where mcp-tools-py and its tools are installed:
+Point to the venv where mcp-tools-py and its tools are installed, here on Windows:
 
 ```json
 {
@@ -152,6 +152,12 @@ Point to the venv where mcp-tools-py and its tools are installed:
         }
     }
 }
+```
+
+On macOS and Linux the interpreter sits in `bin` instead:
+
+```json
+                "--python-executable", "${VIRTUAL_ENV}/bin/python"
 ```
 
 ### Incorrect Configuration
