@@ -164,8 +164,9 @@ two quite different ways:
 - **`import-not-found` / `import-untyped` errors.** Mypy runs and checks your
   code, but reports every import it could not resolve.
 - **`Duplicate module named ...`, exit code 2.** The build fails before checking
-  anything, so the run reports an error rather than a type result. This is the
-  usual outcome for a `src/` layout with no `explicit_package_bases`.
+  anything, so the run reports an error rather than a type result. It takes a
+  narrower shape: the same module basename under two roots, neither carrying an
+  `__init__.py`, so mypy cannot tell the two files apart.
 
 A `src/` layout typically needs:
 

@@ -103,6 +103,7 @@ convention = "google"
 python_version = "3.11"
 strict = true
 warn_unreachable = true
+warn_unused_configs = true
 mypy_path = "src"
 namespace_packages = true
 explicit_package_bases = true
@@ -116,7 +117,7 @@ module = ["mcp.server.fastmcp"]
 ignore_missing_imports = true
 
 [[tool.mypy.overrides]]
-module = ["jedi", "jedi.*"]
+module = ["jedi"]
 ignore_missing_imports = true
 
 [[tool.mypy.overrides]]

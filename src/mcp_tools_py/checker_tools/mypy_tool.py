@@ -30,11 +30,14 @@ def register(mcp: "FastMCPProtocol", checker_tools: "CheckerTools") -> None:
         """Run mypy type checking on the project code.
 
         mypy reads the project's `[tool.mypy]` configuration; the server adds only
-        output-formatting flags. A project with no mypy config is checked at mypy's
-        defaults and will report "passed".
+        output-formatting flags, unless you pass one of the parameters below. A
+        project with no mypy config is checked at mypy's defaults and will report
+        "passed".
 
         Args:
             disable_error_codes: Optional list of mypy error codes to ignore.
+                Nothing is sent by default; supplying codes ignores them for this
+                call and splits the mypy cache.
                 Common codes to disable:
                 - 'import': Import-related errors
                 - 'arg-type': Argument type mismatches

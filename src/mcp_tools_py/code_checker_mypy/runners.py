@@ -66,7 +66,9 @@ def _resolve_cache_dir(
         return os.path.join(project_dir, cache_dir), True
 
     # The environment beats any config file, and run_mypy_check passes our own
-    # environment through to mypy
+    # environment through to mypy. Mypy tests the value with .strip() but assigns
+    # it unstripped, so a whitespace-only value falls through to the config; that
+    # asymmetry is mirrored rather than fixed.
     env_cache_dir = os.environ.get("MYPY_CACHE_DIR", "")
     if env_cache_dir.strip():
         return os.path.join(project_dir, os.path.expanduser(env_cache_dir)), True
