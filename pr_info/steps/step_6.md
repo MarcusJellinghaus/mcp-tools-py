@@ -22,6 +22,8 @@ type" (step 7 finishes it).
 - `tests/test_checker_tools.py` (`:13-45` fixture), `tests/test_tool_availability.py`,
   `tests/test_code_checker_bandit/test_integration.py` (`:11-19`),
   `tests/test_formatter_tools.py`
+- `tests/test_server_params.py` — patches `_check_tool_availability` and assigns
+  `_is_tool_available`; both disappear in this step
 
 ## WHAT
 
@@ -97,6 +99,16 @@ Delete `_tool_availability`, `_is_tool_available`, `_resolved_python` and the fi
 outside the registrars still calls it — otherwise delete that too and let
 `ToolContext.resolve_timeout` be the single implementation.
 
+Each of those four names has readers in the test suite, and every one of them must move in
+this commit:
+
+| Removed name | Readers | Fix |
+|---|---|---|
+| `_check_tool_availability` (renamed) | `tests/test_server_params.py:52,104,141,411,746,797` — `patch.object(ToolServer, "_check_tool_availability", return_value={})` | `patch.object` raises `AttributeError` on a missing attribute. Repoint at `_warn_missing_console_scripts` with `return_value=None`; it stores nothing, so the patch is only suppressing startup warnings. |
+| `_is_tool_available` | `tests/test_server_params.py:58,108,145,415,500,527,799` — `_server._is_tool_available = lambda tool_name: True  # type: ignore[method-assign]` | The method is gone, so both the assignment and its `type: ignore` are wrong (mypy's `--warn-unused-ignores` flags the latter). Replace with a `ToolContext` whose availability answers `True`: patch `mcp_tools_py.utils.tool_context.get_environment_info` to return an `EnvironmentInfo` marking every probed module importable, from the shared fixture added below. |
+| `_resolved_python` | `tests/test_tool_availability.py:44,61,90,103` (`TestResolvePythonExecutable`) and `tests/test_server_params.py:78` | `TestResolvePythonExecutable` becomes assertions on `server.environment.interpreter`, which is what step 1 already rewrote most of them to; finish the conversion here and drop the class's dependence on the removed alias. `test_server_params.py:78` asserts `python_executable=_server._resolved_python` in the `check_code_with_pytest` kwargs — change to `str(_server.context.environment.interpreter)`, matching what `pytest_tool.py` now passes. |
+| the five `_<tool>_binary` | `tests/test_tool_availability.py:542`, and the three mock fixtures below | Covered by the fixture migration. |
+
 ## HOW — the nine tool modules
 
 Uniform substitutions, one per module:
@@ -160,7 +172,15 @@ red the moment the registrars change, so they move in this same commit:
 - `tests/test_tool_availability.py` — `TestToolHandlerShortCircuit` (`:371-547`) sets
   `server._tool_availability` directly; convert to the same mechanism. `:542` sets
   `_lint_imports_binary` and asserts the path appears in the message — keep that
-  assertion against `unavailable_message`.
+  assertion against `unavailable_message`. `TestResolvePythonExecutable` (`:26-103`) is
+  the other class in this file that touches removed state: `:44`, `:61` and `:90` read
+  `_resolved_python`, so they become `server.environment.interpreter` assertions, and
+  `:103` becomes `Path(sys.executable)`. Keep the class — it still tests resolution
+  order, which is now `PythonEnvironment.resolve`'s contract as seen through the server.
+- `tests/test_server_params.py` — the six `_check_tool_availability` patches and the seven
+  `_is_tool_available` assignments listed in the table above. This file is not a
+  `ToolContext` fixture holder; it constructs real servers, so it needs the patch targets
+  updated rather than a fixture swap.
 - `tests/test_code_checker_bandit/test_integration.py:11-19` — same conversion.
 - `tests/test_formatter_tools.py` — the formatter fixture follows `CheckerTools`.
 
@@ -178,7 +198,10 @@ Prefer one shared `ToolContext` fixture (in `tests/conftest.py`) over three near
 > Write `tests/test_tool_context.py` first, then add `utils/tool_context.py`, then convert
 > `CheckerTools`, the nine `*_tool.py` modules and `FormatterTools` to take a
 > `ToolContext`, then strip the corresponding state from `server.py`, then migrate the
-> three mock-server fixtures — they must move in this commit or pytest goes red. Delete
+> three mock-server fixtures and fix every reader of the four removed names — the table in
+> the step lists them, including `tests/test_server_params.py` and
+> `TestResolvePythonExecutable`; they must all move in this commit or pytest goes red.
+> Delete
 > the last two `.importlinter` `ignore_imports` entries and the now-empty `ignore_imports`
 > key. Do not touch `RefactoringTools`, `InspectTools` or `UtilityTools` — step 7 owns
 > them. One commit, all checks passing.

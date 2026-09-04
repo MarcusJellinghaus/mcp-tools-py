@@ -132,6 +132,8 @@ src/mcp_tools_py/utils/tool_context.py                step 6
 
 tests/test_python_environment.py                      step 1
 tests/test_environment_info.py                        step 2
+tests/test_target_scripts_contract.py                 step 2
+tests/test_packaging.py                               step 2
 tests/test_environment_integration.py                 step 4
 tests/test_tool_context.py                            step 6
 ```
@@ -164,7 +166,7 @@ One new folder: `src/mcp_tools_py/utils/target_scripts/`.
 | `tests/test_code_checker_bandit/test_integration.py` | 6 |
 | `tests/test_refactoring/test_refactoring_tools.py` | 4, 7 |
 | `tests/test_formatter_tools.py` | 6 |
-| `tests/test_server_params.py` | 1 (if it asserts on removed attributes) |
+| `tests/test_server_params.py` | 1 (`:83` `venv_path` kwarg), 6 (`_check_tool_availability`, `_is_tool_available`, `_resolved_python`) |
 
 `pyproject.toml` needs **no** change: `[tool.setuptools.packages.find]` defaults to
 `namespaces = true`, so `utils/target_scripts/` with an `__init__.py` is discovered and

@@ -18,8 +18,11 @@ seven", "With only `--python-executable` set, the console-script tools are found
 - `src/mcp_tools_py/code_checker_pytest/runners.py` — `run_tests`, `check_code_with_pytest`
 - `src/mcp_tools_py/checker_tools/pytest_tool.py:111` — call site
 - `src/mcp_tools_py/main.py:66-85` — both help strings
-- `tests/test_tool_availability.py` — patch targets move; three assertions invert
+- `tests/test_tool_availability.py` — patch targets move; three assertions invert;
+  `TestResolvePythonExecutable`'s expected strings change form
 - `tests/test_code_checker/test_runners.py:229` — positional comment
+- `tests/test_server_params.py:83` — asserts `check_code_with_pytest(..., venv_path=None,
+  ...)`; becomes `bin_dir=...` with a non-`None` value
 
 ## WHAT
 
@@ -57,14 +60,19 @@ resolve(python_executable, venv_path):
         sub = "Scripts" if os.name == "nt" else "bin"      # the ONE directory branch
         exe = "python.exe" if os.name == "nt" else "python"
         p = Path(venv_path) / sub / exe
-        if not p.exists(): raise FileNotFoundError(f"Python executable not found in virtual environment: {p}")
+        if not os.path.exists(p): raise FileNotFoundError(f"Python executable not found in virtual environment: {p}")
         return cls(p)
     return cls(Path(python_executable or sys.executable))
 
 bin_dir:            return self.interpreter.parent
 binary(name):       p = bin_dir / (f"{name}.exe" if os.name == "nt" else name)
-                    return p if p.exists() else None
+                    return p if os.path.exists(p) else None
 ```
+
+Existence is checked through `os.path.exists`, not `Path.exists()`, so that `os.name` and
+the existence check share one patchable module attribute
+(`mcp_tools_py.utils.python_environment.os`) — the idiom the existing availability tests
+already use. Patching `Path.exists` globally would be the alternative; this is narrower.
 
 The `.exe` suffix in `binary()` is a filename branch, not a directory branch — it is the
 only remaining one and it lives in one place. `bin_dir` never branches, which is what
@@ -148,15 +156,39 @@ preserving today's fail-loud server construction (`server.py:109-112`).
 `tests/test_tool_availability.py` churn:
 
 - Patch targets `mcp_tools_py.server.os.name` / `.os.path.exists` move to
-  `mcp_tools_py.utils.python_environment.os...`.
+  `mcp_tools_py.utils.python_environment.os.name` /
+  `mcp_tools_py.utils.python_environment.os.path.exists`. These work because the
+  ALGORITHM above calls `os.path.exists`, not `Path.exists()` — if the implementation
+  drifts to `Path.exists()`, these patches become silent no-ops and the tests stop
+  exercising the branch they name.
 - `test_all_tools_missing` (`:134`), `test_lint_imports_unavailable_when_no_venv`
   (`:167`) and `test_vulture_unavailable_when_no_venv` (`:226`) assert the defect. Rewrite
   them to be deterministic under the new rule: pass `python_executable` pointing into an
   empty `tmp_path` so `binary()` genuinely misses, and keep the `False` assertions.
-- `TestResolvePythonExecutable` may keep asserting on `server._resolved_python`.
+- `TestResolvePythonExecutable` **cannot** keep its current expected values.
+  `_resolved_python` is now `str(Path(...))`, which `Path` normalises; the tests compare
+  against `os.path.join(...)` output, which does not normalise the leading separator:
+
+  | Test | Today's expected | New value on Windows |
+  |---|---|---|
+  | `:43-44` `test_venv_path_windows` | `os.path.join("/my/venv","Scripts","python.exe")` → `/my/venv\Scripts\python.exe` | `\my\venv\Scripts\python.exe` |
+  | `:60-61` `test_venv_path_unix` | `os.path.join("/my/venv","bin","python")` | posix-only test, unchanged |
+  | `:90` `test_python_executable_fallback` | `"/usr/local/bin/python3.11"` | `\usr\local\bin\python3.11` |
+  | `:103` `test_sys_executable_fallback` | `sys.executable` | unchanged — already normalised |
+
+  Rewrite `:43-44`, `:60-61` and `:90` to assert on the `Path` rather than the string,
+  which is platform-normalised on both sides and states the intent:
+  `assert server.environment.interpreter == Path("/my/venv") / "Scripts" / "python.exe"`,
+  and `== Path("/usr/local/bin/python3.11")` for `:90`. Leave `:103` alone.
 
 `tests/test_code_checker/test_runners.py:229` — the positional `None,  # venv_path`
 becomes `None,  # bin_dir`. Three further keyword call sites in the same file.
+
+`tests/test_server_params.py:83` — `mock_check_pytest.assert_called_once_with(...)` lists
+`venv_path=None`. It becomes `bin_dir=_server.environment.bin_dir`, and the value is no
+longer `None`: with no flags set the interpreter is `sys.executable`, so `bin_dir` is
+`Path(sys.executable).parent`. Assert against `_server.environment.bin_dir` rather than a
+literal, matching how the same call already asserts `python_executable`.
 
 Add one test asserting `run_tests` prepends `bin_dir` to `PATH` when given and leaves
 `PATH` untouched when `None`.
