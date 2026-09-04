@@ -39,8 +39,9 @@ module.
   `test_is_tool_available.py` are deleted, `test_unavailable_message.py` moves to
   `tests/test_tool_context.py`, `test_handler_short_circuit.py` and
   `test_resolve_python_executable.py` are rewritten in place
-- `tests/test_server_params.py` — patches `_check_tool_availability` and assigns
-  `_is_tool_available`; both disappear in this step
+- `tests/test_server_params.py` — patches `_check_tool_availability`, assigns
+  `_is_tool_available`, and its `TestResolveTimeout` class calls `ToolServer.resolve_timeout`;
+  all three disappear in this step
 
 ## WHAT
 
@@ -144,9 +145,12 @@ warnings are unchanged (decision 14); the five probe-dependent warnings became l
 step 2.
 
 Delete `_tool_availability`, `_is_tool_available`, `_tool_binaries`, `_script_path`,
-`tool_unavailable_message` and `_resolved_python`. `ToolServer` keeps `resolve_timeout` only
-if something outside the registrars still calls it — otherwise delete that too and let
-`ToolContext.resolve_timeout` be the single implementation.
+`tool_unavailable_message`, `_resolved_python` and `resolve_timeout` (`server.py:264`).
+`resolve_timeout` has no production caller outside the nine `*_tool.py` modules and
+`formatter_tools.py:84-85`, all of which move to the context, so
+`ToolContext.resolve_timeout` becomes the single implementation. Leave **no** delegate
+method behind: a back-compat shim on `ToolServer` is the legacy artifact this refactoring
+exists to remove.
 
 Each of those removed names has readers in the test suite, and every one of them must move
 in this commit:
@@ -158,6 +162,7 @@ in this commit:
 | `_resolved_python` | `test_resolve_python_executable.py:32,49,95,113,126`, `test_handler_short_circuit.py:161,193,218`, `test_unavailable_message.py:30,42` and `tests/test_server_params.py:79,84` | `TestResolvePythonExecutable` becomes assertions on `server.environment.interpreter`, which is what step 1 already rewrote most of them to; finish the conversion here. `test_handler_short_circuit.py:161` asserts `call_kwargs.kwargs["python_executable"] == server._resolved_python` — change the right-hand side to `str(server.context.environment.interpreter)`; `:193` and `:218` become `str(server.context.environment.bin_dir)`. `test_server_params.py:79,84` assert `python_executable=` and `venv_bin=` in the `check_code_with_pytest` kwargs — change to `str(_server.context.environment.interpreter)` and `str(_server.context.environment.bin_dir)`, matching what `pytest_tool.py` now passes. `test_unavailable_message.py` moves to `tests/test_tool_context.py` and reads the context instead. |
 | `_tool_availability` | `test_check_tool_availability.py` (whole file), `test_is_tool_available.py` (whole file), `test_handler_short_circuit.py:24,49,74,108,146,188,206`; `tests/test_checker_tools.py:22,42,197,588,632,676`; `tests/test_formatter_tools.py:19,23,308` | The dict is gone; availability is `ToolContext.is_tool_available`. Two files are deleted and one rewritten — see the fixture migration below. |
 | `_tool_binaries` | `test_check_tool_availability.py:53,68,86,89,114,116,118,133,148,150,188`, `test_is_tool_available.py:73,77`, and the three mock fixtures below | All of them sit in the two files this step deletes, or are covered by the fixture migration. |
+| `resolve_timeout` | `tests/test_server_params.py:751-783` — `TestResolveTimeout`, four tests asserting at `:758,759,765,766,776,777,783`; plus the fixture stubs at `tests/test_checker_tools.py:48-53` and `tests/test_formatter_tools.py:28-30` | Move `TestResolveTimeout` to `tests/test_tool_context.py` against `ToolContext.resolve_timeout`; it is the concrete form of test 4 below, so write it there instead of the sketch. All four cases carry over unchanged — `check_timeout` from the CLI, the 300/120 built-ins, a `pyproject.toml` `mypy-timeout` beating `check_timeout`, and an explicit per-call value winning — by building the context with the same `project_dir` and `check_timeout`. Delete the section comment at `:690`'s mention of `ToolServer.resolve_timeout`; the `--check-timeout` CLI tests above it stay. The two fixture stubs are dropped, not ported — see the fixture migration below. |
 
 ## HOW — the nine tool modules
 
@@ -213,7 +218,10 @@ no cache, no subprocess and no reference to the server. `is_tool_available` retu
    `lint-imports` it says `"import-linter is installed"` — the four substrings tabulated
    under ALGORITHM. These are `test_unavailable_message.py`'s assertions, moved here.
 4. `resolve_timeout` delegates to `get_check_timeout` with `check_timeout` as the
-   server-level fallback.
+   server-level fallback — `tests/test_server_params.py`'s `TestResolveTimeout`
+   (`:751-783`) moved here and re-pointed at `ToolContext`. Its four cases already cover
+   the CLI fallback, the 300/120 built-ins, a `pyproject.toml` per-tool override, and an
+   explicit per-call value.
 5. The dataclass is frozen — assigning to a field raises `FrozenInstanceError`.
 
 **Fixture migration** — these files carry a mock `ToolServer` between them and go red the
@@ -226,6 +234,31 @@ moment the registrars change, so they move in this same commit:
   `_is_tool_available` (`:42`) and the stubbed `tool_unavailable_message` (`:43-46`) all
   disappear. `server.venv_path` (`:20`) is already gone — step 1 deletes it, because
   removing its last reader leaves vulture flagging an unread write.
+
+  The `resolve_timeout` stub (`:48-53`) is **dropped, not reproduced**. Against a
+  `tmp_path` `project_dir` with no `pyproject.toml`, the real `get_check_timeout` returns
+  300 for pytest and 120 for everything else and raises `ValueError` on an explicit `0` —
+  exactly what the stub faked and what `:432`, `test_mypy_invalid_timeout_returns_message`
+  (`:544-546`) and `tests/test_formatter_tools.py:300` already assert. Dropping it leaves
+  `from mcp_tools_py.utils.project_config import validate_timeout` (`:10`) unused, so that
+  import goes too. `tests/test_formatter_tools.py:28-30` is the same stub and goes the
+  same way.
+
+  `test_pylint_invalid_timeout_returns_message` (`:435-457`) is the one test that cannot
+  migrate by the mechanism above: it induces the error by assigning
+  `mock_server.resolve_timeout` at `:441`, and assigning **any** attribute on a frozen
+  dataclass instance raises `dataclasses.FrozenInstanceError`. `pylint_tool.py:48` calls
+  `resolve_timeout("pylint")` with no explicit argument, so there is no per-call route
+  either. Induce it through configuration instead: write
+
+  ```toml
+  [tool.mcp-tools-py]
+  pylint-timeout = 0
+  ```
+
+  into the context's `project_dir`, which makes the real `get_check_timeout` raise
+  `"[tool.mcp-tools-py] pylint-timeout must be a positive integer, got 0"`. The assertion
+  at `:456` matches that substring unchanged.
 - `tests/test_tool_availability/` — every file here reads state this step deletes. Two are
   deleted, one moves, two are rewritten:
 
@@ -275,9 +308,10 @@ moment the registrars change, so they move in this same commit:
   Update each surviving module docstring — they name `_resolve_python_executable` and
   `_check_tool_availability`, neither of which exists after this step.
 - `tests/test_server_params.py` — the six `_check_tool_availability` patches and the seven
-  `_is_tool_available` assignments listed in the table above, plus `:79,84`. This file is
-  not a `ToolContext` fixture holder; it constructs real servers, so it needs the patch
-  targets updated rather than a fixture swap.
+  `_is_tool_available` assignments listed in the table above, plus `:79,84`, plus
+  `TestResolveTimeout` (`:751-783`) which moves out to `tests/test_tool_context.py`. This
+  file is not a `ToolContext` fixture holder; it constructs real servers, so it needs the
+  patch targets updated rather than a fixture swap.
 - `tests/test_code_checker_bandit/test_integration.py:11-25` — same conversion.
 - `tests/test_formatter_tools.py:13-31` — the formatter fixture follows `CheckerTools`.
 
@@ -318,7 +352,10 @@ per site — `CheckerTools(server.context)` — not a rewrite.
 > `*_tool.py` modules and `FormatterTools` to take a `ToolContext`, strip the corresponding
 > state from `server.py`, and migrate the three mock-server fixtures plus every reader of
 > the removed names — the table in the step lists them, including
-> `tests/test_server_params.py`; they must all move in this commit or pytest goes red. Also
+> `tests/test_server_params.py`; they must all move in this commit or pytest goes red.
+> `ToolServer.resolve_timeout` is deleted outright — leave no delegate — and its
+> `TestResolveTimeout` class moves onto `ToolContext`; drop the two fixture timeout stubs
+> rather than porting them. Also
 > repoint the 36 real-`ToolServer` `CheckerTools(server)` sites the step tabulates to
 > `CheckerTools(server.context)`; CI runs `mypy --strict src tests`, so each is an
 > `arg-type` error otherwise. In

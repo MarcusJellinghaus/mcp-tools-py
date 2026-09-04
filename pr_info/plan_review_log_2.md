@@ -155,3 +155,57 @@ the `dev` extra is `pyproject.toml:46-51`. Most notably it found a **36th** real
 call site the review missed — `tests/test_server_params.py:546` — and added it to step 6.
 
 **Status**: committed
+
+## Round 3 — 2026-09-04
+
+Round 3 verified round 2's additions and found them fully correct: all 36 real-`ToolServer`
+`CheckerTools(...)` sites exact, and a fresh sweep of `CheckerTools(`, `FormatterTools(`,
+`RefactoringTools(`, `InspectTools(` and `UtilityTools(` across the whole suite found **no
+37th site**. The `build` dev-extra reasoning, step 1's dead-import table, the `cache_clear`
+move to `tests/conftest.py` and the post-step-5 ignored-import count of 2 all confirmed,
+the last by running `lint-imports`. All four findings below cluster on `resolve_timeout` —
+the one name round 2's sweep did not cover.
+
+**Findings**:
+- `pr_info/steps/step_6.md:147-149` — medium — `ToolServer.resolve_timeout`'s deletion was
+  left conditional, and the condition resolves to *delete* (no production caller outside
+  the nine `*_tool.py` modules and `formatter_tools.py:84-85`). But
+  `tests/test_server_params.py:751-783` (`TestResolveTimeout`, 4 tests) calls it directly
+  and is absent from step 6's readers table for that name.
+- `pr_info/steps/step_6.md:222-228` — medium — `tests/test_checker_tools.py:441` induces
+  its error by **assigning** `mock_server.resolve_timeout`. Assigning any attribute on a
+  frozen dataclass raises `FrozenInstanceError` (probed), and `pylint_tool.py:48` passes no
+  explicit timeout, so there is no per-call route either. The step's fixture-migration
+  bullet covers only availability and never mentions `resolve_timeout`.
+- `pr_info/steps/step_3.md:14` — low — no instruction to remove `inspect_library.py`'s
+  dead imports (`importlib`, `inspect`, `types`, and `Any`/`Callable`/`Union`/`cast`) once
+  the resolution body moves to `probe.py`. Steps 1 and 2 state this for `server.py`; step 3
+  is silent.
+- `pr_info/steps/step_1.md:182-183` — low — the stated enforcement reason for removing dead
+  imports is wrong. Ruff runs only docstring rules (`pyproject.toml:89`), so F401 never
+  fires, and pylint's `disable = ["W","C","R"]` plus CI's `pylint -E` suppress it. The real
+  enforcer is vulture (`ci.yml:154`). The instruction is right; the justification is the
+  part a reader generalises from, and is plausibly why step 3 omitted the same cleanup.
+
+**Decisions**:
+- Accepted all four.
+- One borderline choice made without asking: on `resolve_timeout`, took clean deletion with
+  `TestResolveTimeout` re-homed onto `ToolContext.resolve_timeout`, rather than keeping a
+  one-line delegate on `ToolServer`. The repo's refactoring principles require clean
+  deletion with no legacy artifacts, so the simpler end state is the one the rules already
+  prescribe.
+
+**User decisions**: none — round 3 raised no design, scope, or requirements question.
+
+**Changes**: applied to `step_1.md`, `step_2.md`, `step_3.md`, `step_6.md`, `summary.md`,
+and `Decisions.md` (new D6–D8). The chosen mechanism for the invalid-timeout test is
+writing `[tool.mcp-tools-py] pylint-timeout = 0` into the context's `project_dir`; the
+engineer confirmed it produces the exact message `test_checker_tools.py:456` already
+asserts, so that assertion survives unchanged.
+
+Every line reference in the brief matched the tree — the first round in this run where
+nothing needed correcting. The engineer added two facts from the tree: `resolve_timeout` is
+at `server.py:264`, and `test_server_params.py:690` carries a section comment that moves
+with the class.
+
+**Status**: committed

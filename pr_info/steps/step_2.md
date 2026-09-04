@@ -24,7 +24,7 @@ a project module".
 - `src/mcp_tools_py/server.py` — `_is_tool_available`; `PROBE_TIMEOUT_SECONDS`,
   `_TOOL_MODULES` and `_TOOL_PACKAGES` (`:47,51-65`) move to `environment_info.py` and are
   imported back; the `execute_command` import goes with `_is_tool_available` (this was its
-  last use, so ruff/pylint flag it otherwise)
+  last use, so vulture flags it otherwise — see step 1's dead-import note)
 - `tests/test_tool_availability/test_is_tool_available.py` (11 tests, 265 lines) — three
   tests are deleted, two invert, the rest repoint
 - `tests/test_tool_availability/test_resolve_python_executable.py` and

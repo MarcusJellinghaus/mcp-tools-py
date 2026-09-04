@@ -11,7 +11,8 @@ server process", and the `get_library_source` half of "resolves through
 
 **Modified**
 - `src/mcp_tools_py/utils/target_scripts/probe.py` — add the `source` subcommand
-- `src/mcp_tools_py/inspect_library.py` — parent side
+- `src/mcp_tools_py/inspect_library.py` — parent side; the resolution body's imports go
+  with it (see "Dead imports")
 - `src/mcp_tools_py/server.py:116` — `InspectTools(self.environment)`
 - `tach.toml` — add `{ path = "mcp_tools_py.utils" }` to the `inspect_library` module, then
   regenerate the dependency graphs (see Checks)
@@ -71,6 +72,24 @@ _get_library_source(import_path, max_lines, interpreter):
 
 `SOURCE_TIMEOUT_SECONDS = 30`, module-level in `inspect_library.py`. Return stdout
 verbatim so the child's output is the tool's output.
+
+### Dead imports to delete in the same commit
+
+The resolution body is the only user of most of `inspect_library.py`'s imports, so moving
+it to `probe.py` leaves them unused in the parent:
+
+| Import | Line | Only used by |
+|---|---|---|
+| `importlib` | `:3` | `:38` |
+| `inspect` | `:4` | `:55`, `:79` |
+| `types` | `:5` | `:33`, `:65`, `:80` |
+| `Any`, `Callable`, `Union`, `cast` | `:6` | the `cast(...)` at `:80` |
+
+`from typing import TYPE_CHECKING` survives (`:10-11` guards the `FastMCPProtocol`
+import) and so does `log_function_call` (`:8`). The step adds imports for
+`execute_command`, `probe_script_path` and `PythonEnvironment`. Verify the surviving list
+against the file rather than against this table — vulture reports unused imports at 90%
+confidence, above the repo's `--min-confidence 60` (`ci.yml:154`), so a leftover fails CI.
 
 ## DATA
 
@@ -207,7 +226,8 @@ bug.
 > Rewrite `tests/test_inspect_library.py` first — delete the three mocked classes, re-home
 > the two parametrized tests, keep `TestRealImports`, add the six parent-side tests — then
 > move the resolution logic verbatim from `inspect_library.py` into a `source` subcommand
-> in `probe.py`, then rewrite the parent. Update `tach.toml` (regenerating the dependency
+> in `probe.py`, then rewrite the parent, deleting the imports that move out with the body.
+> Update `tach.toml` (regenerating the dependency
 > graphs) and `vulture_whitelist.py` as described, and fix `README.md` in all four places —
 > the tool-table row, the `--python-executable` row, the Environment Configuration section
 > (which still tells users to point the flag at the tool's own venv and labels the project

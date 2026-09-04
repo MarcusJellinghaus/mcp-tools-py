@@ -77,6 +77,47 @@ so step 1 renames the example path to a project venv.
 `tests/test_main_args.py:63` (`test_epilog_does_not_advertise_venv_path`) only asserts that
 the epilog names `--python-executable` and not `--venv-path`, so the rename keeps it green.
 
+### D6 — `ToolServer.resolve_timeout` is deleted, with no delegate left behind
+
+Step 6 previously deferred the choice ("keep it only if something outside the registrars
+still calls it"). Nothing does: the only production callers are the nine
+`checker_tools/*_tool.py` modules and `formatter_tools.py:84-85`, all of which move to
+`ToolContext`. The condition therefore resolves to deletion, and the repo's refactoring
+principles rule out leaving a back-compat delegate. `tests/test_server_params.py`'s
+`TestResolveTimeout` (`:751-783`) moves to `tests/test_tool_context.py` as the concrete
+form of step 6's sketched test 4.
+
+### D7 — the frozen `ToolContext` forces a new mechanism for the invalid-timeout test
+
+`tests/test_checker_tools.py:435-457` induces its error by assigning
+`mock_server.resolve_timeout` (`:441`). Assigning any attribute on a frozen dataclass
+raises `FrozenInstanceError`, and `pylint_tool.py:48` passes no explicit timeout, so
+neither route survives the swap to a real `ToolContext`. Chosen replacement: write
+`[tool.mcp-tools-py] pylint-timeout = 0` into the context's `project_dir` and let the real
+`get_check_timeout` raise. Patching `tool_context.get_check_timeout` was the alternative;
+configuration was preferred because it exercises the real resolution path.
+
+Related: the fixture timeout stubs (`tests/test_checker_tools.py:48-53`,
+`tests/test_formatter_tools.py:28-30`) are **dropped**, not ported. With no
+`pyproject.toml` in the context's `project_dir`, the real `get_check_timeout` already
+returns 300 for pytest, 120 otherwise, and raises on an explicit `0` — what the existing
+assertions expect. `validate_timeout` (`tests/test_checker_tools.py:10`) then goes unused
+and is removed with the stub.
+
+### D8 — vulture, not ruff or pylint, is the dead-import enforcer
+
+Step 1 justified its dead-import cleanup with "ruff and pylint flag the leftovers". Both
+are silenced in this repo: `[tool.ruff.lint] select = ["D", "DOC"]`
+(`pyproject.toml:89`) enables only docstring rules, so F401 never runs, and
+`disable = ["W", "C", "R"]` (`:144`) with CI's `pylint -E` suppresses unused-import
+warnings. Vulture (`ci.yml:154`) reports unused imports at 90% confidence, above the
+repo's 60 threshold. Corrected in steps 1 and 2.
+
+Consequence: step 3 had omitted the same cleanup, plausibly because the wrong
+justification did not generalise. It now lists the imports `inspect_library.py` loses when
+the resolution body moves into `probe.py` — `importlib`, `inspect`, `types`, and `Any` /
+`Callable` / `Union` / `cast`.
+
 ### Mechanical re-anchoring
 
 The plan's ~60 line-precise references were re-verified against the working tree and

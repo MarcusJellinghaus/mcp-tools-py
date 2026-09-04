@@ -202,7 +202,7 @@ One new folder: `src/mcp_tools_py/utils/target_scripts/`.
 | `tests/test_formatter_tools.py` | 6 |
 | `tests/test_utility_tools.py` | 7 |
 | `tests/conftest.py` | 2 (autouse `get_environment_info.cache_clear()`), 6 (shared `ToolContext` fixture) |
-| `tests/test_server_params.py` | 6 (`_check_tool_availability`, `_is_tool_available`, `_resolved_python`) |
+| `tests/test_server_params.py` | 6 (`_check_tool_availability`, `_is_tool_available`, `_resolved_python`; `TestResolveTimeout` moves to `tests/test_tool_context.py`) |
 
 `pyproject.toml` needs no change for **package discovery**:
 `[tool.setuptools.packages.find]` sets only `where = ["src"]`, so `namespaces` defaults to

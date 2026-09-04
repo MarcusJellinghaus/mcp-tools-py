@@ -179,8 +179,12 @@ Two test readers must move with it:
 | `shutil` | `:144` | `python_environment.resolve` |
 | `os` | `:133-136`, `:143`, `:182-184`, `:251` | `resolve` / `binary()`, and `:251` becomes `environment.bin_dir` |
 
-Ruff and pylint flag the leftovers otherwise — the same reason step 2 drops the dead
-`execute_command` import.
+**Vulture** is what flags the leftovers — the same enforcer that makes step 2 drop the
+dead `execute_command` import. It reports an unused import at 90% confidence, above the
+repo's `--min-confidence 60` (`ci.yml:154`). Neither ruff nor pylint would catch these:
+`[tool.ruff.lint] select = ["D", "DOC"]` (`pyproject.toml:89`) enables only docstring
+rules, so F401 never runs, and `disable = ["W", "C", "R"]` (`:144`) plus CI's `pylint -E`
+suppress unused-import warnings.
 
 **The import removal and the patch-target repointing below are one commit.** A
 `patch("mcp_tools_py.server.os.name")` against a module that no longer imports `os` raises
