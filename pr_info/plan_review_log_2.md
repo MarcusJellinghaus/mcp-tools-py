@@ -92,3 +92,66 @@ fixture is `:13-54`. A Windows `Path` normalisation probe surfaced two further t
 `test_handler_short_circuit.py:162` and `:194`.
 
 **Status**: committed
+
+## Round 2 — 2026-09-04
+
+Round 2 verified round 1's re-anchoring: ~90 line-precise references spot-checked, the
+great majority exact — every `server.py` reference, every `tests/test_server_params.py`
+line, all 24 `execute_command` patch sites, the test counts, all eleven `_tool_binaries`
+lines, the ten step-6 substitution rows, the fourteen `TYPE_CHECKING` importers, and the
+`README.md` / `architecture.md` / `.importlinter` / `tach.toml` anchors. D1–D4 are
+consistently reflected across all step files, and the ten issue criteria map cleanly onto
+the criteria→step table. The remaining findings are completeness gaps, not corrections.
+
+**Findings**:
+- `pr_info/steps/step_6.md` + `summary.md` — high — three test files construct
+  `CheckerTools` from a **real** `ToolServer`, not a mock, and are absent from step 6:
+  `tests/test_final_validation.py` (24 sites),
+  `tests/test_code_checker_pytest/test_reporting.py` (9, via the real-`ToolServer` fixture
+  at `conftest.py:21-24`) and `test_code_checker_pytest/test_runners.py:77,136`. CI runs
+  `mypy --strict src tests` (`ci.yml:113`), so each is an `arg-type` error.
+- `pr_info/steps/step_4.md` + `step_7.md` + `summary.md` — high —
+  `tests/test_refactoring/test_rope_tools.py:506` unlisted in both steps; it breaks twice
+  (step 4 adds a required `environment` positional, step 7 replaces the signature).
+- `pr_info/steps/step_2.md` + `summary.md` — medium — `build` is in neither `dependencies`
+  nor the `dev` extra, and CI installs `.[dev]`, so `pytest.importorskip("build")` skips
+  everywhere and acceptance criterion 8 would never actually be verified.
+- `pr_info/steps/step_5.md` — medium — the expected post-step-5 ignored-import count is
+  **2**, not 10: the four deleted expressions match 12 of the 14 edges, `checker_tools.**`
+  alone covering the nine `*_tool.py` modules.
+- `pr_info/steps/step_1.md` — medium — `server.py`'s `os`, `shutil` and `sys` imports all
+  go dead and no step removes them; the removal must share a commit with the repointing of
+  the ~20 `patch("mcp_tools_py.server.os.*")` sites or those raise `AttributeError`.
+- `pr_info/steps/step_1.md` — medium — patch-target list omits
+  `test_resolve_python_executable.py:85` (`shutil.which`, pinned by `:96`) and
+  `test_check_tool_availability.py:103`.
+- `pr_info/steps/step_1.md` — medium — two further `os.path.join` vs `str(Path(...))`
+  mismatches at `test_check_tool_availability.py:68-70` and `:133-135`; `:188-190` is safe.
+- `pr_info/steps/step_1.md` — low — `_is_tool_available`'s `_tool_binaries` write at
+  `server.py:207` must store a `str` (pinned by `test_is_tool_available.py:77`).
+- `pr_info/steps/step_1.md:160` — low — deferring the `tests/test_checker_tools.py:20`
+  deletion to step 6 leaves a write with no reader, which vulture flags in step 1.
+- `pr_info/steps/step_2.md` — low — the `get_environment_info.cache_clear()` autouse
+  fixture is still module-scoped; the `lru_cache` is process-wide. Raised in rounds 4 and 5
+  of `plan_review_log_1.md` and applied in neither.
+- Seven line-reference drifts across `summary.md`, `step_3.md`, `step_4.md`, `step_6.md`
+  — low.
+
+**Decisions**:
+- Accepted all eleven mechanics findings.
+- One escalation candidate handled autonomously rather than asked: `main.py:52-53`'s epilog
+  examples still read `tools-venv`, a sixth site carrying the framing D1 corrects. D1's
+  enumeration of five sites was not an exhaustive audit, and renaming an example path is
+  applying a decision the user already made, not making a new one — no scope or
+  architecture impact.
+
+**User decisions**: none — no finding this round raised a genuine design or scope question.
+
+**Changes**: applied to all seven step files, `summary.md`, and `Decisions.md` (new D5).
+
+Engineer corrections to the brief, found against the tree: vulture runs at `ci.yml:154`,
+not `:155`; the stale ignored-import claims are at `step_5.md:82-83,122`, not `:78,110`;
+the `dev` extra is `pyproject.toml:46-51`. Most notably it found a **36th** real-`ToolServer`
+call site the review missed — `tests/test_server_params.py:546` — and added it to step 6.
+
+**Status**: committed

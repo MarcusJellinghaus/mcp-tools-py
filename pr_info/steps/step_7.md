@@ -17,7 +17,8 @@ doc states the rule whose absence produced the bug.
 - `docs/architecture/architecture.md` — the invariant, the single-environment sentence,
   and the module overview
 - `vulture_whitelist.py` — only if vulture flags the unused parameter
-- `tests/test_refactoring/test_refactoring_tools.py`, `tests/test_utility_tools.py`
+- `tests/test_refactoring/test_refactoring_tools.py`,
+  `tests/test_refactoring/test_rope_tools.py:506`, `tests/test_utility_tools.py`
 
 ## WHAT
 
@@ -116,7 +117,8 @@ signature unification plus documentation.
 
 ## Tests
 
-- `tests/test_refactoring/test_refactoring_tools.py` — constructor call sites take a
+- `tests/test_refactoring/test_refactoring_tools.py` (`:36,46,100,120`) and
+  `tests/test_refactoring/test_rope_tools.py:506` — constructor call sites take a
   `ToolContext` (second edit to these lines; step 4 made the first).
 - `tests/test_utility_tools.py:16,37,63` — `UtilityTools()` becomes `UtilityTools(context)`.
 - One new test asserting all five registrars accept the same `ToolContext`: build one

@@ -39,7 +39,7 @@ exact bug being fixed. Step 7 converts `InspectTools` to take `ToolContext`.
 
 ## ALGORITHM — child
 
-Move the current body of `_get_library_source` (`inspect_library.py:14-94`) into
+Move the current body of `_get_library_source` (`inspect_library.py:14-99`) into
 `probe.py` unchanged: the backwards walk for the longest importable module prefix, the
 `getattr` chain, the available-symbols listing capped at 50, the `inspect.getsource`
 call, the built-in/C-extension message, and the truncation footer. Semantics do not
@@ -119,9 +119,10 @@ configuration under which `get_library_source` resolves correctly.
 
 3. **`:133-181`, the Environment Configuration section** — `:135` states the flag "must
    point to the environment where **the checker tools are installed** … typically the tool's
-   own virtual environment, not your project's runtime venv", and `:165` labels a project
-   `.venv` (`:174`) as "Incorrect Configuration". After this change that example is what the
-   fix requires. Rewrite the section to say:
+   own virtual environment, not your project's runtime venv"; `:141` introduces the correct
+   example as "the venv where mcp-tools-py and its tools are installed", which names the
+   **tool** env; and `:165` labels a project `.venv` (`:174`) as "Incorrect Configuration".
+   After this change that example is what the fix requires. Rewrite the section to say:
 
    - There is **one** configurable environment, the **project env**: the venv holding the
      project's dependencies *and* the checker tools. The checkers must import the
@@ -140,10 +141,11 @@ configuration under which `get_library_source` resolves correctly.
    fail if your project's `.venv` doesn't have the required tools installed") is the
    sentence that already says this correctly — build the replacement around it.
 
-4. **`:185-188`, the Troubleshooting section** added by #229 — three of its four bullets
-   tell the reader to point `--python-executable` at "an environment where they are
-   installed", which under decision 5 must name the project env specifically. Bring them
-   into line with the section above.
+4. **`:185-188`, the Troubleshooting section** added by #229 — two of its four bullets,
+   `:186` and `:187`, tell the reader to point `--python-executable` at "an environment
+   where they are installed", which under decision 5 must name the project env
+   specifically. Bring those two into line with the section above; `:185` and `:188` carry
+   no framing and stay.
 
 Use the same wording as step 1's `main.py` help string so the two do not drift.
 

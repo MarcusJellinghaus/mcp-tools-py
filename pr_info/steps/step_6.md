@@ -28,8 +28,13 @@ module.
 - `src/mcp_tools_py/formatter/formatter_tools.py`
 - `.importlinter` — delete the last two `ignore_imports` entries
 - `tests/test_checker_tools.py` (`:13-54` fixture),
-  `tests/test_code_checker_bandit/test_integration.py` (`:11-20`),
+  `tests/test_code_checker_bandit/test_integration.py` (`:11-25`),
   `tests/test_formatter_tools.py`, `tests/conftest.py` (shared `ToolContext` fixture)
+- Three files that construct `CheckerTools` from a **real** `ToolServer`, so no fixture
+  migration covers them — see "Real-`ToolServer` call sites" below:
+  `tests/test_final_validation.py`, `tests/test_code_checker_pytest/test_reporting.py`,
+  `tests/test_code_checker_pytest/test_runners.py` (and the `server` fixture at
+  `tests/test_code_checker_pytest/conftest.py:21-24`)
 - `tests/test_tool_availability/` — `test_check_tool_availability.py` and
   `test_is_tool_available.py` are deleted, `test_unavailable_message.py` moves to
   `tests/test_tool_context.py`, `test_handler_short_circuit.py` and
@@ -219,8 +224,8 @@ moment the registrars change, so they move in this same commit:
   creating or omitting binary files and by patching `get_environment_info`, not by writing
   `_tool_availability` (`:22`). `_tool_binaries` (`:34-40`), the stubbed
   `_is_tool_available` (`:42`) and the stubbed `tool_unavailable_message` (`:43-46`) all
-  disappear, and so does `server.venv_path` (`:20`), which step 1 already removed from
-  production but which a `MagicMock` tolerated silently.
+  disappear. `server.venv_path` (`:20`) is already gone — step 1 deletes it, because
+  removing its last reader leaves vulture flagging an unread write.
 - `tests/test_tool_availability/` — every file here reads state this step deletes. Two are
   deleted, one moves, two are rewritten:
 
@@ -278,6 +283,24 @@ moment the registrars change, so they move in this same commit:
 
 Prefer one shared `ToolContext` fixture (in `tests/conftest.py`) over three near-copies.
 
+**Real-`ToolServer` call sites** — 36 further sites build `CheckerTools` from an actual
+`ToolServer`, not a mock, so the fixture migration above does not reach them. CI runs
+`mypy --strict src tests` (`ci.yml:113`), so `CheckerTools(server)` against
+`__init__(self, context: ToolContext)` is an `arg-type` error at every one:
+
+| File | Sites |
+|---|---|
+| `tests/test_final_validation.py` | 24 — `:123,139,174,198,201,223,226,244,247,266,269,294,297,319,339,349,366,371,388,402,426,432,443,454` |
+| `tests/test_code_checker_pytest/test_reporting.py` | 9 — `:68,133,188,242,274,307,358,411,468` |
+| `tests/test_code_checker_pytest/test_runners.py` | 2 — `:77,136` |
+| `tests/test_server_params.py` | 1 — `:546` |
+
+The two `test_code_checker_pytest` files reach the server through the fixture at
+`tests/test_code_checker_pytest/conftest.py:21-24`; `test_final_validation.py` and
+`test_server_params.py:545` construct `ToolServer(...)` inline. Every site calls only
+`_format_pytest_result_with_details` or `_format_pylint_result`, so the fix is one token
+per site — `CheckerTools(server.context)` — not a rewrite.
+
 ## Checks
 
 `run_format_code`, `run_pylint_check`, `run_pytest_check`, `run_mypy_check`,
@@ -295,7 +318,10 @@ Prefer one shared `ToolContext` fixture (in `tests/conftest.py`) over three near
 > `*_tool.py` modules and `FormatterTools` to take a `ToolContext`, strip the corresponding
 > state from `server.py`, and migrate the three mock-server fixtures plus every reader of
 > the removed names — the table in the step lists them, including
-> `tests/test_server_params.py`; they must all move in this commit or pytest goes red. In
+> `tests/test_server_params.py`; they must all move in this commit or pytest goes red. Also
+> repoint the 36 real-`ToolServer` `CheckerTools(server)` sites the step tabulates to
+> `CheckerTools(server.context)`; CI runs `mypy --strict src tests`, so each is an
+> `arg-type` error otherwise. In
 > `tests/test_tool_availability/`, delete `test_check_tool_availability.py` and
 > `test_is_tool_available.py` — they test methods that no longer exist — after folding the
 > behaviours the step names, including the fail-open probe case, into

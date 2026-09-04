@@ -79,8 +79,12 @@ the `ToolServer` imports, and step 6 deletes them.
 `unmatched_ignore_imports_alerting` defaults to `error` and `.importlinter` does not
 override it, so an expression matching nothing aborts the run with "No matches for ignored
 import". That is why the deletions happen here rather than all together at the end
-(decision 26). Confirm with `run_lint_imports_check` that the report now says "10 ignored
-imports" rather than 14.
+(decision 26).
+
+`lint-imports` reports `Layered Architecture KEPT (14 ignored imports)` today. The four
+deleted expressions match twelve of them — `checker_tools.**` alone covers the nine
+`*_tool.py` modules — so confirm with `run_lint_imports_check` that the report now says
+**2 ignored imports**: the two entries step 6 deletes.
 
 ## DATA
 
@@ -119,5 +123,5 @@ assert on module import structure.
 > `src/mcp_tools_py/utils/mcp_protocols.py`, repoint all fourteen `TYPE_CHECKING`
 > importers, and delete the four named `ignore_imports` entries — not the other two.
 > Behaviour must not change; no new tests. Verify with `run_lint_imports_check` that the
-> contract passes and reports 10 ignored imports, not 14 and not an unmatched-expression
+> contract passes and reports 2 ignored imports, not 14 and not an unmatched-expression
 > error. One commit, all checks passing.

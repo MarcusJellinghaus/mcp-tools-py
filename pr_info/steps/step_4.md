@@ -19,8 +19,10 @@ not the flag that supplies it.
 - `src/mcp_tools_py/refactoring/jedi_tools.py`
 - `src/mcp_tools_py/refactoring/__init__.py` — `RefactoringTools.__init__`
 - `src/mcp_tools_py/server.py:112` — pass the environment
-- `tests/test_refactoring/test_refactoring_tools.py` — constructor call sites, plus the two
-  direct `jedi_tools` call sites at `:71` and `:86`
+- `tests/test_refactoring/test_refactoring_tools.py` — constructor call sites (`:36,46,100,120`),
+  plus the two direct `jedi_tools` call sites at `:71` and `:86`
+- `tests/test_refactoring/test_rope_tools.py:506` — `RefactoringTools(tmp_path, timeout=60)`;
+  the new `environment` positional lands before `timeout`
 - `tests/test_refactoring/test_jedi_tools.py` — ten call sites gain the interpreter, plus
   one new construction test
 - `tests/test_refactoring/test_integration.py:78,84,138` — three call sites
@@ -88,7 +90,7 @@ list_symbols / find_references:
 `environment_path`; the environment is built lazily in `Project.get_environment()`, which
 calls `create_environment(...)` — and *that* is what raises `InvalidPythonEnvironment` and
 spawns the `CompiledSubprocess`. Its first caller is `jedi.Script(...)`, at
-`jedi_tools.py:27` and `:99`, which sits **outside** every `try` in that file. A `try`
+`jedi_tools.py:27` and `:102`, which sits **outside** every `try` in that file. A `try`
 wrapped around the constructor alone would therefore catch nothing: the traceback would
 still escape from the `Script` line, and the `lru_cache` would have stored a "successful"
 project whose environment fails on every call.
@@ -99,7 +101,7 @@ so forcing it here is not an extra spawn — it moves the one spawn inside the g
 cached region, and the later `jedi.Script(...)` reuses the already-built environment and
 cannot raise `InvalidPythonEnvironment`.
 
-Catching `Exception` matches the existing idiom in this file (`:29`, `:118`, both with
+Catching `Exception` matches the existing idiom in this file (`:31`, `:125`, both with
 `# pylint: disable=broad-exception-caught`) and avoids importing jedi's private exception
 path. The message names the interpreter, so an unusable environment surfaces as text
 rather than a traceback.

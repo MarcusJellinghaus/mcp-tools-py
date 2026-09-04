@@ -69,6 +69,14 @@ Three #229 behaviours need no carry-over, and step 2 says why:
 (preserved via the probe blob's `distributions` map), and the console-script fast path (one
 probe now serves all five). The three tests that assert those mechanics are deleted.
 
+### D5 — The `main.py` epilog examples follow the help text
+
+`main.py:52-53` shows `--python-executable /path/to/tools-venv/bin/python` and
+`C:\path\to\tools-venv\Scripts\python.exe`. That is D1's backwards framing in example form,
+so step 1 renames the example path to a project venv.
+`tests/test_main_args.py:63` (`test_epilog_does_not_advertise_venv_path`) only asserts that
+the epilog names `--python-executable` and not `--venv-path`, so the rename keeps it green.
+
 ### Mechanical re-anchoring
 
 The plan's ~60 line-precise references were re-verified against the working tree and

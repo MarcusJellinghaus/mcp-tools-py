@@ -33,9 +33,11 @@ Two pieces of the original step are already on main and must not be redone:
   `PythonEnvironment`; the dead `self.venv_path` / `self.python_executable` attributes go;
   the flag docstrings at `:82-93` (`ToolServer.__init__`) and `:297-307` (`create_server`)
 - `vulture_whitelist.py:26-27` — the `_.python_executable` / `_.venv_path` entries
-- `src/mcp_tools_py/main.py:70-78` — the `--python-executable` help string
-- `tests/test_tool_availability/` — patch targets move; five expected values change form;
+- `src/mcp_tools_py/main.py:70-78` — the `--python-executable` help string, and `:52-53` —
+  the two epilog examples, which name a `tools-venv` path
+- `tests/test_tool_availability/` — patch targets move; seven expected values change form;
   one assertion on a deleted attribute goes
+- `tests/test_checker_tools.py:20` — the now-unread `server.venv_path` assignment
 
 ## WHAT
 
@@ -134,6 +136,11 @@ availability[key] = path is not None
 and `os.path.dirname(self._resolved_python)`. Their message text and the fail-open probe
 timeout are unchanged in this step — step 2 owns both.
 
+`_is_tool_available` has a **second** `_tool_binaries` write, at `server.py:207`. It must
+store `str(path)` too: `test_is_tool_available.py:77` asserts the stored value equals an
+`os.path.join` string, so storing a `Path` fails. Both writes disappear in steps 2 and 6,
+but step 1 has to land green on its own.
+
 ### Dead state to delete in the same commit
 
 `self.python_executable` (`server.py:95`) and `self.venv_path` (`:96`) have exactly one
@@ -157,8 +164,27 @@ Two test readers must move with it:
 - `tests/test_tool_availability/test_handler_short_circuit.py:187` — #229 added
   `assert server.venv_path is None`. Delete that line; the test's actual subject is
   `venv_bin`, asserted at `:192-194`.
-- `tests/test_checker_tools.py:20` sets `server.venv_path` on a `MagicMock`, which
-  tolerates a removed attribute silently; step 6's fixture migration drops it.
+- `tests/test_checker_tools.py:20` sets `server.venv_path` on a `MagicMock`. `:187` above
+  is its last reader, so once that goes the assignment is a write nobody reads and vulture
+  flags it — CI runs `vulture src tests vulture_whitelist.py` (`ci.yml:154`). **Delete
+  `:20` in this commit**, not in step 6's fixture migration.
+
+### Dead imports to delete in the same commit
+
+`server.py` loses its `os`, `shutil` and `sys` imports (`:4-6`) along with the two methods:
+
+| Import | Only uses | Where they go |
+|---|---|---|
+| `sys` | `:141` | `python_environment.resolve` |
+| `shutil` | `:144` | `python_environment.resolve` |
+| `os` | `:133-136`, `:143`, `:182-184`, `:251` | `resolve` / `binary()`, and `:251` becomes `environment.bin_dir` |
+
+Ruff and pylint flag the leftovers otherwise — the same reason step 2 drops the dead
+`execute_command` import.
+
+**The import removal and the patch-target repointing below are one commit.** A
+`patch("mcp_tools_py.server.os.name")` against a module that no longer imports `os` raises
+`AttributeError`, so leaving any of the ~20 sites behind turns the suite red.
 
 ## HOW — `main.py`
 
@@ -173,10 +199,16 @@ naming the **project** environment, e.g.:
 > project's dependencies and the checker tools. A path that neither exists nor resolves on
 > PATH fails at startup. Defaults to the current interpreter (sys.executable).
 
+The epilog carries the same framing as an example: `main.py:52-53` show
+`--python-executable /path/to/tools-venv/bin/python` and
+`C:\path\to\tools-venv\Scripts\python.exe`. Rename the path to a project venv
+(`/path/to/project/.venv/bin/python`, `C:\path\to\project\.venv\Scripts\python.exe`).
+
 `--venv-path` keeps `argparse.SUPPRESS` (`main.py:83`) and its deprecation warning
 (`:197-202`): `tests/test_main_args.py:27` asserts the flag is absent from `--help` and
-`:63` asserts the epilog names `--python-executable` and not `--venv-path`. This edit must
-not break either.
+`:63` (`test_epilog_does_not_advertise_venv_path`) asserts the epilog names
+`--python-executable` and not `--venv-path`. Both survive the rename — confirm by running
+the file — but this edit must not break either.
 
 `README.md` carries the same backwards framing in four more places — step 3 owns those.
 
@@ -209,20 +241,24 @@ PATH, preserving today's fail-loud server construction (`server.py:143-150`).
 
 `tests/test_tool_availability/` churn:
 
-- **Patch targets.** Roughly fourteen sites patch `mcp_tools_py.server.os.name` or
+- **Patch targets.** Roughly fifteen sites patch `mcp_tools_py.server.os.name` or
   `.os.path.exists`: `test_resolve_python_executable.py:23,24,40,41,56,57,103`;
-  `test_check_tool_availability.py:20,60,61,104-107,125,126`;
+  `test_check_tool_availability.py:20,60,61,103,104-107,125,126`;
   `test_is_tool_available.py:204`; `test_handler_short_circuit.py:131,172`. Several patch a
   single `os.path.exists` so that both the interpreter *and* the console scripts appear to
-  exist. Because `_script_path` moves into `python_environment` alongside `resolve`,
-  exactly one patch target survives:
+  exist. One further site patches `shutil`:
+  `test_resolve_python_executable.py:85` (`mcp_tools_py.server.shutil.which`), whose `:96`
+  asserts `mock_which.assert_called_once_with("python3")` — it becomes
+  `mcp_tools_py.utils.python_environment.shutil.which`. Because `_script_path` moves into
+  `python_environment` alongside `resolve`, exactly one patch target survives:
   `mcp_tools_py.utils.python_environment.os.name` / `.os.path.exists`. These work only
   because the ALGORITHM above calls `os.path.exists`, not `Path.exists()` — if the
   implementation drifts, the patches become silent no-ops and the tests stop exercising the
   branch they name.
-- **Expected values.** `_resolved_python` becomes `str(Path(...))`, which normalises the
-  separator; the tests compare against `os.path.join` output and bare POSIX literals, which
-  do not. On Windows:
+- **Expected values.** `_resolved_python` and the `_tool_binaries` values become
+  `str(Path(...))`, which normalises the separator; the tests compare against `os.path.join`
+  output and bare POSIX literals, which do not. CI is `ubuntu-latest`, so these bite the
+  local Windows run first. On Windows:
 
   | Test | Today's expected | New value |
   |---|---|---|
@@ -233,15 +269,23 @@ PATH, preserving today's fail-loud server construction (`server.py:143-150`).
   | `:126` `test_sys_executable_fallback` | `sys.executable` | unchanged — already normalised |
   | `test_handler_short_circuit.py:162` `test_resolved_python_passed_to_pytest_runner` | `"/custom/python"` | `\custom\python` |
   | `test_handler_short_circuit.py:194` `test_venv_bin_derived_from_resolved_python` | `"/custom"` | `\custom` |
+  | `test_check_tool_availability.py:68-70` `test_lint_imports_available_when_binary_exists` | `os.path.join("/mock/venv","Scripts","lint-imports.exe")` → `/mock/venv\Scripts\lint-imports.exe` | `\mock\venv\Scripts\lint-imports.exe` |
+  | `:133-135` `test_vulture_available_when_binary_exists` | the same for `vulture.exe` | `\mock\venv\Scripts\vulture.exe` |
 
-  Rewrite the five that break to assert on a `Path`, which is platform-normalised on both
+  `test_check_tool_availability.py:188-190` is **safe** — its base comes from
+  `os.path.dirname(python)` with `python` from `_dummy_python(tmp_path)`, already
+  normalised on both sides.
+
+  Rewrite the seven that break to assert on a `Path`, which is platform-normalised on both
   sides and states the intent:
   `assert server.environment.interpreter == Path("/my/venv") / "Scripts" / "python.exe"`,
   `== Path("/usr/bin/python3")` and `== Path("/usr/local/bin/python3.11")`. The two in
   `test_handler_short_circuit.py` compare strings against a mock's kwargs, so they become
   `== str(Path("/custom/python"))` and `== str(Path("/custom"))`; each keeps its point —
-  the *resolved* interpreter, not the raw argument, is what reaches the runner. Leave
-  `:48-49` and `:126` alone.
+  the *resolved* interpreter, not the raw argument, is what reaches the runner. The two
+  `_tool_binaries` assertions become
+  `== str(Path("/mock/venv") / "Scripts" / "lint-imports.exe")` and the vulture equivalent.
+  Leave `:48-49` and `:126` alone.
 
 Already done by #229 — do **not** redo:
 
@@ -268,9 +312,12 @@ which is what confirms the two whitelist entries were safe to drop.
 > `src/mcp_tools_py/utils/python_environment.py` carrying `_resolve_python_executable`'s
 > body verbatim — existence check, `shutil.which` fallback and the exact error message —
 > plus `_script_path` as `binary()`, then rewire `server.py` and `main.py`'s
-> `--python-executable` help string, then delete the now write-only `self.venv_path` /
-> `self.python_executable` attributes with their `vulture_whitelist.py` entries and refresh
-> the two flag docstrings, then fix the test churn listed in the step. Do **not** rename
+> `--python-executable` help string and its two epilog examples, then delete the now
+> write-only `self.venv_path` / `self.python_executable` attributes with their
+> `vulture_whitelist.py` entries, drop `server.py`'s now-dead `os`, `shutil` and `sys`
+> imports, and refresh the two flag docstrings, then fix the test churn listed in the step
+> — the patch targets must be repointed in this same commit, or patching a removed module
+> attribute raises `AttributeError`. Do **not** rename
 > `venv_bin` to `bin_dir` and do not touch `code_checker_pytest/runners.py` — #229 already
 > derives that value from the interpreter. Do not touch `inspect_library.py` or
 > `jedi_tools.py` — later steps own them. This is one commit: tests, implementation and all

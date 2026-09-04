@@ -20,6 +20,7 @@ a project module".
 
 **Modified**
 - `.importlinter` — new `forbidden` contract
+- `pyproject.toml` — add `"build>=1.0"` to the `dev` extra (see criterion 8 below)
 - `src/mcp_tools_py/server.py` — `_is_tool_available`; `PROBE_TIMEOUT_SECONDS`,
   `_TOOL_MODULES` and `_TOOL_PACKAGES` (`:47,51-65`) move to `environment_info.py` and are
   imported back; the `execute_command` import goes with `_is_tool_available` (this was its
@@ -275,12 +276,15 @@ Probe stdout, one line of JSON:
    `sys.executable` and assert `importable == {"json": True, "pytest": True,
    "nosuchmodule_xyz": False}` and that `version` matches `platform.python_version()`.
 
-Every test that touches the cache must call `get_environment_info.cache_clear()` — put it
-in an autouse fixture in this module.
+Every test that touches the cache must call `get_environment_info.cache_clear()`. Put the
+autouse fixture in **`tests/conftest.py`**, not in this module: the `lru_cache` is
+process-wide, step 6 adds `tests/test_tool_context.py` as a second consumer, and an xdist
+worker runs many modules per process, so a module-scoped fixture leaves the cache warm for
+whatever runs next.
 
 **Criterion 8 — `probe.py` in a built wheel** — needs a test that inspects a wheel.
-`tests/test_packaging.py`, `@pytest.mark.integration` (it builds a distribution, so it is
-seconds, not milliseconds):
+`tests/test_packaging.py`, `@pytest.mark.integration`. `build` creates an isolated
+environment and installs the build backend into it, so this is tens of seconds:
 
 ```
 pytest.importorskip("build")
@@ -293,8 +297,13 @@ assert "mcp_tools_py/utils/target_scripts/__init__.py" in names
 
 This is the only form that distinguishes "present in the checkout" from "shipped", which
 is exactly what the criterion asks and what a later reorganisation would break silently
-(the third rejected alternative in the issue). Skip rather than fake when `build` is
-absent, per the knowledge base.
+(the third rejected alternative in the issue).
+
+`build` is in neither `dependencies` nor the `dev` extra today, and CI installs `.[dev]`
+(`ci.yml:131`), so `importorskip` would skip the test locally **and** in CI — criterion 8
+would never actually be checked. **Add `"build>=1.0"` to the `dev` extra
+(`pyproject.toml:46-51`) in this step.** Keep the `importorskip` as the guard for anyone
+running without the extra, per the knowledge base's skip-don't-fake rule.
 
 `tests/test_tool_availability/test_is_tool_available.py` (11 tests) currently patches
 `mcp_tools_py.server.execute_command` and asserts a `python -m <tool> --version`
@@ -366,5 +375,8 @@ The two new tests are `integration`-marked, so run them explicitly as well:
 > deleting the three tests the step names. Add the `.importlinter`
 > contract together with `tests/test_target_scripts_contract.py`, which proves it fails
 > when `probe.py` imports a project module; do not verify that by hand. Add
-> `tests/test_packaging.py` for the wheel. One commit, all checks passing, including the
+> `tests/test_packaging.py` for the wheel, together with `"build>=1.0"` in
+> `pyproject.toml`'s `dev` extra — without it that test skips everywhere and criterion 8
+> goes unchecked. Put the `get_environment_info.cache_clear()` autouse fixture in
+> `tests/conftest.py`. One commit, all checks passing, including the
 > integration-marked run. Do not add a `source` subcommand yet — step 3 owns it.

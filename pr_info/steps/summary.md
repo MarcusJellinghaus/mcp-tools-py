@@ -4,7 +4,7 @@
 
 Three tools resolve Python names against the wrong interpreter:
 
-- `inspect_library.py:36` calls `importlib.import_module` **in the MCP server's own
+- `inspect_library.py:38` calls `importlib.import_module` **in the MCP server's own
   process**, so it only sees the tool env.
 - `jedi_tools.py:26,99` build `jedi.Project(path=...)` with no `environment_path`, so
   jedi falls back to `VIRTUAL_ENV`, then conda, then "the latest Python on the system".
@@ -175,6 +175,7 @@ One new folder: `src/mcp_tools_py/utils/target_scripts/`.
 | `src/mcp_tools_py/checker_tools/{pylint,pytest,mypy,ruff_check,ruff_fix,bandit,vulture,tach,lint_imports}_tool.py` | 5, 6 |
 | `src/mcp_tools_py/formatter/formatter_tools.py` | 5, 6 |
 | `.importlinter` | 2 (add contract), 5 (−4 entries), 6 (−2 entries) |
+| `pyproject.toml` | 2 (`build` in the `dev` extra) |
 | `tach.toml` | 3 (`inspect_library`), 7 (`utility_tools`) |
 | `README.md` | 3 |
 | `vulture_whitelist.py` | 1 (`_.python_executable`, `_.venv_path`), 3, 7 (if needed) |
@@ -184,23 +185,31 @@ One new folder: `src/mcp_tools_py/utils/target_scripts/`.
 | `tests/test_tool_availability/test_check_tool_availability.py` | 1, 6 (deleted) |
 | `tests/test_tool_availability/test_is_tool_available.py` | 1, 2, 6 (deleted) |
 | `tests/test_tool_availability/test_handler_short_circuit.py` | 1, 2, 6 |
-| `tests/test_tool_availability/test_unavailable_message.py` | 2, 6 (moved into `tests/test_tool_context.py`) |
+| `tests/test_tool_availability/test_unavailable_message.py` | 6 (moved into `tests/test_tool_context.py`; step 2 only constrains its message text) |
 | `tests/test_main_args.py` | 1 (must keep passing; no edit expected) |
 | `tests/test_inspect_library.py` | 3 |
-| `tests/test_checker_tools.py` | 6 |
+| `tests/test_checker_tools.py` | 1 (`:20`), 6 |
 | `tests/test_code_checker_bandit/test_integration.py` | 6 |
+| `tests/test_final_validation.py` | 6 (24 `CheckerTools(server)` sites) |
+| `tests/test_code_checker_pytest/test_reporting.py` | 6 (9 sites) |
+| `tests/test_code_checker_pytest/test_runners.py` | 6 (2 sites) |
+| `tests/test_code_checker_pytest/conftest.py` | 6 (real-`ToolServer` `server` fixture) |
 | `tests/test_refactoring/test_refactoring_tools.py` | 4, 7 |
+| `tests/test_refactoring/test_rope_tools.py` | 4, 7 (`:506` constructor call) |
 | `tests/test_refactoring/test_jedi_tools.py` | 4 |
 | `tests/test_refactoring/test_integration.py` | 4 |
 | `tests/test_refactoring/test_lazy_imports.py` | 4 |
 | `tests/test_formatter_tools.py` | 6 |
 | `tests/test_utility_tools.py` | 7 |
-| `tests/conftest.py` | 6 (shared `ToolContext` fixture) |
+| `tests/conftest.py` | 2 (autouse `get_environment_info.cache_clear()`), 6 (shared `ToolContext` fixture) |
 | `tests/test_server_params.py` | 6 (`_check_tool_availability`, `_is_tool_available`, `_resolved_python`) |
 
-`pyproject.toml` needs **no** change: `[tool.setuptools.packages.find]` defaults to
-`namespaces = true`, so `utils/target_scripts/` with an `__init__.py` is discovered and
-its `.py` files ship in the wheel (criterion 8).
+`pyproject.toml` needs no change for **package discovery**:
+`[tool.setuptools.packages.find]` sets only `where = ["src"]`, so `namespaces` defaults to
+true, `utils/target_scripts/` with an `__init__.py` is discovered, and its `.py` files ship
+in the wheel (criterion 8). It does need one **test dependency**: step 2 adds
+`"build>=1.0"` to the `dev` extra, without which `tests/test_packaging.py` skips both
+locally and in CI and criterion 8 is never verified.
 
 ## Acceptance criteria → step
 
