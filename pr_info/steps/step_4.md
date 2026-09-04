@@ -51,7 +51,7 @@ for the two tools.
 
 The cost is that the fifteen existing call sites listed above must be edited, and that each
 distinct `(project_dir, interpreter)` now spawns one `CompiledSubprocess`:
-`jedi.Project(environment_path=...)` creates a fresh `Environment` per project and
+`Project.get_environment()` creates a fresh `Environment` per project and
 `Environment.__init__` spawns eagerly. Pass `sys.executable` in those tests — the same
 interpreter running the suite, so inference results are unchanged — and see the teardown
 note under Tests. `test_lazy_imports.py:62` targets a **missing** file, which returns
@@ -67,7 +67,9 @@ first of two small edits to the same call sites.
 _get_project(project_dir, interpreter):
     import jedi
     try:
-        return jedi.Project(path=project_dir, environment_path=interpreter), None
+        project = jedi.Project(path=project_dir, environment_path=interpreter)
+        project.get_environment()                 # force it HERE - see below
+        return project, None
     except Exception as exc:                      # jedi.InvalidPythonEnvironment and friends
         return None, (f"Error: cannot analyse against the Python environment at "
                       f"'{interpreter}': {exc}")
@@ -80,10 +82,29 @@ list_symbols / find_references:
     ... unchanged from here ...
 ```
 
+**`jedi.Project(...)` alone raises nothing.** `Project.__init__` only stores
+`environment_path`; the environment is built lazily in `Project.get_environment()`, which
+calls `create_environment(...)` — and *that* is what raises `InvalidPythonEnvironment` and
+spawns the `CompiledSubprocess`. Its first caller is `jedi.Script(...)`, at
+`jedi_tools.py:27` and `:99`, which sits **outside** every `try` in that file. A `try`
+wrapped around the constructor alone would therefore catch nothing: the traceback would
+still escape from the `Script` line, and the `lru_cache` would have stored a "successful"
+project whose environment fails on every call.
+
+Calling `project.get_environment()` inside the `try` is what makes the promise below
+true. `Project.get_environment()` memoises on the project (`if self._environment is None`),
+so forcing it here is not an extra spawn — it moves the one spawn inside the guarded,
+cached region, and the later `jedi.Script(...)` reuses the already-built environment and
+cannot raise `InvalidPythonEnvironment`.
+
 Catching `Exception` matches the existing idiom in this file (`:29`, `:118`, both with
 `# pylint: disable=broad-exception-caught`) and avoids importing jedi's private exception
 path. The message names the interpreter, so an unusable environment surfaces as text
 rather than a traceback.
+
+Test this directly: patch `jedi.Project` so that `get_environment()` raises, call
+`list_symbols`, and assert the returned string names the interpreter — no exception
+propagates — and that a second call does not re-attempt (the failure is cached).
 
 `environment_path=`, not `sys_path=` (decision 2): a `sys.path` override avoids jedi's
 child interpreter but still infers against the *tool* env's stdlib and builtins.
@@ -106,6 +127,11 @@ the intended trade and is why the cache exists.
 
 Patch `jedi.Project` and assert it is called with `environment_path` set to the
 interpreter passed in. This is the structural guard.
+
+A second new test covers the failure path, which is where the constructor-only `try` would
+have leaked: make the patched project's `get_environment()` raise, then assert
+`list_symbols` **returns** a string naming the interpreter rather than propagating, and
+that a second call does not re-attempt (`_get_project` cached the failure).
 
 **Existing call sites** — the fifteen listed under WHERE all gain the interpreter. Add a
 module-level helper in `test_jedi_tools.py` so the edit is mechanical and the choice is

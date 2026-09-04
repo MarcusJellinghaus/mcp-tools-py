@@ -94,15 +94,32 @@ now — the nine checker tool modules read them and step 6 rewrites those module
 ```python
 CONSOLE_SCRIPT_TOOLS = ("lint-imports", "vulture", "ruff", "bandit", "tach")
 
+binaries: dict[str, Optional[str]] = {}
 for name in CONSOLE_SCRIPT_TOOLS:
     path = self.environment.binary(name)
     availability[name] = path is not None
-    setattr(self, f"_{name.replace('-', '_')}_binary", str(path) if path else None)
+    binaries[name] = str(path) if path else None
     if path is None:
         logger.warning("%s not found in %s. Ensure --venv-path or --python-executable "
                        "points to an environment where %s is installed.",
                        name, self.environment.bin_dir, name)
+
+# Declared explicitly, not via setattr — see below.
+self._lint_imports_binary: Optional[str] = binaries["lint-imports"]
+self._vulture_binary: Optional[str] = binaries["vulture"]
+self._ruff_binary: Optional[str] = binaries["ruff"]
+self._bandit_binary: Optional[str] = binaries["bandit"]
+self._tach_binary: Optional[str] = binaries["tach"]
 ```
+
+**The five attributes must stay declared.** A `setattr(self, f"_{name}_binary", ...)` loop
+would be shorter, but mypy cannot see attributes assigned under a computed name, so every
+reader in the nine tool modules becomes an `attr-defined` error —
+`ruff_check_tool.py:41,66`, `ruff_fix_tool.py:42,66`, `bandit_tool.py:42,66`,
+`lint_imports_tool.py:39,48`, `tach_tool.py:29,41`, `vulture_tool.py:40,64`. Passing mypy
+is an exit criterion for this step. The five explicit lines keep today's annotations
+(`Optional[str]`) and today's read sites working unchanged; step 6 deletes all five
+attributes when the tool modules switch to `context.environment.binary(...)`.
 
 Update the `_check_tool_availability` docstring — it currently lists "(lint-imports,
 vulture, ruff, bandit)" and omits tach.
@@ -202,11 +219,21 @@ preserving today's fail-loud server construction (`server.py:109-112`).
   | `:60-61` `test_venv_path_unix` | `os.path.join("/my/venv","bin","python")` | posix-only test, unchanged |
   | `:90` `test_python_executable_fallback` | `"/usr/local/bin/python3.11"` | `\usr\local\bin\python3.11` |
   | `:103` `test_sys_executable_fallback` | `sys.executable` | unchanged — already normalised |
+  | `:521` `test_resolved_python_passed_to_pytest_runner` (in `TestToolHandlerShortCircuit`) | `"/custom/python"` | `\custom\python` |
 
   Rewrite `:43-44`, `:60-61` and `:90` to assert on the `Path` rather than the string,
   which is platform-normalised on both sides and states the intent:
   `assert server.environment.interpreter == Path("/my/venv") / "Scripts" / "python.exe"`,
   and `== Path("/usr/local/bin/python3.11")` for `:90`. Leave `:103` alone.
+
+  `:521` is the same break outside `TestResolvePythonExecutable` and is easy to miss:
+  `test_resolved_python_passed_to_pytest_runner` constructs the server with
+  `python_executable="/custom/python"` and then asserts
+  `call_kwargs.kwargs["python_executable"] == "/custom/python"` on top of the
+  `== server._resolved_python` assertion at `:520`. The literal goes red on Windows in
+  **this** step; step 6 only rewrites `:520`'s right-hand side. Change `:521` to
+  `== str(Path("/custom/python"))`, keeping the test's point — the *resolved* interpreter,
+  not the raw argument, reaches the runner.
 
 `tests/test_code_checker/test_runners.py:229` — the positional `None,  # venv_path`
 becomes `None,  # bin_dir`. Three further keyword call sites in the same file.
