@@ -75,6 +75,26 @@ hand today — for a console-script tool it names `environment.bin_dir`, for an 
 uses the probe's version and distributions per step 2. Each tool module's short-circuit
 becomes `return context.unavailable_message("ruff")`.
 
+**The message must keep two substrings verbatim: `"<tool> is not available"` and
+`"Restart the server"`.** Thirteen assertions across four test files match on them, and
+they are the user-facing contract, not incidental wording:
+
+| File | Assertions |
+|---|---|
+| `tests/test_tool_availability.py` | `:396`, `:397`, `:421`, `:422`, `:446`, `:447`, `:547` |
+| `tests/test_checker_tools.py` | `:194`, `:585`, `:629`, `:673` |
+| `tests/test_formatter_tools.py` | `:301` |
+| `tests/test_code_checker_bandit/test_integration.py` | `:45`, `:46` |
+
+The diagnostic wording at `step_2.md:127-132` (`"<tool> is not installed in <interpreter>
+(Python <version>)"`) contains **neither** substring — that text is the *logger warning*
+for the lazy probe, and adopting it as the tool's return string turns all thirteen
+assertions red. Build the message as "`<tool>` is not available …" plus the step-2
+diagnosis (interpreter, Python version, distribution present or not) plus "Restart the
+server after installing.", so the added diagnostic is a gain and the contract holds. Only
+if a substring is deliberately dropped does the table above become a list of assertions to
+rewrite; all four files are already in this step's Modified list either way.
+
 ## HOW — `server.py`
 
 ```python
@@ -157,7 +177,9 @@ no cache, no subprocess and no reference to the server. `is_tool_available` retu
 2. `is_tool_available` for an `-m` tool reads the probe — patch
    `mcp_tools_py.utils.tool_context.get_environment_info` and assert both outcomes.
 3. `unavailable_message` names the bin dir for a console-script tool and the interpreter
-   plus Python version for an `-m` tool.
+   plus Python version for an `-m` tool, and in both cases contains `"<tool> is not
+   available"` and `"Restart the server"` — the substrings the thirteen existing
+   assertions listed under ALGORITHM match on.
 4. `resolve_timeout` delegates to `get_check_timeout` with `check_timeout` as the
    server-level fallback.
 5. The dataclass is frozen — assigning to a field raises `FrozenInstanceError`.
@@ -228,7 +250,9 @@ Prefer one shared `ToolContext` fixture (in `tests/conftest.py`) over three near
 ## LLM prompt
 
 > Read `pr_info/steps/summary.md` and `pr_info/steps/step_6.md`, then implement step 6.
-> Write `tests/test_tool_context.py` first, then add `utils/tool_context.py`, then convert
+> Write `tests/test_tool_context.py` first — including the assertion that
+> `unavailable_message` keeps the substrings `"<tool> is not available"` and
+> `"Restart the server"` — then add `utils/tool_context.py`, then convert
 > `CheckerTools`, the nine `*_tool.py` modules and `FormatterTools` to take a
 > `ToolContext`, then strip the corresponding state from `server.py`, then migrate the
 > three mock-server fixtures and fix every reader of the removed names — the table in
