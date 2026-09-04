@@ -188,6 +188,11 @@ class TestMypyCommandConstruction:
 class TestMypyTimeoutMessage:
     """A timeout reports cache state, the exact command and how to retry."""
 
+    @pytest.fixture(autouse=True)
+    def _no_ambient_cache_env(self, monkeypatch: pytest.MonkeyPatch) -> None:
+        """An ambient MYPY_CACHE_DIR would override the config these tests set."""
+        monkeypatch.delenv("MYPY_CACHE_DIR", raising=False)
+
     @staticmethod
     def _timeout_error(tmp_path: Path, mock_exec: Any, **kwargs: Any) -> str:
         """Run the checker against a timing-out mypy, return the error text."""
@@ -289,5 +294,73 @@ class TestMypyTimeoutMessage:
 
         assert _resolve_cache_dir(str(tmp_path), "chosen") == (
             os.path.join(str(tmp_path), "chosen"),
+            True,
+        )
+
+    def test_resolve_cache_dir_env_beats_config(
+        self, tmp_path: Path, monkeypatch: pytest.MonkeyPatch
+    ) -> None:
+        """MYPY_CACHE_DIR overrides the config file, so it wins here too."""
+        (tmp_path / "pyproject.toml").write_text(
+            '[tool.mypy]\ncache_dir = "x"\n', encoding="utf-8"
+        )
+        monkeypatch.setenv("MYPY_CACHE_DIR", "from_env")
+
+        assert _resolve_cache_dir(str(tmp_path), None) == (
+            os.path.join(str(tmp_path), "from_env"),
+            True,
+        )
+
+    def test_resolve_cache_dir_argument_beats_env(
+        self, tmp_path: Path, monkeypatch: pytest.MonkeyPatch
+    ) -> None:
+        """--cache-dir is parsed after the environment override, so it wins."""
+        monkeypatch.setenv("MYPY_CACHE_DIR", "from_env")
+
+        assert _resolve_cache_dir(str(tmp_path), "chosen") == (
+            os.path.join(str(tmp_path), "chosen"),
+            True,
+        )
+
+    def test_resolve_cache_dir_expands_home_in_config(self, tmp_path: Path) -> None:
+        """Mypy expands ~ in a config cache_dir, so it is not a project subpath."""
+        (tmp_path / "pyproject.toml").write_text(
+            '[tool.mypy]\ncache_dir = "~/.cache/mypy"\n', encoding="utf-8"
+        )
+
+        assert _resolve_cache_dir(str(tmp_path), None) == (
+            os.path.expanduser("~/.cache/mypy"),
+            True,
+        )
+
+    def test_resolve_cache_dir_expands_vars_in_config(
+        self, tmp_path: Path, monkeypatch: pytest.MonkeyPatch
+    ) -> None:
+        monkeypatch.setenv("CACHE_ROOT", "rooted")
+        (tmp_path / "pyproject.toml").write_text(
+            '[tool.mypy]\ncache_dir = "$CACHE_ROOT/c"\n', encoding="utf-8"
+        )
+
+        assert _resolve_cache_dir(str(tmp_path), None) == (
+            os.path.join(str(tmp_path), "rooted/c"),
+            True,
+        )
+
+    def test_resolve_cache_dir_expands_home_but_not_vars_in_env(
+        self, tmp_path: Path, monkeypatch: pytest.MonkeyPatch
+    ) -> None:
+        """Mypy runs expanduser over MYPY_CACHE_DIR, but not expandvars."""
+        monkeypatch.setenv("CACHE_ROOT", "rooted")
+        monkeypatch.setenv("MYPY_CACHE_DIR", "$CACHE_ROOT/c")
+
+        assert _resolve_cache_dir(str(tmp_path), None) == (
+            os.path.join(str(tmp_path), "$CACHE_ROOT/c"),
+            True,
+        )
+
+        monkeypatch.setenv("MYPY_CACHE_DIR", "~/env_cache")
+
+        assert _resolve_cache_dir(str(tmp_path), None) == (
+            os.path.expanduser("~/env_cache"),
             True,
         )

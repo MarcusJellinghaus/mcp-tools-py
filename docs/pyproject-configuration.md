@@ -180,32 +180,31 @@ explicit_package_bases = true
 
 Mypy discards its incremental cache whenever a cache-affecting option changes, so
 a run with a different flag set pays for a full cold rebuild. The flags this
-server sends on **every** call are chosen to stay out of that set; the three
-optional ones do not:
+server sends on **every** call leave the cache alone; the three optional ones do
+not:
 
-| Flag | Sent | Affects the cache |
-|------|------|-------------------|
-| `--output json` | every call | No |
-| `--no-color-output` | every call | No |
-| `--show-column-numbers` | every call | No |
-| `--show-error-codes` | every call (already mypy's default; kept for explicitness) | No |
-| `--cache-dir` | when `cache_dir` is passed | **Yes** — picks a different cache directory |
-| `--follow-imports` | when `follow_imports` is passed | **Yes** — invalidates the cache |
-| `--disable-error-code` | when `disable_error_codes` is passed | **Yes** — invalidates the cache |
+| Flag | Sent | Effect on the cache |
+|------|------|---------------------|
+| `--output json` | every call | None |
+| `--no-color-output` | every call | None |
+| `--show-column-numbers` | every call | None |
+| `--show-error-codes` | every call (already mypy's default; kept for explicitness) | None |
+| `--cache-dir` | when `cache_dir` is passed | Sends the run to a different cache directory |
+| `--follow-imports` | when `follow_imports` is passed | Invalidates the cache |
+| `--disable-error-code` | when `disable_error_codes` is passed | Invalidates the cache |
 
 So by default — no `cache_dir`, no `follow_imports`, no `disable_error_codes` —
 a tool run and a plain `mypy` run in your shell share one cache.
 
-**Passing `follow_imports` or `disable_error_codes` splits it.** Both are in
+**Passing `follow_imports` or `disable_error_codes` invalidates it.** Both are in
 mypy's set of cache-affecting options, so a call that supplies either invalidates
 the cache against every run that does not supply the same value — alternating
 between the two costs a cold rebuild each way. Use them for one-off narrowing,
 not routinely; put the lasting choice in `[tool.mypy]` instead.
 
-**Passing `cache_dir` splits it differently.** The option is not one mypy treats
-as cache-affecting, so nothing is invalidated — but the run reads and writes a
-cache of its own, so it neither benefits from nor warms the one your shell runs
-use.
+**Passing `cache_dir` bypasses it.** The option is not in mypy's cache-affecting
+set, so nothing is invalidated — but the run reads and writes a cache of its own,
+so it neither benefits from nor warms the one your shell runs use.
 
 The mypy version, the installed plugins and the interpreter are part of the cache
 key too. Warming the cache from a different virtualenv fails just as silently as

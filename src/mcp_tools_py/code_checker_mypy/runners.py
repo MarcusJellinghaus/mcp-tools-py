@@ -19,16 +19,39 @@ from mcp_tools_py.utils.subprocess_runner import (
 logger = logging.getLogger(__name__)
 
 
+def _expand_config_cache_dir(path: str) -> str:
+    """Expand a ``cache_dir`` config value the way mypy does.
+
+    ``config_parser.expand_path`` applies ``expandvars`` over ``expanduser``,
+    and ``main.py`` then runs ``expanduser`` once more over the result.
+
+    Args:
+        path: The raw ``cache_dir`` value read from the config file.
+
+    Returns:
+        The expanded path.
+    """
+    return os.path.expanduser(os.path.expandvars(os.path.expanduser(path)))
+
+
 def _resolve_cache_dir(
     project_dir: str, cache_dir: str | None
 ) -> tuple[str | None, bool]:
     """Resolve the cache directory mypy will use, and whether that is certain.
 
-    Mypy consults ``mypy.ini``, ``.mypy.ini``, ``pyproject.toml`` and
-    ``setup.cfg`` in that order. Only ``pyproject.toml`` is parsed here; when an
-    INI-format config could own the setting the answer is None rather than a
-    guess. With no local config at all, mypy falls back to a user-level config
-    that may set ``cache_dir``, so ``.mypy_cache`` is returned as an assumption.
+    Mypy takes the cache directory from, in order of precedence: the
+    ``--cache-dir`` argument, the ``MYPY_CACHE_DIR`` environment variable, the
+    ``cache_dir`` config setting, and the ``.mypy_cache`` default. Config is read
+    from ``mypy.ini``, ``.mypy.ini``, ``pyproject.toml`` and ``setup.cfg`` in
+    that order; only ``pyproject.toml`` is parsed here, so when an INI-format
+    config could own the setting the answer is None rather than a guess. With no
+    local config at all, mypy falls back to a user-level config that may set
+    ``cache_dir``, so ``.mypy_cache`` is returned as an assumption.
+
+    Path expansion follows mypy, which treats each source differently: a config
+    value gets ``expandvars`` and ``expanduser``, ``MYPY_CACHE_DIR`` gets
+    ``expanduser`` only, and a ``--cache-dir`` argument gets neither, because
+    mypy parses the command line after its expansion pass.
 
     Args:
         project_dir: Path to the project directory, which is mypy's cwd.
@@ -41,6 +64,12 @@ def _resolve_cache_dir(
     """
     if cache_dir:
         return os.path.join(project_dir, cache_dir), True
+
+    # The environment beats any config file, and run_mypy_check passes our own
+    # environment through to mypy
+    env_cache_dir = os.environ.get("MYPY_CACHE_DIR", "")
+    if env_cache_dir.strip():
+        return os.path.join(project_dir, os.path.expanduser(env_cache_dir)), True
 
     for ini_name in ("mypy.ini", ".mypy.ini"):
         if os.path.isfile(os.path.join(project_dir, ini_name)):
@@ -61,7 +90,10 @@ def _resolve_cache_dir(
             configured = mypy_section.get("cache_dir", ".mypy_cache")
             if not isinstance(configured, str):
                 return None, False
-            return os.path.join(project_dir, configured), True
+            return (
+                os.path.join(project_dir, _expand_config_cache_dir(configured)),
+                True,
+            )
 
     if os.path.isfile(os.path.join(project_dir, "setup.cfg")):
         return None, False

@@ -1,6 +1,7 @@
 """Tests for error transparency: stderr surfacing and 'No module named' detection."""
 
 import sys
+from pathlib import Path
 from typing import Any
 from unittest.mock import patch
 
@@ -221,14 +222,20 @@ class TestMypyTimeout:
     """Test that a mypy timeout is reported as a timeout, not a generic failure."""
 
     @patch("mcp_tools_py.code_checker_mypy.runners.execute_command")
-    def test_timeout_reported_as_timeout(self, mock_exec: Any) -> None:
+    def test_timeout_reported_as_timeout(
+        self, mock_exec: Any, tmp_path: Path, monkeypatch: pytest.MonkeyPatch
+    ) -> None:
+        # The timeout branch walks the cache directory, so run against an empty
+        # project rather than the developer's own .mypy_cache
+        monkeypatch.delenv("MYPY_CACHE_DIR", raising=False)
+        (tmp_path / "src").mkdir()
         mock_exec.return_value = make_command_result(
             return_code=1,
             timed_out=True,
             execution_error="Process timed out after 5 seconds",
         )
         result = run_mypy_check(
-            project_dir=".",
+            project_dir=str(tmp_path),
             python_executable=sys.executable,
             target_directories=["src"],
             timeout_seconds=5,
