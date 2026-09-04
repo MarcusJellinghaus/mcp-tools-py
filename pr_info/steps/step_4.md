@@ -17,19 +17,24 @@ package absent from the tool env, `get_library_source` returns that package's so
 - `src/mcp_tools_py/refactoring/jedi_tools.py`
 - `src/mcp_tools_py/refactoring/__init__.py` — `RefactoringTools.__init__`
 - `src/mcp_tools_py/server.py:87` — pass the environment
-- `tests/test_refactoring/test_refactoring_tools.py` — constructor call sites
-- `tests/test_refactoring/test_jedi_tools.py` — one new construction test
+- `tests/test_refactoring/test_refactoring_tools.py` — constructor call sites, plus the two
+  direct `jedi_tools` call sites at `:71` and `:86`
+- `tests/test_refactoring/test_jedi_tools.py` — ten call sites gain the interpreter, plus
+  one new construction test
+- `tests/test_refactoring/test_integration.py:78,84,138` — three call sites
+- `tests/test_refactoring/test_lazy_imports.py:62` — the `list_symbols(...)` snippet run in
+  the child interpreter
 
 ## WHAT
 
 ```python
 # jedi_tools.py
 @lru_cache(maxsize=None)
-def _get_project(project_dir: str, interpreter: str | None) -> tuple[Any | None, str | None]: ...
+def _get_project(project_dir: str, interpreter: str) -> tuple[Any | None, str | None]: ...
 
-def list_symbols(project_dir: Path, file_path: str, interpreter: str | None = None) -> str: ...
+def list_symbols(project_dir: Path, file_path: str, interpreter: str) -> str: ...
 def find_references(project_dir: Path, file_path: str, symbol_name: str,
-                    interpreter: str | None = None) -> str: ...
+                    interpreter: str) -> str: ...
 
 # refactoring/__init__.py
 class RefactoringTools:
@@ -37,11 +42,21 @@ class RefactoringTools:
                  timeout: int = 120) -> None: ...
 ```
 
-`interpreter=None` means "jedi's default environment", exactly today's behaviour.
-Production always passes the resolved interpreter. The default exists so the ~13 existing
-jedi tests need no edit and the suite does not spawn thirteen `CompiledSubprocess`
-children — `jedi.Project(environment_path=...)` creates a fresh `Environment` per project,
-and `Environment.__init__` spawns eagerly.
+`interpreter` is **required**, matching step 3's rule for `_get_library_source`
+(`step_3.md:33`). A `None` default meaning "jedi's default environment" would keep the
+pre-fix resolution path — `VIRTUAL_ENV`, then conda, then "the latest Python on the
+system" — reachable from any call site that forgets the argument, which is exactly the
+defect this issue exists to remove. The same decision must not come out two different ways
+for the two tools.
+
+The cost is that the fifteen existing call sites listed above must be edited, and that each
+distinct `(project_dir, interpreter)` now spawns one `CompiledSubprocess`:
+`jedi.Project(environment_path=...)` creates a fresh `Environment` per project and
+`Environment.__init__` spawns eagerly. Pass `sys.executable` in those tests — the same
+interpreter running the suite, so inference results are unchanged — and see the teardown
+note under Tests. `test_lazy_imports.py:62` targets a **missing** file, which returns
+before `_get_project` is reached, so that test spawns nothing and keeps proving the lazy
+import.
 
 Step 7 converts `RefactoringTools` to `ToolContext`; this step's constructor change is the
 first of two small edits to the same call sites.
@@ -52,8 +67,6 @@ first of two small edits to the same call sites.
 _get_project(project_dir, interpreter):
     import jedi
     try:
-        if interpreter is None:
-            return jedi.Project(path=project_dir), None
         return jedi.Project(path=project_dir, environment_path=interpreter), None
     except Exception as exc:                      # jedi.InvalidPythonEnvironment and friends
         return None, (f"Error: cannot analyse against the Python environment at "
@@ -92,8 +105,22 @@ the intended trade and is why the cache exists.
 **Unit** — `tests/test_refactoring/test_jedi_tools.py`, one new test:
 
 Patch `jedi.Project` and assert it is called with `environment_path` set to the
-interpreter passed in. This is the structural guard; the existing thirteen tests keep
-calling without an interpreter and stay untouched.
+interpreter passed in. This is the structural guard.
+
+**Existing call sites** — the fifteen listed under WHERE all gain the interpreter. Add a
+module-level helper in `test_jedi_tools.py` so the edit is mechanical and the choice is
+visible, mirroring step 3's `_src`:
+
+```python
+def _symbols(project_dir: Path, file_path: str) -> str:
+    return list_symbols(project_dir, file_path, sys.executable)
+```
+
+Every call now builds a `jedi.Environment`, so add an autouse teardown fixture calling
+`_get_project.cache_clear()` in `test_jedi_tools.py`, `test_integration.py` and
+`test_refactoring_tools.py`. Dropping the cached projects releases the `CompiledSubprocess`
+children instead of leaving them to be reaped at interpreter exit — the same reason the
+integration test below clears the cache.
 
 **Integration** — `tests/test_environment_integration.py`, `@pytest.mark.integration`:
 
@@ -147,8 +174,10 @@ The second is the one that matters here. Also `run_lint_imports_check` and
 > Read `pr_info/steps/summary.md` and `pr_info/steps/step_4.md`, then implement step 4.
 > Write the `jedi.Project(environment_path=...)` construction test and
 > `tests/test_environment_integration.py` first, then add `_get_project` to
-> `jedi_tools.py`, thread `interpreter` through both public functions, and pass the
-> environment from `server.py` through `RefactoringTools`. Do not edit the thirteen
-> existing jedi tests — if one needs editing, the `interpreter=None` default is wrong.
+> `jedi_tools.py`, thread a **required** `interpreter` through both public functions, and
+> pass the environment from `server.py` through `RefactoringTools`. Do not give
+> `interpreter` a `None` default — that would keep the `VIRTUAL_ENV` fallback this issue
+> removes. Update the fifteen existing call sites listed in the step to pass
+> `sys.executable`, and add the `_get_project.cache_clear()` teardown fixtures.
 > Run the integration-marked tests explicitly; they are skipped by the default filter.
 > One commit, all checks passing.

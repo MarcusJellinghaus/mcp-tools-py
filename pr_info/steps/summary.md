@@ -82,10 +82,7 @@ These reduce moving parts without touching any acceptance criterion:
 3. **The five `_*_binary` attributes are deleted, not moved** — callers use
    `environment.binary("ruff")` at use time. Removes five attributes from `server.py` and
    from three test fixtures.
-4. **`jedi_tools` takes `interpreter: str | None`**, where `None` keeps today's default
-   environment. Production always passes it; the ~13 existing jedi tests need no edit and
-   the suite does not spawn 13 `CompiledSubprocess` children.
-5. **`prefix` and `is_venv` dropped from the probe blob** — no consumer. `sys_path` stays
+4. **`prefix` and `is_venv` dropped from the probe blob** — no consumer. `sys_path` stays
    (#228 names it), `distributions` stays (decision 15's error text, #61).
 
 ## Deviations from the issue, with reasons
@@ -101,6 +98,11 @@ These reduce moving parts without touching any acceptance criterion:
   commit.
 - **The `integration`-marked venv test moves from the end to step 4**, where both fixed
   tools first exist together.
+- **`jedi_tools.list_symbols` / `find_references` take a required `interpreter`**, with no
+  `None` default. A default meaning "jedi's default environment" would leave the
+  `VIRTUAL_ENV` fallback this issue removes reachable, and step 3 makes the same parameter
+  required on `_get_library_source`. Cost: fifteen existing test call sites are edited in
+  step 4 and each distinct project now builds a `jedi.Environment`.
 - **`run_tests(bin_dir=...)` always prepends to `PATH` when given** (the open question
   from the discussion; option A). `bin_dir` always matches the interpreter actually
   running pytest, so prepending it is correct rather than incidental. The parameter
@@ -157,7 +159,7 @@ One new folder: `src/mcp_tools_py/utils/target_scripts/`.
 | `.importlinter` | 2 (add contract), 5 (−4 entries), 6 (−2 entries) |
 | `tach.toml` | 3 (`inspect_library`), 7 (`utility_tools`) |
 | `README.md` | 3 |
-| `vulture_whitelist.py` | 3, 7 (if needed) |
+| `vulture_whitelist.py` | 1 (`_.python_executable`, `_.venv_path`), 3, 7 (if needed) |
 | `docs/architecture/architecture.md` | 7 |
 | `tests/test_tool_availability.py` | 1, 2, 6 |
 | `tests/test_inspect_library.py` | 3 |
@@ -165,6 +167,9 @@ One new folder: `src/mcp_tools_py/utils/target_scripts/`.
 | `tests/test_code_checker/test_runners.py` | 1 |
 | `tests/test_code_checker_bandit/test_integration.py` | 6 |
 | `tests/test_refactoring/test_refactoring_tools.py` | 4, 7 |
+| `tests/test_refactoring/test_jedi_tools.py` | 4 |
+| `tests/test_refactoring/test_integration.py` | 4 |
+| `tests/test_refactoring/test_lazy_imports.py` | 4 |
 | `tests/test_formatter_tools.py` | 6 |
 | `tests/test_server_params.py` | 1 (`:83` `venv_path` kwarg), 6 (`_check_tool_availability`, `_is_tool_available`, `_resolved_python`) |
 

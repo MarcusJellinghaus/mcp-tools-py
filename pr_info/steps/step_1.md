@@ -14,7 +14,10 @@ seven", "With only `--python-executable` set, the console-script tools are found
 - `tests/test_python_environment.py`
 
 **Modified**
-- `src/mcp_tools_py/server.py` — `_resolve_python_executable`, `_check_tool_availability`
+- `src/mcp_tools_py/server.py` — `_resolve_python_executable`, `_check_tool_availability`,
+  the dead `self.venv_path` / `self.python_executable` attributes, and the flag docstrings
+  at `:64-65` and `:282-283`
+- `vulture_whitelist.py:26-27` — the `_.python_executable` / `_.venv_path` entries
 - `src/mcp_tools_py/code_checker_pytest/runners.py` — `run_tests`, `check_code_with_pytest`
 - `src/mcp_tools_py/checker_tools/pytest_tool.py:111` — call site
 - `src/mcp_tools_py/main.py:66-85` — both help strings
@@ -103,6 +106,30 @@ for name in CONSOLE_SCRIPT_TOOLS:
 
 Update the `_check_tool_availability` docstring — it currently lists "(lint-imports,
 vulture, ruff, bandit)" and omits tach.
+
+### Dead state to delete in the same commit
+
+`self.venv_path` (`server.py:74`) and `self.python_executable` (`:73`) have exactly one
+reader each today: `_resolve_python_executable` / `_check_tool_availability` for
+`venv_path`, and `pytest_tool.py:111` for `server.venv_path`. This step removes all of
+them — the two constructor **parameters** stay, but they are consumed by
+`PythonEnvironment.resolve(...)` and stored nowhere else. Leaving the attributes behind
+would leave the server carrying write-only state that no longer describes how anything
+resolves. So:
+
+- Delete `self.python_executable = python_executable` and `self.venv_path = venv_path`.
+  `self.environment` replaces both.
+- Delete the `_.python_executable` and `_.venv_path` entries at `vulture_whitelist.py:26-27`,
+  then run `run_vulture_check`. If vulture reports either name from a **different** source
+  — `main.py:192` reads them off the argparse `Namespace` — restore just that entry with a
+  comment naming the real reason, rather than restoring both blindly.
+- Update the `venv_path` / `python_executable` docstrings in `ToolServer.__init__`
+  (`:64-65`) and `create_server` (`:282-283`). Both currently say the flags select an
+  interpreter "for running tests"; they now also select the environment that library and
+  symbol lookups resolve in. Use the same wording as the `main.py` help strings below.
+
+`tests/test_checker_tools.py:20` sets `server.venv_path` on a `MagicMock`, which tolerates
+a removed attribute silently; step 6's fixture migration drops it.
 
 ## HOW — `code_checker_pytest/runners.py`
 
@@ -197,14 +224,17 @@ Add one test asserting `run_tests` prepends `bin_dir` to `PATH` when given and l
 
 `run_format_code`, then `run_pylint_check`, `run_pytest_check(extra_args=["-n","auto"])`,
 `run_mypy_check`. Also `run_lint_imports_check` and `run_tach_check` — `utils` gains a
-module but no new dependency edge, so both should stay green.
+module but no new dependency edge, so both should stay green. And `run_vulture_check`,
+which is what confirms the two whitelist entries were safe to drop.
 
 ## LLM prompt
 
 > Read `pr_info/steps/summary.md` and `pr_info/steps/step_1.md`, then implement step 1.
 > Write `tests/test_python_environment.py` first and watch it fail, then add
 > `src/mcp_tools_py/utils/python_environment.py`, then rewire `server.py`,
-> `code_checker_pytest/runners.py`, `checker_tools/pytest_tool.py` and `main.py`, then fix
+> `code_checker_pytest/runners.py`, `checker_tools/pytest_tool.py` and `main.py`, then
+> delete the now write-only `self.venv_path` / `self.python_executable` attributes with
+> their `vulture_whitelist.py` entries and refresh the two flag docstrings, then fix
 > the test churn listed in the step. This is one commit: tests, implementation and all
 > checks passing. Do not touch `inspect_library.py` or `jedi_tools.py` — later steps own
 > them.
