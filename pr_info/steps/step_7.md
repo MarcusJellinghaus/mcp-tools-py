@@ -12,7 +12,8 @@ doc states the rule whose absence produced the bug.
 - `src/mcp_tools_py/inspect_library.py` — `InspectTools`
 - `src/mcp_tools_py/utility_tools.py` — `UtilityTools`
 - `src/mcp_tools_py/server.py` — three call sites
-- `tach.toml` — add `mcp_tools_py.utils` to `utility_tools`
+- `tach.toml` — add `mcp_tools_py.utils` to `utility_tools`, then regenerate
+  `docs/architecture/dependencies/dependency_graph.html` and `pydeps_graph.*`
 - `docs/architecture/architecture.md` — the invariant, the single-environment sentence,
   and the module overview
 - `vulture_whitelist.py` — only if vulture flags the unused parameter
@@ -81,20 +82,23 @@ deleted all six `ignore_imports` entries as they went.
 
 `docs/architecture/architecture.md`:
 
-1. **The invariant**, in *Cross-cutting Concepts* (near the enforcement table at `:168`):
+1. **The invariant**, in *Cross-cutting Concepts* (section 8 begins at `:228`; put it near
+   the Architecture Enforcement table at `:241-245`):
 
    > Any tool that resolves a Python name — module, symbol, or installed package —
    > resolves it through `ToolContext.environment`. Never through the ambient process,
    > never through `VIRTUAL_ENV`.
 
-2. **Why there is one configurable environment**, in *Deployment View* or near `:21`: the
-   checkers must import the project's dependencies, so they run in the project env; the
-   same interpreter therefore resolves library and symbol lookups. Name the two
-   environments explicitly — the **tool env** (`MCP_CODER_VENV_PATH`, where
-   `mcp_tools_py` itself is installed, not configurable through the flags) and the
-   **project env** (`--venv-path` / `--python-executable`) — because the phrase "tool
+2. **Why there is one configurable environment**, in *Deployment View*: the checkers must
+   import the project's dependencies, so they run in the project env; the same interpreter
+   therefore resolves library and symbol lookups. Name the two environments explicitly —
+   the **tool env** (`MCP_CODER_VENV_PATH`, where `mcp_tools_py` itself is installed, not
+   configurable through the flags) and the **project env** (`--python-executable`, with the
+   deprecated `--venv-path` still resolving the interpreter) — because the phrase "tool
    venv" has been used for both and that ambiguity is what made `main.py`'s help text
-   backwards.
+   backwards. `:224` already names both flags after #229; extend that bullet rather than
+   adding a second one. Also update the dependency-rules bullets at `:134-139` if the new
+   `utils` modules change what they say.
 
 3. **Module overview**: add `utils/python_environment.py`, `utils/environment_info.py`,
    `utils/target_scripts/probe.py`, `utils/tool_context.py` and
@@ -102,8 +106,8 @@ deleted all six `ignore_imports` entries as they went.
    runs under `sys.executable` with `-m`, `probe.py` runs under the target interpreter by
    absolute path and is stdlib-only, enforced by the `target_scripts` contract.
 
-4. Update the `.importlinter` sentence: it says "three contracts"; there are now four, and
-   the `ignore_imports` list is gone.
+4. Update the `.importlinter` sentence at `:248`: it says "three contracts"; there are now
+   four, and the `ignore_imports` list is gone.
 
 ## DATA
 
@@ -114,7 +118,7 @@ signature unification plus documentation.
 
 - `tests/test_refactoring/test_refactoring_tools.py` — constructor call sites take a
   `ToolContext` (second edit to these lines; step 4 made the first).
-- `tests/test_utility_tools.py:11,16` — `UtilityTools()` becomes `UtilityTools(context)`.
+- `tests/test_utility_tools.py:16,37,63` — `UtilityTools()` becomes `UtilityTools(context)`.
 - One new test asserting all five registrars accept the same `ToolContext`: build one
   context, construct all five, register against a mock MCP, and assert 17 tools are
   registered. This is the acceptance criterion expressed as a test.
@@ -125,6 +129,10 @@ Reuse the shared `ToolContext` fixture added to `tests/conftest.py` in step 6.
 
 `run_format_code`, `run_pylint_check`, `run_pytest_check`, `run_mypy_check`,
 `run_lint_imports_check`, `run_tach_check`, `run_vulture_check`.
+
+`docs/architecture/dependencies/readme.md` requires the generated graphs to be refreshed
+after a `tach.toml` change: run `tools/tach_docs.bat` and `tools/pydeps_graph.bat` and
+commit the updated `dependency_graph.html` and `pydeps_graph.*` with this step.
 
 Then re-run the integration-marked tests once —
 `run_pytest_check(extra_args=["-n","auto"], markers=["integration"])` — since the venv

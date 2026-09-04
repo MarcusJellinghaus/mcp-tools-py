@@ -4,9 +4,11 @@
 falling back to `VIRTUAL_ENV` / "the latest Python on the system". Ends with the
 integration test that would have caught the reported bug.
 
-**Acceptance criterion closed:** "With `--venv-path` pointing at a venv containing a
-package absent from the tool env, `get_library_source` returns that package's source and
-`list_symbols` resolves against it."
+**Acceptance criterion closed:** "With `--python-executable` pointing into a venv containing
+a package absent from the tool env, `get_library_source` returns that package's source and
+`list_symbols` resolves against it." Stated through `--python-executable`, not
+`--venv-path`: #229 deprecated the latter, and the criterion is about the resolution target,
+not the flag that supplies it.
 
 ## WHERE
 
@@ -16,7 +18,7 @@ package absent from the tool env, `get_library_source` returns that package's so
 **Modified**
 - `src/mcp_tools_py/refactoring/jedi_tools.py`
 - `src/mcp_tools_py/refactoring/__init__.py` — `RefactoringTools.__init__`
-- `src/mcp_tools_py/server.py:87` — pass the environment
+- `src/mcp_tools_py/server.py:112` — pass the environment
 - `tests/test_refactoring/test_refactoring_tools.py` — constructor call sites, plus the two
   direct `jedi_tools` call sites at `:71` and `:86`
 - `tests/test_refactoring/test_jedi_tools.py` — ten call sites gain the interpreter, plus
@@ -42,8 +44,8 @@ class RefactoringTools:
                  timeout: int = 120) -> None: ...
 ```
 
-`interpreter` is **required**, matching step 3's rule for `_get_library_source`
-(`step_3.md:33`). A `None` default meaning "jedi's default environment" would keep the
+`interpreter` is **required**, matching step 3's rule for `_get_library_source`. A `None`
+default meaning "jedi's default environment" would keep the
 pre-fix resolution path — `VIRTUAL_ENV`, then conda, then "the latest Python on the
 system" — reachable from any call site that forgets the argument, which is exactly the
 defect this issue exists to remove. The same decision must not come out two different ways
@@ -153,11 +155,16 @@ integration test below clears the cache.
 ```
 env_dir = tmp_path / "env"
 venv.EnvBuilder(with_pip=False).create(env_dir)                     # ~1 s
-site = sysconfig.get_paths(vars={"base": str(env_dir), "platbase": str(env_dir),
-                                 "installed_base": str(env_dir)})["purelib"]
-write <site>/probe_only_pkg/__init__.py containing `class Marker:` and a function
-interpreter = PythonEnvironment.resolve(venv_path=str(env_dir)).interpreter
+paths = sysconfig.get_paths(vars={"base": str(env_dir), "platbase": str(env_dir),
+                                  "installed_base": str(env_dir)})
+write <paths["purelib"]>/probe_only_pkg/__init__.py containing `class Marker:` and a function
+python = Path(paths["scripts"]) / ("python.exe" if os.name == "nt" else "python")
+interpreter = PythonEnvironment.resolve(python_executable=str(python)).interpreter
 ```
+
+Resolve through `python_executable`, not the deprecated `venv_path`: the criterion is about
+the resolution target, and `sysconfig` already yields the `scripts` directory here, so the
+test needs no `Scripts`/`bin` branch of its own.
 
 Assertions:
 

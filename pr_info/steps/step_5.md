@@ -38,7 +38,7 @@ class FastMCPProtocol(Protocol):
     def run(self) -> None: ...
 ```
 
-Moved verbatim from `server.py:19-39`, docstrings included.
+Moved verbatim from `server.py:19-40`, docstrings included.
 
 ## HOW
 
@@ -52,7 +52,7 @@ from mcp_tools_py.utils.mcp_protocols import FastMCPProtocol
 ```
 
 Two of the fourteen — `checker_tools/__init__.py:26` and
-`formatter/formatter_tools.py:16` — import `FastMCPProtocol, ToolServer` together. They
+`formatter/formatter_tools.py:17` — import `FastMCPProtocol, ToolServer` together. They
 keep the `ToolServer` half from `mcp_tools_py.server`; step 6 removes it.
 
 `server.py` keeps `from mcp_tools_py.utils.mcp_protocols import FastMCPProtocol` for the

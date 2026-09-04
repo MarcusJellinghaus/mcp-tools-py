@@ -20,10 +20,15 @@ a project module".
 
 **Modified**
 - `.importlinter` — new `forbidden` contract
-- `src/mcp_tools_py/server.py` — `_is_tool_available`; the `execute_command` import goes
-  with it (this was its last use, so ruff/pylint flag it otherwise)
-- `tests/test_tool_availability.py` — `TestIsToolAvailable` (`:244-347`), **and** the ten
-  `patch("mcp_tools_py.server.execute_command")` sites outside it
+- `src/mcp_tools_py/server.py` — `_is_tool_available`; `PROBE_TIMEOUT_SECONDS`,
+  `_TOOL_MODULES` and `_TOOL_PACKAGES` (`:47,51-65`) move to `environment_info.py` and are
+  imported back; the `execute_command` import goes with `_is_tool_available` (this was its
+  last use, so ruff/pylint flag it otherwise)
+- `tests/test_tool_availability/test_is_tool_available.py` (11 tests, 265 lines) — three
+  tests are deleted, two invert, the rest repoint
+- `tests/test_tool_availability/test_resolve_python_executable.py` and
+  `test_handler_short_circuit.py` — the `patch("mcp_tools_py.server.execute_command")`
+  sites outside `TestIsToolAvailable`
 
 ## WHAT — the child
 
@@ -46,8 +51,12 @@ that wraps them.
 ```python
 # src/mcp_tools_py/utils/environment_info.py
 
-PROBED_MODULES: tuple[str, ...] = ("pylint", "pytest", "mypy", "black", "isort")
-PROBE_TIMEOUT_SECONDS = 30
+PROBE_TIMEOUT_SECONDS = 30                       # moved from server.py:47
+
+TOOL_MODULES: dict[str, str | None] = {...}      # moved from server.py:51-65
+TOOL_PACKAGES: dict[str, str] = {"lint-imports": "import-linter"}
+
+PROBED_MODULES: tuple[str, ...] = tuple(m for m in TOOL_MODULES.values() if m)
 
 @dataclass(frozen=True)
 class EnvironmentInfo:
@@ -63,10 +72,19 @@ def probe_script_path() -> Path: ...
 def get_environment_info(interpreter: str) -> EnvironmentInfo: ...
 ```
 
-`get_environment_info` **returns** a failure-shaped `EnvironmentInfo` (empty maps,
-`error` set) rather than raising, because `lru_cache` does not cache exceptions and
-decision 3 requires failures to be cached. `ToolContext` can then stay frozen with no
-mutable collaborator.
+**One home for the ten-tool taxonomy.** #229 introduced `PROBE_TIMEOUT_SECONDS`,
+`_TOOL_MODULES` and `_TOOL_PACKAGES` in `server.py`; this step would otherwise add a second
+copy here and step 6 a third (`CONSOLE_SCRIPT_TOOLS` in `tool_context.py`). Move the three
+into `environment_info.py`, drop the leading underscore since they are now cross-module, and
+derive everything else from them — `PROBED_MODULES` above, and in step 6
+`CONSOLE_SCRIPT_TOOLS = frozenset(k for k, v in TOOL_MODULES.items() if v is None)`.
+`server.py` imports them back; its three read sites (`:160`, `:203`, `:249-250`) change name
+only. This also removes the risk of `PROBED_MODULES` drifting from the real call sites.
+
+`get_environment_info` **returns** a failure-shaped `EnvironmentInfo` rather than raising,
+because `lru_cache` does not cache exceptions and decision 3 requires failures to be cached.
+`ToolContext` can then stay frozen with no mutable collaborator. See "Failure is fail-open"
+below for what that shape says about availability.
 
 ## ALGORITHM — child
 
@@ -105,6 +123,23 @@ get_environment_info(interpreter):
 `probe_script_path()` is `Path(__file__).parent / "target_scripts" / "probe.py"` — an
 absolute path, per decision 7.
 
+### Failure is fail-open
+
+`_failed(reason)` returns
+`EnvironmentInfo(version="", sys_path=(), distributions={}, importable={m: True for m in PROBED_MODULES}, error=reason)`.
+
+A probe that fails or times out therefore reports all five module tools **available**, with
+a logged warning, so each call proceeds and surfaces the real error. This preserves #229's
+policy: `server._is_tool_available` (`server.py:186-235`) has a 30 s timeout that fails
+open, pinned by
+`tests/test_tool_availability/test_is_tool_available.py:101`
+(`test_timeout_fails_open_and_caches`). Failing closed would be a regression the old code
+did not have — one slow probe would make all five tools vanish at once, where today each
+fails open independently.
+
+"The probe failed" and "the probe succeeded and says pytest is not importable" are
+different answers: only the second reports unavailable.
+
 ## HOW — `server.py`
 
 `_is_tool_available` keeps its signature and its cache dict, and stops running
@@ -115,7 +150,9 @@ if tool_name in self._tool_availability:
     return self._tool_availability[tool_name]
 info = get_environment_info(self._resolved_python)
 available = info.importable.get(tool_name, False)
-if not available:
+if info.error:
+    logger.warning(...)          # fail-open: available stays True
+elif not available:
     logger.warning(...)          # see below
 self._tool_availability[tool_name] = available
 return available
@@ -124,15 +161,28 @@ return available
 Actionable warning text (decision 15) — the distributions map turns a flag problem into a
 broken-install diagnosis:
 
-- probe failed → `"cannot describe the environment at <interpreter>: <error>"`
+- probe failed → `"cannot describe the environment at <interpreter>: <error>. Assuming
+  <tool> is available."`
 - not importable, distribution present → `"<tool> is not importable by <interpreter>
   (Python <version>), though distribution <tool> <ver> is installed"`
 - not importable, no distribution → `"<tool> is not installed in <interpreter> (Python
-  <version>). Ensure --python-executable / --venv-path point at the project's
-  environment."`
+  <version>). Ensure --python-executable points at the project's environment."`
+
+**Name only `--python-executable`.** `tests/test_tool_availability/test_unavailable_message.py:33`
+and `:45` assert `"--venv-path" not in message`, and step 6 builds the user-facing message
+from this diagnosis.
 
 The probe runs on **first use**, not at server start (decision 14): a session that only
 calls `sleep` pays nothing, and `tests/test_startup_time.py`'s 2 s budget is unaffected.
+
+### #229 behaviours that need no carry-over
+
+- `PYTEST_DISABLE_PLUGIN_AUTOLOAD=1` (`server.py:215`) becomes moot: it existed because the
+  probe *ran* `python -m pytest --version`. `find_spec` locates without executing.
+- Version logging (`server.py:230`) is preserved through the probe blob's `distributions`
+  map — issue decision 15 already relies on it.
+- The console-script fast path (`server.py:202-207`) becomes moot: it saved a per-tool
+  subprocess, and the probe now runs once for all five.
 
 ## HOW — `.importlinter`
 
@@ -215,6 +265,8 @@ Probe stdout, one line of JSON:
 3. Caches failure — non-zero exit, two calls, called once, `error` is set both times.
 4. Timeout → `error` set, no exception.
 5. Unparsable stdout → `error` set, no exception.
+   Each of 3-5 also asserts the fail-open shape: every name in `PROBED_MODULES` reads
+   `True` in `importable`.
 6. Not invoked until first use — construct a server, assert `execute_command` not called.
 7. `probe_script_path()` points at an existing file. This guards the parent's path
    arithmetic only — it passes in any source checkout and says **nothing** about wheel
@@ -244,22 +296,51 @@ is exactly what the criterion asks and what a later reorganisation would break s
 (the third rejected alternative in the issue). Skip rather than fake when `build` is
 absent, per the knowledge base.
 
-`tests/test_tool_availability.py` — `TestIsToolAvailable` (`:244-347`) currently patches
-`mcp_tools_py.server.execute_command` and asserts a subprocess was run. Repoint it at
-`mcp_tools_py.server.get_environment_info` (or patch `execute_command` inside
-`environment_info`) and keep the same four behaviours: first call probes, second call is
-cached, an eager console-script tool never probes, a failed probe marks unavailable.
+`tests/test_tool_availability/test_is_tool_available.py` (11 tests) currently patches
+`mcp_tools_py.server.execute_command` and asserts a `python -m <tool> --version`
+subprocess was run. Repoint the survivors at `mcp_tools_py.server.get_environment_info` (or
+patch `execute_command` inside `environment_info`).
+
+**Delete three tests** — they assert mechanics the probe removes, named in "#229 behaviours
+that need no carry-over" above:
+
+- `:43` `test_script_on_disk_skips_subprocess` and `:60`
+  `test_script_group_fast_path_records_binary` — the console-script fast path is gone.
+- `:159` `test_probe_disables_plugin_autoload` — `find_spec` executes nothing, so there is
+  no autoload to disable.
+
+**Two tests invert**, because the probe is shared: `:135`
+`test_execution_error_without_timeout_caches_false` and `:219`
+`test_subprocess_failure_marks_unavailable` both simulate a failing subprocess, which is now
+a failing *probe* and therefore fails open. Rewrite them as "the probe succeeds and reports
+`importable["pytest"] is False` → unavailable", which is the behaviour that actually
+survives.
+
+**Re-anchor, do not delete, `:101` `test_timeout_fails_open_and_caches`** onto the probe:
+a timed-out probe still reports pytest available, still logs a warning, and is still cached
+after one call. It is the test that pins the fail-open policy.
+
+The rest keep their behaviour with the patch target changed: `:17` first call probes, `:82`
+a console-script-only tool never probes, `:182` a second call runs no further subprocess,
+`:200` an eagerly detected tool is answered from the cache, `:244` a successful probe marks
+available.
 
 **`execute_command` leaves `server.py` in this step**, so every
 `patch("mcp_tools_py.server.execute_command")` in the suite raises `AttributeError` once
-the now-dead import is removed. Fifteen sites exist; five are inside `TestIsToolAvailable`
-and are handled above. The other ten are at `:34`, `:51`, `:80`, `:96`, `:378`, `:403`,
-`:428`, `:453`, `:487` and `:527` — they patch it only to keep server construction from
-spawning subprocesses, which the lazy probe (decision 14) already guarantees. **Delete
-those ten `patch(...)` context-manager entries and the `mock_exec.return_value = ...`
-lines that feed them**, rather than repointing them; nothing in those tests asserts on the
-mock. Removing the import and leaving any of the ten in place turns the file red, so both
-halves land in this commit.
+the now-dead import is removed. There are 24 sites across three files:
+
+| File | Lines |
+|---|---|
+| `test_is_tool_available.py` | `:21,47,64,86,107,139,163,186,205,223,248` |
+| `test_resolve_python_executable.py` | `:22,39,68,83,102,119` |
+| `test_handler_short_circuit.py` | `:18,43,68,93,127,168,200` |
+
+Those in `test_is_tool_available.py` belong to the tests handled above. The thirteen in the
+other two files patch it only to keep server construction from spawning subprocesses, which
+the lazy probe (decision 14) already guarantees. **Delete those thirteen `patch(...)`
+context-manager entries and the `mock_exec.return_value = ...` lines that feed them**,
+rather than repointing them; nothing in those tests asserts on the mock. Removing the import
+and leaving any of them in place turns the file red, so both halves land in this commit.
 
 ## Checks
 
@@ -276,10 +357,13 @@ The two new tests are `integration`-marked, so run them explicitly as well:
 > Read `pr_info/steps/summary.md` and `pr_info/steps/step_2.md`, then implement step 2.
 > Write `tests/test_environment_info.py` first, then `probe.py` (stdlib imports only —
 > `json`, `sys`, `platform`, `importlib.util`, `importlib.metadata`), then
-> `environment_info.py`, then rewire `server._is_tool_available`, drop the now-dead
-> `execute_command` import from `server.py` and fix all fifteen
-> `patch("mcp_tools_py.server.execute_command")` sites in
-> `tests/test_tool_availability.py` — five repointed, ten deleted. Add the `.importlinter`
+> `environment_info.py` (moving `PROBE_TIMEOUT_SECONDS`, `TOOL_MODULES` and `TOOL_PACKAGES`
+> there from `server.py` so the ten-tool taxonomy has one home), then rewire
+> `server._is_tool_available` — keeping #229's fail-open policy, so a failed or timed-out
+> probe reports the five module tools available with a warning — drop the now-dead
+> `execute_command` import from `server.py` and fix all 24
+> `patch("mcp_tools_py.server.execute_command")` sites in `tests/test_tool_availability/`,
+> deleting the three tests the step names. Add the `.importlinter`
 > contract together with `tests/test_target_scripts_contract.py`, which proves it fails
 > when `probe.py` imports a project module; do not verify that by hand. Add
 > `tests/test_packaging.py` for the wheel. One commit, all checks passing, including the

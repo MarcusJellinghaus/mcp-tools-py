@@ -4,17 +4,20 @@
 the parent gains a timeout where it previously could hang the server indefinitely.
 
 **Acceptance criteria closed:** "`get_library_source` no longer imports anything in the
-server process", and the `get_library_source` half of "resolves through `--venv-path`".
+server process", and the `get_library_source` half of "resolves through
+`--python-executable`".
 
 ## WHERE
 
 **Modified**
 - `src/mcp_tools_py/utils/target_scripts/probe.py` — add the `source` subcommand
 - `src/mcp_tools_py/inspect_library.py` — parent side
-- `src/mcp_tools_py/server.py:90` — `InspectTools(self.environment)`
-- `tach.toml` — add `{ path = "mcp_tools_py.utils" }` to the `inspect_library` module
-- `README.md` — tool table entry (`:440`), the two Python-configuration rows (`:103-104`)
-  and the whole **Environment Configuration** section (`:135-173`)
+- `src/mcp_tools_py/server.py:116` — `InspectTools(self.environment)`
+- `tach.toml` — add `{ path = "mcp_tools_py.utils" }` to the `inspect_library` module, then
+  regenerate the dependency graphs (see Checks)
+- `README.md` — tool table entry (`:449`), the `--python-executable` row (`:103`), the
+  **Environment Configuration** section (`:133-181`) and the **Troubleshooting** section
+  (`:185-188`)
 - `vulture_whitelist.py:75-76` — drop the orphaned `_.b` / `_.c`
 - `tests/test_inspect_library.py`
 
@@ -98,47 +101,51 @@ lands second must not duplicate it.
 
 ## HOW — `README.md` and `vulture_whitelist.py`
 
-`README.md` carries the same backwards guidance step 1 fixes in `main.py`, in three places.
-All three must change in this step, or the README documents the opposite of the invariant
+`README.md` carries the same backwards guidance step 1 fixes in `main.py`, in four places.
+All four must change in this step, or the README documents the opposite of the invariant
 this issue establishes — and its worked "Incorrect Configuration" example becomes the only
 configuration under which `get_library_source` resolves correctly.
 
-1. **`:440`** — extend the `get_library_source` row to say the path is resolved in the
+1. **`:449`** — extend the `get_library_source` row to say the path is resolved in the
    project's configured environment, e.g. "Resolves a dotted import path in the configured
    project environment and returns its source".
 
-2. **`:103-104`** — the `--python-executable` and `--venv-path` rows both end with "the
-   tool's own venv, not the project's runtime venv". Replace with the project env: the
-   flags name the environment holding the project's dependencies, which is where the
-   checkers run *and* where library and symbol lookups resolve. Keep the factual half of
-   the `--venv-path` row (ruff, bandit, vulture, tach and lint-imports are located as
-   binaries in it) — that part is correct.
+2. **`:103`** — the `--python-executable` row ends with "the environment where they are
+   installed (the tool's own venv), not the project's runtime venv". Replace with the
+   project env: the flag names the environment holding the project's dependencies, which is
+   where the checkers run *and* where library and symbol lookups resolve. Leave `:104`
+   alone — #229 replaced the old `--venv-path` row with a deprecation notice that says
+   nothing about which venv to pick.
 
-3. **`:135-173`, the Environment Configuration section** — currently states the flags
-   "must point to the environment where **the checker tools are installed** … typically
-   the tool's own virtual environment, not your project's runtime venv", then labels
-   `--venv-path ${VIRTUAL_ENV}` as "Correct Configuration" and
-   `--venv-path /path/to/your/project/.venv` as "Incorrect Configuration". After this
-   change the second example is what the fix requires. Rewrite the section to say:
+3. **`:133-181`, the Environment Configuration section** — `:135` states the flag "must
+   point to the environment where **the checker tools are installed** … typically the tool's
+   own virtual environment, not your project's runtime venv", and `:165` labels a project
+   `.venv` (`:174`) as "Incorrect Configuration". After this change that example is what the
+   fix requires. Rewrite the section to say:
 
    - There is **one** configurable environment, the **project env**: the venv holding the
      project's dependencies *and* the checker tools. The checkers must import the
      project's dependencies (pytest, pylint and mypy all do), so the two cannot be
      separated — decision 5.
    - The **tool env**, where `mcp_tools_py` itself is installed, is a different
-     environment and is **not** configured through these flags.
+     environment and is **not** configured through this flag.
    - Library and symbol resolution (`get_library_source`, `list_symbols`,
-     `find_references`) now follow the same interpreter, so pointing the flags at the
+     `find_references`) now follow the same interpreter, so pointing the flag at the
      wrong venv makes those tools resolve against the wrong packages.
 
-   Keep the `${VIRTUAL_ENV}` example as the correct one — the JSON was always right; only
-   the prose labelling it "the tool's own venv" was wrong. Replace the "Incorrect
-   Configuration" block: a project `.venv` **without** the checker tools installed is the
-   real failure, not a project `.venv` as such. `:173` ("This will fail if your project's
-   `.venv` doesn't have the required tools installed") is the sentence that already says
-   this correctly — build the replacement around it.
+   Keep the `${VIRTUAL_ENV}` examples (`:150`, `:160`) as the correct ones — the JSON was
+   always right; only the prose labelling them "the tool's own venv" was wrong. Replace the
+   "Incorrect Configuration" block at `:163-181`: a project `.venv` **without** the checker
+   tools installed is the real failure, not a project `.venv` as such. `:181` ("This will
+   fail if your project's `.venv` doesn't have the required tools installed") is the
+   sentence that already says this correctly — build the replacement around it.
 
-Use the same wording as step 1's `main.py` help strings so the two do not drift.
+4. **`:185-188`, the Troubleshooting section** added by #229 — three of its four bullets
+   tell the reader to point `--python-executable` at "an environment where they are
+   installed", which under decision 5 must name the project env specifically. Bring them
+   into line with the section above.
+
+Use the same wording as step 1's `main.py` help string so the two do not drift.
 
 `vulture_whitelist.py:75-76` — delete `_.b` and `_.c` (mock attributes for the tests being
 removed). **Keep** `_.get_library_source` at `:69`.
@@ -184,6 +191,10 @@ def _src(import_path: str, max_lines: int = 200) -> str:
 `run_lint_imports_check`, `run_tach_check` (needs the `tach.toml` edit above),
 `run_vulture_check` (needs the whitelist edit).
 
+`docs/architecture/dependencies/readme.md` requires the generated graphs to be refreshed
+after a `tach.toml` change: run `tools/tach_docs.bat` and `tools/pydeps_graph.bat` and
+commit the updated `dependency_graph.html` and `pydeps_graph.*` with this step.
+
 **Manual verification worth doing once:** point a server at a venv holding a package the
 tool env lacks and confirm `get_library_source` returns its source. That is the reported
 bug.
@@ -194,10 +205,11 @@ bug.
 > Rewrite `tests/test_inspect_library.py` first — delete the three mocked classes, re-home
 > the two parametrized tests, keep `TestRealImports`, add the six parent-side tests — then
 > move the resolution logic verbatim from `inspect_library.py` into a `source` subcommand
-> in `probe.py`, then rewrite the parent. Update `tach.toml` and `vulture_whitelist.py` as
-> described, and fix `README.md` in all three places — the tool-table row, the two
-> Python-configuration rows, and the Environment Configuration section, which still tells
-> users to point the flags at the tool's own venv and labels the project `.venv` as
-> incorrect. The ten surviving tests must pass with no assertion
+> in `probe.py`, then rewrite the parent. Update `tach.toml` (regenerating the dependency
+> graphs) and `vulture_whitelist.py` as described, and fix `README.md` in all four places —
+> the tool-table row, the `--python-executable` row, the Environment Configuration section
+> (which still tells users to point the flag at the tool's own venv and labels the project
+> `.venv` as incorrect) and the Troubleshooting bullets. The ten surviving tests must pass
+> with no assertion
 > changes; if one needs its assertion changed, the move was not verbatim. One commit, all
 > checks passing.

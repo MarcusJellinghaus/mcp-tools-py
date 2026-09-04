@@ -1,11 +1,26 @@
 # Step 1 — `PythonEnvironment` value object
 
-Collapses seven `Scripts`/`bin` branches into one and fixes the
-`--python-executable`-only defect. No new behaviour beyond that fix.
+#229 already derives tool detection from the resolved interpreter, so this step is no
+longer a defect fix. It introduces the value object steps 3, 4 and 6 consume, moves the
+two surviving `Scripts`/`bin` branches into it, and corrects the `main.py` help text.
 
-**Acceptance criteria closed:** "One `Scripts`/`bin` branch exists in the codebase, not
-seven", "With only `--python-executable` set, the console-script tools are found",
-"`main.py` help text no longer contradicts the resolution target".
+**Acceptance criteria closed:** "Both surviving `Scripts`/`bin` branches live in one
+module", "`main.py` help text no longer contradicts the resolution target".
+
+Two pieces of the original step are already on main and must not be redone:
+
+- **"With only `--python-executable` set, the console-script tools are found"** is
+  delivered by #229 — `server.py:183` derives the search directory from the resolved
+  interpreter, pinned by
+  `tests/test_tool_availability/test_check_tool_availability.py:170`
+  (`test_scripts_found_without_venv_path`).
+- **Issue decision 22's `venv_bin` → `bin_dir` rename is dropped.** #229 already derives
+  the value from the interpreter under the name `venv_bin`
+  (`runners.py:89,200-203,475`), and `pytest_tool.py:107` passes
+  `os.path.dirname(server._resolved_python)`. Renaming would churn `runners.py`,
+  `pytest_tool.py`, `tests/test_code_checker/test_runners.py` and
+  `tests/test_server_params.py` with no behaviour change, so decision 22 counts as
+  satisfied.
 
 ## WHERE
 
@@ -14,18 +29,13 @@ seven", "With only `--python-executable` set, the console-script tools are found
 - `tests/test_python_environment.py`
 
 **Modified**
-- `src/mcp_tools_py/server.py` — `_resolve_python_executable`, `_check_tool_availability`,
-  the dead `self.venv_path` / `self.python_executable` attributes, and the flag docstrings
-  at `:64-65` and `:282-283`
+- `src/mcp_tools_py/server.py` — `_resolve_python_executable` and `_script_path` move into
+  `PythonEnvironment`; the dead `self.venv_path` / `self.python_executable` attributes go;
+  the flag docstrings at `:82-93` (`ToolServer.__init__`) and `:297-307` (`create_server`)
 - `vulture_whitelist.py:26-27` — the `_.python_executable` / `_.venv_path` entries
-- `src/mcp_tools_py/code_checker_pytest/runners.py` — `run_tests`, `check_code_with_pytest`
-- `src/mcp_tools_py/checker_tools/pytest_tool.py:111` — call site
-- `src/mcp_tools_py/main.py:66-85` — both help strings
-- `tests/test_tool_availability.py` — patch targets move; three assertions invert;
-  `TestResolvePythonExecutable`'s expected strings change form
-- `tests/test_code_checker/test_runners.py:229` — positional comment
-- `tests/test_server_params.py:83` — asserts `check_code_with_pytest(..., venv_path=None,
-  ...)`; becomes `bin_dir=...` with a non-`None` value
+- `src/mcp_tools_py/main.py:70-78` — the `--python-executable` help string
+- `tests/test_tool_availability/` — patch targets move; five expected values change form;
+  one assertion on a deleted attribute goes
 
 ## WHAT
 
@@ -51,9 +61,10 @@ class PythonEnvironment:
     def binary(self, name: str) -> Path | None: ...
 ```
 
-`run_tests` and `check_code_with_pytest` (both public exports of
-`code_checker_pytest`) replace `venv_path: Optional[str] = None` with
-`bin_dir: Optional[Path] = None` **in the same position**.
+`venv_path` stays a parameter of `resolve()`. `--venv-path` is deprecated by #229 — hidden
+from `--help` (`main.py:83`) and warned about (`main.py:197-202`) — but still resolves the
+interpreter, and `tests/test_main_args.py:27,63` pin that. Honouring it here is the
+transition path, not a new feature.
 
 ## ALGORITHM
 
@@ -62,24 +73,42 @@ resolve(python_executable, venv_path):
     if venv_path:
         sub = "Scripts" if os.name == "nt" else "bin"      # the ONE directory branch
         exe = "python.exe" if os.name == "nt" else "python"
-        p = Path(venv_path) / sub / exe
-        if not os.path.exists(p): raise FileNotFoundError(f"Python executable not found in virtual environment: {p}")
-        return cls(p)
-    return cls(Path(python_executable or sys.executable))
+        python, source = Path(venv_path) / sub / exe, "--venv-path"
+    elif python_executable:
+        python, source = Path(python_executable), "--python-executable"
+    else:
+        python, source = Path(sys.executable), "sys.executable"
+
+    if not os.path.exists(python):
+        on_path = shutil.which(str(python))
+        if on_path is None:
+            raise FileNotFoundError(
+                f"Python interpreter not found: {python} (from {source})")
+        return cls(Path(on_path))
+    return cls(python)
 
 bin_dir:            return self.interpreter.parent
 binary(name):       p = bin_dir / (f"{name}.exe" if os.name == "nt" else name)
                     return p if os.path.exists(p) else None
 ```
 
+**`resolve()` carries `_resolve_python_executable`'s current body verbatim**
+(`server.py:118-150`): the existence check, the `shutil.which` PATH fallback for a bare
+name, and the message `"Python interpreter not found: {python} (from {source})"` including
+the `source` label. Three tests pin that contract —
+`tests/test_tool_availability/test_resolve_python_executable.py:51`
+(`match="--venv-path"`), `:64` (`match="--python-executable"`) and `:79` (asserts
+`shutil.which` was called) — and a message without the source label fails the first two.
+
 Existence is checked through `os.path.exists`, not `Path.exists()`, so that `os.name` and
 the existence check share one patchable module attribute
 (`mcp_tools_py.utils.python_environment.os`) — the idiom the existing availability tests
 already use. Patching `Path.exists` globally would be the alternative; this is narrower.
 
-The `.exe` suffix in `binary()` is a filename branch, not a directory branch — it is the
-only remaining one and it lives in one place. `bin_dir` never branches, which is what
-fixes the `--python-executable`-only case.
+`binary()` replaces `server._script_path` (`server.py:173-184`), whose `.exe` filename
+branch at `:182` is the second and last `Scripts`/`bin` branch in the codebase. Both then
+live in `python_environment.py`, which is what the criterion asks. It is a filename branch,
+not a directory branch: `bin_dir` never branches.
 
 ## HOW — `server.py`
 
@@ -88,96 +117,74 @@ self.environment = PythonEnvironment.resolve(python_executable, venv_path)
 self._resolved_python = str(self.environment.interpreter)   # unchanged for callers
 ```
 
-`_check_tool_availability` becomes a loop. Keep the five `_<tool>_binary` attributes for
-now — the nine checker tool modules read them and step 6 rewrites those modules anyway:
+`_check_tool_availability` keeps its shape and its `_tool_binaries` dict; only the lookup
+changes:
 
 ```python
-CONSOLE_SCRIPT_TOOLS = ("lint-imports", "vulture", "ruff", "bandit", "tach")
-
-binaries: dict[str, Optional[str]] = {}
-for name in CONSOLE_SCRIPT_TOOLS:
-    path = self.environment.binary(name)
-    availability[name] = path is not None
-    binaries[name] = str(path) if path else None
-    if path is None:
-        logger.warning("%s not found in %s. Ensure --venv-path or --python-executable "
-                       "points to an environment where %s is installed.",
-                       name, self.environment.bin_dir, name)
-
-# Declared explicitly, not via setattr — see below.
-self._lint_imports_binary: Optional[str] = binaries["lint-imports"]
-self._vulture_binary: Optional[str] = binaries["vulture"]
-self._ruff_binary: Optional[str] = binaries["ruff"]
-self._bandit_binary: Optional[str] = binaries["bandit"]
-self._tach_binary: Optional[str] = binaries["tach"]
+path = self.environment.binary(key)
+if path is not None:
+    self._tool_binaries[key] = str(path)
+else:
+    logger.warning("%s", self.tool_unavailable_message(key))
+availability[key] = path is not None
 ```
 
-**The five attributes must stay declared.** A `setattr(self, f"_{name}_binary", ...)` loop
-would be shorter, but mypy cannot see attributes assigned under a computed name, so every
-reader in the nine tool modules becomes an `attr-defined` error —
-`ruff_check_tool.py:41,66`, `ruff_fix_tool.py:42,66`, `bandit_tool.py:42,66`,
-`lint_imports_tool.py:39,48`, `tach_tool.py:29,41`, `vulture_tool.py:40,64`. Passing mypy
-is an exit criterion for this step. The five explicit lines keep today's annotations
-(`Optional[str]`) and today's read sites working unchanged; step 6 deletes all five
-attributes when the tool modules switch to `context.environment.binary(...)`.
-
-Update the `_check_tool_availability` docstring — it currently lists "(lint-imports,
-vulture, ruff, bandit)" and omits tach.
+`_is_tool_available` and `tool_unavailable_message` likewise call
+`self.environment.binary(...)` and `self.environment.bin_dir` in place of `_script_path`
+and `os.path.dirname(self._resolved_python)`. Their message text and the fail-open probe
+timeout are unchanged in this step — step 2 owns both.
 
 ### Dead state to delete in the same commit
 
-`self.venv_path` (`server.py:74`) and `self.python_executable` (`:73`) have exactly one
-reader each today: `_resolve_python_executable` / `_check_tool_availability` for
-`venv_path`, and `pytest_tool.py:111` for `server.venv_path`. This step removes all of
-them — the two constructor **parameters** stay, but they are consumed by
-`PythonEnvironment.resolve(...)` and stored nowhere else. Leaving the attributes behind
-would leave the server carrying write-only state that no longer describes how anything
-resolves. So:
+`self.python_executable` (`server.py:95`) and `self.venv_path` (`:96`) have exactly one
+production reader between them, `_resolve_python_executable`, which moves out. The two
+constructor **parameters** stay, but they are consumed by `PythonEnvironment.resolve(...)`
+and stored nowhere else. So:
 
 - Delete `self.python_executable = python_executable` and `self.venv_path = venv_path`.
   `self.environment` replaces both.
 - Delete the `_.python_executable` and `_.venv_path` entries at `vulture_whitelist.py:26-27`,
   then run `run_vulture_check`. If vulture reports either name from a **different** source
-  — `main.py:192` reads them off the argparse `Namespace` — restore just that entry with a
-  comment naming the real reason, rather than restoring both blindly.
+  — `main.py:208-209` reads them off the argparse `Namespace` — restore just that entry
+  with a comment naming the real reason, rather than restoring both blindly.
 - Update the `venv_path` / `python_executable` docstrings in `ToolServer.__init__`
-  (`:64-65`) and `create_server` (`:282-283`). Both currently say the flags select an
-  interpreter "for running tests"; they now also select the environment that library and
-  symbol lookups resolve in. Use the same wording as the `main.py` help strings below.
+  (`:82-93`) and `create_server` (`:297-307`). Both currently describe an interpreter "for
+  running tests"; it now also selects the environment that library and symbol lookups
+  resolve in. Use the same wording as the `main.py` help string below.
 
-`tests/test_checker_tools.py:20` sets `server.venv_path` on a `MagicMock`, which tolerates
-a removed attribute silently; step 6's fixture migration drops it.
+Two test readers must move with it:
 
-## HOW — `code_checker_pytest/runners.py`
-
-Replace lines 201-208:
-
-```python
-if bin_dir:
-    env["PATH"] = f"{bin_dir}{os.pathsep}{os.environ.get('PATH', '')}"
-```
-
-`pytest_tool.py:111` changes `venv_path=server.venv_path` to
-`bin_dir=server.environment.bin_dir`, so PATH is now always prepended in server use
-(the `--python-executable`-only fix). The `Optional` default preserves standalone
-library use. Update the `venv_path` key in the `logger.info` extra at line 132 and the
-stale comment at line 151.
+- `tests/test_tool_availability/test_handler_short_circuit.py:187` — #229 added
+  `assert server.venv_path is None`. Delete that line; the test's actual subject is
+  `venv_bin`, asserted at `:192-194`.
+- `tests/test_checker_tools.py:20` sets `server.venv_path` on a `MagicMock`, which
+  tolerates a removed attribute silently; step 6's fixture migration drops it.
 
 ## HOW — `main.py`
 
-Both help strings say the flag should point at "the tool's own venv, not the project's
-runtime venv", which is backwards. Replace with wording naming the **project**
-environment, e.g.:
+`main.py:70-78` says the flag "should point to the environment where they are installed
+(the tool's own venv), not the project's runtime venv". Issue decision 5 says that is
+backwards: pylint, pytest and mypy must import the project's dependencies, so the checker
+venv and the project-dependency venv are necessarily the same one. Replace with wording
+naming the **project** environment, e.g.:
 
 > Path to the Python interpreter of the project's environment. The checkers run in it and
 > library/symbol lookups resolve against it, so it must be the environment holding the
-> project's dependencies. Defaults to the current interpreter (sys.executable).
+> project's dependencies and the checker tools. A path that neither exists nor resolves on
+> PATH fails at startup. Defaults to the current interpreter (sys.executable).
+
+`--venv-path` keeps `argparse.SUPPRESS` (`main.py:83`) and its deprecation warning
+(`:197-202`): `tests/test_main_args.py:27` asserts the flag is absent from `--help` and
+`:63` asserts the epilog names `--python-executable` and not `--venv-path`. This edit must
+not break either.
+
+`README.md` carries the same backwards framing in four more places — step 3 owns those.
 
 ## DATA
 
 `PythonEnvironment.binary()` returns `Path | None` — `None` means "not present".
-`resolve()` raises `FileNotFoundError` when `venv_path` is set but its python is missing,
-preserving today's fail-loud server construction (`server.py:109-112`).
+`resolve()` raises `FileNotFoundError` when the interpreter neither exists nor resolves on
+PATH, preserving today's fail-loud server construction (`server.py:143-150`).
 
 ## Tests (write first)
 
@@ -186,66 +193,66 @@ preserving today's fail-loud server construction (`server.py:109-112`).
 1. `venv_path` wins over `python_executable`; patch
    `mcp_tools_py.utils.python_environment.os.name` to `"nt"` and `"posix"` and assert the
    two layouts (use `tmp_path` and create the file so `exists()` is true).
-2. `venv_path` set but missing python → `FileNotFoundError`.
+2. `venv_path` set but missing python → `FileNotFoundError` naming `--venv-path`.
 3. Only `python_executable` set → used verbatim.
-4. Neither set → `sys.executable`.
-5. `bin_dir == interpreter.parent`, asserted by constructing `PythonEnvironment` directly
+4. `python_executable` set but missing, and not on PATH → `FileNotFoundError` naming
+   `--python-executable`.
+5. A bare name resolves through `shutil.which`.
+6. Neither set → `sys.executable`.
+7. `bin_dir == interpreter.parent`, asserted by constructing `PythonEnvironment` directly
    (platform-independent).
-6. `binary()` hit: create `tmp_path/ruff(.exe)` → returns that path.
-7. `binary()` miss: returns `None`.
-8. **The defect fix:** with only `python_executable` pointing at
-   `tmp_path/Scripts/python.exe` (or `bin/python`) and `tmp_path/.../ruff(.exe)` present,
-   `binary("ruff")` is not `None`.
+8. `binary()` hit: create `tmp_path/ruff(.exe)` → returns that path. `binary()` miss:
+   returns `None`.
+9. With only `python_executable` pointing at `tmp_path/Scripts/python.exe` (or
+   `bin/python`) and `tmp_path/.../ruff(.exe)` present, `binary("ruff")` is not `None` —
+   #229's behaviour, restated against the value object.
 
-`tests/test_tool_availability.py` churn:
+`tests/test_tool_availability/` churn:
 
-- Patch targets `mcp_tools_py.server.os.name` / `.os.path.exists` move to
-  `mcp_tools_py.utils.python_environment.os.name` /
-  `mcp_tools_py.utils.python_environment.os.path.exists`. These work because the
-  ALGORITHM above calls `os.path.exists`, not `Path.exists()` — if the implementation
-  drifts to `Path.exists()`, these patches become silent no-ops and the tests stop
-  exercising the branch they name.
-- `test_all_tools_missing` (`:134`), `test_lint_imports_unavailable_when_no_venv`
-  (`:167`) and `test_vulture_unavailable_when_no_venv` (`:226`) assert the defect. Rewrite
-  them to be deterministic under the new rule: pass `python_executable` pointing into an
-  empty `tmp_path` so `binary()` genuinely misses, and keep the `False` assertions.
-- `TestResolvePythonExecutable` **cannot** keep its current expected values.
-  `_resolved_python` is now `str(Path(...))`, which `Path` normalises; the tests compare
-  against `os.path.join(...)` output, which does not normalise the leading separator:
+- **Patch targets.** Roughly fourteen sites patch `mcp_tools_py.server.os.name` or
+  `.os.path.exists`: `test_resolve_python_executable.py:23,24,40,41,56,57,103`;
+  `test_check_tool_availability.py:20,60,61,104-107,125,126`;
+  `test_is_tool_available.py:204`; `test_handler_short_circuit.py:131,172`. Several patch a
+  single `os.path.exists` so that both the interpreter *and* the console scripts appear to
+  exist. Because `_script_path` moves into `python_environment` alongside `resolve`,
+  exactly one patch target survives:
+  `mcp_tools_py.utils.python_environment.os.name` / `.os.path.exists`. These work only
+  because the ALGORITHM above calls `os.path.exists`, not `Path.exists()` — if the
+  implementation drifts, the patches become silent no-ops and the tests stop exercising the
+  branch they name.
+- **Expected values.** `_resolved_python` becomes `str(Path(...))`, which normalises the
+  separator; the tests compare against `os.path.join` output and bare POSIX literals, which
+  do not. On Windows:
 
-  | Test | Today's expected | New value on Windows |
+  | Test | Today's expected | New value |
   |---|---|---|
-  | `:43-44` `test_venv_path_windows` | `os.path.join("/my/venv","Scripts","python.exe")` → `/my/venv\Scripts\python.exe` | `\my\venv\Scripts\python.exe` |
-  | `:60-61` `test_venv_path_unix` | `os.path.join("/my/venv","bin","python")` | posix-only test, unchanged |
-  | `:90` `test_python_executable_fallback` | `"/usr/local/bin/python3.11"` | `\usr\local\bin\python3.11` |
-  | `:103` `test_sys_executable_fallback` | `sys.executable` | unchanged — already normalised |
-  | `:521` `test_resolved_python_passed_to_pytest_runner` (in `TestToolHandlerShortCircuit`) | `"/custom/python"` | `\custom\python` |
+  | `test_resolve_python_executable.py:31-32` `test_venv_path_windows` | `os.path.join("/my/venv","Scripts","python.exe")` → `/my/venv\Scripts\python.exe` | `\my\venv\Scripts\python.exe` |
+  | `:48-49` `test_venv_path_unix` | `os.path.join("/my/venv","bin","python")` | posix-only test, unchanged |
+  | `:95` `test_bare_name_resolved_on_path` | `"/usr/bin/python3"` | `\usr\bin\python3` |
+  | `:113` `test_python_executable_fallback` | `"/usr/local/bin/python3.11"` | `\usr\local\bin\python3.11` |
+  | `:126` `test_sys_executable_fallback` | `sys.executable` | unchanged — already normalised |
+  | `test_handler_short_circuit.py:162` `test_resolved_python_passed_to_pytest_runner` | `"/custom/python"` | `\custom\python` |
+  | `test_handler_short_circuit.py:194` `test_venv_bin_derived_from_resolved_python` | `"/custom"` | `\custom` |
 
-  Rewrite `:43-44`, `:60-61` and `:90` to assert on the `Path` rather than the string,
-  which is platform-normalised on both sides and states the intent:
+  Rewrite the five that break to assert on a `Path`, which is platform-normalised on both
+  sides and states the intent:
   `assert server.environment.interpreter == Path("/my/venv") / "Scripts" / "python.exe"`,
-  and `== Path("/usr/local/bin/python3.11")` for `:90`. Leave `:103` alone.
+  `== Path("/usr/bin/python3")` and `== Path("/usr/local/bin/python3.11")`. The two in
+  `test_handler_short_circuit.py` compare strings against a mock's kwargs, so they become
+  `== str(Path("/custom/python"))` and `== str(Path("/custom"))`; each keeps its point —
+  the *resolved* interpreter, not the raw argument, is what reaches the runner. Leave
+  `:48-49` and `:126` alone.
 
-  `:521` is the same break outside `TestResolvePythonExecutable` and is easy to miss:
-  `test_resolved_python_passed_to_pytest_runner` constructs the server with
-  `python_executable="/custom/python"` and then asserts
-  `call_kwargs.kwargs["python_executable"] == "/custom/python"` on top of the
-  `== server._resolved_python` assertion at `:520`. The literal goes red on Windows in
-  **this** step; step 6 only rewrites `:520`'s right-hand side. Change `:521` to
-  `== str(Path("/custom/python"))`, keeping the test's point — the *resolved* interpreter,
-  not the raw argument, reaches the runner.
+Already done by #229 — do **not** redo:
 
-`tests/test_code_checker/test_runners.py:229` — the positional `None,  # venv_path`
-becomes `None,  # bin_dir`. Three further keyword call sites in the same file.
-
-`tests/test_server_params.py:83` — `mock_check_pytest.assert_called_once_with(...)` lists
-`venv_path=None`. It becomes `bin_dir=_server.environment.bin_dir`, and the value is no
-longer `None`: with no flags set the interpreter is `sys.executable`, so `bin_dir` is
-`Path(sys.executable).parent`. Assert against `_server.environment.bin_dir` rather than a
-literal, matching how the same call already asserts `python_executable`.
-
-Add one test asserting `run_tests` prepends `bin_dir` to `PATH` when given and leaves
-`PATH` untouched when `None`.
+- `test_lint_imports_unavailable_when_no_venv` and `test_vulture_unavailable_when_no_venv`
+  are now `test_lint_imports_unavailable_when_script_not_on_disk` and
+  `test_vulture_unavailable_when_script_not_on_disk`
+  (`test_check_tool_availability.py:73,137`), rewritten exactly as this step used to
+  prescribe, using the new `_dummy_python` helper in
+  `tests/test_tool_availability/_helpers.py`. Use `_dummy_python` for any new test needing
+  a pinned script directory, in preference to patching `os.path.exists`.
+- The `_check_tool_availability` docstring no longer omits tach (`server.py:152-157`).
 
 ## Checks
 
@@ -258,10 +265,13 @@ which is what confirms the two whitelist entries were safe to drop.
 
 > Read `pr_info/steps/summary.md` and `pr_info/steps/step_1.md`, then implement step 1.
 > Write `tests/test_python_environment.py` first and watch it fail, then add
-> `src/mcp_tools_py/utils/python_environment.py`, then rewire `server.py`,
-> `code_checker_pytest/runners.py`, `checker_tools/pytest_tool.py` and `main.py`, then
-> delete the now write-only `self.venv_path` / `self.python_executable` attributes with
-> their `vulture_whitelist.py` entries and refresh the two flag docstrings, then fix
-> the test churn listed in the step. This is one commit: tests, implementation and all
-> checks passing. Do not touch `inspect_library.py` or `jedi_tools.py` — later steps own
-> them.
+> `src/mcp_tools_py/utils/python_environment.py` carrying `_resolve_python_executable`'s
+> body verbatim — existence check, `shutil.which` fallback and the exact error message —
+> plus `_script_path` as `binary()`, then rewire `server.py` and `main.py`'s
+> `--python-executable` help string, then delete the now write-only `self.venv_path` /
+> `self.python_executable` attributes with their `vulture_whitelist.py` entries and refresh
+> the two flag docstrings, then fix the test churn listed in the step. Do **not** rename
+> `venv_bin` to `bin_dir` and do not touch `code_checker_pytest/runners.py` — #229 already
+> derives that value from the interpreter. Do not touch `inspect_library.py` or
+> `jedi_tools.py` — later steps own them. This is one commit: tests, implementation and all
+> checks passing.

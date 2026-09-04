@@ -55,12 +55,16 @@ not a style rule. Enforced by a new `.importlinter` `forbidden` contract.
 This is what lets all six `.importlinter` `ignore_imports` entries go away — the
 registrars stop importing anything from `server`.
 
-### 5. Seven `Scripts`/`bin` branches collapse to one
+### 5. The two surviving `Scripts`/`bin` branches move into one module
 
-Six in `server.py` (`_resolve_python_executable` plus five in `_check_tool_availability`)
-and one in `code_checker_pytest/runners.py:203-206`. `bin_dir` derives from the
-**interpreter path**, not from `venv_path` — which fixes a live defect for free: today,
-with only `--python-executable` set, all five console-script tools report unavailable.
+#229 removed five of the original seven: `_check_tool_availability` now derives the search
+directory from the resolved interpreter (`server.py:183`), and
+`code_checker_pytest/runners.py` takes an already-derived `venv_bin`. Two remain — the
+directory branch in `_resolve_python_executable` (`server.py:133-136`) and the `.exe`
+filename branch in `_script_path` (`:182`) — and step 1 moves both into
+`utils/python_environment.py`. The defect that motivated the collapse ("with only
+`--python-executable` set, all five console-script tools report unavailable") is already
+fixed on main.
 
 ### 6. Availability without subprocesses
 
@@ -78,12 +82,19 @@ These reduce moving parts without touching any acceptance criterion:
    interpreter path removes that tension entirely — `ToolContext` stays frozen and carries
    only values. (`lru_cache` does not cache exceptions, so the probe function *returns* a
    failure-shaped `EnvironmentInfo` instead of raising — which decision 3 wants anyway.)
+   That shape reports the five module tools **available**, preserving #229's fail-open
+   timeout: one slow probe must not make all five vanish at once.
 2. **Same idiom for the jedi project cache**, instead of a second bespoke one.
-3. **The five `_*_binary` attributes are deleted, not moved** — callers use
-   `environment.binary("ruff")` at use time. Removes five attributes from `server.py` and
+3. **`server._tool_binaries` is deleted, not moved** — callers use
+   `environment.binary("ruff")` at use time. Removes one attribute from `server.py` and
    from three test fixtures.
 4. **`prefix` and `is_venv` dropped from the probe blob** — no consumer. `sys_path` stays
    (#228 names it), `distributions` stays (decision 15's error text, #61).
+5. **One home for the ten-tool taxonomy.** #229 put `PROBE_TIMEOUT_SECONDS`, `_TOOL_MODULES`
+   and `_TOOL_PACKAGES` in `server.py`; step 2 moves them to `utils/environment_info.py` and
+   everything else derives from them — `PROBED_MODULES` there, `CONSOLE_SCRIPT_TOOLS` in
+   step 6's `tool_context.py`. Three parallel lists of the same ten tools would otherwise
+   drift.
 
 ## Deviations from the issue, with reasons
 
@@ -93,9 +104,17 @@ These reduce moving parts without touching any acceptance criterion:
   `mcp_tools_py.utils`. Deferring would leave step 3 red. `utility_tools` keeps its edit
   in step 7. #228 needs the same `inspect_library` line — whichever lands second must not
   duplicate it.
-- **Steps 6 and 7 stay split** (issue decision 25). Simplification 3 removes much of the
-  fixture churn, but step 6 still touches ~16 files; merging would make one ~24-file
+- **Steps 6 and 7 stay split** (issue decision 25). Simplification 3 and #229 remove much
+  of the fixture churn, but step 6 still touches ~16 files; merging would make one ~24-file
   commit.
+- **Issue decision 22's `venv_bin` → `bin_dir` rename is dropped.** #229 already derives the
+  value from the interpreter under the name `venv_bin`, so the rename would be pure churn
+  across `runners.py`, `pytest_tool.py` and two test files. The decision's intent —
+  "the PATH prepend follows the interpreter, not `--venv-path`" — is satisfied.
+- **Criteria are stated through `--python-executable`, not `--venv-path`.** #229 deprecated
+  `--venv-path`: hidden from `--help`, warned about at startup, and no longer used to locate
+  tools. It still resolves the interpreter, and `PythonEnvironment.resolve(venv_path=...)`
+  keeps honouring it for the transition.
 - **The `integration`-marked venv test moves from the end to step 4**, where both fixed
   tools first exist together.
 - **`jedi_tools.list_symbols` / `find_references` take a required `interpreter`**, with no
@@ -103,16 +122,16 @@ These reduce moving parts without touching any acceptance criterion:
   `VIRTUAL_ENV` fallback this issue removes reachable, and step 3 makes the same parameter
   required on `_get_library_source`. Cost: fifteen existing test call sites are edited in
   step 4 and each distinct project now builds a `jedi.Environment`.
-- **`run_tests(bin_dir=...)` always prepends to `PATH` when given** (the open question
-  from the discussion; option A). `bin_dir` always matches the interpreter actually
-  running pytest, so prepending it is correct rather than incidental. The parameter
-  defaults to `None` for standalone library use, which preserves today's behaviour there.
+- **`run_tests(venv_bin=...)` always prepends to `PATH` when given** (the open question
+  from the discussion; option A). #229 already implements this: `venv_bin` matches the
+  interpreter actually running pytest, so prepending it is correct rather than incidental,
+  and the parameter still defaults to `None` for standalone library use.
 
 ## Steps
 
 | # | Title | Closes |
 |---|---|---|
-| 1 | `PythonEnvironment` value object | criteria 3, 4, 10 |
+| 1 | `PythonEnvironment` value object | criteria 3, 10 |
 | 2 | Probe script + `EnvironmentInfo` | criteria 5, 8, 9 |
 | 3 | `get_library_source` runs in a child | criteria 1 (half), 2 — **reported bug closes** |
 | 4 | jedi `environment_path` + venv integration test | criterion 1 |
@@ -148,7 +167,6 @@ One new folder: `src/mcp_tools_py/utils/target_scripts/`.
 |---|---|
 | `src/mcp_tools_py/server.py` | 1, 2, 3, 4, 5, 6, 7 |
 | `src/mcp_tools_py/main.py` | 1 |
-| `src/mcp_tools_py/code_checker_pytest/runners.py` | 1 |
 | `src/mcp_tools_py/inspect_library.py` | 3, 5, 7 |
 | `src/mcp_tools_py/refactoring/jedi_tools.py` | 4 |
 | `src/mcp_tools_py/refactoring/__init__.py` | 4, 5, 7 |
@@ -161,17 +179,24 @@ One new folder: `src/mcp_tools_py/utils/target_scripts/`.
 | `README.md` | 3 |
 | `vulture_whitelist.py` | 1 (`_.python_executable`, `_.venv_path`), 3, 7 (if needed) |
 | `docs/architecture/architecture.md` | 7 |
-| `tests/test_tool_availability.py` | 1, 2, 6 |
+| `docs/architecture/dependencies/dependency_graph.html`, `pydeps_graph.*` (generated) | 3, 7 |
+| `tests/test_tool_availability/test_resolve_python_executable.py` | 1, 2, 6 |
+| `tests/test_tool_availability/test_check_tool_availability.py` | 1, 6 (deleted) |
+| `tests/test_tool_availability/test_is_tool_available.py` | 1, 2, 6 (deleted) |
+| `tests/test_tool_availability/test_handler_short_circuit.py` | 1, 2, 6 |
+| `tests/test_tool_availability/test_unavailable_message.py` | 2, 6 (moved into `tests/test_tool_context.py`) |
+| `tests/test_main_args.py` | 1 (must keep passing; no edit expected) |
 | `tests/test_inspect_library.py` | 3 |
 | `tests/test_checker_tools.py` | 6 |
-| `tests/test_code_checker/test_runners.py` | 1 |
 | `tests/test_code_checker_bandit/test_integration.py` | 6 |
 | `tests/test_refactoring/test_refactoring_tools.py` | 4, 7 |
 | `tests/test_refactoring/test_jedi_tools.py` | 4 |
 | `tests/test_refactoring/test_integration.py` | 4 |
 | `tests/test_refactoring/test_lazy_imports.py` | 4 |
 | `tests/test_formatter_tools.py` | 6 |
-| `tests/test_server_params.py` | 1 (`:83` `venv_path` kwarg), 6 (`_check_tool_availability`, `_is_tool_available`, `_resolved_python`) |
+| `tests/test_utility_tools.py` | 7 |
+| `tests/conftest.py` | 6 (shared `ToolContext` fixture) |
+| `tests/test_server_params.py` | 6 (`_check_tool_availability`, `_is_tool_available`, `_resolved_python`) |
 
 `pyproject.toml` needs **no** change: `[tool.setuptools.packages.find]` defaults to
 `namespaces = true`, so `utils/target_scripts/` with an `__init__.py` is discovered and
@@ -181,10 +206,10 @@ its `.py` files ship in the wheel (criterion 8).
 
 | Criterion | Step |
 |---|---|
-| `get_library_source` + `list_symbols` resolve through `--venv-path` | 3, 4 |
+| `get_library_source` + `list_symbols` resolve through `--python-executable` | 3, 4 |
 | `get_library_source` imports nothing in the server process | 3 |
-| One `Scripts`/`bin` branch, not seven | 1 |
-| Console-script tools found with only `--python-executable` | 1 |
+| Both surviving `Scripts`/`bin` branches live in one module | 1 |
+| Console-script tools found with only `--python-executable` | already on main (#229) |
 | No `python -m <tool> --version` subprocess remains | 2 |
 | All five registrars take the same argument type | 6, 7 |
 | `lint-imports` and `tach` pass with six `ignore_imports` removed | 5, 6 |
