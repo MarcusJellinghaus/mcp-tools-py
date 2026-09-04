@@ -133,16 +133,17 @@ When the MCP tool invokes mypy (via `python -m mypy`), the project directory is
 mypy's working directory, so mypy finds `pyproject.toml` by itself. In each
 directory mypy looks for `mypy.ini`, `.mypy.ini`, `pyproject.toml` and
 `setup.cfg`, in that order. `pyproject.toml` and `setup.cfg` are skipped when
-they carry no mypy section; a `mypy.ini` without a `[mypy]` section instead ends
-discovery outright, warning `No [mypy] section in config file` and looking no
-further. Otherwise the search continues: from mypy 1.15 onwards it repeats in
-the parent directory, stopping at a directory that contains `.git` or `.hg` or
-at the filesystem root, while mypy 1.13 and 1.14 skip that upward walk; every
-version then falls back to the user-level configs, `~/.config/mypy/config` first
-and `~/.mypy.ini` second. Because the walk's stop condition is a repository
-root, a project directory that is itself the repository root — the usual case —
-never reads a parent directory's config; a project nested inside a larger
-repository does, on mypy 1.15 and later.
+they carry no mypy section; a `mypy.ini` or `.mypy.ini` without a `[mypy]`
+section instead ends discovery outright, warning `No [mypy] section in config
+file` and looking no further. Otherwise the search continues: from mypy 1.15
+onwards it repeats in the parent directory, stopping at a directory that
+contains `.git` or `.hg` or at the filesystem root, while mypy 1.13 and 1.14
+skip that upward walk; every version then falls back to the user-level configs:
+`$XDG_CONFIG_HOME/mypy/config` when that variable is set, then
+`~/.config/mypy/config`, then `~/.mypy.ini`. Because the walk's stop condition
+is a repository root, a project directory that is itself the repository root —
+the usual case — never reads a parent directory's config; a project nested
+inside a larger repository does, on mypy 1.15 and later.
 
 **The MCP tool adds only output-formatting flags** — no strictness, no import
 resolution, no per-module settings of its own — unless you pass one of its
