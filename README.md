@@ -85,9 +85,11 @@ The mypy tools expose the following parameters for customization:
 Mypy reads your project's `pyproject.toml` automatically, and `[tool.mypy]` is the
 single source of truth for the flag set — the tool adds only output-formatting flags,
 unless you pass `follow_imports`, `cache_dir` or `disable_error_codes`. A project with
-no `[tool.mypy]` section of its own is checked at mypy's defaults — or at a parent
-directory's config or the user-level `~/.mypy.ini`, if either is present — and still
-reports "passed". See
+no `[tool.mypy]` section of its own has no floor: with no config in scope it runs at
+mypy's defaults and reports "passed" having checked very little; with a parent
+directory's config (mypy 1.15 and later) or a user-level `~/.config/mypy/config` or
+`~/.mypy.ini` in scope it runs at those settings and can report errors the project
+never asked for. See
 [docs/pyproject-configuration.md](docs/pyproject-configuration.md) for migration
 guidance and the effect on mypy's cache.
 
