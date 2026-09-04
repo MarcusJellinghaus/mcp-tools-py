@@ -214,7 +214,6 @@ def main() -> None:
             check_timeout=args.check_timeout,
         )
     except FileNotFoundError as exc:
-        logger.error("Server creation failed", exc_info=True)
         print(f"Error: {exc}", file=sys.stderr)
         sys.exit(1)
 
