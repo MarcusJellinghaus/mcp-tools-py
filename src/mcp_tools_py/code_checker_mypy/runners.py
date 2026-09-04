@@ -43,10 +43,12 @@ def _resolve_cache_dir(
     ``--cache-dir`` argument, the ``MYPY_CACHE_DIR`` environment variable, the
     ``cache_dir`` config setting, and the ``.mypy_cache`` default. Config is read
     from ``mypy.ini``, ``.mypy.ini``, ``pyproject.toml`` and ``setup.cfg`` in
-    that order; only ``pyproject.toml`` is parsed here, so when an INI-format
-    config could own the setting the answer is None rather than a guess. With no
-    local config at all, mypy falls back to a user-level config that may set
-    ``cache_dir``, so ``.mypy_cache`` is returned as an assumption.
+    that order; only the project directory's ``pyproject.toml`` is parsed here,
+    so when an INI-format config could own the setting the answer is None rather
+    than a guess. With no config in the project directory, mypy 1.15 and newer
+    repeat the search in the parent directories up to a ``.git``/``.hg`` root
+    before falling back to a user-level config, and either may set ``cache_dir``,
+    so ``.mypy_cache`` is returned as an assumption.
 
     Path expansion follows mypy, which treats each source differently: a config
     value gets ``expandvars`` and ``expanduser``, ``MYPY_CACHE_DIR`` gets

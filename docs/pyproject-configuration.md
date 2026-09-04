@@ -130,10 +130,17 @@ Mix and match to suit your project's standards.
 ## How mypy reads `pyproject.toml`
 
 When the MCP tool invokes mypy (via `python -m mypy`), the project directory is
-mypy's working directory, so mypy finds `pyproject.toml` by itself. It looks for
-`mypy.ini`, `.mypy.ini`, `pyproject.toml` and `setup.cfg`, in that order, and
-takes the first one that carries a mypy section. It does **not** walk up the
-directory tree: a config file above the project directory is never read.
+mypy's working directory, so mypy finds `pyproject.toml` by itself. In each
+directory mypy looks for `mypy.ini`, `.mypy.ini`, `pyproject.toml` and
+`setup.cfg`, in that order. `pyproject.toml` and `setup.cfg` are skipped when
+they carry no mypy section, but a `mypy.ini` without a `[mypy]` section ends the
+search with `No [mypy] section in config file`. From mypy 1.15 onwards the
+search then repeats in the parent directory, stopping at a directory that
+contains `.git` or `.hg` or at the filesystem root, before falling back to the
+user-level configs. (Mypy 1.13 and 1.14 look in the working directory only.)
+Because the stop condition is a repository root, a project directory that is
+itself the repository root — the usual case — never reads a config above it; a
+project nested inside a larger repository does.
 
 **The MCP tool adds only output-formatting flags** — no strictness, no import
 resolution, no per-module settings of its own — unless you pass one of its
@@ -141,10 +148,11 @@ optional parameters (`follow_imports`, `cache_dir`, `disable_error_codes`), each
 of which sends the corresponding flag for that one call. Otherwise `[tool.mypy]`
 is the single source of truth for the flag set mypy runs with.
 
-> **There is no floor.** A project with no `[tool.mypy]` section is checked at
-> mypy's defaults: bodies of unannotated functions are not checked at all. The run
-> reports "passed" and nothing warns you that almost nothing was verified. If you
-> want strict checking, you have to ask for it.
+> **There is no floor.** A project with no `[tool.mypy]` section of its own is
+> checked at mypy's defaults — bodies of unannotated functions are not checked at
+> all — or at whatever a parent directory's config happens to say, if one is in
+> scope. Either way the run reports "passed" and nothing tells you which flag set
+> it used. If you want strict checking, ask for it in this project's own config.
 
 ### Replicating the old strict default
 
