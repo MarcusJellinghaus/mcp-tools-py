@@ -61,6 +61,7 @@ _.get_detailed_test_summary  # Used conditionally in reporting
 # Test fixtures and mocks that appear unused
 _.mock_pytest_results_success  # Test fixture
 _.side_effect  # Mock attribute used in tests
+_._no_ambient_cache_env  # Autouse fixture, invoked by pytest not by name
 
 # Data file variables used for module resolution
 _.module_file_absolute
