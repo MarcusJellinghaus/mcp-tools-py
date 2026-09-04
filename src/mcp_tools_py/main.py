@@ -45,11 +45,12 @@ def _build_parser() -> argparse.ArgumentParser:
     parser = argparse.ArgumentParser(
         description="MCP Tools Py Server - Run pylint, pytest, and mypy checks on Python code",
         formatter_class=argparse.RawDescriptionHelpFormatter,
-        epilog="""
+        epilog=r"""
 Examples:
   mcp-tools-py --project-dir /path/to/project
   mcp-tools-py --project-dir . --log-level DEBUG --keep-temp-files
-  mcp-tools-py --project-dir /path/to/project --python-executable /path/to/tools-venv/bin/python --test-folder tests
+  mcp-tools-py --project-dir . --python-executable /path/to/tools-venv/bin/python --test-folder tests
+  mcp-tools-py --project-dir . --python-executable C:\path\to\tools-venv\Scripts\python.exe
         """,
     )
     parser.add_argument(
@@ -159,7 +160,8 @@ def main() -> None:
     project_dir = Path(args.project_dir)
     if not project_dir.exists() or not project_dir.is_dir():
         print(
-            f"Error: Project directory does not exist or is not a directory: {project_dir}"
+            f"Error: Project directory does not exist or is not a directory: {project_dir}",
+            file=sys.stderr,
         )
         sys.exit(1)
 
@@ -212,7 +214,8 @@ def main() -> None:
             check_timeout=args.check_timeout,
         )
     except FileNotFoundError as exc:
-        print(f"Error: {exc}")
+        logger.error("Server creation failed", exc_info=True)
+        print(f"Error: {exc}", file=sys.stderr)
         sys.exit(1)
 
     logger.info("Starting MCP server")

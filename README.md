@@ -156,7 +156,7 @@ Point to the venv where mcp-tools-py and its tools are installed, here on Window
 
 On macOS and Linux the interpreter sits in `bin` instead:
 
-```json
+```text
                 "--python-executable", "${VIRTUAL_ENV}/bin/python"
 ```
 
@@ -184,7 +184,7 @@ This will fail if your project's `.venv` doesn't have the required tools install
 
 - **"Python interpreter not found"** at startup: `--python-executable` points at a path that doesn't exist — usually because the environment variable it interpolates is unset. The message names the flag that supplied the path.
 - **"No module named pytest"** (or pylint/mypy/black/isort): Your `--python-executable` points to an environment that doesn't have the required tools installed. Update the configuration to point to the correct environment.
-- **"ruff is not available"** (or bandit/vulture/tach/lint-imports): these tools are console scripts, looked for next to `--python-executable`. The message names the directory searched; point `--python-executable` at an environment where they are installed.
+- **"ruff is not available"** (or bandit/vulture/tach/lint-imports): these tools are console scripts, looked for next to `--python-executable`. The message names the directory searched; point `--python-executable` at an environment where they are installed. A bare name such as `python3` resolving to a system interpreter reports all five as unavailable, because they are not installed next to it.
 - **After installing missing tools**, restart the MCP server for changes to take effect. The console-script tools are located at startup; pytest, pylint, mypy, black and isort are checked on first use. Both results are cached for the session.
 
 ## Installation

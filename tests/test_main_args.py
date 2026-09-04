@@ -84,13 +84,11 @@ class TestMissingInterpreter:
         with (
             patch("sys.argv", argv),
             patch("mcp_tools_py.main.setup_logging"),
-            patch(
-                "mcp_tools_py.main.create_server",
-                side_effect=FileNotFoundError("Python interpreter not found: x"),
-            ),
             pytest.raises(SystemExit) as exc_info,
         ):
             main()
 
         assert exc_info.value.code == 1
-        assert "Python interpreter not found" in capsys.readouterr().out
+        captured = capsys.readouterr()
+        # stdout is the stdio protocol channel, so the message goes to stderr.
+        assert "Error: Python interpreter not found" in captured.err
