@@ -55,8 +55,9 @@ def register(mcp: "FastMCPProtocol", checker_tools: "CheckerTools") -> None:
                 - 'error': Error if imports cannot be followed
             cache_dir: Optional custom cache directory for incremental checking.
                 Mypy uses caching to speed up subsequent runs. Nothing is sent by
-                default: the project's `[tool.mypy] cache_dir` decides, else mypy's
-                own `.mypy_cache`.
+                default. Precedence: this argument, then `MYPY_CACHE_DIR` in the
+                environment, then the project's `[tool.mypy] cache_dir`, then
+                mypy's own `.mypy_cache`.
             timeout_seconds: Maximum seconds to wait for mypy. Overrides the
                 configured limit for this call. Must be a positive integer.
                 Defaults to `[tool.mcp-tools-py]` config, then `--check-timeout`,
