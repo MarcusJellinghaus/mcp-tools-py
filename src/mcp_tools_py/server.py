@@ -2,7 +2,7 @@
 
 import logging
 from pathlib import Path
-from typing import Callable, Optional, Protocol, TypeVar
+from typing import Optional
 
 from mcp_tools_py.checker_tools import CheckerTools
 from mcp_tools_py.formatter import FormatterTools
@@ -16,32 +16,9 @@ from mcp_tools_py.utils.environment_info import (
     EnvironmentInfo,
     get_environment_info,
 )
+from mcp_tools_py.utils.mcp_protocols import FastMCPProtocol
 from mcp_tools_py.utils.project_config import ToolName, get_check_timeout
 from mcp_tools_py.utils.python_environment import PythonEnvironment
-
-# Type definitions for FastMCP
-T = TypeVar("T")
-
-
-class ToolDecorator(Protocol):
-    """Protocol for an MCP tool-registration decorator."""
-
-    def __call__(self, func: Callable[..., T]) -> Callable[..., T]:
-        """Register `func` as an MCP tool and return it."""
-        ...
-
-
-class FastMCPProtocol(Protocol):
-    """Subset of FastMCP's surface used by ToolServer."""
-
-    def tool(self) -> ToolDecorator:
-        """Return a decorator that registers a tool."""
-        ...
-
-    def run(self) -> None:
-        """Run the MCP server event loop."""
-        ...
-
 
 # Initialize logger
 logger = logging.getLogger(__name__)

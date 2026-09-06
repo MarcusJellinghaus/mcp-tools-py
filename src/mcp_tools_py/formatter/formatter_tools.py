@@ -14,7 +14,8 @@ from mcp_tools_py.utils.project_config import (
 )
 
 if TYPE_CHECKING:
-    from mcp_tools_py.server import FastMCPProtocol, ToolServer
+    from mcp_tools_py.server import ToolServer
+    from mcp_tools_py.utils.mcp_protocols import FastMCPProtocol
 
 logger = logging.getLogger(__name__)
 

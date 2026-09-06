@@ -12,7 +12,7 @@ from mcp_tools_py.refactoring.rope_tools import rename_symbol as rope_rename_sym
 from mcp_tools_py.utils.python_environment import PythonEnvironment
 
 if TYPE_CHECKING:
-    from mcp_tools_py.server import FastMCPProtocol
+    from mcp_tools_py.utils.mcp_protocols import FastMCPProtocol
 
 
 class RefactoringTools:

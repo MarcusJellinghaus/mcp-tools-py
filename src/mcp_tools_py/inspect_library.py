@@ -8,7 +8,7 @@ from mcp_tools_py.utils.python_environment import PythonEnvironment
 from mcp_tools_py.utils.subprocess_runner import execute_command
 
 if TYPE_CHECKING:
-    from mcp_tools_py.server import FastMCPProtocol
+    from mcp_tools_py.utils.mcp_protocols import FastMCPProtocol
 
 # Timeout for one name resolution in the target environment.
 SOURCE_TIMEOUT_SECONDS = 30

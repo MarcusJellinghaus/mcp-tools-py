@@ -10,7 +10,7 @@ from mcp_tools_py.log_utils import log_function_call
 
 if TYPE_CHECKING:
     from mcp_tools_py.checker_tools import CheckerTools
-    from mcp_tools_py.server import FastMCPProtocol
+    from mcp_tools_py.utils.mcp_protocols import FastMCPProtocol
 
 logger = logging.getLogger(__name__)
 

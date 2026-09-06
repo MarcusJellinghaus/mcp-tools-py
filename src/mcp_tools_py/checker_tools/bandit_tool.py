@@ -10,7 +10,7 @@ from mcp_tools_py.utils.project_config import resolve_target_directories
 
 if TYPE_CHECKING:
     from mcp_tools_py.checker_tools import CheckerTools
-    from mcp_tools_py.server import FastMCPProtocol
+    from mcp_tools_py.utils.mcp_protocols import FastMCPProtocol
 
 logger = logging.getLogger(__name__)
 
