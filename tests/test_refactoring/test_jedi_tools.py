@@ -2,24 +2,11 @@
 
 import sys
 from pathlib import Path
-from typing import Iterator
 from unittest.mock import patch
 
 import pytest
 
-from mcp_tools_py.refactoring.jedi_tools import (
-    _get_project,
-    find_references,
-    list_symbols,
-)
-
-
-@pytest.fixture(autouse=True)
-def _clear_project_cache() -> Iterator[None]:
-    """Drop cached jedi projects so their child processes are released."""
-    _get_project.cache_clear()
-    yield
-    _get_project.cache_clear()
+from mcp_tools_py.refactoring.jedi_tools import find_references, list_symbols
 
 
 def _symbols(project_dir: Path, file_path: str) -> str:

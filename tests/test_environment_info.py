@@ -1,10 +1,13 @@
 """Tests for the one-shot environment probe and its parsed result."""
 
 import json
+import logging
 import platform
 import sys
 from pathlib import Path
 from unittest.mock import MagicMock, patch
+
+import pytest
 
 from mcp_tools_py.utils.environment_info import (
     PROBED_MODULES,
@@ -109,6 +112,64 @@ class TestGetEnvironmentInfo:
             )
 
             mock_exec.assert_not_called()
+
+
+class TestToolVersionLogging:
+    """The startup diagnostic naming the tool distributions the probe found."""
+
+    _LOGGER = "mcp_tools_py.utils.environment_info"
+
+    @staticmethod
+    def _version_messages(caplog: pytest.LogCaptureFixture) -> list[str]:
+        """Collect the records reporting tool versions.
+
+        Args:
+            caplog: pytest's log capture for the finished call.
+
+        Returns:
+            The messages of every record naming tool versions.
+        """
+        return [
+            record.getMessage()
+            for record in caplog.records
+            if record.getMessage().startswith("tool versions in ")
+        ]
+
+    def test_success_logs_every_found_distribution(
+        self, caplog: pytest.LogCaptureFixture
+    ) -> None:
+        """A successful probe logs one record naming each tool it found."""
+        blob = json.dumps(
+            {
+                "version": "3.11.9",
+                "sys_path": [],
+                "distributions": {"pylint": "3.2.0", "import-linter": "2.0"},
+                "importable": {},
+            }
+        )
+        with patch("mcp_tools_py.utils.environment_info.execute_command") as mock_exec:
+            mock_exec.return_value = make_command_result(stdout=blob)
+
+            with caplog.at_level(logging.INFO, logger=self._LOGGER):
+                get_environment_info("/some/python")
+
+        messages = self._version_messages(caplog)
+        assert len(messages) == 1
+        assert "/some/python" in messages[0]
+        assert "pylint 3.2.0" in messages[0]
+        assert "import-linter 2.0" in messages[0]
+
+    def test_failure_logs_no_versions(self, caplog: pytest.LogCaptureFixture) -> None:
+        """A failed probe has no versions to report, so it logs none."""
+        with patch("mcp_tools_py.utils.environment_info.execute_command") as mock_exec:
+            mock_exec.return_value = make_command_result(
+                return_code=1, stderr="no such file"
+            )
+
+            with caplog.at_level(logging.INFO, logger=self._LOGGER):
+                get_environment_info("/some/python")
+
+        assert self._version_messages(caplog) == []
 
 
 class TestProbeScript:

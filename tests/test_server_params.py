@@ -585,8 +585,8 @@ async def test_integration_with_existing_server_parameters(
 
     # Verify that server constructor parameters are properly used
     assert server.project_dir == Path("/test/project")
-    assert server.test_folder == "tests"  # default
-    assert server.keep_temp_files == False  # default
+    assert server.context.test_folder == "tests"  # default
+    assert server.context.keep_temp_files == False  # default
 
     with patch(
         "mcp_tools_py.checker_tools.pytest_tool.check_code_with_pytest"

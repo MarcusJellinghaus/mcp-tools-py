@@ -50,7 +50,7 @@ ignore_imports =
 name = target_scripts import nothing from the project
 type = forbidden
 source_modules =
-    mcp_tools_py.utils.target_scripts.probe
+    mcp_tools_py.utils.target_scripts
 forbidden_modules =
     mcp_tools_py.*
     mcp_tools_py.*.*

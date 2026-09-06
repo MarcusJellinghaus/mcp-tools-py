@@ -2,13 +2,11 @@
 
 import sys
 from pathlib import Path
-from typing import Iterator
 from unittest.mock import MagicMock
 
 import pytest
 
 from mcp_tools_py.refactoring import RefactoringTools
-from mcp_tools_py.refactoring.jedi_tools import _get_project
 from mcp_tools_py.utils.python_environment import PythonEnvironment
 from mcp_tools_py.utils.tool_context import ToolContext
 
@@ -23,14 +21,6 @@ def _context(project_dir: Path) -> ToolContext:
         project_dir=project_dir,
         environment=PythonEnvironment(Path(sys.executable)),
     )
-
-
-@pytest.fixture(autouse=True)
-def _clear_project_cache() -> Iterator[None]:
-    """Drop cached jedi projects so their child processes are released."""
-    _get_project.cache_clear()
-    yield
-    _get_project.cache_clear()
 
 
 @pytest.fixture

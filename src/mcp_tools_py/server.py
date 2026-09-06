@@ -45,11 +45,6 @@ class ToolServer:
             check_timeout: Server-level timeout in seconds for checker and formatter subprocesses. If None, per-tool configuration or the built-in defaults apply.
         """
         self.project_dir = project_dir
-        self.test_folder = test_folder
-        self.keep_temp_files = keep_temp_files
-        self.refactoring_timeout = refactoring_timeout
-        self.vulture_whitelist = vulture_whitelist
-        self.check_timeout = check_timeout
 
         # Import FastMCP
         from mcp.server.fastmcp import FastMCP
@@ -57,19 +52,17 @@ class ToolServer:
         self.mcp: FastMCPProtocol = FastMCP("MCP Tools Service")
         self.environment = PythonEnvironment.resolve(python_executable, venv_path)
         self.context = ToolContext(
-            project_dir=self.project_dir,
+            project_dir=project_dir,
             environment=self.environment,
-            test_folder=self.test_folder,
-            keep_temp_files=self.keep_temp_files,
-            vulture_whitelist=self.vulture_whitelist,
-            check_timeout=self.check_timeout,
+            test_folder=test_folder,
+            keep_temp_files=keep_temp_files,
+            vulture_whitelist=vulture_whitelist,
+            check_timeout=check_timeout,
         )
         self._warn_missing_console_scripts()
         CheckerTools(self.context).register(self.mcp)
         FormatterTools(self.context).register(self.mcp)
-        RefactoringTools(self.context, timeout=self.refactoring_timeout).register(
-            self.mcp
-        )
+        RefactoringTools(self.context, timeout=refactoring_timeout).register(self.mcp)
         UtilityTools(self.context).register(self.mcp)
         InspectTools(self.context).register(self.mcp)
 

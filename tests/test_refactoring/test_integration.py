@@ -3,24 +3,11 @@
 import sys
 import time
 from pathlib import Path
-from typing import Iterator
 
 import pytest
 
-from mcp_tools_py.refactoring.jedi_tools import (
-    _get_project,
-    find_references,
-    list_symbols,
-)
+from mcp_tools_py.refactoring.jedi_tools import find_references, list_symbols
 from mcp_tools_py.refactoring.rope_tools import move_module, move_symbol, rename_symbol
-
-
-@pytest.fixture(autouse=True)
-def _clear_project_cache() -> Iterator[None]:
-    """Drop cached jedi projects so their child processes are released."""
-    _get_project.cache_clear()
-    yield
-    _get_project.cache_clear()
 
 
 @pytest.fixture

@@ -41,12 +41,15 @@ def _lint_imports() -> Optional[Path]:
     return PythonEnvironment.resolve().binary("lint-imports")
 
 
-def _build_fixture(tmp_path: Path, probe_source: str) -> str:
+def _build_fixture(
+    tmp_path: Path, probe_source: str, extra_scripts: Optional[dict[str, str]] = None
+) -> str:
     """Write a miniature package mirroring the real layout.
 
     Args:
         tmp_path: Directory to build in; becomes the working directory.
         probe_source: Contents of the fake `probe.py`.
+        extra_scripts: Further target scripts, filename -> contents.
 
     Returns:
         The contract name, as it appears in the lint-imports report.
@@ -65,6 +68,8 @@ def _build_fixture(tmp_path: Path, probe_source: str) -> str:
     (package / "utils" / "helper.py").write_text("thing = 1\n", encoding="utf-8")
     (scripts / "__init__.py").write_text("", encoding="utf-8")
     (scripts / "probe.py").write_text(probe_source, encoding="utf-8")
+    for filename, source in (extra_scripts or {}).items():
+        (scripts / filename).write_text(source, encoding="utf-8")
 
     (tmp_path / ".importlinter").write_text(
         "[importlinter]\n"
@@ -128,3 +133,23 @@ def test_project_import_breaks_the_contract(tmp_path: Path) -> None:
     assert return_code != 0, report
     assert name in report
     assert "BROKEN" in report
+
+
+@pytest.mark.integration
+def test_second_script_is_covered_too(tmp_path: Path) -> None:
+    """The contract names the package, so a newly added script is covered."""
+    if _lint_imports() is None:
+        pytest.skip("lint-imports is not installed next to this interpreter")
+
+    name = _build_fixture(
+        tmp_path,
+        "import json\n",
+        extra_scripts={"other.py": "from fakepkg.utils.helper import thing\n"},
+    )
+
+    return_code, report = _run_lint_imports(tmp_path)
+
+    assert return_code != 0, report
+    assert name in report
+    assert "BROKEN" in report
+    assert "fakepkg.utils.target_scripts.other" in report
