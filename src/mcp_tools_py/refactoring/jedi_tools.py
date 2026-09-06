@@ -2,16 +2,54 @@
 
 from __future__ import annotations
 
+from functools import lru_cache
 from pathlib import Path
-from typing import Any, List
+from typing import Any, List, Optional, Tuple
 
 
-def list_symbols(project_dir: Path, file_path: str) -> str:
+@lru_cache(maxsize=None)
+def _get_project(
+    project_dir: str, interpreter: str
+) -> Tuple[Optional[Any], Optional[str]]:
+    """Build a jedi project that resolves names in `interpreter`.
+
+    The environment is forced here rather than left to `jedi.Script`, which
+    is the first caller of `Project.get_environment()`: an unusable
+    interpreter must fail inside this try, not later at the call site.
+    `get_environment()` memoises on the project, so forcing it costs no
+    extra child process.
+
+    Failures are cached alongside successes — a fixed environment needs a
+    server restart either way, and this avoids one spawn attempt per call.
+
+    Args:
+        project_dir: Absolute path to project root.
+        interpreter: Path to the Python interpreter to resolve names in.
+
+    Returns:
+        `(project, None)`, or `(None, error_message)` when the environment
+        cannot be used.
+    """
+    import jedi  # pylint: disable=import-error,import-outside-toplevel
+
+    try:
+        project = jedi.Project(path=project_dir, environment_path=interpreter)
+        project.get_environment()
+    except Exception as exc:  # pylint: disable=broad-exception-caught
+        return None, (
+            f"Error: cannot analyse against the Python environment at "
+            f"'{interpreter}': {exc}"
+        )
+    return project, None
+
+
+def list_symbols(project_dir: Path, file_path: str, interpreter: str) -> str:
     """List all top-level symbols in a file.
 
     Args:
         project_dir: Absolute path to project root.
         file_path: File path relative to project root.
+        interpreter: Path to the Python interpreter to resolve names in.
 
     Returns:
         Formatted string listing symbols, or error message.
@@ -23,7 +61,9 @@ def list_symbols(project_dir: Path, file_path: str) -> str:
         return f"Error: file not found: {file_path}"
 
     source = abs_path.read_text(encoding="utf-8")
-    project = jedi.Project(path=str(project_dir))
+    project, error = _get_project(str(project_dir), interpreter)
+    if error is not None:
+        return error
     script = jedi.Script(code=source, path=str(abs_path), project=project)
 
     try:
@@ -78,13 +118,16 @@ def _filter_top_level(names: List[Any], *, exclude_imports: bool = False) -> Lis
     return result
 
 
-def find_references(project_dir: Path, file_path: str, symbol_name: str) -> str:
+def find_references(
+    project_dir: Path, file_path: str, symbol_name: str, interpreter: str
+) -> str:
     """Find all references to a symbol across the project.
 
     Args:
         project_dir: Absolute path to project root.
         file_path: File path relative to project root.
         symbol_name: Name of the top-level symbol.
+        interpreter: Path to the Python interpreter to resolve names in.
 
     Returns:
         Formatted string listing references, or error message.
@@ -96,7 +139,9 @@ def find_references(project_dir: Path, file_path: str, symbol_name: str) -> str:
         return f"Error: file not found: {file_path}"
 
     source = abs_path.read_text(encoding="utf-8")
-    project = jedi.Project(path=str(project_dir))
+    project, error = _get_project(str(project_dir), interpreter)
+    if error is not None:
+        return error
 
     # Find the symbol's position using get_names
     script = jedi.Script(code=source, path=str(abs_path), project=project)

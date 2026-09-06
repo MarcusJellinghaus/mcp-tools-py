@@ -59,6 +59,7 @@ def test_jedi_loads_only_when_a_jedi_tool_runs() -> None:
     """Confirms the lazy import is wired correctly: calling a jedi tool loads jedi."""
     loaded = _loaded_heavy_modules(
         "from mcp_tools_py.refactoring import jedi_tools\n"
-        "jedi_tools.list_symbols(__import__('pathlib').Path('.'), 'missing.py')"
+        "jedi_tools.list_symbols(__import__('pathlib').Path('.'), 'missing.py', "
+        "__import__('sys').executable)"
     )
     assert "jedi" in loaded

@@ -90,9 +90,9 @@ class ToolServer:
         self._tool_availability = self._check_tool_availability()
         CheckerTools(self).register(self.mcp)
         FormatterTools(self).register(self.mcp)
-        RefactoringTools(self.project_dir, timeout=self.refactoring_timeout).register(
-            self.mcp
-        )
+        RefactoringTools(
+            self.project_dir, self.environment, timeout=self.refactoring_timeout
+        ).register(self.mcp)
         UtilityTools().register(self.mcp)
         InspectTools(self.environment).register(self.mcp)
 

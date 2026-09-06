@@ -501,7 +501,12 @@ def test_rope_cli_unknown_operation() -> None:
 
 def test_refactoring_tools_init_stores_timeout(tmp_path: Path) -> None:
     """RefactoringTools(path, timeout=60)._timeout == 60."""
-    from mcp_tools_py.refactoring import RefactoringTools
+    import sys
 
-    tools = RefactoringTools(tmp_path, timeout=60)
+    from mcp_tools_py.refactoring import RefactoringTools
+    from mcp_tools_py.utils.python_environment import PythonEnvironment
+
+    tools = RefactoringTools(
+        tmp_path, PythonEnvironment(Path(sys.executable)), timeout=60
+    )
     assert tools._timeout == 60  # noqa: SLF001

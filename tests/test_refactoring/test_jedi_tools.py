@@ -1,10 +1,87 @@
 """Tests for jedi-based symbol discovery and reference finding."""
 
+import sys
 from pathlib import Path
+from typing import Iterator
+from unittest.mock import patch
 
 import pytest
 
-from mcp_tools_py.refactoring.jedi_tools import find_references, list_symbols
+from mcp_tools_py.refactoring.jedi_tools import (
+    _get_project,
+    find_references,
+    list_symbols,
+)
+
+
+@pytest.fixture(autouse=True)
+def _clear_project_cache() -> Iterator[None]:
+    """Drop cached jedi projects so their child processes are released."""
+    _get_project.cache_clear()
+    yield
+    _get_project.cache_clear()
+
+
+def _symbols(project_dir: Path, file_path: str) -> str:
+    """List symbols, resolving against the interpreter running the tests.
+
+    Args:
+        project_dir: Absolute path to project root.
+        file_path: File path relative to project root.
+
+    Returns:
+        The tool's answer.
+    """
+    return list_symbols(project_dir, file_path, sys.executable)
+
+
+def _references(project_dir: Path, file_path: str, symbol_name: str) -> str:
+    """Find references, resolving against the interpreter running the tests.
+
+    Args:
+        project_dir: Absolute path to project root.
+        file_path: File path relative to project root.
+        symbol_name: Name of the top-level symbol.
+
+    Returns:
+        The tool's answer.
+    """
+    return find_references(project_dir, file_path, symbol_name, sys.executable)
+
+
+# --- environment tests ---
+
+
+def test_project_is_built_with_the_given_environment_path(tmp_path: Path) -> None:
+    """The interpreter passed in becomes jedi's environment_path."""
+    (tmp_path / "example.py").write_text("def foo(): ...\n")
+
+    with patch("jedi.Script"), patch("jedi.Project") as mock_project:
+        list_symbols(tmp_path, "example.py", "/some/python")
+
+    mock_project.assert_called_once_with(
+        path=str(tmp_path), environment_path="/some/python"
+    )
+
+
+def test_unusable_environment_is_reported_and_cached(tmp_path: Path) -> None:
+    """An environment that cannot be built yields a message, not an exception."""
+    (tmp_path / "example.py").write_text("def foo(): ...\n")
+
+    with patch("jedi.Project") as mock_project:
+        mock_project.return_value.get_environment.side_effect = RuntimeError(
+            "no interpreter there"
+        )
+
+        first = list_symbols(tmp_path, "example.py", "/nonexistent/python")
+        second = list_symbols(tmp_path, "example.py", "/nonexistent/python")
+
+    assert "/nonexistent/python" in first
+    assert "no interpreter there" in first
+    assert second == first
+    # The failure is cached: the second call does not re-attempt.
+    assert mock_project.call_count == 1
+
 
 # --- list_symbols tests ---
 
@@ -23,7 +100,7 @@ def test_list_symbols_by_type(
     """Lists top-level symbols of each type."""
     f = tmp_path / "example.py"
     f.write_text(code)
-    result = list_symbols(tmp_path, "example.py")
+    result = _symbols(tmp_path, "example.py")
     for name in expected:
         assert name in result
     assert symbol_type.rstrip("s") in result.lower() or any(
@@ -42,7 +119,7 @@ def test_list_symbols_ignores_nested(tmp_path: Path) -> None:
     )
     f = tmp_path / "nested.py"
     f.write_text(code)
-    result = list_symbols(tmp_path, "nested.py")
+    result = _symbols(tmp_path, "nested.py")
     assert "Outer" in result
     assert "top_func" in result
     assert "method" not in result
@@ -53,13 +130,13 @@ def test_list_symbols_empty_file(tmp_path: Path) -> None:
     """Returns empty list for empty file."""
     f = tmp_path / "empty.py"
     f.write_text("")
-    result = list_symbols(tmp_path, "empty.py")
+    result = _symbols(tmp_path, "empty.py")
     assert "No symbols found" in result or result.strip() == ""
 
 
 def test_list_symbols_nonexistent_file(tmp_path: Path) -> None:
     """Returns error string for missing file."""
-    result = list_symbols(tmp_path, "missing.py")
+    result = _symbols(tmp_path, "missing.py")
     assert "error" in result.lower() or "not found" in result.lower()
 
 
@@ -77,7 +154,7 @@ def test_list_symbols_excludes_imports(tmp_path: Path) -> None:
     )
     f = tmp_path / "mixed.py"
     f.write_text(code)
-    result = list_symbols(tmp_path, "mixed.py")
+    result = _symbols(tmp_path, "mixed.py")
     assert "my_func" in result
     assert "MyClass" in result
     assert "MAX" in result
@@ -89,7 +166,7 @@ def test_list_symbols_syntax_error(tmp_path: Path) -> None:
     """Returns error for file with syntax errors."""
     f = tmp_path / "bad.py"
     f.write_text("def foo(\n")
-    result = list_symbols(tmp_path, "bad.py")
+    result = _symbols(tmp_path, "bad.py")
     # Jedi may still parse partial results or return an error
     assert isinstance(result, str)
 
@@ -103,7 +180,7 @@ def test_find_references_function(tmp_path: Path) -> None:
     (tmp_path / "mod_b.py").write_text(
         "from mod_a import helper\n\nresult = helper()\n"
     )
-    result = find_references(tmp_path, "mod_a.py", "helper")
+    result = _references(tmp_path, "mod_a.py", "helper")
     assert "mod_a.py" in result
     assert "helper" in result
 
@@ -112,7 +189,7 @@ def test_find_references_class(tmp_path: Path) -> None:
     """Finds references to a class."""
     (tmp_path / "models.py").write_text("class Widget:\n    pass\n")
     (tmp_path / "use.py").write_text("from models import Widget\n\nw = Widget()\n")
-    result = find_references(tmp_path, "models.py", "Widget")
+    result = _references(tmp_path, "models.py", "Widget")
     assert "models.py" in result
     assert "Widget" in result
 
@@ -120,7 +197,7 @@ def test_find_references_class(tmp_path: Path) -> None:
 def test_find_references_not_found(tmp_path: Path) -> None:
     """Returns error with available symbols when symbol not found."""
     (tmp_path / "src.py").write_text("def real_func():\n    pass\n")
-    result = find_references(tmp_path, "src.py", "nonexistent")
+    result = _references(tmp_path, "src.py", "nonexistent")
     assert "not found" in result.lower()
     assert "real_func" in result
 
@@ -129,6 +206,6 @@ def test_find_references_import_usage(tmp_path: Path) -> None:
     """Finds import statements as references."""
     (tmp_path / "lib.py").write_text("CONSTANT = 99\n")
     (tmp_path / "main.py").write_text("from lib import CONSTANT\n\nprint(CONSTANT)\n")
-    result = find_references(tmp_path, "lib.py", "CONSTANT")
+    result = _references(tmp_path, "lib.py", "CONSTANT")
     assert "lib.py" in result
     assert "CONSTANT" in result

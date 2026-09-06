@@ -1,12 +1,26 @@
 """End-to-end integration tests for refactoring workflows."""
 
+import sys
 import time
 from pathlib import Path
+from typing import Iterator
 
 import pytest
 
-from mcp_tools_py.refactoring.jedi_tools import find_references, list_symbols
+from mcp_tools_py.refactoring.jedi_tools import (
+    _get_project,
+    find_references,
+    list_symbols,
+)
 from mcp_tools_py.refactoring.rope_tools import move_module, move_symbol, rename_symbol
+
+
+@pytest.fixture(autouse=True)
+def _clear_project_cache() -> Iterator[None]:
+    """Drop cached jedi projects so their child processes are released."""
+    _get_project.cache_clear()
+    yield
+    _get_project.cache_clear()
 
 
 @pytest.fixture
@@ -75,13 +89,15 @@ def test_full_workflow_split_large_file(multi_module_project: Path) -> None:
     project = multi_module_project
 
     # 1. list_symbols on models.py -> should show User, Address, validate_email
-    symbols_output = list_symbols(project, "myproject/models.py")
+    symbols_output = list_symbols(project, "myproject/models.py", sys.executable)
     assert "User" in symbols_output
     assert "Address" in symbols_output
     assert "validate_email" in symbols_output
 
     # 2. find_references for validate_email -> should show models.py, services.py
-    refs_output = find_references(project, "myproject/models.py", "validate_email")
+    refs_output = find_references(
+        project, "myproject/models.py", "validate_email", sys.executable
+    )
     assert "models.py" in refs_output
     assert "services.py" in refs_output
 
@@ -135,7 +151,9 @@ def test_rename_then_verify_references(multi_module_project: Path) -> None:
     project = multi_module_project
 
     # 1. find_references for User -> should show models.py, services.py
-    refs_output = find_references(project, "myproject/models.py", "User")
+    refs_output = find_references(
+        project, "myproject/models.py", "User", sys.executable
+    )
     assert "models.py" in refs_output
     assert "services.py" in refs_output
 

@@ -1,11 +1,25 @@
 """Tests for RefactoringTools registration and relative-path output."""
 
+import sys
 from pathlib import Path
+from typing import Iterator
 from unittest.mock import MagicMock
 
 import pytest
 
 from mcp_tools_py.refactoring import RefactoringTools
+from mcp_tools_py.refactoring.jedi_tools import _get_project
+from mcp_tools_py.utils.python_environment import PythonEnvironment
+
+TEST_ENV = PythonEnvironment(Path(sys.executable))
+
+
+@pytest.fixture(autouse=True)
+def _clear_project_cache() -> Iterator[None]:
+    """Drop cached jedi projects so their child processes are released."""
+    _get_project.cache_clear()
+    yield
+    _get_project.cache_clear()
 
 
 @pytest.fixture
@@ -33,7 +47,7 @@ def test_refactoring_tools_registers_five_tools(
     tmp_path: Path, mock_mcp: MagicMock
 ) -> None:
     """RefactoringTools registers all 5 tools on an MCP server."""
-    tools = RefactoringTools(tmp_path)
+    tools = RefactoringTools(tmp_path, TEST_ENV)
     tools.register(mock_mcp)
 
     assert mock_mcp.tool.call_count == 5
@@ -43,7 +57,7 @@ def test_refactoring_tools_registers_expected_names(
     tmp_path: Path, mock_mcp: MagicMock
 ) -> None:
     """RefactoringTools registers tools with the correct function names."""
-    tools = RefactoringTools(tmp_path)
+    tools = RefactoringTools(tmp_path, TEST_ENV)
     tools.register(mock_mcp)
 
     registered = mock_mcp._registered_functions
@@ -68,7 +82,7 @@ def test_list_symbols_output_uses_relative_paths(tmp_path: Path) -> None:
 
     from mcp_tools_py.refactoring.jedi_tools import list_symbols
 
-    result = list_symbols(tmp_path, "example.py")
+    result = list_symbols(tmp_path, "example.py", sys.executable)
 
     assert str(tmp_path) not in result
     assert "example.py" in result
@@ -83,7 +97,7 @@ def test_find_references_output_uses_relative_paths(tmp_path: Path) -> None:
 
     from mcp_tools_py.refactoring.jedi_tools import find_references
 
-    result = find_references(tmp_path, "models.py", "Item")
+    result = find_references(tmp_path, "models.py", "Item", sys.executable)
 
     assert str(tmp_path) not in result
     assert "models.py" in result
@@ -97,7 +111,7 @@ def test_registered_list_symbols_uses_relative_paths(
     src = tmp_path / "mod.py"
     src.write_text("X = 42\n")
 
-    tools = RefactoringTools(tmp_path)
+    tools = RefactoringTools(tmp_path, TEST_ENV)
     tools.register(mock_mcp)
 
     # Find the registered list_symbols function
@@ -117,7 +131,7 @@ def test_registered_find_references_uses_relative_paths(
     (tmp_path / "lib.py").write_text("VAL = 100\n")
     (tmp_path / "main.py").write_text("from lib import VAL\nprint(VAL)\n")
 
-    tools = RefactoringTools(tmp_path)
+    tools = RefactoringTools(tmp_path, TEST_ENV)
     tools.register(mock_mcp)
 
     registered = mock_mcp._registered_functions
