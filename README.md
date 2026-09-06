@@ -74,12 +74,24 @@ The mypy tools expose the following parameters for customization:
 
 | Parameter | Type | Default | Description |
 |-----------|------|---------|-------------|
-| `strict` | boolean | True | Use strict mode settings |
 | `disable_error_codes` | list | None | List of mypy error codes to ignore |
 | `target_directories` | list | None (auto-detected) | Directories to check relative to project_dir. Auto-detected from `pyproject.toml` when omitted |
-| `follow_imports` | string | 'normal' | How to handle imports during type checking |
-| `cache_dir` | string | None (`.mypy_cache`) | Custom cache directory for incremental checking |
+| `follow_imports` | string | None (no flag sent; the project's `[tool.mypy]` decides) | How to handle imports during type checking |
+| `cache_dir` | string | None (no flag sent; `MYPY_CACHE_DIR` decides, else `[tool.mypy] cache_dir`, else `.mypy_cache`) | Custom cache directory for incremental checking |
 | `timeout_seconds` | integer | None (resolved from config, else 120) | Maximum seconds to wait for mypy. Positive integers only |
+
+### Mypy Configuration
+
+Mypy reads your project's `pyproject.toml` automatically, and `[tool.mypy]` is the
+single source of truth for the flag set — the tool adds only output-formatting flags,
+unless you pass `follow_imports`, `cache_dir` or `disable_error_codes`. A project with
+no `[tool.mypy]` section of its own has no floor: with no config in scope it runs at
+mypy's defaults and reports "passed" having checked very little; with a parent
+directory's config (mypy 1.15 and later) or a user-level `~/.config/mypy/config` or
+`~/.mypy.ini` in scope it runs at those settings and can report errors the project
+never asked for. See
+[docs/pyproject-configuration.md](docs/pyproject-configuration.md) for migration
+guidance and the effect on mypy's cache.
 
 ## Command Line Interface (CLI)
 
@@ -433,7 +445,7 @@ The server exposes 17 MCP tools.
 |------|--------------|
 | `run_pylint_check` | Static analysis; findings returned as an LLM-actionable prompt |
 | `run_pytest_check` | Runs the test suite, parses the JSON report, summarises failures |
-| `run_mypy_check` | Strict-mode type checking with configurable error codes |
+| `run_mypy_check` | Type checking driven by the project's `[tool.mypy]`, with configurable error codes |
 | `run_ruff_check` | Ruff lint analysis, read-only |
 | `run_ruff_fix` | Applies ruff's safe fixes in place; unsafe fixes are opt-in |
 | `run_bandit_check` | Security lint |

@@ -110,7 +110,7 @@ jobs:
           - {name: "isort", cmd: "isort --version && isort --check --profile=black --float-to-top src tests"}
           - {name: "pylint", cmd: "pylint --version && pylint -E ./src ./tests"}
           - {name: "pytest", cmd: "pytest --version && pytest tests"}
-          - {name: "mypy", cmd: "mypy --version && mypy --strict src tests"}
+          - {name: "mypy", cmd: "mypy --version && mypy src tests"}
           - {name: "ruff-docstrings", cmd: "ruff --version && ruff check src tests"}
           # mcp-coder declares mcp-workspace as a plain name, so uvx resolves it
           # from PyPI — too old for mcp-coder's imports. Pin it to git as well.

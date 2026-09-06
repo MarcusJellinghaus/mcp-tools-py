@@ -118,7 +118,7 @@ tools\iSort.bat       # Import sorting
 We use **Python 3.11+** with modern type hints:
 
 - ✅ Use `dict, list, |` instead of `from typing import Dict, List, Union`
-- ✅ Provide type hints for all functions (mypy strict compliance)
+- ✅ Provide type hints for all functions (compliant with the `[tool.mypy]` settings in `pyproject.toml`)
 - ✅ Follow DRY principle - keep code concise
 - ✅ Use absolute imports
 - ✅ Use 4 spaces for indentation
@@ -214,7 +214,7 @@ pytest -m installation
    pytest tests/
    
    # Step 3: Mypy
-   python -m mypy --strict src tests
+   python -m mypy src tests
    ```
 
 2. **All checks must pass** before submitting PR

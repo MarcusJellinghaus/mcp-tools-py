@@ -101,14 +101,9 @@ convention = "google"
 
 [tool.mypy]
 python_version = "3.11"
-warn_return_any = true
+strict = true
+warn_unreachable = true
 warn_unused_configs = true
-disallow_untyped_defs = true
-disallow_incomplete_defs = true
-check_untyped_defs = true
-# disallow_untyped_decorators = false  # can create issues with pytest fixtures
-no_implicit_optional = true
-strict_optional = true
 mypy_path = "src"
 namespace_packages = true
 explicit_package_bases = true
@@ -122,7 +117,7 @@ module = ["mcp.server.fastmcp"]
 ignore_missing_imports = true
 
 [[tool.mypy.overrides]]
-module = ["jedi", "jedi.*"]
+module = ["jedi"]
 ignore_missing_imports = true
 
 [[tool.mypy.overrides]]

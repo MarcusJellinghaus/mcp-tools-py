@@ -21,7 +21,6 @@ def register(mcp: "FastMCPProtocol", checker_tools: "CheckerTools") -> None:
     @mcp.tool()
     @log_function_call
     def run_mypy_check(
-        strict: bool = True,
         disable_error_codes: list[str] | None = None,
         target_directories: list[str] | None = None,
         follow_imports: str | None = None,
@@ -30,11 +29,18 @@ def register(mcp: "FastMCPProtocol", checker_tools: "CheckerTools") -> None:
     ) -> str:
         """Run mypy type checking on the project code.
 
+        mypy reads the project's `[tool.mypy]` configuration; the server adds only
+        output-formatting flags, unless you pass `follow_imports`, `cache_dir` or
+        `disable_error_codes`. A project with no mypy config of its own has no
+        floor: with nothing in scope it runs at mypy's defaults and reports
+        "passed" having checked very little; with a parent directory's config
+        (mypy 1.15 and later) or a user-level `~/.config/mypy/config` or
+        `~/.mypy.ini` in scope it can report errors the project never asked for.
+
         Args:
-            strict: Use strict mode settings (default: True).
-                When True, applies comprehensive type checking with flags like
-                --strict, --warn-redundant-casts, --warn-unused-ignores, etc.
             disable_error_codes: Optional list of mypy error codes to ignore.
+                Nothing is sent by default; supplying codes ignores them for this
+                call and splits the mypy cache.
                 Common codes to disable:
                 - 'import': Import-related errors
                 - 'arg-type': Argument type mismatches
@@ -45,15 +51,19 @@ def register(mcp: "FastMCPProtocol", checker_tools: "CheckerTools") -> None:
                 Auto-detected from pyproject.toml when None. For example:
                 ["src"] (source only), ["src", "tests"] (both),
                 ["mypackage"] (custom package), ["."] (entire project).
-            follow_imports: How to handle imports during type checking.
+            follow_imports: How to handle imports during type checking. Nothing is
+                sent by default and the project's `[tool.mypy]` decides; supplying a
+                value overrides it for this call and splits the mypy cache.
                 Options:
-                - 'normal' (default): Follow and type check imported modules
+                - 'normal': Follow and type check imported modules
                 - 'silent': Follow imports but suppress errors in imported modules
                 - 'skip': Don't follow imports, only check specified files
                 - 'error': Error if imports cannot be followed
             cache_dir: Optional custom cache directory for incremental checking.
-                Mypy uses caching to speed up subsequent runs.
-                Defaults to .mypy_cache in the project directory.
+                Mypy uses caching to speed up subsequent runs. Nothing is sent by
+                default. Precedence: this argument, then `MYPY_CACHE_DIR` in the
+                environment, then the project's `[tool.mypy] cache_dir`, then
+                mypy's own `.mypy_cache`.
             timeout_seconds: Maximum seconds to wait for mypy. Overrides the
                 configured limit for this call. Must be a positive integer.
                 Defaults to `[tool.mcp-tools-py]` config, then `--check-timeout`,
@@ -81,7 +91,6 @@ def register(mcp: "FastMCPProtocol", checker_tools: "CheckerTools") -> None:
                 "Starting mypy check",
                 extra={
                     "project_dir": str(server.project_dir),
-                    "strict": strict,
                     "disable_error_codes": disable_error_codes,
                     "target_directories": resolved,
                 },
@@ -91,7 +100,6 @@ def register(mcp: "FastMCPProtocol", checker_tools: "CheckerTools") -> None:
             mypy_prompt = get_mypy_prompt(
                 str(server.project_dir),
                 python_executable=server._resolved_python,
-                strict=strict,
                 disable_error_codes=disable_error_codes,
                 target_directories=resolved,
                 follow_imports=follow_imports,

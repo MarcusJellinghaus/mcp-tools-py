@@ -7,6 +7,9 @@ from mcp_tools_py.utils.project_config import DEFAULT_CHECK_TIMEOUT
 
 logger = logging.getLogger(__name__)
 
+# Prefix that marks a prompt as a failure rather than a list of type issues
+MYPY_FAILURE_PREFIX = "Mypy execution failed:"
+
 
 def create_mypy_prompt(result: MypyResult) -> str | None:
     """Generate LLM-friendly prompt from mypy results.
@@ -79,7 +82,6 @@ def create_mypy_prompt(result: MypyResult) -> str | None:
 def get_mypy_prompt(
     project_dir: str,
     python_executable: str,
-    strict: bool = True,
     disable_error_codes: list[str] | None = None,
     target_directories: list[str] | None = None,
     follow_imports: str | None = None,
@@ -93,10 +95,10 @@ def get_mypy_prompt(
     Args:
         project_dir: Path to project directory
         python_executable: Python interpreter to use
-        strict: Use strict mode (default: True)
         disable_error_codes: Error codes to ignore
         target_directories: Directories to check
-        follow_imports: How to handle imports ('normal', 'silent', 'skip', 'error')
+        follow_imports: How to handle imports ('normal', 'silent', 'skip', 'error');
+            omitted from the command line when None
         cache_dir: Custom cache directory for incremental checking
         timeout_seconds: Maximum seconds to wait for mypy
 
@@ -108,15 +110,14 @@ def get_mypy_prompt(
     result = run_mypy_check(
         project_dir=project_dir,
         python_executable=python_executable,
-        strict=strict,
         disable_error_codes=disable_error_codes,
         target_directories=target_directories,
-        follow_imports=follow_imports or "normal",
+        follow_imports=follow_imports,
         cache_dir=cache_dir,
         timeout_seconds=timeout_seconds,
     )
 
     if result.error:
-        return f"Mypy execution failed: {result.error}"
+        return f"{MYPY_FAILURE_PREFIX} {result.error}"
 
     return create_mypy_prompt(result)

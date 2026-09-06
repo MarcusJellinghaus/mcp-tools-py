@@ -14,6 +14,7 @@ from mcp_tools_py.checker_tools import (
     tach_tool,
     vulture_tool,
 )
+from mcp_tools_py.code_checker_mypy.reporting import MYPY_FAILURE_PREFIX
 from mcp_tools_py.code_checker_pytest.reporting import (
     MAX_FAILURES,
     MAX_OUTPUT_LINES,
@@ -123,6 +124,9 @@ class CheckerTools:
         """
         if mypy_prompt is None:
             return "Mypy check completed. No type errors found."
+        # A failure already names itself -- don't announce it as type issues
+        if mypy_prompt.startswith(MYPY_FAILURE_PREFIX):
+            return mypy_prompt
         return f"Mypy found type issues that need attention:\n\n{mypy_prompt}"
 
 

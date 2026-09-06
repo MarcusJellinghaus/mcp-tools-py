@@ -2,6 +2,9 @@
 
 import logging
 import os
+import tomllib
+from datetime import datetime
+from pathlib import Path
 
 from mcp_tools_py.code_checker_mypy.models import MypyResult
 from mcp_tools_py.code_checker_mypy.parsers import parse_mypy_json_output
@@ -15,47 +18,153 @@ from mcp_tools_py.utils.subprocess_runner import (
 
 logger = logging.getLogger(__name__)
 
-# Default strict flags from tools/mypy.bat
-STRICT_FLAGS = [
-    "--strict",
-    "--warn-redundant-casts",
-    "--warn-unused-ignores",
-    "--warn-unreachable",
-    "--disallow-any-generics",
-    "--disallow-untyped-defs",
-    "--disallow-incomplete-defs",
-    "--check-untyped-defs",
-    "--disallow-untyped-decorators",
-    "--no-implicit-optional",
-    "--warn-return-any",
-    "--no-implicit-reexport",
-    "--strict-optional",
-]
+
+def _expand_config_cache_dir(path: str) -> str:
+    """Expand a ``cache_dir`` config value the way mypy does.
+
+    ``config_parser.expand_path`` applies ``expandvars`` over ``expanduser``,
+    and ``main.py`` then runs ``expanduser`` once more over the result.
+
+    Args:
+        path: The raw ``cache_dir`` value read from the config file.
+
+    Returns:
+        The expanded path.
+    """
+    return os.path.expanduser(os.path.expandvars(os.path.expanduser(path)))
+
+
+def _resolve_cache_dir(
+    project_dir: str, cache_dir: str | None
+) -> tuple[str | None, bool]:
+    """Resolve the cache directory mypy will use, and whether that is certain.
+
+    Mypy takes the cache directory from, in order of precedence: the
+    ``--cache-dir`` argument, the ``MYPY_CACHE_DIR`` environment variable, the
+    ``cache_dir`` config setting, and the ``.mypy_cache`` default. Config is read
+    from ``mypy.ini``, ``.mypy.ini``, ``pyproject.toml`` and ``setup.cfg`` in
+    that order; only the project directory's ``pyproject.toml`` is parsed here,
+    so when an INI-format config could own the setting the answer is None rather
+    than a guess. With no config in the project directory, mypy 1.15 and newer
+    repeat the search in the parent directories up to a ``.git``/``.hg`` root;
+    every version then falls back to a user-level config. Either may set
+    ``cache_dir``, so ``.mypy_cache`` is returned as an assumption.
+
+    Path expansion follows mypy, which treats each source differently: a config
+    value gets ``expandvars`` and ``expanduser``, ``MYPY_CACHE_DIR`` gets
+    ``expanduser`` only, and a ``--cache-dir`` argument gets neither, because
+    mypy parses the command line after its expansion pass.
+
+    Args:
+        project_dir: Path to the project directory, which is mypy's cwd.
+        cache_dir: Cache directory passed on the command line, if any.
+
+    Returns:
+        A ``(path, certain)`` pair. ``path`` is None when nothing can be said;
+        ``certain`` is False when the path is mypy's default rather than a
+        resolved setting.
+    """
+    if cache_dir:
+        return os.path.join(project_dir, cache_dir), True
+
+    # The environment beats any config file, and run_mypy_check passes our own
+    # environment through to mypy. Mypy tests the value with .strip() but assigns
+    # it unstripped, so a whitespace-only value falls through to the config; that
+    # asymmetry is mirrored rather than fixed.
+    env_cache_dir = os.environ.get("MYPY_CACHE_DIR", "")
+    if env_cache_dir.strip():
+        return os.path.join(project_dir, os.path.expanduser(env_cache_dir)), True
+
+    for ini_name in ("mypy.ini", ".mypy.ini"):
+        if os.path.isfile(os.path.join(project_dir, ini_name)):
+            return None, False
+
+    pyproject_path = os.path.join(project_dir, "pyproject.toml")
+    if os.path.isfile(pyproject_path):
+        try:
+            with open(pyproject_path, "rb") as f:
+                toml_data = tomllib.load(f)
+        except (OSError, tomllib.TOMLDecodeError):
+            return None, False
+        tool_section = toml_data.get("tool")
+        mypy_section = (
+            tool_section.get("mypy") if isinstance(tool_section, dict) else None
+        )
+        if isinstance(mypy_section, dict):
+            configured = mypy_section.get("cache_dir", ".mypy_cache")
+            if not isinstance(configured, str):
+                return None, False
+            return (
+                os.path.join(project_dir, _expand_config_cache_dir(configured)),
+                True,
+            )
+
+    if os.path.isfile(os.path.join(project_dir, "setup.cfg")):
+        return None, False
+
+    return os.path.join(project_dir, ".mypy_cache"), False
+
+
+def _describe_cache(cache_path: str) -> str:
+    """Describe a mypy cache directory: existence, total bytes, newest mtime.
+
+    Args:
+        cache_path: Path to the cache directory.
+
+    Returns:
+        A single line of facts about the directory.
+    """
+    if not os.path.isdir(cache_path):
+        return f"{cache_path} (does not exist)"
+
+    stats: list[os.stat_result] = []
+    skipped = 0
+    try:
+        for entry in Path(cache_path).rglob("*"):
+            # A killed mypy can leave the cache mid-write, so an entry may
+            # vanish or be unreadable -- skip it, not the whole report
+            try:
+                if entry.is_file():
+                    stats.append(entry.stat())
+            except OSError:
+                skipped += 1
+    except OSError as exc:
+        if not stats:
+            return f"{cache_path} (unreadable: {exc})"
+        skipped += 1  # the walk stopped early; report what was counted
+
+    if not stats:
+        return f"{cache_path} (empty)"
+
+    total_bytes = sum(s.st_size for s in stats)
+    newest = datetime.fromtimestamp(max(s.st_mtime for s in stats)).isoformat()
+    skipped_note = f", {skipped} skipped" if skipped else ""
+    return (
+        f"{cache_path} ({total_bytes} bytes across {len(stats)} files"
+        f"{skipped_note}, newest {newest})"
+    )
 
 
 @log_function_call
 def run_mypy_check(
     project_dir: str,
     python_executable: str,
-    strict: bool = True,
     disable_error_codes: list[str] | None = None,
     target_directories: list[str] | None = None,
-    follow_imports: str = "normal",
+    follow_imports: str | None = None,
     cache_dir: str | None = None,
-    config_file: str | None = None,
     timeout_seconds: int = DEFAULT_CHECK_TIMEOUT,
 ) -> MypyResult:
     """Run mypy type checking on project.
 
     Args:
         project_dir: Path to the project directory
-        strict: Use strict mode settings (default: True)
         disable_error_codes: List of error codes to ignore (e.g., ['import', 'arg-type'])
         target_directories: Directories to check (auto-detected from pyproject.toml when None)
-        follow_imports: How to handle imports ('normal', 'silent', 'skip', 'error')
+        follow_imports: How to handle imports ('normal', 'silent', 'skip', 'error');
+            omitted from the command line when None
         python_executable: Python interpreter to use (default: sys.executable)
         cache_dir: Custom cache directory for incremental checking
-        config_file: Path to custom mypy config file
         timeout_seconds: Maximum seconds to wait for mypy
 
     Returns:
@@ -97,24 +206,16 @@ def run_mypy_check(
         "--no-color-output",
         "--show-column-numbers",
         "--show-error-codes",
-        "--namespace-packages",  # Handle src layout properly
-        "--explicit-package-bases",  # Fix duplicate module names issue
     ]
-
-    # Add strict flags if requested
-    if strict:
-        command.extend(STRICT_FLAGS)
-
-    # Add config file if specified
-    if config_file and os.path.exists(os.path.join(project_dir, config_file)):
-        command.extend(["--config-file", config_file])
 
     # Add cache directory
     if cache_dir:
         command.extend(["--cache-dir", cache_dir])
 
-    # Add follow imports setting
-    command.extend(["--follow-imports", follow_imports])
+    # Add follow imports setting only when asked: it is cache-affecting, and
+    # otherwise the project's [tool.mypy] decides
+    if follow_imports:
+        command.extend(["--follow-imports", follow_imports])
 
     # Disable specific error codes
     if disable_error_codes:
@@ -128,15 +229,15 @@ def run_mypy_check(
         "Starting mypy check",
         extra={
             "project_dir": project_dir,
-            "strict": strict,
             "targets": mypy_targets,
             "command": " ".join(command),
         },
     )
 
-    # Set MYPYPATH to src directory to handle module resolution correctly
+    # MYPY_NUM_WORKERS forces mypy's native parser and is cache-affecting, so an
+    # ambient value would silently split the cache
     env = os.environ.copy()
-    env["MYPYPATH"] = os.path.join(project_dir, "src")
+    env.pop("MYPY_NUM_WORKERS", None)
 
     # Execute mypy
     result = execute_command(
@@ -151,10 +252,34 @@ def run_mypy_check(
 
     # Report a timeout as a timeout: execute_command sets execution_error too
     if result.timed_out:
+        cache_path, cache_certain = _resolve_cache_dir(project_dir, cache_dir)
+        if cache_path is None:
+            cache_line = "Cache: the cache directory could not be resolved."
+        elif cache_certain:
+            cache_line = f"Cache: {_describe_cache(cache_path)}"
+        else:
+            cache_line = (
+                f"Cache (assumed, mypy's default location): "
+                f"{_describe_cache(cache_path)}"
+            )
         return MypyResult(
             return_code=1,
             messages=[],
-            error=f"timed out after {timeout_seconds} seconds",
+            error="\n".join(
+                [
+                    f"timed out after {timeout_seconds} seconds",
+                    cache_line,
+                    "A killed run leaves a partial cache; comparing size and mtime "
+                    "across runs shows whether successive runs make progress.",
+                    f"Command: {' '.join(command)}",
+                    f"cwd: {project_dir}",
+                    f"interpreter: {python_executable}",
+                    "A cold mypy cache on a large project can take longer than "
+                    "the limit.",
+                    f"Retry with a larger timeout_seconds "
+                    f"(this run used {timeout_seconds}).",
+                ]
+            ),
         )
 
     # Handle execution errors

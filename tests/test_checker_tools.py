@@ -7,6 +7,7 @@ from unittest.mock import MagicMock, patch
 import pytest
 
 from mcp_tools_py.checker_tools import CheckerTools
+from mcp_tools_py.code_checker_mypy.reporting import MYPY_FAILURE_PREFIX
 from mcp_tools_py.utils.project_config import validate_timeout
 
 
@@ -109,6 +110,16 @@ def test_format_mypy_result_with_issues(checker_tools: CheckerTools) -> None:
     result = checker_tools._format_mypy_result(prompt)
     assert "Mypy found type issues" in result
     assert prompt in result
+
+
+def test_format_mypy_result_failure_keeps_its_own_headline(
+    checker_tools: CheckerTools,
+) -> None:
+    """A failure prompt already names itself and is returned as-is."""
+    prompt = f"{MYPY_FAILURE_PREFIX} timed out after 120 seconds"
+    result = checker_tools._format_mypy_result(prompt)
+    assert result == prompt
+    assert "Mypy found type issues" not in result
 
 
 # --- Pytest formatting tests ---

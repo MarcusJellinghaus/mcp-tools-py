@@ -1,8 +1,9 @@
 # Project Configuration via `pyproject.toml`
 
 The checked project's `pyproject.toml` drives several parts of this server: the
-`[tool.mcp-tools-py]` section it owns itself, plus sections owned by other tools
-that it reads (pylint messages, target directories).
+`[tool.mcp-tools-py]` section it owns itself, the sections the checkers read for
+themselves (`[tool.pylint]`, `[tool.mypy]`), and the keys it reads to auto-detect
+target directories.
 
 ---
 
@@ -126,7 +127,134 @@ Mix and match to suit your project's standards.
 
 ---
 
-## One-off overrides with `extra_args`
+## How mypy reads `pyproject.toml`
+
+When the MCP tool invokes mypy (via `python -m mypy`), the project directory is
+mypy's working directory, so mypy finds `pyproject.toml` by itself. In each
+directory mypy looks for `mypy.ini`, `.mypy.ini`, `pyproject.toml` and
+`setup.cfg`, in that order. `pyproject.toml` and `setup.cfg` are skipped when
+they carry no mypy section; a `mypy.ini` or `.mypy.ini` without a `[mypy]`
+section instead ends discovery outright, warning `No [mypy] section in config
+file` and looking no further. Otherwise the search continues: from mypy 1.15
+onwards it repeats in the parent directory, stopping at a directory that
+contains `.git` or `.hg` or at the filesystem root, while mypy 1.13 and 1.14
+skip that upward walk; every version then falls back to the user-level configs:
+`$XDG_CONFIG_HOME/mypy/config` when that variable is set, then
+`~/.config/mypy/config`, then `~/.mypy.ini`. Because the walk's stop condition
+is a repository root, a project directory that is itself the repository root —
+the usual case — never reads a parent directory's config; a project nested
+inside a larger repository does, on mypy 1.15 and later.
+
+**The MCP tool adds only output-formatting flags** — no strictness, no import
+resolution, no per-module settings of its own — unless you pass one of its
+optional parameters (`follow_imports`, `cache_dir`, `disable_error_codes`), each
+of which sends the corresponding flag for that one call. Otherwise `[tool.mypy]`
+is the single source of truth for the flag set mypy runs with.
+
+> **There is no floor.** The server never makes checking stricter than the
+> project asks for, so a project with no `[tool.mypy]` section of its own is left
+> with whatever config discovery turns up. That fails in two opposite ways.
+>
+> - **Nothing in scope — a silent pass.** Mypy runs at its own defaults, which do
+>   not check the body of an unannotated function at all. The run reports
+>   "passed" having verified very little.
+> - **A config outside the project in scope — unexpected errors.** From mypy 1.15
+>   a parent directory's config applies; at every version the user-level
+>   `~/.config/mypy/config`, else `~/.mypy.ini`, applies. A project nested inside
+>   a strict repository is checked at that strictness and reports errors it never
+>   asked for.
+>
+> Neither case names the config it used, so the output cannot tell you which one
+> you got. If you want a known flag set, put it in this project's own
+> `[tool.mypy]`.
+
+### Replicating the old strict default
+
+Earlier versions of this tool passed a hardcoded strictness set on every run. To
+get that checking back, put it in your `pyproject.toml`:
+
+```toml
+[tool.mypy]
+strict = true
+warn_unreachable = true
+```
+
+### Import resolution is yours too — and it fails loudly
+
+`mypy_path`, `namespace_packages` and `explicit_package_bases` are no longer
+supplied either. Unlike the silent pass above, you will notice, in one of two
+quite different ways:
+
+- **`import-not-found` / `import-untyped` errors.** Mypy runs and checks your
+  code, but reports every import it could not resolve.
+- **`Duplicate module named ...`, exit code 2.** Any two files under the targeted
+  roots that resolve to the same module name trigger it — `__init__.py` in both
+  roots does not prevent it. The build fails before checking anything, so the run
+  reports an error rather than a type result.
+
+A `src/` layout typically needs:
+
+```toml
+[tool.mypy]
+mypy_path = "src"
+namespace_packages = true
+explicit_package_bases = true
+```
+
+### Sharing mypy's cache
+
+Mypy discards its incremental cache whenever a cache-affecting option changes, so
+a run with a different flag set pays for a full cold rebuild. The flags this
+server sends on **every** call leave the cache alone; the three optional ones do
+not:
+
+| Flag | Sent | Effect on the cache |
+|------|------|---------------------|
+| `--output json` | every call | None |
+| `--no-color-output` | every call | None |
+| `--show-column-numbers` | every call | None |
+| `--show-error-codes` | every call (already mypy's default; kept for explicitness) | None |
+| `--cache-dir` | when `cache_dir` is passed | Sends the run to a different cache directory |
+| `--follow-imports` | when `follow_imports` is passed | Invalidates the cache |
+| `--disable-error-code` | when `disable_error_codes` is passed | Invalidates the cache |
+
+So by default — no `cache_dir`, no `follow_imports`, no `disable_error_codes` —
+a tool run and a plain `mypy` run in your shell share one cache.
+
+**Passing `follow_imports` or `disable_error_codes` invalidates it.** Both are in
+mypy's set of cache-affecting options, so a call that supplies either invalidates
+the cache against every run that does not supply the same value — alternating
+between the two costs a cold rebuild each way. Use them for one-off narrowing,
+not routinely; put the lasting choice in `[tool.mypy]` instead.
+
+**Passing `cache_dir` bypasses it.** The option is not in mypy's cache-affecting
+set, so nothing is invalidated — but the run reads and writes a cache of its own,
+so it neither benefits from nor warms the one your shell runs use.
+
+**`MYPY_CACHE_DIR` in your environment beats `[tool.mypy] cache_dir`.** The
+server passes it through to mypy untouched: an ambient value is a deliberate
+choice, and honouring it keeps tool runs in the same cache as your shell runs.
+Only the `cache_dir` argument overrides it.
+
+`MYPY_NUM_WORKERS` is the one mypy environment variable the server does remove
+before running. A non-zero value forces mypy's native parser, which is
+cache-affecting, so an ambient value would split the cache with nothing on the
+command line naming the cause.
+
+The mypy version, the installed plugins and the interpreter are part of the cache
+key too. Warming the cache from a different virtualenv fails just as silently as
+warming it with the wrong flags.
+
+### Local scripts and CI
+
+Any flag on the command line beats the config file, so a script or CI job still
+passing `--strict` re-splits the cache against every other run — including the one
+the MCP tool makes. Collapse them to plain `mypy src tests` and let `[tool.mypy]`
+decide.
+
+---
+
+## One-off pylint overrides with `extra_args`
 
 To suppress a specific code for a single run without changing `pyproject.toml`,
 pass `extra_args` to the MCP tool:
