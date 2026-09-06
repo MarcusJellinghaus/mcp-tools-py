@@ -7,12 +7,15 @@ answer is cached per interpreter path.
 """
 
 import json
+import logging
 from dataclasses import dataclass
 from functools import lru_cache
 from pathlib import Path
 from typing import Mapping, Optional
 
 from mcp_tools_py.utils.subprocess_runner import execute_command
+
+logger = logging.getLogger(__name__)
 
 # Timeout for the one-shot environment probe.
 PROBE_TIMEOUT_SECONDS = 30
@@ -40,6 +43,11 @@ TOOL_PACKAGES: dict[str, str] = {"lint-imports": "import-linter"}
 
 # The modules the probe is asked about: every tool invoked as `python -m`.
 PROBED_MODULES: tuple[str, ...] = tuple(m for m in TOOL_MODULES.values() if m)
+
+# The distributions the tools ship in, lowercased to match the probe blob.
+TOOL_DISTRIBUTIONS: tuple[str, ...] = tuple(
+    TOOL_PACKAGES.get(key, key).lower() for key in TOOL_MODULES
+)
 
 
 @dataclass(frozen=True)
@@ -94,6 +102,23 @@ def _failed(reason: str) -> EnvironmentInfo:
     )
 
 
+def _log_tool_versions(interpreter: str, info: EnvironmentInfo) -> None:
+    """Report which tool distributions the probe found, and at which version.
+
+    Args:
+        interpreter: Path to the interpreter that was probed.
+        info: The successful probe result to report on.
+    """
+    found = [
+        f"{name} {info.distributions[name]}"
+        for name in TOOL_DISTRIBUTIONS
+        if name in info.distributions
+    ]
+    logger.info(
+        "tool versions in %s: %s", interpreter, ", ".join(found) if found else "none"
+    )
+
+
 @lru_cache(maxsize=None)
 def get_environment_info(interpreter: str) -> EnvironmentInfo:
     """Describe `interpreter`, running the probe at most once per path.
@@ -130,4 +155,5 @@ def get_environment_info(interpreter: str) -> EnvironmentInfo:
         )
     except (ValueError, KeyError, TypeError):
         return _failed(f"probe of {interpreter} returned unparsable output")
+    _log_tool_versions(interpreter, info)
     return info

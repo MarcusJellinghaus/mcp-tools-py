@@ -18,8 +18,11 @@ _PYTEST_RUNNER = "mcp_tools_py.checker_tools.pytest_tool.check_code_with_pytest"
 class TestToolHandlerShortCircuit:
     """Test that tool handlers return immediate error when tool unavailable."""
 
-    def _server_with(self, tmp_path: Path, **importable: bool) -> tuple[Any, Any]:
-        """Build a server over a pinned environment reporting `importable`.
+    def _server_with(self, tmp_path: Path) -> tuple[Any, Any]:
+        """Build a server over a dummy interpreter under `tmp_path`.
+
+        The environment it reports is not pinned here — a caller that cares
+        patches `get_environment_info` around the tool call itself.
 
         Returns:
             The server and the dict of tools it registered.
