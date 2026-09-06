@@ -94,7 +94,7 @@ class ToolServer:
             self.mcp
         )
         UtilityTools().register(self.mcp)
-        InspectTools().register(self.mcp)
+        InspectTools(self.environment).register(self.mcp)
 
     def _check_tool_availability(self) -> dict[str, bool]:
         """Locate the console-script tools next to the resolved interpreter.

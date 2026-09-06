@@ -112,7 +112,7 @@ mcp-tools-py --project-dir /path/to/project [options]
 #### Python Configuration
 | Parameter | Type | Default | Description |
 |-----------|------|---------|-------------|
-| `--python-executable` | string | sys.executable | Path to the Python interpreter that runs the checker tools. Should point to the environment where they are installed (the tool's own venv), not the project's runtime venv. A bare name is looked up on PATH; a path that neither exists nor resolves fails at startup |
+| `--python-executable` | string | sys.executable | Path to the Python interpreter of the project's environment. The checkers run in it and library/symbol lookups resolve against it, so it must be the environment holding the project's dependencies and the checker tools. A bare name is looked up on PATH; a path that neither exists nor resolves fails at startup |
 | `--venv-path` | string | None | **Deprecated**, hidden from `--help`. Still accepted, and still resolves the interpreter (taking precedence over `--python-executable`), but no longer used to locate tools. Use `--python-executable` instead |
 
 #### Test Configuration
@@ -144,13 +144,17 @@ mcp-tools-py --project-dir /path/to/project [options]
 
 ## Environment Configuration
 
-`--python-executable` must point to the environment where **the checker tools are installed** — pytest, pylint, mypy, black and isort are run through that interpreter, while ruff, bandit, vulture, tach and lint-imports are console scripts located next to it. This is typically the tool's own virtual environment, not your project's runtime venv.
+There is **one** configurable environment: the **project env**, the virtual environment holding your project's dependencies *and* the checker tools. `--python-executable` names its interpreter. The two cannot be separated — pytest, pylint and mypy all import the project's dependencies to do their work — so the tools have to be installed alongside them. pytest, pylint, mypy, black and isort are run through that interpreter, while ruff, bandit, vulture, tach and lint-imports are console scripts located next to it.
+
+The **tool env**, where `mcp_tools_py` itself is installed, is a different environment and is **not** configured through this flag.
+
+Library and symbol resolution (`get_library_source`, `list_symbols`, `find_references`) follows the same interpreter, so pointing the flag at the wrong venv makes those tools resolve against the wrong packages.
 
 The first example below builds that path by interpolating an environment variable, so an unset or stale variable leaves `--python-executable` pointing nowhere. The server then fails at startup with a `FileNotFoundError` naming the flag, rather than starting up and reporting every tool as missing. A bare interpreter name such as `python3` is looked up on PATH instead.
 
 ### Correct Configuration
 
-Point to the venv where mcp-tools-py and its tools are installed, here on Windows:
+Point to the project's venv, with the checker tools installed in it, here on Windows:
 
 ```json
 {
@@ -174,7 +178,7 @@ On macOS and Linux the interpreter sits in `bin` instead:
 
 ### Incorrect Configuration
 
-Do **not** point to your project's runtime venv if it doesn't have the checker tools installed:
+Do **not** point to a venv without the checker tools installed:
 
 ```json
 {
@@ -183,20 +187,20 @@ Do **not** point to your project's runtime venv if it doesn't have the checker t
             "command": "mcp-tools-py",
             "args": [
                 "--project-dir", "/path/to/your/project",
-                "--python-executable", "/path/to/your/project/.venv/bin/python"
+                "--python-executable", "/usr/bin/python3"
             ]
         }
     }
 }
 ```
 
-This will fail if your project's `.venv` doesn't have the required tools installed.
+A system interpreter, or any venv that is not the project's, reports the tools as missing and resolves library and symbol lookups against the wrong packages. Your project's own `.venv` fails the same way if it doesn't have the required tools installed — install them there rather than pointing the flag elsewhere.
 
 ### Troubleshooting
 
 - **"Python interpreter not found"** at startup: `--python-executable` points at a path that doesn't exist — usually because the environment variable it interpolates is unset. The message names the flag that supplied the path.
-- **"No module named pytest"** (or pylint/mypy/black/isort): Your `--python-executable` points to an environment that doesn't have the required tools installed. Update the configuration to point to the correct environment.
-- **"ruff is not available"** (or bandit/vulture/tach/lint-imports): these tools are console scripts, looked for next to `--python-executable`. The message names the directory searched; point `--python-executable` at an environment where they are installed. A bare name such as `python3` resolving to a system interpreter reports all five as unavailable, because they are not installed next to it.
+- **"No module named pytest"** (or pylint/mypy/black/isort): Your `--python-executable` points to an environment that doesn't have the required tools installed. Point it at the project's environment and install them there.
+- **"ruff is not available"** (or bandit/vulture/tach/lint-imports): these tools are console scripts, looked for next to `--python-executable`. The message names the directory searched; point `--python-executable` at the project's environment and install them there. A bare name such as `python3` resolving to a system interpreter reports all five as unavailable, because they are not installed next to it.
 - **After installing missing tools**, restart the MCP server for changes to take effect. The console-script tools are located at startup; pytest, pylint, mypy, black and isort are checked on first use. Both results are cached for the session.
 
 ## Installation
@@ -458,7 +462,7 @@ The server exposes 17 MCP tools.
 | `move_symbol` | Moves top-level symbols to another module, updating imports |
 | `rename_symbol` | Renames a module-level symbol project-wide |
 | `move_module` | Moves a module into another package, updating references |
-| `get_library_source` | Resolves a dotted import path and returns its source |
+| `get_library_source` | Resolves a dotted import path in the configured project environment and returns its source |
 | `sleep` | Pauses execution for a given number of seconds |
 
 Parameters for pylint, pytest and mypy are documented under [Features](#features).

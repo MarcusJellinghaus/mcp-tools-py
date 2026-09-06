@@ -1,166 +1,35 @@
-"""Unit tests for inspect_library module (mocked + real-import)."""
+"""Unit tests for inspect_library: the parent side, and real resolution."""
 
-import types
-from unittest.mock import MagicMock, patch
+import sys
+from unittest.mock import patch
 
 import pytest
 
-from mcp_tools_py.inspect_library import _get_library_source
+from mcp_tools_py.inspect_library import SOURCE_TIMEOUT_SECONDS, _get_library_source
+from mcp_tools_py.utils.environment_info import probe_script_path
+from tests.conftest import make_command_result
 
 
-class TestParseImportPath:
-    """Tests for import path resolution logic."""
+def _src(import_path: str, max_lines: int = 200) -> str:
+    """Resolve `import_path` in the interpreter running the tests.
 
-    @patch("mcp_tools_py.inspect_library.inspect")
-    @patch("mcp_tools_py.inspect_library.importlib")
-    def test_parse_import_path_module_and_attr(
-        self, mock_importlib: MagicMock, mock_inspect: MagicMock
-    ) -> None:
-        """'a.b.c.D' tries 'a.b.c.D' first, falls back to 'a.b.c' + getattr 'D'."""
-        fake_module = types.ModuleType("a.b.c")
-        fake_class = type("D", (), {})
-        setattr(fake_module, "D", fake_class)
+    Args:
+        import_path: Dotted import path to resolve.
+        max_lines: Maximum source lines to return.
 
-        # First call with "a.b.c.D" fails, second with "a.b.c" succeeds
-        mock_importlib.import_module.side_effect = [ImportError, fake_module]
-        mock_inspect.getsource.return_value = "class D:\n    pass\n"
-
-        result = _get_library_source("a.b.c.D")
-
-        assert "class D:" in result
-        mock_inspect.getsource.assert_called_once_with(fake_class)
-
-    @patch("mcp_tools_py.inspect_library.inspect")
-    @patch("mcp_tools_py.inspect_library.importlib")
-    def test_walk_backwards_resolution(
-        self, mock_importlib: MagicMock, mock_inspect: MagicMock
-    ) -> None:
-        """Tries longest path first, falls back correctly."""
-        fake_module = types.ModuleType("a")
-        nested = MagicMock()
-        nested.c = MagicMock()
-        fake_module.b = nested  # type: ignore[attr-defined]
-
-        # "a.b.c" fails, "a.b" fails, "a" succeeds
-        mock_importlib.import_module.side_effect = [
-            ImportError,
-            ImportError,
-            fake_module,
-        ]
-        mock_inspect.getsource.return_value = "def c():\n    pass\n"
-
-        result = _get_library_source("a.b.c")
-
-        assert "def c():" in result
-        # Verify it tried longest path first
-        calls = mock_importlib.import_module.call_args_list
-        assert calls[0].args[0] == "a.b.c"
-        assert calls[1].args[0] == "a.b"
-        assert calls[2].args[0] == "a"
+    Returns:
+        The tool's answer for that path.
+    """
+    return _get_library_source(import_path, max_lines, sys.executable)
 
 
-class TestTruncation:
-    """Tests for source truncation logic."""
-
-    @patch("mcp_tools_py.inspect_library.inspect")
-    @patch("mcp_tools_py.inspect_library.importlib")
-    def test_truncation_applied(
-        self, mock_importlib: MagicMock, mock_inspect: MagicMock
-    ) -> None:
-        """Source > max_lines is truncated with correct message."""
-        fake_module = types.ModuleType("mymod")
-        mock_importlib.import_module.return_value = fake_module
-
-        # 10 lines of source
-        source_lines = [f"line {i}" for i in range(10)]
-        mock_inspect.getsource.return_value = "\n".join(source_lines)
-
-        result = _get_library_source("mymod", max_lines=3)
-
-        assert "line 0" in result
-        assert "line 1" in result
-        assert "line 2" in result
-        assert "line 9" not in result
-        assert "... truncated (showing 3 of 10 lines)" in result
-        assert "Use max_lines to see more." in result
-
-    @patch("mcp_tools_py.inspect_library.inspect")
-    @patch("mcp_tools_py.inspect_library.importlib")
-    def test_truncation_not_applied(
-        self, mock_importlib: MagicMock, mock_inspect: MagicMock
-    ) -> None:
-        """Source <= max_lines returns full source."""
-        fake_module = types.ModuleType("mymod")
-        mock_importlib.import_module.return_value = fake_module
-
-        source = "def foo():\n    return 42\n"
-        mock_inspect.getsource.return_value = source
-
-        result = _get_library_source("mymod", max_lines=200)
-
-        assert result == source
-        assert "truncated" not in result
-
-
-class TestErrorHandling:
-    """Tests for error paths."""
-
-    @patch("mcp_tools_py.inspect_library.importlib")
-    def test_bad_module_error(self, mock_importlib: MagicMock) -> None:
-        """All import attempts fail → clear error message."""
-        mock_importlib.import_module.side_effect = ImportError
-
-        result = _get_library_source("nonexistent.module.path")
-
-        assert result == "Module 'nonexistent.module.path' not found"
-
-    @patch("mcp_tools_py.inspect_library.inspect")
-    @patch("mcp_tools_py.inspect_library.importlib")
-    def test_bad_symbol_lists_available(
-        self, mock_importlib: MagicMock, mock_inspect: MagicMock
-    ) -> None:
-        """Module found but attr missing → sorted list with types; verify 50-symbol cap."""
-        fake_module = types.ModuleType("mymod")
-        # Add 60 public attributes to test the 50-symbol cap
-        for i in range(60):
-            setattr(fake_module, f"symbol_{i:03d}", lambda: None)
-
-        mock_importlib.import_module.side_effect = [ImportError, fake_module]
-        mock_inspect.getmembers.return_value = [
-            (name, getattr(fake_module, name))
-            for name in sorted(dir(fake_module))
-            if not name.startswith("_")
-        ]
-
-        result = _get_library_source("mymod.nonexistent")
-
-        assert "'nonexistent' not found in module 'mymod'" in result
-        assert "Available symbols:" in result
-        # Verify cap at 50 symbols
-        symbol_lines = [
-            line for line in result.split("\n") if line.startswith("  symbol_")
-        ]
-        assert len(symbol_lines) == 50
-
-    @patch("mcp_tools_py.inspect_library.inspect")
-    @patch("mcp_tools_py.inspect_library.importlib")
-    def test_builtin_c_extension_error(
-        self, mock_importlib: MagicMock, mock_inspect: MagicMock
-    ) -> None:
-        """getsource raises TypeError → friendly message."""
-        fake_module = types.ModuleType("mymod")
-        mock_importlib.import_module.return_value = fake_module
-        mock_inspect.getsource.side_effect = TypeError("built-in")
-
-        result = _get_library_source("mymod")
-
-        assert "Source not available for 'mymod' (built-in/C extension)" in result
-        assert "Only pure-Python symbols have inspectable source." in result
+class TestArgumentHandling:
+    """Tests for arguments the parent answers without a child process."""
 
     @pytest.mark.parametrize("bad_value", [0, -5, -1])
     def test_max_lines_invalid_returns_error(self, bad_value: int) -> None:
         """max_lines in [0, -5, -1] → validation error."""
-        result = _get_library_source("anything", max_lines=bad_value)
+        result = _src("anything", max_lines=bad_value)
 
         assert (
             f"max_lines must be a positive integer (>= 1), got: {bad_value}" == result
@@ -169,9 +38,87 @@ class TestErrorHandling:
     @pytest.mark.parametrize("bad_path", ["", ".", ".."])
     def test_empty_or_malformed_import_path(self, bad_path: str) -> None:
         """Empty or malformed import paths return error instead of raising."""
-        result = _get_library_source(bad_path)
+        result = _src(bad_path)
 
         assert "not found" in result.lower()
+
+
+class TestChildProcess:
+    """Tests for how the parent treats the child process it runs."""
+
+    def test_timeout_names_the_import_path(self) -> None:
+        """A child that times out yields a message, not an exception."""
+        with patch("mcp_tools_py.inspect_library.execute_command") as mock_exec:
+            mock_exec.return_value = make_command_result(
+                return_code=-1,
+                timed_out=True,
+                execution_error="Process timed out",
+            )
+
+            result = _get_library_source("json.encoder", 200, "/some/python")
+
+            assert "json.encoder" in result
+            assert "timed out" in result
+            assert str(SOURCE_TIMEOUT_SECONDS) in result
+
+    def test_non_zero_exit_reports_code_and_stderr(self) -> None:
+        """A child that crashes yields its exit code and a stderr snippet."""
+        with patch("mcp_tools_py.inspect_library.execute_command") as mock_exec:
+            mock_exec.return_value = make_command_result(
+                return_code=1, stderr="Traceback: boom"
+            )
+
+            result = _get_library_source("json.encoder", 200, "/some/python")
+
+            assert "json.encoder" in result
+            assert "1" in result
+            assert "Traceback: boom" in result
+
+    def test_missing_interpreter_names_the_interpreter(self) -> None:
+        """An interpreter that cannot be run is named in the message."""
+        with patch("mcp_tools_py.inspect_library.execute_command") as mock_exec:
+            mock_exec.return_value = make_command_result(
+                return_code=-1, execution_error="No such file or directory"
+            )
+
+            result = _get_library_source("json.encoder", 200, "/no/such/python")
+
+            assert "/no/such/python" in result
+            assert "No such file or directory" in result
+
+    def test_stdout_returned_verbatim(self) -> None:
+        """The child's output is the tool's output, unchanged."""
+        with patch("mcp_tools_py.inspect_library.execute_command") as mock_exec:
+            mock_exec.return_value = make_command_result(
+                stdout="def foo():\n    return 42\n"
+            )
+
+            result = _get_library_source("mod.foo", 200, "/some/python")
+
+            assert result == "def foo():\n    return 42\n"
+
+    def test_invalid_max_lines_runs_no_child(self) -> None:
+        """Argument validation needs no environment, so it costs no subprocess."""
+        with patch("mcp_tools_py.inspect_library.execute_command") as mock_exec:
+            _get_library_source("json.encoder", 0, "/some/python")
+
+            mock_exec.assert_not_called()
+
+    def test_command_uses_the_given_interpreter(self) -> None:
+        """The command runs the probe under the interpreter passed in."""
+        with patch("mcp_tools_py.inspect_library.execute_command") as mock_exec:
+            mock_exec.return_value = make_command_result(stdout="source")
+
+            _get_library_source("json.encoder", 50, "/some/python")
+
+            command = mock_exec.call_args.args[0]
+            assert command == [
+                "/some/python",
+                str(probe_script_path()),
+                "source",
+                "json.encoder",
+                "50",
+            ]
 
 
 class TestRealImports:
@@ -179,53 +126,53 @@ class TestRealImports:
 
     def test_stdlib_class(self) -> None:
         """json.encoder.JSONEncoder resolves to the real class source."""
-        result = _get_library_source("json.encoder.JSONEncoder")
+        result = _src("json.encoder.JSONEncoder")
 
         assert "def encode" in result
 
     def test_module_level(self) -> None:
         """json.encoder resolves to the full module source."""
-        result = _get_library_source("json.encoder")
+        result = _src("json.encoder")
 
         assert "class JSONEncoder" in result
 
     def test_nested_attribute(self) -> None:
         """json.encoder.JSONEncoder.encode resolves to just the method."""
-        method_source = _get_library_source("json.encoder.JSONEncoder.encode")
-        class_source = _get_library_source("json.encoder.JSONEncoder")
+        method_source = _src("json.encoder.JSONEncoder.encode")
+        class_source = _src("json.encoder.JSONEncoder")
 
         assert "def encode" in method_source
         assert len(method_source) < len(class_source)
 
     def test_custom_max_lines_truncation(self) -> None:
         """JSONEncoder source is truncated when max_lines=50."""
-        result = _get_library_source("json.encoder.JSONEncoder", max_lines=50)
+        result = _src("json.encoder.JSONEncoder", max_lines=50)
 
         assert "truncated" in result
         assert "showing 50 of" in result
 
     def test_bad_module(self) -> None:
         """Completely unknown package returns 'not found'."""
-        result = _get_library_source("nonexistent_package.Foo")
+        result = _src("nonexistent_package.Foo")
 
         assert "not found" in result
 
     def test_bad_symbol_lists_available(self) -> None:
         """Known module + bad symbol lists available symbols with types."""
-        result = _get_library_source("json.NoSuchThing")
+        result = _src("json.NoSuchThing")
 
         assert "not found in module" in result
         assert "Available symbols:" in result
 
     def test_third_party_dep(self) -> None:
         """structlog.get_logger resolves (structlog is a project dependency)."""
-        result = _get_library_source("structlog.get_logger")
+        result = _src("structlog.get_logger")
 
         assert "def get_logger" in result
 
     def test_builtin_type(self) -> None:
         """builtins.dict is a C extension — no source available."""
-        result = _get_library_source("builtins.dict")
+        result = _src("builtins.dict")
 
         assert "Source not available" in result
         assert "built-in/C extension" in result

@@ -70,7 +70,3 @@ _.get_library_source  # FastMCP tool handler
 
 # MCP tool handler for code formatting
 _.run_format_code  # FastMCP tool handler
-
-# Test mock attributes used for nested attribute resolution
-_.b  # Mock attribute in test_inspect_library
-_.c  # Mock attribute in test_inspect_library
