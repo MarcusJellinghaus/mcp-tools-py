@@ -2,9 +2,31 @@
 
 from __future__ import annotations
 
+import atexit
+import shutil
+import tempfile
 from functools import lru_cache
 from pathlib import Path
 from typing import Any, List, Optional, Tuple
+
+
+@lru_cache(maxsize=None)
+def _private_cache_directory() -> str:
+    """Create a jedi cache directory that only this process writes to.
+
+    `parso` saves a pickle by truncating the target file and then dumping
+    into it, and its reader tolerates only a missing file. Processes that
+    share jedi's default `~/.cache/jedi` — pytest-xdist workers, a second
+    server, an editor — can therefore hand each other a half-written
+    pickle, which surfaces as `EOFError: Ran out of input`. A per-process
+    directory removes the shared file.
+
+    Returns:
+        Path to a temporary directory, removed when the process exits.
+    """
+    directory = tempfile.mkdtemp(prefix="mcp-tools-py-jedi-")
+    atexit.register(shutil.rmtree, directory, ignore_errors=True)
+    return directory
 
 
 @lru_cache(maxsize=None)
@@ -31,6 +53,8 @@ def _get_project(
         cannot be used.
     """
     import jedi  # pylint: disable=import-error,import-outside-toplevel
+
+    jedi.settings.cache_directory = _private_cache_directory()
 
     try:
         project = jedi.Project(path=project_dir, environment_path=interpreter)
@@ -165,25 +189,27 @@ def find_references(
     line = target.line
     col = target.column
 
+    # Reading a reference's details infers types, so the formatting loop
+    # can fail the same ways the lookup can and belongs in the same try.
     try:
         refs = script.get_references(line=line, column=col)
+
+        if not refs:
+            return f"No references found for '{symbol_name}'"
+
+        lines = [f"References to '{symbol_name}' ({len(refs)} found):"]
+        for ref in refs:
+            ref_path = ref.module_path
+            if ref_path is not None:
+                try:
+                    rel = Path(ref_path).relative_to(project_dir)
+                except ValueError:
+                    rel = Path(ref_path)
+            else:
+                rel = Path(file_path)
+            description = ref.description
+            lines.append(f"  {rel}:{ref.line}: {description}")
     except Exception as exc:  # pylint: disable=broad-exception-caught
         return f"Error finding references for '{symbol_name}': {exc}"
-
-    if not refs:
-        return f"No references found for '{symbol_name}'"
-
-    lines = [f"References to '{symbol_name}' ({len(refs)} found):"]
-    for ref in refs:
-        ref_path = ref.module_path
-        if ref_path is not None:
-            try:
-                rel = Path(ref_path).relative_to(project_dir)
-            except ValueError:
-                rel = Path(ref_path)
-        else:
-            rel = Path(file_path)
-        description = ref.description
-        lines.append(f"  {rel}:{ref.line}: {description}")
 
     return "\n".join(lines)

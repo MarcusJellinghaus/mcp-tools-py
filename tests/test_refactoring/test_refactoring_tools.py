@@ -141,3 +141,54 @@ def test_registered_find_references_uses_relative_paths(
 
     assert str(tmp_path) not in result
     assert "lib.py" in result
+
+
+# --- Cache isolation and error handling ---
+
+
+def test_jedi_uses_a_private_cache_directory(tmp_path: Path) -> None:
+    """jedi caches parse trees per process, not in the shared ~/.cache/jedi."""
+    import jedi
+
+    from mcp_tools_py.refactoring.jedi_tools import (
+        _private_cache_directory,
+        list_symbols,
+    )
+
+    (tmp_path / "mod.py").write_text("X = 42\n")
+
+    list_symbols(tmp_path, "mod.py", sys.executable)
+
+    cache_dir = Path(jedi.settings.cache_directory)
+    assert cache_dir == Path(_private_cache_directory())
+    assert cache_dir.name.startswith("mcp-tools-py-jedi-")
+    assert cache_dir.is_dir()
+
+
+def test_find_references_reports_failures_while_formatting(
+    tmp_path: Path, monkeypatch: pytest.MonkeyPatch
+) -> None:
+    """A failure while reading a reference's details becomes an error message."""
+    import jedi
+
+    from mcp_tools_py.refactoring.jedi_tools import find_references
+
+    (tmp_path / "lib.py").write_text("VAL = 100\n")
+
+    class _ExplodingRef:
+        module_path = None
+        line = 1
+
+        @property
+        def description(self) -> str:
+            raise EOFError("Ran out of input")
+
+    def fake_get_references(self: object, line: int, column: int) -> list[object]:
+        return [_ExplodingRef()]
+
+    monkeypatch.setattr(jedi.Script, "get_references", fake_get_references)
+
+    result = find_references(tmp_path, "lib.py", "VAL", sys.executable)
+
+    assert result.startswith("Error finding references for 'VAL':")
+    assert "Ran out of input" in result
