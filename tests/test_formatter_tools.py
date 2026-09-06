@@ -1,37 +1,15 @@
 """Tests for FormatterTools MCP tool registration and logic."""
 
-from pathlib import Path
 from typing import Any
 from unittest.mock import MagicMock, patch
 
-import pytest
-
 from mcp_tools_py.formatter.formatter_tools import FormatterTools, _format_results
 from mcp_tools_py.formatter.models import FormatterResult
+from mcp_tools_py.utils.tool_context import ToolContext
+from tests.conftest import make_environment_info
 
 
-@pytest.fixture
-def mock_server() -> MagicMock:
-    """Create a mock CodeCheckerServer with required attributes."""
-    server = MagicMock()
-    server.project_dir = Path("/fake/project")
-    server._resolved_python = "/usr/bin/python3"
-    server._tool_availability = {
-        "isort": True,
-        "black": True,
-    }
-    server._is_tool_available = lambda tool: server._tool_availability.get(tool, False)
-    server.tool_unavailable_message = lambda key: (
-        f"{key} is not available in /mock/venv/bin. "
-        "Restart the server after installing."
-    )
-    server.resolve_timeout = lambda tool, explicit=None: (
-        300 if tool == "pytest" else 120
-    )
-    return server
-
-
-def _capture_run_format_code(mock_server: MagicMock) -> Any:
+def _capture_run_format_code(tool_context: ToolContext) -> Any:
     """Register FormatterTools and capture the run_format_code function."""
     captured_fns: dict[str, Any] = {}
 
@@ -41,7 +19,7 @@ def _capture_run_format_code(mock_server: MagicMock) -> Any:
 
     mock_mcp = MagicMock()
     mock_mcp.tool.return_value = capture
-    FormatterTools(mock_server).register(mock_mcp)
+    FormatterTools(tool_context).register(mock_mcp)
     return captured_fns["run_format_code"]
 
 
@@ -64,13 +42,13 @@ _RUNNER_PATCH = "mcp_tools_py.formatter.formatter_tools._run_format_code"
 class TestRegistration:
     """Tests for tool registration."""
 
-    def test_registers_one_tool(self, mock_server: MagicMock) -> None:
+    def test_registers_one_tool(self, tool_context: ToolContext) -> None:
         """Verify mcp.tool() called exactly once."""
         mock_mcp = MagicMock()
         mock_decorator = MagicMock(side_effect=lambda fn: fn)
         mock_mcp.tool.return_value = mock_decorator
 
-        FormatterTools(mock_server).register(mock_mcp)
+        FormatterTools(tool_context).register(mock_mcp)
 
         assert mock_mcp.tool.call_count == 1
 
@@ -78,9 +56,9 @@ class TestRegistration:
 class TestStepOrdering:
     """Tests for step selection and ordering."""
 
-    def test_default_steps_isort_then_black(self, mock_server: MagicMock) -> None:
+    def test_default_steps_isort_then_black(self, tool_context: ToolContext) -> None:
         """Call with no args, verify steps passed through to runner."""
-        run_format = _capture_run_format_code(mock_server)
+        run_format = _capture_run_format_code(tool_context)
 
         mock_runner = MagicMock(
             return_value={
@@ -97,9 +75,9 @@ class TestStepOrdering:
         assert "## isort" in result
         assert "## black" in result
 
-    def test_custom_steps_order(self, mock_server: MagicMock) -> None:
+    def test_custom_steps_order(self, tool_context: ToolContext) -> None:
         """Pass steps=["black"], verify only black in output."""
-        run_format = _capture_run_format_code(mock_server)
+        run_format = _capture_run_format_code(tool_context)
 
         mock_runner = MagicMock(
             return_value={
@@ -117,9 +95,9 @@ class TestStepOrdering:
 class TestValidation:
     """Tests for input validation."""
 
-    def test_runner_value_error_returns_error(self, mock_server: MagicMock) -> None:
+    def test_runner_value_error_returns_error(self, tool_context: ToolContext) -> None:
         """Runner raises ValueError, wrapper returns error string."""
-        run_format = _capture_run_format_code(mock_server)
+        run_format = _capture_run_format_code(tool_context)
 
         mock_runner = MagicMock(side_effect=ValueError("bad timeout"))
 
@@ -130,10 +108,10 @@ class TestValidation:
         assert "bad timeout" in result
 
     def test_unknown_step_reported_as_invalid_not_missing(
-        self, mock_server: MagicMock
+        self, tool_context: ToolContext
     ) -> None:
         """An unknown step is rejected before the availability check runs."""
-        run_format = _capture_run_format_code(mock_server)
+        run_format = _capture_run_format_code(tool_context)
 
         mock_runner = MagicMock()
 
@@ -148,9 +126,9 @@ class TestValidation:
 class TestTargetDirectories:
     """Tests for target directory resolution."""
 
-    def test_target_directories_auto_detected(self, mock_server: MagicMock) -> None:
+    def test_target_directories_auto_detected(self, tool_context: ToolContext) -> None:
         """Mock resolve_target_directories, verify it's called when target_directories=None."""
-        run_format = _capture_run_format_code(mock_server)
+        run_format = _capture_run_format_code(tool_context)
 
         mock_runner = MagicMock(
             return_value={
@@ -168,11 +146,11 @@ class TestTargetDirectories:
         ):
             run_format()
 
-        mock_resolve.assert_called_once_with(str(mock_server.project_dir), None)
+        mock_resolve.assert_called_once_with(str(tool_context.project_dir), None)
 
-    def test_target_directories_explicit(self, mock_server: MagicMock) -> None:
+    def test_target_directories_explicit(self, tool_context: ToolContext) -> None:
         """Pass explicit dirs, verify resolve_target_directories receives them."""
-        run_format = _capture_run_format_code(mock_server)
+        run_format = _capture_run_format_code(tool_context)
 
         mock_runner = MagicMock(
             return_value={
@@ -191,7 +169,7 @@ class TestTargetDirectories:
             run_format(target_directories=["src", "tests"])
 
         mock_resolve.assert_called_once_with(
-            str(mock_server.project_dir), ["src", "tests"]
+            str(tool_context.project_dir), ["src", "tests"]
         )
 
 
@@ -199,10 +177,10 @@ class TestCheckOnlyMode:
     """Tests for check_only behavior."""
 
     def test_check_only_runs_all_steps_despite_nonzero(
-        self, mock_server: MagicMock
+        self, tool_context: ToolContext
     ) -> None:
         """check_only with failures — both steps in output, no 'stopped' message."""
-        run_format = _capture_run_format_code(mock_server)
+        run_format = _capture_run_format_code(tool_context)
 
         mock_runner = MagicMock(
             return_value={
@@ -222,9 +200,11 @@ class TestCheckOnlyMode:
         assert "## black" in result
         assert "Formatting stopped" not in result
 
-    def test_normal_mode_stops_on_first_failure(self, mock_server: MagicMock) -> None:
+    def test_normal_mode_stops_on_first_failure(
+        self, tool_context: ToolContext
+    ) -> None:
         """isort fails in runner, only isort in results → stopped message."""
-        run_format = _capture_run_format_code(mock_server)
+        run_format = _capture_run_format_code(tool_context)
 
         mock_runner = MagicMock(
             return_value={
@@ -243,9 +223,9 @@ class TestCheckOnlyMode:
 class TestOutput:
     """Tests for output formatting."""
 
-    def test_output_has_markdown_headers(self, mock_server: MagicMock) -> None:
+    def test_output_has_markdown_headers(self, tool_context: ToolContext) -> None:
         """Verify output contains ## isort and ## black."""
-        run_format = _capture_run_format_code(mock_server)
+        run_format = _capture_run_format_code(tool_context)
 
         mock_runner = MagicMock(
             return_value={
@@ -283,9 +263,11 @@ class TestOutput:
 class TestTimeouts:
     """Tests for timeout resolution."""
 
-    def test_resolved_timeouts_passed_to_runner(self, mock_server: MagicMock) -> None:
+    def test_resolved_timeouts_passed_to_runner(
+        self, tool_context: ToolContext
+    ) -> None:
         """Both black and isort budgets are resolved and forwarded."""
-        run_format = _capture_run_format_code(mock_server)
+        run_format = _capture_run_format_code(tool_context)
 
         mock_runner = MagicMock(
             return_value={
@@ -303,14 +285,19 @@ class TestTimeouts:
 class TestToolAvailability:
     """Tests for tool availability checking."""
 
-    def test_tool_unavailable_returns_error(self, mock_server: MagicMock) -> None:
+    def test_tool_unavailable_returns_error(self, tool_context: ToolContext) -> None:
         """black not available, verify error before runner is called."""
-        mock_server._tool_availability = {"isort": True, "black": False}
-        run_format = _capture_run_format_code(mock_server)
+        run_format = _capture_run_format_code(tool_context)
 
         mock_runner = MagicMock()
 
-        with patch(_RUNNER_PATCH, mock_runner):
+        with (
+            patch(_RUNNER_PATCH, mock_runner),
+            patch(
+                "mcp_tools_py.utils.tool_context.get_environment_info",
+                return_value=make_environment_info(black=False),
+            ),
+        ):
             result = run_format(target_directories=["src"])
 
         # Runner should NOT have been called
@@ -324,9 +311,9 @@ _CONFLICT_PATCH = "mcp_tools_py.formatter.formatter_tools.check_line_length_conf
 class TestLineLengthWarnings:
     """Tests for line-length conflict warning integration."""
 
-    def test_line_length_warnings_prepended(self, mock_server: MagicMock) -> None:
+    def test_line_length_warnings_prepended(self, tool_context: ToolContext) -> None:
         """Warnings from check_line_length_conflicts appear before formatter output."""
-        run_format = _capture_run_format_code(mock_server)
+        run_format = _capture_run_format_code(tool_context)
 
         mock_runner = MagicMock(
             return_value={
@@ -351,9 +338,9 @@ class TestLineLengthWarnings:
         isort_pos = result.index("## isort")
         assert warning_pos < isort_pos
 
-    def test_no_line_length_warnings(self, mock_server: MagicMock) -> None:
+    def test_no_line_length_warnings(self, tool_context: ToolContext) -> None:
         """No warnings → no extra text prepended."""
-        run_format = _capture_run_format_code(mock_server)
+        run_format = _capture_run_format_code(tool_context)
 
         mock_runner = MagicMock(
             return_value={

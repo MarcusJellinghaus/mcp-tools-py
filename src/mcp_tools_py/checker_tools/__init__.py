@@ -24,8 +24,8 @@ from mcp_tools_py.code_checker_pytest.reporting import (
 )
 
 if TYPE_CHECKING:
-    from mcp_tools_py.server import ToolServer
     from mcp_tools_py.utils.mcp_protocols import FastMCPProtocol
+    from mcp_tools_py.utils.tool_context import ToolContext
 
 logger = logging.getLogger(__name__)
 
@@ -33,8 +33,8 @@ logger = logging.getLogger(__name__)
 class CheckerTools:
     """Registers pylint, pytest, mypy, lint-imports, vulture, ruff check, ruff fix, bandit, and tach checker tools on an MCP server."""
 
-    def __init__(self, server: "ToolServer") -> None:
-        self._server = server
+    def __init__(self, context: "ToolContext") -> None:
+        self.context = context
 
     def register(self, mcp: "FastMCPProtocol") -> None:
         """Register all checker tools with the MCP server."""

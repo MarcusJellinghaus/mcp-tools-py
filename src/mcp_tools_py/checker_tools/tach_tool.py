@@ -15,7 +15,7 @@ logger = logging.getLogger(__name__)
 
 def register(mcp: "FastMCPProtocol", checker_tools: "CheckerTools") -> None:
     """Register the tach architecture boundary checker tool."""
-    server = checker_tools._server
+    context = checker_tools.context
 
     @mcp.tool()
     @log_function_call
@@ -25,18 +25,19 @@ def register(mcp: "FastMCPProtocol", checker_tools: "CheckerTools") -> None:
         Returns:
             Status line followed by raw JSON output from `tach check --output json`.
         """
-        if not server._is_tool_available("tach"):
-            return server.tool_unavailable_message("tach")
+        tach_binary = context.environment.binary("tach")
+        if not context.is_tool_available("tach") or tach_binary is None:
+            return context.unavailable_message("tach")
 
         try:
             logger.info(
                 "Starting tach check",
-                extra={"project_dir": str(server.project_dir)},
+                extra={"project_dir": str(context.project_dir)},
             )
             output = run_tach(
-                tach_binary=server._tool_binaries["tach"],
-                project_dir=str(server.project_dir),
-                timeout_seconds=server.resolve_timeout("tach"),
+                tach_binary=str(tach_binary),
+                project_dir=str(context.project_dir),
+                timeout_seconds=context.resolve_timeout("tach"),
             )
             logger.info(
                 "tach check completed",
@@ -51,7 +52,7 @@ def register(mcp: "FastMCPProtocol", checker_tools: "CheckerTools") -> None:
                 extra={
                     "error": str(e),
                     "error_type": type(e).__name__,
-                    "project_dir": str(server.project_dir),
+                    "project_dir": str(context.project_dir),
                 },
             )
             return error_msg

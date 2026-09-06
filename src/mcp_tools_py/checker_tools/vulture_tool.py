@@ -16,7 +16,7 @@ logger = logging.getLogger(__name__)
 
 def register(mcp: "FastMCPProtocol", checker_tools: "CheckerTools") -> None:
     """Register the vulture dead-code checker tool."""
-    server = checker_tools._server
+    context = checker_tools.context
 
     @mcp.tool()
     @log_function_call
@@ -36,11 +36,12 @@ def register(mcp: "FastMCPProtocol", checker_tools: "CheckerTools") -> None:
         Returns:
             Raw vulture output (stdout + stderr combined)
         """
-        if not server._is_tool_available("vulture"):
-            return server.tool_unavailable_message("vulture")
+        vulture_binary = context.environment.binary("vulture")
+        if not context.is_tool_available("vulture") or vulture_binary is None:
+            return context.unavailable_message("vulture")
 
         resolved = resolve_target_directories(
-            str(server.project_dir), target_directories
+            str(context.project_dir), target_directories
         )
         if isinstance(resolved, str):
             return resolved
@@ -49,25 +50,25 @@ def register(mcp: "FastMCPProtocol", checker_tools: "CheckerTools") -> None:
             logger.info(
                 "Starting vulture check",
                 extra={
-                    "project_dir": str(server.project_dir),
+                    "project_dir": str(context.project_dir),
                     "target_directories": resolved,
                     "min_confidence": min_confidence,
                     "extra_args": extra_args,
                 },
             )
 
-            project_dir = server.project_dir
-            whitelist_path = project_dir / server.vulture_whitelist
+            project_dir = context.project_dir
+            whitelist_path = project_dir / context.vulture_whitelist
             whitelist = str(whitelist_path) if whitelist_path.exists() else None
 
             output = run_vulture(
-                vulture_binary=server._tool_binaries["vulture"],
+                vulture_binary=str(vulture_binary),
                 project_dir=str(project_dir),
                 target_directories=resolved,
                 min_confidence=min_confidence,
                 extra_args=extra_args,
                 whitelist_path=whitelist,
-                timeout_seconds=server.resolve_timeout("vulture"),
+                timeout_seconds=context.resolve_timeout("vulture"),
             )
 
             logger.info(
@@ -86,7 +87,7 @@ def register(mcp: "FastMCPProtocol", checker_tools: "CheckerTools") -> None:
                 extra={
                     "error": str(e),
                     "error_type": type(e).__name__,
-                    "project_dir": str(server.project_dir),
+                    "project_dir": str(context.project_dir),
                 },
             )
             return error_msg

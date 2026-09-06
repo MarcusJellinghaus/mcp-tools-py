@@ -14,8 +14,8 @@ from mcp_tools_py.utils.project_config import (
 )
 
 if TYPE_CHECKING:
-    from mcp_tools_py.server import ToolServer
     from mcp_tools_py.utils.mcp_protocols import FastMCPProtocol
+    from mcp_tools_py.utils.tool_context import ToolContext
 
 logger = logging.getLogger(__name__)
 
@@ -25,8 +25,8 @@ _UNPARSABLE_CAP = 10
 class FormatterTools:
     """Registers formatting tools on an MCP server."""
 
-    def __init__(self, server: "ToolServer") -> None:
-        self._server = server
+    def __init__(self, context: "ToolContext") -> None:
+        self.context = context
 
     def register(self, mcp: "FastMCPProtocol") -> None:
         """Register all formatter tools with the MCP server."""
@@ -63,7 +63,7 @@ class FormatterTools:
 
             # Resolve target directories
             resolved = resolve_target_directories(
-                str(self._server.project_dir), target_directories
+                str(self.context.project_dir), target_directories
             )
             if isinstance(resolved, str):
                 return resolved
@@ -71,23 +71,23 @@ class FormatterTools:
 
             # Check tool availability upfront
             for step in resolved_steps:
-                if not self._server._is_tool_available(step):
-                    return f"Error: {self._server.tool_unavailable_message(step)}"
+                if not self.context.is_tool_available(step):
+                    return f"Error: {self.context.unavailable_message(step)}"
 
             # Check for line-length conflicts
             warnings = check_line_length_conflicts(
-                str(self._server.project_dir), resolved_steps
+                str(self.context.project_dir), resolved_steps
             )
 
             # Delegate to runner
             try:
                 timeouts = {
-                    "isort": self._server.resolve_timeout("isort"),
-                    "black": self._server.resolve_timeout("black"),
+                    "isort": self.context.resolve_timeout("isort"),
+                    "black": self.context.resolve_timeout("black"),
                 }
                 results = _run_format_code(
-                    self._server._resolved_python,
-                    self._server.project_dir,
+                    str(self.context.environment.interpreter),
+                    self.context.project_dir,
                     dirs,
                     resolved_steps,
                     check_only,

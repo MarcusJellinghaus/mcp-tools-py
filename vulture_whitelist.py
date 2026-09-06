@@ -61,6 +61,7 @@ _.mock_pytest_results_success  # Test fixture
 _.side_effect  # Mock attribute used in tests
 _._no_ambient_cache_env  # Autouse fixture, invoked by pytest not by name
 _clear_environment_info_cache  # Autouse fixture in tests/conftest.py
+all_modules_importable  # Fixture requested for its patching, never read by name
 _clear_project_cache  # Autouse fixture in the jedi and environment test modules
 
 # Data file variables used for module resolution

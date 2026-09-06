@@ -1,31 +1,14 @@
 """Integration tests for bandit checker tool registration and execution."""
 
 from collections.abc import Callable
-from pathlib import Path
 from unittest.mock import MagicMock, patch
 
 from mcp_tools_py.checker_tools import CheckerTools, bandit_tool
 from mcp_tools_py.code_checker_bandit.models import BanditMessage, BanditResult
+from mcp_tools_py.utils.tool_context import ToolContext
 
 
-def _make_mock_server(bandit_available: bool = True) -> MagicMock:
-    """Create a mock ToolServer with bandit configuration."""
-    server = MagicMock()
-    server.project_dir = Path("/fake/project")
-    server._resolved_python = "/usr/bin/python3"
-    server._tool_binaries = (
-        {"bandit": "/mock/venv/bin/bandit"} if bandit_available else {}
-    )
-    server._tool_availability = {"bandit": bandit_available}
-    server._is_tool_available = lambda tool: server._tool_availability.get(tool, False)
-    server.tool_unavailable_message = lambda key: (
-        f"{key} is not available in /mock/venv/bin. "
-        "Restart the server after installing."
-    )
-    return server
-
-
-def _register_and_capture(server: MagicMock) -> dict[str, object]:
+def _register_and_capture(context: ToolContext) -> dict[str, object]:
     """Register checker tools and capture the registered functions."""
     registered: dict[str, object] = {}
 
@@ -36,15 +19,17 @@ def _register_and_capture(server: MagicMock) -> dict[str, object]:
     mock_mcp = MagicMock()
     mock_mcp.tool.return_value = capture
 
-    checker = CheckerTools(server)
+    checker = CheckerTools(context)
     bandit_tool.register(mock_mcp, checker)
     return registered
 
 
-def test_bandit_not_available_message() -> None:
+def test_bandit_not_available_message(tool_context: ToolContext) -> None:
     """When bandit is unavailable, the tool returns a not-available message."""
-    server = _make_mock_server(bandit_available=False)
-    tools = _register_and_capture(server)
+    binary = tool_context.environment.binary("bandit")
+    assert binary is not None
+    binary.unlink()
+    tools = _register_and_capture(tool_context)
 
     result = tools["run_bandit_check"]()  # type: ignore[operator]
 
@@ -52,10 +37,9 @@ def test_bandit_not_available_message() -> None:
     assert "Restart the server" in result
 
 
-def test_bandit_happy_path() -> None:
+def test_bandit_happy_path(tool_context: ToolContext) -> None:
     """When bandit finds issues, the formatted report is returned."""
-    server = _make_mock_server(bandit_available=True)
-    tools = _register_and_capture(server)
+    tools = _register_and_capture(tool_context)
 
     messages = [
         BanditMessage(
@@ -92,10 +76,9 @@ def test_bandit_happy_path() -> None:
     assert "src/app.py" in result
 
 
-def test_bandit_error_handling() -> None:
+def test_bandit_error_handling(tool_context: ToolContext) -> None:
     """When bandit returns an error, the error string is returned."""
-    server = _make_mock_server(bandit_available=True)
-    tools = _register_and_capture(server)
+    tools = _register_and_capture(tool_context)
 
     mock_result = BanditResult(
         return_code=-1,
@@ -120,10 +103,9 @@ def test_bandit_error_handling() -> None:
     assert "bandit crashed unexpectedly" in result
 
 
-def test_bandit_no_issues_found() -> None:
+def test_bandit_no_issues_found(tool_context: ToolContext) -> None:
     """When bandit finds no issues, a clean message is returned."""
-    server = _make_mock_server(bandit_available=True)
-    tools = _register_and_capture(server)
+    tools = _register_and_capture(tool_context)
 
     mock_result = BanditResult(return_code=0, messages=[], errors=[])
 

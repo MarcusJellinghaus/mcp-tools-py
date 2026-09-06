@@ -16,7 +16,7 @@ logger = logging.getLogger(__name__)
 
 def register(mcp: "FastMCPProtocol", checker_tools: "CheckerTools") -> None:
     """Register the pylint checker tool."""
-    server = checker_tools._server
+    context = checker_tools.context
 
     @mcp.tool()
     @log_function_call
@@ -35,17 +35,17 @@ def register(mcp: "FastMCPProtocol", checker_tools: "CheckerTools") -> None:
         Returns:
             Formatted pylint result, or an error message string.
         """
-        if not server._is_tool_available("pylint"):
-            return server.tool_unavailable_message("pylint")
+        if not context.is_tool_available("pylint"):
+            return context.unavailable_message("pylint")
 
         resolved = resolve_target_directories(
-            str(server.project_dir), target_directories
+            str(context.project_dir), target_directories
         )
         if isinstance(resolved, str):
             return resolved
 
         try:
-            resolved_timeout = server.resolve_timeout("pylint")
+            resolved_timeout = context.resolve_timeout("pylint")
         except ValueError as exc:
             return f"Error: {exc}"
 
@@ -53,7 +53,7 @@ def register(mcp: "FastMCPProtocol", checker_tools: "CheckerTools") -> None:
             logger.info(
                 "Starting pylint check",
                 extra={
-                    "project_dir": str(server.project_dir),
+                    "project_dir": str(context.project_dir),
                     "extra_args": extra_args,
                     "target_directories": resolved,
                     "max_issues": max_issues,
@@ -61,8 +61,8 @@ def register(mcp: "FastMCPProtocol", checker_tools: "CheckerTools") -> None:
             )
 
             pylint_prompt = get_pylint_prompt(
-                str(server.project_dir),
-                python_executable=server._resolved_python,
+                str(context.project_dir),
+                python_executable=str(context.environment.interpreter),
                 extra_args=extra_args,
                 target_directories=resolved,
                 max_issues=max_issues,
@@ -87,7 +87,7 @@ def register(mcp: "FastMCPProtocol", checker_tools: "CheckerTools") -> None:
                 extra={
                     "error": str(e),
                     "error_type": type(e).__name__,
-                    "project_dir": str(server.project_dir),
+                    "project_dir": str(context.project_dir),
                 },
             )
             raise

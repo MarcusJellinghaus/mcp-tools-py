@@ -65,7 +65,7 @@ class TestReporting:
         }
 
         # Run with show_details=True
-        result = CheckerTools(server)._format_pytest_result_with_details(
+        result = CheckerTools(server.context)._format_pytest_result_with_details(
             test_results, show_details=True
         )
 
@@ -130,7 +130,7 @@ class TestReporting:
             "test_results": pytest_report,
         }
 
-        result = CheckerTools(server)._format_pytest_result_with_details(
+        result = CheckerTools(server.context)._format_pytest_result_with_details(
             test_results, show_details=True
         )
 
@@ -185,7 +185,7 @@ class TestReporting:
         }
 
         # Test with show_details=True (which would add -s automatically)
-        result = CheckerTools(server)._format_pytest_result_with_details(
+        result = CheckerTools(server.context)._format_pytest_result_with_details(
             test_results, show_details=True
         )
 
@@ -239,7 +239,7 @@ class TestReporting:
         }
 
         # Both verbosity and show_details should work together
-        result = CheckerTools(server)._format_pytest_result_with_details(
+        result = CheckerTools(server.context)._format_pytest_result_with_details(
             test_results, show_details=True
         )
 
@@ -271,7 +271,7 @@ class TestReporting:
             "test_results": pytest_report,
         }
 
-        result = CheckerTools(server)._format_pytest_result_with_details(
+        result = CheckerTools(server.context)._format_pytest_result_with_details(
             test_results, show_details=True
         )
 
@@ -304,7 +304,7 @@ class TestReporting:
             "test_results": pytest_report,
         }
 
-        result = CheckerTools(server)._format_pytest_result_with_details(
+        result = CheckerTools(server.context)._format_pytest_result_with_details(
             test_results, show_details=True
         )
 
@@ -355,7 +355,7 @@ class TestReporting:
             "test_results": pytest_report,
         }
 
-        result = CheckerTools(server)._format_pytest_result_with_details(
+        result = CheckerTools(server.context)._format_pytest_result_with_details(
             test_results, show_details=True
         )
 
@@ -408,7 +408,7 @@ class TestReporting:
             "test_results": pytest_report,
         }
 
-        result = CheckerTools(server)._format_pytest_result_with_details(
+        result = CheckerTools(server.context)._format_pytest_result_with_details(
             test_results, show_details=True
         )
 
@@ -465,7 +465,7 @@ class TestReporting:
 
         # Run several formatting operations
         for _ in range(3):
-            CheckerTools(server)._format_pytest_result_with_details(
+            CheckerTools(server.context)._format_pytest_result_with_details(
                 test_results, show_details=True
             )
 

@@ -17,7 +17,7 @@ logger = logging.getLogger(__name__)
 
 def register(mcp: "FastMCPProtocol", checker_tools: "CheckerTools") -> None:
     """Register the bandit security checker tool."""
-    server = checker_tools._server
+    context = checker_tools.context
 
     @mcp.tool()
     @log_function_call
@@ -38,11 +38,12 @@ def register(mcp: "FastMCPProtocol", checker_tools: "CheckerTools") -> None:
         Returns:
             Formatted bandit report, or an error message string.
         """
-        if not server._is_tool_available("bandit"):
-            return server.tool_unavailable_message("bandit")
+        bandit_binary = context.environment.binary("bandit")
+        if not context.is_tool_available("bandit") or bandit_binary is None:
+            return context.unavailable_message("bandit")
 
         resolved = resolve_target_directories(
-            str(server.project_dir), target_directories
+            str(context.project_dir), target_directories
         )
         if isinstance(resolved, str):
             return resolved
@@ -51,7 +52,7 @@ def register(mcp: "FastMCPProtocol", checker_tools: "CheckerTools") -> None:
             logger.info(
                 "Starting bandit check",
                 extra={
-                    "project_dir": str(server.project_dir),
+                    "project_dir": str(context.project_dir),
                     "target_directories": resolved,
                     "extra_args": extra_args,
                     "max_issues": max_issues,
@@ -59,11 +60,11 @@ def register(mcp: "FastMCPProtocol", checker_tools: "CheckerTools") -> None:
             )
 
             result = run_bandit_check_impl(
-                bandit_binary=server._tool_binaries["bandit"],
-                project_dir=str(server.project_dir),
+                bandit_binary=str(bandit_binary),
+                project_dir=str(context.project_dir),
                 target_directories=resolved,
                 extra_args=extra_args,
-                timeout_seconds=server.resolve_timeout("bandit"),
+                timeout_seconds=context.resolve_timeout("bandit"),
             )
 
             if result.error:
@@ -85,7 +86,7 @@ def register(mcp: "FastMCPProtocol", checker_tools: "CheckerTools") -> None:
                 extra={
                     "error": str(e),
                     "error_type": type(e).__name__,
-                    "project_dir": str(server.project_dir),
+                    "project_dir": str(context.project_dir),
                 },
             )
             return error_msg

@@ -16,7 +16,7 @@ logger = logging.getLogger(__name__)
 
 def register(mcp: "FastMCPProtocol", checker_tools: "CheckerTools") -> None:
     """Register the mypy checker tool."""
-    server = checker_tools._server
+    context = checker_tools.context
 
     @mcp.tool()
     @log_function_call
@@ -72,17 +72,17 @@ def register(mcp: "FastMCPProtocol", checker_tools: "CheckerTools") -> None:
         Returns:
             A string containing mypy results or a prompt for an LLM to interpret
         """
-        if not server._is_tool_available("mypy"):
-            return server.tool_unavailable_message("mypy")
+        if not context.is_tool_available("mypy"):
+            return context.unavailable_message("mypy")
 
         resolved = resolve_target_directories(
-            str(server.project_dir), target_directories
+            str(context.project_dir), target_directories
         )
         if isinstance(resolved, str):
             return resolved
 
         try:
-            resolved_timeout = server.resolve_timeout("mypy", timeout_seconds)
+            resolved_timeout = context.resolve_timeout("mypy", timeout_seconds)
         except ValueError as exc:
             return f"Error: {exc}"
 
@@ -90,7 +90,7 @@ def register(mcp: "FastMCPProtocol", checker_tools: "CheckerTools") -> None:
             logger.info(
                 "Starting mypy check",
                 extra={
-                    "project_dir": str(server.project_dir),
+                    "project_dir": str(context.project_dir),
                     "disable_error_codes": disable_error_codes,
                     "target_directories": resolved,
                 },
@@ -98,8 +98,8 @@ def register(mcp: "FastMCPProtocol", checker_tools: "CheckerTools") -> None:
 
             # Run mypy check
             mypy_prompt = get_mypy_prompt(
-                str(server.project_dir),
-                python_executable=server._resolved_python,
+                str(context.project_dir),
+                python_executable=str(context.environment.interpreter),
                 disable_error_codes=disable_error_codes,
                 target_directories=resolved,
                 follow_imports=follow_imports,
@@ -126,7 +126,7 @@ def register(mcp: "FastMCPProtocol", checker_tools: "CheckerTools") -> None:
                 extra={
                     "error": str(e),
                     "error_type": type(e).__name__,
-                    "project_dir": str(server.project_dir),
+                    "project_dir": str(context.project_dir),
                 },
             )
             raise

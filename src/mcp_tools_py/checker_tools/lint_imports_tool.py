@@ -17,7 +17,7 @@ logger = logging.getLogger(__name__)
 
 def register(mcp: "FastMCPProtocol", checker_tools: "CheckerTools") -> None:
     """Register the lint-imports checker tool."""
-    server = checker_tools._server
+    context = checker_tools.context
 
     @mcp.tool()
     @log_function_call
@@ -35,15 +35,16 @@ def register(mcp: "FastMCPProtocol", checker_tools: "CheckerTools") -> None:
             header (PASSED / BROKEN / ERROR), so truncation cannot hide
             failures.
         """
-        if not server._is_tool_available("lint-imports"):
-            return server.tool_unavailable_message("lint-imports")
+        binary = context.environment.binary("lint-imports")
+        if not context.is_tool_available("lint-imports") or binary is None:
+            return context.unavailable_message("lint-imports")
 
         try:
             return run_lint_imports_check_impl(
-                server._tool_binaries["lint-imports"],
-                str(server.project_dir),
+                str(binary),
+                str(context.project_dir),
                 extra_args,
-                server.resolve_timeout("lint-imports"),
+                context.resolve_timeout("lint-imports"),
             )
         except Exception as e:
             error_msg = (
@@ -54,7 +55,7 @@ def register(mcp: "FastMCPProtocol", checker_tools: "CheckerTools") -> None:
                 extra={
                     "error": str(e),
                     "error_type": type(e).__name__,
-                    "project_dir": str(server.project_dir),
+                    "project_dir": str(context.project_dir),
                 },
             )
             return error_msg

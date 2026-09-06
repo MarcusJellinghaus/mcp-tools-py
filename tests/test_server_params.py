@@ -3,13 +3,15 @@ Tests for the server functionality with updated parameter exposure.
 """
 
 import inspect
-import os
-import textwrap
+import logging
 from pathlib import Path
 from typing import Any, Dict, Tuple
 from unittest.mock import MagicMock, patch
 
 import pytest
+
+from mcp_tools_py.utils.tool_context import CONSOLE_SCRIPT_TOOLS
+from tests.test_tool_availability._helpers import _dummy_python
 
 
 def _get_tool(mock_tool: MagicMock, name: str) -> Any:
@@ -25,7 +27,9 @@ def mock_project_dir() -> Path:
 
 
 @pytest.mark.asyncio
-async def test_run_pytest_check_parameters(mock_project_dir: Path) -> None:
+async def test_run_pytest_check_parameters(
+    mock_project_dir: Path, all_modules_importable: Any
+) -> None:
     """Test that run_pytest_check properly uses server parameters and passes parameters correctly."""
     with (
         patch("mcp.server.fastmcp.FastMCP") as mock_fastmcp,
@@ -50,13 +54,12 @@ async def test_run_pytest_check_parameters(mock_project_dir: Path) -> None:
         # Create server with the static parameters
         with patch.object(
             ToolServer,
-            "_check_tool_availability",
-            return_value={},
+            "_warn_missing_console_scripts",
+            return_value=None,
         ):
             _server = ToolServer(
                 mock_project_dir, test_folder="custom_tests", keep_temp_files=True
             )
-            _server._is_tool_available = lambda tool_name: True  # type: ignore[method-assign]
 
         assert (
             len(mock_tool.call_args_list) >= 2
@@ -76,12 +79,12 @@ async def test_run_pytest_check_parameters(mock_project_dir: Path) -> None:
         mock_check_pytest.assert_called_once_with(
             project_dir=str(mock_project_dir),
             test_folder="custom_tests",  # From server constructor
-            python_executable=_server._resolved_python,  # Resolved by server
+            python_executable=str(_server.context.environment.interpreter),
             markers=["slow", "integration"],
             verbosity=2,
             extra_args=["--no-header"],
             env_vars={"TEST_ENV": "value"},
-            venv_bin=os.path.dirname(_server._resolved_python),
+            venv_bin=str(_server.context.environment.bin_dir),
             keep_temp_files=True,  # From server constructor
             skip_default_test_folder=False,
             timeout_seconds=300,  # Built-in pytest default
@@ -102,11 +105,10 @@ async def test_run_pylint_check_signature() -> None:
 
         with patch.object(
             ToolServer,
-            "_check_tool_availability",
-            return_value={},
+            "_warn_missing_console_scripts",
+            return_value=None,
         ):
             _server = ToolServer(project_dir=Path("/test/project"))
-            _server._is_tool_available = lambda tool_name: True  # type: ignore[method-assign]
 
         # Look up run_pylint_check by name to avoid fragile index assumptions
         tools = {
@@ -129,7 +131,7 @@ async def test_run_pylint_check_signature() -> None:
 
 
 @pytest.fixture
-def mock_server() -> Tuple[Any, MagicMock]:
+def mock_server(all_modules_importable: Any) -> Tuple[Any, MagicMock]:
     """Create ToolServer for testing."""
     with patch("mcp.server.fastmcp.FastMCP") as mock_fastmcp:
         mock_tool = MagicMock()
@@ -139,11 +141,10 @@ def mock_server() -> Tuple[Any, MagicMock]:
 
         with patch.object(
             ToolServer,
-            "_check_tool_availability",
-            return_value={},
+            "_warn_missing_console_scripts",
+            return_value=None,
         ):
             server = ToolServer(project_dir=Path("/test/project"))
-            server._is_tool_available = lambda tool_name: True  # type: ignore[method-assign]
 
         # Return server and the mock tool for test access
         return server, mock_tool
@@ -409,11 +410,10 @@ async def test_mcp_tool_decorator_compatibility() -> None:
 
         with patch.object(
             ToolServer,
-            "_check_tool_availability",
-            return_value={},
+            "_warn_missing_console_scripts",
+            return_value=None,
         ):
             server = ToolServer(project_dir=Path("/test/project"))
-            server._is_tool_available = lambda tool_name: True  # type: ignore[method-assign]
 
         # Verify that tools were registered correctly
         assert (
@@ -479,7 +479,9 @@ async def test_enhanced_reporting_integration_preparation(
 class TestServerPylintMaxIssues:
     """Tests for max_issues parameter wiring in run_pylint_check."""
 
-    def test_run_pylint_check_passes_max_issues(self) -> None:
+    def test_run_pylint_check_passes_max_issues(
+        self, all_modules_importable: Any
+    ) -> None:
         """Verify max_issues=3 is forwarded to get_pylint_prompt."""
         with (
             patch("mcp.server.fastmcp.FastMCP") as mock_fastmcp,
@@ -497,8 +499,7 @@ class TestServerPylintMaxIssues:
 
             from mcp_tools_py.server import ToolServer
 
-            _server = ToolServer(project_dir=Path("/test/project"))
-            _server._is_tool_available = lambda tool_name: True  # type: ignore[method-assign]
+            ToolServer(project_dir=Path("/test/project"))
             run_pylint_check = _get_tool(mock_tool, "run_pylint_check")
 
             run_pylint_check(max_issues=3)
@@ -506,7 +507,9 @@ class TestServerPylintMaxIssues:
             mock_get_pylint_prompt.assert_called_once()
             assert mock_get_pylint_prompt.call_args[1]["max_issues"] == 3
 
-    def test_run_pylint_check_default_max_issues(self) -> None:
+    def test_run_pylint_check_default_max_issues(
+        self, all_modules_importable: Any
+    ) -> None:
         """Verify default max_issues=1 is forwarded to get_pylint_prompt."""
         with (
             patch("mcp.server.fastmcp.FastMCP") as mock_fastmcp,
@@ -524,8 +527,7 @@ class TestServerPylintMaxIssues:
 
             from mcp_tools_py.server import ToolServer
 
-            _server = ToolServer(project_dir=Path("/test/project"))
-            _server._is_tool_available = lambda tool_name: True  # type: ignore[method-assign]
+            ToolServer(project_dir=Path("/test/project"))
             run_pylint_check = _get_tool(mock_tool, "run_pylint_check")
 
             run_pylint_check()
@@ -543,7 +545,7 @@ class TestServerPylintMaxIssues:
             from mcp_tools_py.server import ToolServer
 
             server = ToolServer(project_dir=Path("/test/project"))
-            checker = CheckerTools(server)
+            checker = CheckerTools(server.context)
 
             prompt = "pylint found some issues related to code W0612."
             result = checker._format_pylint_result(prompt)
@@ -687,7 +689,7 @@ async def test_run_pytest_check_prepends_dedup_notes(
         assert "-m" in result
 
 
-# Tests for --check-timeout and ToolServer.resolve_timeout
+# Tests for --check-timeout
 
 
 class TestCheckTimeoutCli:
@@ -733,56 +735,6 @@ class TestCheckTimeoutCli:
                 parse_args()
 
 
-def _make_server(project_dir: Path, **kwargs: Any) -> Any:
-    """Build a ToolServer with FastMCP and tool availability stubbed out.
-
-    Returns:
-        A ToolServer instance.
-    """
-    with patch("mcp.server.fastmcp.FastMCP") as mock_fastmcp:
-        mock_fastmcp.return_value.tool.return_value = MagicMock()
-
-        from mcp_tools_py.server import ToolServer
-
-        with patch.object(ToolServer, "_check_tool_availability", return_value={}):
-            return ToolServer(project_dir=project_dir, **kwargs)
-
-
-class TestResolveTimeout:
-    """Tests for ToolServer.resolve_timeout."""
-
-    def test_cli_timeout_applies_to_every_tool(self) -> None:
-        """check_timeout from the CLI overrides both built-in defaults."""
-        server = _make_server(Path("/test/project"), check_timeout=45)
-
-        assert server.resolve_timeout("mypy") == 45
-        assert server.resolve_timeout("pytest") == 45
-
-    def test_built_in_defaults_without_configuration(self) -> None:
-        """Without configuration, pytest gets 300 and everything else 120."""
-        server = _make_server(Path("/test/project"))
-
-        assert server.resolve_timeout("mypy") == 120
-        assert server.resolve_timeout("pytest") == 300
-
-    def test_pyproject_value_beats_cli_timeout(self, tmp_path: Path) -> None:
-        """A per-tool pyproject value wins over --check-timeout."""
-        (tmp_path / "pyproject.toml").write_text(textwrap.dedent("""\
-                [tool.mcp-tools-py]
-                mypy-timeout = 600
-                """))
-        server = _make_server(tmp_path, check_timeout=45)
-
-        assert server.resolve_timeout("mypy") == 600
-        assert server.resolve_timeout("pylint") == 45
-
-    def test_explicit_argument_wins(self) -> None:
-        """An explicit per-call value beats the server-level timeout."""
-        server = _make_server(Path("/test/project"), check_timeout=45)
-
-        assert server.resolve_timeout("mypy", 90) == 90
-
-
 def _capture_pytest_tool() -> Any:
     """Register the checker tools and return the run_pytest_check tool.
 
@@ -795,9 +747,10 @@ def _capture_pytest_tool() -> Any:
 
         from mcp_tools_py.server import ToolServer
 
-        with patch.object(ToolServer, "_check_tool_availability", return_value={}):
-            server = ToolServer(project_dir=Path("/fake/project/dir"))
-            server._is_tool_available = lambda tool_name: True  # type: ignore[method-assign]
+        with patch.object(
+            ToolServer, "_warn_missing_console_scripts", return_value=None
+        ):
+            ToolServer(project_dir=Path("/fake/project/dir"))
 
     return _get_tool(mock_tool, "run_pytest_check")
 
@@ -805,7 +758,9 @@ def _capture_pytest_tool() -> Any:
 class TestPytestTimeoutArgument:
     """Tests for the run_pytest_check timeout_seconds argument."""
 
-    def test_explicit_timeout_reaches_the_runner(self) -> None:
+    def test_explicit_timeout_reaches_the_runner(
+        self, all_modules_importable: Any
+    ) -> None:
         """An explicit timeout_seconds reaches check_code_with_pytest."""
         run_pytest_check = _capture_pytest_tool()
 
@@ -821,7 +776,7 @@ class TestPytestTimeoutArgument:
 
         assert mock_check_pytest.call_args[1]["timeout_seconds"] == 900
 
-    def test_invalid_timeout_returns_message(self) -> None:
+    def test_invalid_timeout_returns_message(self, all_modules_importable: Any) -> None:
         """An invalid timeout_seconds comes back as text, and pytest is never run."""
         run_pytest_check = _capture_pytest_tool()
 
@@ -832,3 +787,41 @@ class TestPytestTimeoutArgument:
 
         assert "timeout_seconds" in result
         mock_check_pytest.assert_not_called()
+
+
+class TestStartupConsoleScriptWarnings:
+    """The server warns about missing console scripts and stores nothing."""
+
+    def test_warning_matches_handler_message(
+        self, tmp_path: Path, caplog: pytest.LogCaptureFixture
+    ) -> None:
+        """Each of the five names is warned about with the handler's message."""
+        from mcp_tools_py.server import ToolServer
+
+        with patch("mcp.server.fastmcp.FastMCP") as mock_fastmcp:
+            mock_fastmcp.return_value.tool.return_value = MagicMock()
+
+            with caplog.at_level(logging.WARNING, logger="mcp_tools_py.server"):
+                server = ToolServer(
+                    project_dir=Path("/project"),
+                    python_executable=_dummy_python(tmp_path),
+                )
+
+        warnings = [record.getMessage() for record in caplog.records]
+        for tool_name in CONSOLE_SCRIPT_TOOLS:
+            assert server.context.unavailable_message(tool_name) in warnings
+        assert any("import-linter is installed" in text for text in warnings)
+
+    def test_server_stores_no_availability(self, tmp_path: Path) -> None:
+        """Availability is answered at use time, never cached on the server."""
+        from mcp_tools_py.server import ToolServer
+
+        with patch("mcp.server.fastmcp.FastMCP") as mock_fastmcp:
+            mock_fastmcp.return_value.tool.return_value = MagicMock()
+            server = ToolServer(
+                project_dir=Path("/project"),
+                python_executable=_dummy_python(tmp_path),
+            )
+
+        assert not hasattr(server, "_tool_availability")
+        assert not hasattr(server, "_tool_binaries")

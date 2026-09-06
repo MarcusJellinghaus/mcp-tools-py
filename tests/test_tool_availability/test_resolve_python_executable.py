@@ -117,4 +117,4 @@ class TestResolvePythonExecutable:
 
             server = _create_server(project_dir=Path("/project"))
 
-            assert server._resolved_python == sys.executable
+            assert server.environment.interpreter == Path(sys.executable)

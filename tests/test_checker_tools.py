@@ -1,5 +1,6 @@
 """Tests for CheckerTools extraction from server.py."""
 
+import textwrap
 from pathlib import Path
 from typing import Any
 from unittest.mock import MagicMock, patch
@@ -8,68 +9,32 @@ import pytest
 
 from mcp_tools_py.checker_tools import CheckerTools
 from mcp_tools_py.code_checker_mypy.reporting import MYPY_FAILURE_PREFIX
-from mcp_tools_py.utils.project_config import validate_timeout
+from mcp_tools_py.utils.tool_context import ToolContext
+
+
+def _remove_console_script(context: ToolContext, tool_name: str) -> None:
+    """Make a console-script tool unavailable by deleting its binary."""
+    binary = context.environment.binary(tool_name)
+    assert binary is not None
+    binary.unlink()
 
 
 @pytest.fixture
-def mock_server() -> MagicMock:
-    """Create a mock CodeCheckerServer with required attributes."""
-    server = MagicMock()
-    server.project_dir = Path("/fake/project")
-    server.test_folder = "tests"
-    server.keep_temp_files = False
-    server._resolved_python = "/usr/bin/python3"
-    server._tool_availability = {
-        "pylint": True,
-        "pytest": True,
-        "mypy": True,
-        "black": True,
-        "isort": True,
-        "lint-imports": True,
-        "vulture": True,
-        "ruff": True,
-        "bandit": True,
-        "tach": True,
-    }
-    server._tool_binaries = {
-        "lint-imports": "/mock/venv/bin/lint-imports",
-        "vulture": "/mock/venv/bin/vulture",
-        "ruff": "/mock/venv/bin/ruff",
-        "bandit": "/mock/venv/bin/bandit",
-        "tach": "/mock/venv/bin/tach",
-    }
-    server.vulture_whitelist = "vulture_whitelist.py"
-    server._is_tool_available = lambda tool: server._tool_availability.get(tool, False)
-    server.tool_unavailable_message = lambda key: (
-        f"{key} is not available in /mock/venv/bin. "
-        "Restart the server after installing."
-    )
-
-    def resolve_timeout(tool: str, explicit: int | None = None) -> int:
-        if explicit is not None:
-            return validate_timeout(explicit, "timeout_seconds")
-        return 300 if tool == "pytest" else 120
-
-    server.resolve_timeout = resolve_timeout
-    return server
-
-
-@pytest.fixture
-def checker_tools(mock_server: MagicMock) -> CheckerTools:
-    """Create a CheckerTools instance with a mock server."""
-    return CheckerTools(mock_server)
+def checker_tools(tool_context: ToolContext) -> CheckerTools:
+    """Create a CheckerTools instance over the shared context."""
+    return CheckerTools(tool_context)
 
 
 # --- Registration tests ---
 
 
-def test_checker_tools_registers_nine_tools(mock_server: MagicMock) -> None:
+def test_checker_tools_registers_nine_tools(tool_context: ToolContext) -> None:
     """Test that CheckerTools.register() registers exactly 9 tools on an MCP server."""
     mock_mcp = MagicMock()
     mock_decorator = MagicMock(side_effect=lambda fn: fn)
     mock_mcp.tool.return_value = mock_decorator
 
-    checker = CheckerTools(mock_server)
+    checker = CheckerTools(tool_context)
     checker.register(mock_mcp)
 
     # 9 tools: run_pylint_check, run_pytest_check, run_mypy_check,
@@ -186,7 +151,7 @@ def test_format_pytest_result_execution_error(checker_tools: CheckerTools) -> No
 
 
 def _capture_vulture(
-    mock_server: MagicMock,
+    tool_context: ToolContext,
 ) -> Any:
     """Register checker tools and capture the run_vulture_check function."""
     captured_fns: dict[str, Any] = {}
@@ -197,22 +162,22 @@ def _capture_vulture(
 
     mock_mcp = MagicMock()
     mock_mcp.tool.return_value = capture
-    checker = CheckerTools(mock_server)
+    checker = CheckerTools(tool_context)
     checker.register(mock_mcp)
     return captured_fns["run_vulture_check"]
 
 
-def test_vulture_unavailable_returns_error(mock_server: MagicMock) -> None:
+def test_vulture_unavailable_returns_error(tool_context: ToolContext) -> None:
     """When vulture is not available, return an error message."""
-    mock_server._tool_availability["vulture"] = False
-    run_vulture = _capture_vulture(mock_server)
+    _remove_console_script(tool_context, "vulture")
+    run_vulture = _capture_vulture(tool_context)
     result = run_vulture()
     assert "vulture is not available" in result
 
 
-def test_vulture_success_returns_raw_output(mock_server: MagicMock) -> None:
+def test_vulture_success_returns_raw_output(tool_context: ToolContext) -> None:
     """When vulture succeeds, return raw stdout."""
-    run_vulture = _capture_vulture(mock_server)
+    run_vulture = _capture_vulture(tool_context)
 
     with (
         patch(
@@ -230,9 +195,9 @@ def test_vulture_success_returns_raw_output(mock_server: MagicMock) -> None:
     assert "No dead code found!" in result
 
 
-def test_vulture_failure_returns_raw_output(mock_server: MagicMock) -> None:
+def test_vulture_failure_returns_raw_output(tool_context: ToolContext) -> None:
     """When vulture fails, return raw stdout+stderr."""
-    run_vulture = _capture_vulture(mock_server)
+    run_vulture = _capture_vulture(tool_context)
 
     with (
         patch(
@@ -250,9 +215,9 @@ def test_vulture_failure_returns_raw_output(mock_server: MagicMock) -> None:
     assert "vulture: error: invalid config" in result
 
 
-def test_vulture_passes_whitelist_to_runner(mock_server: MagicMock) -> None:
+def test_vulture_passes_whitelist_to_runner(tool_context: ToolContext) -> None:
     """When whitelist file exists, it is passed to run_vulture_check."""
-    run_vulture = _capture_vulture(mock_server)
+    run_vulture = _capture_vulture(tool_context)
 
     with (
         patch(
@@ -267,13 +232,13 @@ def test_vulture_passes_whitelist_to_runner(mock_server: MagicMock) -> None:
     ):
         run_vulture()
 
-    whitelist_str = str(Path("/fake/project") / "vulture_whitelist.py")
+    whitelist_str = str(tool_context.project_dir / "vulture_whitelist.py")
     assert mock_runner.call_args[1]["whitelist_path"] == whitelist_str
 
 
-def test_vulture_passes_resolved_timeout(mock_server: MagicMock) -> None:
+def test_vulture_passes_resolved_timeout(tool_context: ToolContext) -> None:
     """The resolved timeout is passed to run_vulture_check."""
-    run_vulture = _capture_vulture(mock_server)
+    run_vulture = _capture_vulture(tool_context)
 
     with (
         patch(
@@ -294,9 +259,9 @@ def test_vulture_passes_resolved_timeout(mock_server: MagicMock) -> None:
 # --- Lint-imports handler tests ---
 
 
-def test_lint_imports_passes_resolved_timeout(mock_server: MagicMock) -> None:
+def test_lint_imports_passes_resolved_timeout(tool_context: ToolContext) -> None:
     """The resolved timeout is passed to run_lint_imports_check_impl."""
-    run_lint_imports = _capture_tool(mock_server, "run_lint_imports_check")
+    run_lint_imports = _capture_tool(tool_context, "run_lint_imports_check")
 
     with patch(
         "mcp_tools_py.checker_tools.lint_imports_tool.run_lint_imports_check_impl",
@@ -310,9 +275,9 @@ def test_lint_imports_passes_resolved_timeout(mock_server: MagicMock) -> None:
 # --- Bandit handler tests ---
 
 
-def test_bandit_passes_resolved_timeout(mock_server: MagicMock) -> None:
+def test_bandit_passes_resolved_timeout(tool_context: ToolContext) -> None:
     """The resolved timeout is passed to run_bandit_check_impl."""
-    run_bandit = _capture_tool(mock_server, "run_bandit_check")
+    run_bandit = _capture_tool(tool_context, "run_bandit_check")
 
     with (
         patch(
@@ -332,9 +297,9 @@ def test_bandit_passes_resolved_timeout(mock_server: MagicMock) -> None:
 # --- Ruff handler tests ---
 
 
-def test_ruff_check_passes_resolved_timeout(mock_server: MagicMock) -> None:
+def test_ruff_check_passes_resolved_timeout(tool_context: ToolContext) -> None:
     """The resolved timeout is passed to run_ruff_check_impl."""
-    run_ruff_check = _capture_tool(mock_server, "run_ruff_check")
+    run_ruff_check = _capture_tool(tool_context, "run_ruff_check")
 
     with (
         patch(
@@ -351,9 +316,9 @@ def test_ruff_check_passes_resolved_timeout(mock_server: MagicMock) -> None:
     assert mock_runner.call_args[1]["timeout_seconds"] == 120
 
 
-def test_ruff_fix_passes_resolved_timeout(mock_server: MagicMock) -> None:
+def test_ruff_fix_passes_resolved_timeout(tool_context: ToolContext) -> None:
     """The resolved timeout is passed to run_ruff_fix_impl."""
-    run_ruff_fix = _capture_tool(mock_server, "run_ruff_fix")
+    run_ruff_fix = _capture_tool(tool_context, "run_ruff_fix")
 
     with (
         patch(
@@ -374,7 +339,7 @@ def test_ruff_fix_passes_resolved_timeout(mock_server: MagicMock) -> None:
 
 
 def _capture_tool(
-    mock_server: MagicMock,
+    tool_context: ToolContext,
     tool_name: str,
 ) -> Any:
     """Register checker tools and capture a specific tool function."""
@@ -386,14 +351,14 @@ def _capture_tool(
 
     mock_mcp = MagicMock()
     mock_mcp.tool.return_value = capture
-    checker = CheckerTools(mock_server)
+    checker = CheckerTools(tool_context)
     checker.register(mock_mcp)
     return captured_fns[tool_name]
 
 
-def test_pylint_auto_detects_directories(mock_server: MagicMock) -> None:
+def test_pylint_auto_detects_directories(tool_context: ToolContext) -> None:
     """Pylint uses resolve_target_directories when no dirs are given."""
-    run_pylint = _capture_tool(mock_server, "run_pylint_check")
+    run_pylint = _capture_tool(tool_context, "run_pylint_check")
 
     with (
         patch(
@@ -410,9 +375,9 @@ def test_pylint_auto_detects_directories(mock_server: MagicMock) -> None:
     assert mock_prompt.call_args[1]["target_directories"] == ["src", "tests"]
 
 
-def test_pylint_resolution_error_returns_message(mock_server: MagicMock) -> None:
+def test_pylint_resolution_error_returns_message(tool_context: ToolContext) -> None:
     """Pylint returns error string when directory resolution fails."""
-    run_pylint = _capture_tool(mock_server, "run_pylint_check")
+    run_pylint = _capture_tool(tool_context, "run_pylint_check")
 
     with patch(
         "mcp_tools_py.checker_tools.pylint_tool.resolve_target_directories",
@@ -423,9 +388,9 @@ def test_pylint_resolution_error_returns_message(mock_server: MagicMock) -> None
     assert "Error resolving target directories" in result
 
 
-def test_pylint_passes_default_timeout(mock_server: MagicMock) -> None:
+def test_pylint_passes_default_timeout(tool_context: ToolContext) -> None:
     """Without configuration the built-in default reaches get_pylint_prompt."""
-    run_pylint = _capture_tool(mock_server, "run_pylint_check")
+    run_pylint = _capture_tool(tool_context, "run_pylint_check")
 
     with (
         patch(
@@ -442,14 +407,13 @@ def test_pylint_passes_default_timeout(mock_server: MagicMock) -> None:
     assert mock_prompt.call_args[1]["timeout_seconds"] == 120
 
 
-def test_pylint_invalid_timeout_returns_message(mock_server: MagicMock) -> None:
+def test_pylint_invalid_timeout_returns_message(tool_context: ToolContext) -> None:
     """An invalid configured timeout comes back as text, and pylint is never run."""
-
-    def raising_resolve_timeout(tool: str, explicit: int | None = None) -> int:
-        raise ValueError("pylint-timeout must be a positive integer, got 0")
-
-    mock_server.resolve_timeout = raising_resolve_timeout
-    run_pylint = _capture_tool(mock_server, "run_pylint_check")
+    (tool_context.project_dir / "pyproject.toml").write_text(textwrap.dedent("""\
+            [tool.mcp-tools-py]
+            pylint-timeout = 0
+            """))
+    run_pylint = _capture_tool(tool_context, "run_pylint_check")
 
     with (
         patch(
@@ -467,9 +431,9 @@ def test_pylint_invalid_timeout_returns_message(mock_server: MagicMock) -> None:
     mock_prompt.assert_not_called()
 
 
-def test_mypy_auto_detects_directories(mock_server: MagicMock) -> None:
+def test_mypy_auto_detects_directories(tool_context: ToolContext) -> None:
     """Mypy uses resolve_target_directories when no dirs are given."""
-    run_mypy = _capture_tool(mock_server, "run_mypy_check")
+    run_mypy = _capture_tool(tool_context, "run_mypy_check")
 
     with (
         patch(
@@ -486,9 +450,9 @@ def test_mypy_auto_detects_directories(mock_server: MagicMock) -> None:
     assert mock_prompt.call_args[1]["target_directories"] == ["src", "tests"]
 
 
-def test_mypy_resolution_error_returns_message(mock_server: MagicMock) -> None:
+def test_mypy_resolution_error_returns_message(tool_context: ToolContext) -> None:
     """Mypy returns error string when directory resolution fails."""
-    run_mypy = _capture_tool(mock_server, "run_mypy_check")
+    run_mypy = _capture_tool(tool_context, "run_mypy_check")
 
     with patch(
         "mcp_tools_py.checker_tools.mypy_tool.resolve_target_directories",
@@ -499,9 +463,9 @@ def test_mypy_resolution_error_returns_message(mock_server: MagicMock) -> None:
     assert "Error resolving target directories" in result
 
 
-def test_mypy_passes_explicit_timeout(mock_server: MagicMock) -> None:
+def test_mypy_passes_explicit_timeout(tool_context: ToolContext) -> None:
     """An explicit timeout_seconds reaches get_mypy_prompt."""
-    run_mypy = _capture_tool(mock_server, "run_mypy_check")
+    run_mypy = _capture_tool(tool_context, "run_mypy_check")
 
     with (
         patch(
@@ -518,9 +482,9 @@ def test_mypy_passes_explicit_timeout(mock_server: MagicMock) -> None:
     assert mock_prompt.call_args[1]["timeout_seconds"] == 900
 
 
-def test_mypy_passes_default_timeout(mock_server: MagicMock) -> None:
+def test_mypy_passes_default_timeout(tool_context: ToolContext) -> None:
     """Without configuration the built-in default reaches get_mypy_prompt."""
-    run_mypy = _capture_tool(mock_server, "run_mypy_check")
+    run_mypy = _capture_tool(tool_context, "run_mypy_check")
 
     with (
         patch(
@@ -537,9 +501,9 @@ def test_mypy_passes_default_timeout(mock_server: MagicMock) -> None:
     assert mock_prompt.call_args[1]["timeout_seconds"] == 120
 
 
-def test_mypy_invalid_timeout_returns_message(mock_server: MagicMock) -> None:
+def test_mypy_invalid_timeout_returns_message(tool_context: ToolContext) -> None:
     """An invalid timeout_seconds comes back as text, and mypy is never run."""
-    run_mypy = _capture_tool(mock_server, "run_mypy_check")
+    run_mypy = _capture_tool(tool_context, "run_mypy_check")
 
     with (
         patch(
@@ -557,9 +521,9 @@ def test_mypy_invalid_timeout_returns_message(mock_server: MagicMock) -> None:
     mock_prompt.assert_not_called()
 
 
-def test_vulture_auto_detects_directories(mock_server: MagicMock) -> None:
+def test_vulture_auto_detects_directories(tool_context: ToolContext) -> None:
     """Vulture uses resolve_target_directories when no dirs are given."""
-    run_vulture_fn = _capture_vulture(mock_server)
+    run_vulture_fn = _capture_vulture(tool_context)
 
     with (
         patch(
@@ -577,9 +541,9 @@ def test_vulture_auto_detects_directories(mock_server: MagicMock) -> None:
     assert mock_runner.call_args[1]["target_directories"] == ["src", "tests"]
 
 
-def test_vulture_resolution_error_returns_message(mock_server: MagicMock) -> None:
+def test_vulture_resolution_error_returns_message(tool_context: ToolContext) -> None:
     """Vulture returns error string when directory resolution fails."""
-    run_vulture_fn = _capture_vulture(mock_server)
+    run_vulture_fn = _capture_vulture(tool_context)
 
     with patch(
         "mcp_tools_py.checker_tools.vulture_tool.resolve_target_directories",
@@ -593,17 +557,17 @@ def test_vulture_resolution_error_returns_message(mock_server: MagicMock) -> Non
 # --- Ruff check handler tests ---
 
 
-def test_ruff_check_unavailable_returns_error(mock_server: MagicMock) -> None:
+def test_ruff_check_unavailable_returns_error(tool_context: ToolContext) -> None:
     """When ruff is not available, return an error message."""
-    mock_server._tool_availability["ruff"] = False
-    run_ruff_check = _capture_tool(mock_server, "run_ruff_check")
+    _remove_console_script(tool_context, "ruff")
+    run_ruff_check = _capture_tool(tool_context, "run_ruff_check")
     result = run_ruff_check()
     assert "ruff is not available" in result
 
 
-def test_ruff_check_success_delegates_to_impl(mock_server: MagicMock) -> None:
+def test_ruff_check_success_delegates_to_impl(tool_context: ToolContext) -> None:
     """When ruff check succeeds, delegate to run_ruff_check_impl."""
-    run_ruff_check = _capture_tool(mock_server, "run_ruff_check")
+    run_ruff_check = _capture_tool(tool_context, "run_ruff_check")
 
     with (
         patch(
@@ -621,9 +585,9 @@ def test_ruff_check_success_delegates_to_impl(mock_server: MagicMock) -> None:
     mock_impl.assert_called_once()
 
 
-def test_ruff_check_resolution_error_returns_message(mock_server: MagicMock) -> None:
+def test_ruff_check_resolution_error_returns_message(tool_context: ToolContext) -> None:
     """Ruff check returns error string when directory resolution fails."""
-    run_ruff_check = _capture_tool(mock_server, "run_ruff_check")
+    run_ruff_check = _capture_tool(tool_context, "run_ruff_check")
 
     with patch(
         "mcp_tools_py.checker_tools.ruff_check_tool.resolve_target_directories",
@@ -637,17 +601,17 @@ def test_ruff_check_resolution_error_returns_message(mock_server: MagicMock) -> 
 # --- Ruff fix handler tests ---
 
 
-def test_ruff_fix_unavailable_returns_error(mock_server: MagicMock) -> None:
+def test_ruff_fix_unavailable_returns_error(tool_context: ToolContext) -> None:
     """When ruff is not available, return an error message."""
-    mock_server._tool_availability["ruff"] = False
-    run_ruff_fix = _capture_tool(mock_server, "run_ruff_fix")
+    _remove_console_script(tool_context, "ruff")
+    run_ruff_fix = _capture_tool(tool_context, "run_ruff_fix")
     result = run_ruff_fix()
     assert "ruff is not available" in result
 
 
-def test_ruff_fix_success_delegates_to_impl(mock_server: MagicMock) -> None:
+def test_ruff_fix_success_delegates_to_impl(tool_context: ToolContext) -> None:
     """When ruff fix succeeds, delegate to run_ruff_fix_impl."""
-    run_ruff_fix = _capture_tool(mock_server, "run_ruff_fix")
+    run_ruff_fix = _capture_tool(tool_context, "run_ruff_fix")
 
     with (
         patch(
@@ -665,9 +629,9 @@ def test_ruff_fix_success_delegates_to_impl(mock_server: MagicMock) -> None:
     mock_impl.assert_called_once()
 
 
-def test_ruff_fix_resolution_error_returns_message(mock_server: MagicMock) -> None:
+def test_ruff_fix_resolution_error_returns_message(tool_context: ToolContext) -> None:
     """Ruff fix returns error string when directory resolution fails."""
-    run_ruff_fix = _capture_tool(mock_server, "run_ruff_fix")
+    run_ruff_fix = _capture_tool(tool_context, "run_ruff_fix")
 
     with patch(
         "mcp_tools_py.checker_tools.ruff_fix_tool.resolve_target_directories",
@@ -681,17 +645,17 @@ def test_ruff_fix_resolution_error_returns_message(mock_server: MagicMock) -> No
 # --- Tach handler tests ---
 
 
-def test_tach_unavailable_returns_error(mock_server: MagicMock) -> None:
+def test_tach_unavailable_returns_error(tool_context: ToolContext) -> None:
     """When tach is not available, return an error message."""
-    mock_server._tool_availability["tach"] = False
-    run_tach_check = _capture_tool(mock_server, "run_tach_check")
+    _remove_console_script(tool_context, "tach")
+    run_tach_check = _capture_tool(tool_context, "run_tach_check")
     result = run_tach_check()
     assert "tach is not available" in result
 
 
-def test_tach_success_returns_raw_output(mock_server: MagicMock) -> None:
+def test_tach_success_returns_raw_output(tool_context: ToolContext) -> None:
     """When tach succeeds, return the runner's output."""
-    run_tach_check = _capture_tool(mock_server, "run_tach_check")
+    run_tach_check = _capture_tool(tool_context, "run_tach_check")
 
     with patch(
         "mcp_tools_py.checker_tools.tach_tool.run_tach",
@@ -701,7 +665,7 @@ def test_tach_success_returns_raw_output(mock_server: MagicMock) -> None:
 
     assert result == "tach check passed (no output)."
     mock_runner.assert_called_once_with(
-        tach_binary="/mock/venv/bin/tach",
-        project_dir=str(Path("/fake/project")),
+        tach_binary=str(tool_context.environment.binary("tach")),
+        project_dir=str(tool_context.project_dir),
         timeout_seconds=120,
     )

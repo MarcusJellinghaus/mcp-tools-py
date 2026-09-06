@@ -74,7 +74,7 @@ def test_fast_operation():
             "test_results": pytest_report,
         }
 
-        result = CheckerTools(server)._format_pytest_result_with_details(
+        result = CheckerTools(server.context)._format_pytest_result_with_details(
             test_results, show_details=True
         )
 
@@ -133,7 +133,7 @@ def test_fast_operation():
         }
 
         start_time = time.time()
-        result = CheckerTools(server)._format_pytest_result_with_details(
+        result = CheckerTools(server.context)._format_pytest_result_with_details(
             test_results, show_details=True
         )
         end_time = time.time()

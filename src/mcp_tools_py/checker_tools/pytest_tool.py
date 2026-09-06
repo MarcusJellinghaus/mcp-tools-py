@@ -1,7 +1,6 @@
 """Pytest MCP tool registration."""
 
 import logging
-import os
 from typing import TYPE_CHECKING, Dict, List, Optional
 
 from mcp_tools_py.code_checker_pytest.runners import check_code_with_pytest
@@ -17,7 +16,7 @@ logger = logging.getLogger(__name__)
 
 def register(mcp: "FastMCPProtocol", checker_tools: "CheckerTools") -> None:
     """Register the pytest checker tool."""
-    server = checker_tools._server
+    context = checker_tools.context
 
     @mcp.tool()
     @log_function_call
@@ -72,15 +71,15 @@ def register(mcp: "FastMCPProtocol", checker_tools: "CheckerTools") -> None:
             # Integration test run
             run_pytest_check(markers=["integration"])
         """
-        if not server._is_tool_available("pytest"):
-            return server.tool_unavailable_message("pytest")
+        if not context.is_tool_available("pytest"):
+            return context.unavailable_message("pytest")
 
         try:
             logger.info(
                 "Starting pytest check",
                 extra={
-                    "project_dir": str(server.project_dir),
-                    "test_folder": server.test_folder,
+                    "project_dir": str(context.project_dir),
+                    "test_folder": context.test_folder,
                     "markers": markers,
                     "extra_args": extra_args,
                 },
@@ -88,7 +87,7 @@ def register(mcp: "FastMCPProtocol", checker_tools: "CheckerTools") -> None:
 
             # Sanitize extra_args: deduplicate flags, extract verbosity
             sanitized = sanitize_extra_args(
-                extra_args, markers, project_dir=str(server.project_dir)
+                extra_args, markers, project_dir=str(context.project_dir)
             )
 
             # Log any deduplication notes
@@ -97,17 +96,17 @@ def register(mcp: "FastMCPProtocol", checker_tools: "CheckerTools") -> None:
 
             # Run pytest
             test_results = check_code_with_pytest(
-                project_dir=str(server.project_dir),
-                test_folder=server.test_folder,
-                python_executable=server._resolved_python,
+                project_dir=str(context.project_dir),
+                test_folder=context.test_folder,
+                python_executable=str(context.environment.interpreter),
                 markers=markers,
                 verbosity=sanitized.verbosity,
                 extra_args=sanitized.cleaned_args,
                 env_vars=env_vars,
-                venv_bin=os.path.dirname(server._resolved_python),
-                keep_temp_files=server.keep_temp_files,
+                venv_bin=str(context.environment.bin_dir),
+                keep_temp_files=context.keep_temp_files,
                 skip_default_test_folder=sanitized.has_path_args,
-                timeout_seconds=server.resolve_timeout("pytest", timeout_seconds),
+                timeout_seconds=context.resolve_timeout("pytest", timeout_seconds),
             )
 
             # Always show detailed failure output
@@ -148,7 +147,7 @@ def register(mcp: "FastMCPProtocol", checker_tools: "CheckerTools") -> None:
                 extra={
                     "error": str(e),
                     "error_type": type(e).__name__,
-                    "project_dir": str(server.project_dir),
+                    "project_dir": str(context.project_dir),
                 },
             )
             return error_msg

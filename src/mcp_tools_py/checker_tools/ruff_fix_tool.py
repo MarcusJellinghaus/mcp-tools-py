@@ -16,7 +16,7 @@ logger = logging.getLogger(__name__)
 
 def register(mcp: "FastMCPProtocol", checker_tools: "CheckerTools") -> None:
     """Register the ruff fix (modifies files) tool."""
-    server = checker_tools._server
+    context = checker_tools.context
 
     @mcp.tool()
     @log_function_call
@@ -38,11 +38,12 @@ def register(mcp: "FastMCPProtocol", checker_tools: "CheckerTools") -> None:
         Returns:
             Formatted fix report, or an error message string.
         """
-        if not server._is_tool_available("ruff"):
-            return server.tool_unavailable_message("ruff")
+        ruff_binary = context.environment.binary("ruff")
+        if not context.is_tool_available("ruff") or ruff_binary is None:
+            return context.unavailable_message("ruff")
 
         resolved = resolve_target_directories(
-            str(server.project_dir), target_directories
+            str(context.project_dir), target_directories
         )
         if isinstance(resolved, str):
             return resolved
@@ -51,7 +52,7 @@ def register(mcp: "FastMCPProtocol", checker_tools: "CheckerTools") -> None:
             logger.info(
                 "Starting ruff fix",
                 extra={
-                    "project_dir": str(server.project_dir),
+                    "project_dir": str(context.project_dir),
                     "select": select,
                     "target_directories": resolved,
                     "extra_args": extra_args,
@@ -59,12 +60,12 @@ def register(mcp: "FastMCPProtocol", checker_tools: "CheckerTools") -> None:
             )
 
             output = run_ruff_fix_impl(
-                ruff_binary=server._tool_binaries["ruff"],
-                project_dir=str(server.project_dir),
+                ruff_binary=str(ruff_binary),
+                project_dir=str(context.project_dir),
                 target_directories=resolved,
                 select=select,
                 extra_args=extra_args,
-                timeout_seconds=server.resolve_timeout("ruff"),
+                timeout_seconds=context.resolve_timeout("ruff"),
             )
 
             logger.info(
@@ -83,7 +84,7 @@ def register(mcp: "FastMCPProtocol", checker_tools: "CheckerTools") -> None:
                 extra={
                     "error": str(e),
                     "error_type": type(e).__name__,
-                    "project_dir": str(server.project_dir),
+                    "project_dir": str(context.project_dir),
                 },
             )
             return error_msg
