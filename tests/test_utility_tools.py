@@ -5,15 +5,16 @@ from unittest.mock import MagicMock, patch
 import pytest
 
 from mcp_tools_py.utility_tools import UtilityTools
+from mcp_tools_py.utils.tool_context import ToolContext
 
 
-def test_utility_tools_registers_sleep_tool() -> None:
+def test_utility_tools_registers_sleep_tool(tool_context: ToolContext) -> None:
     """Test that UtilityTools.register() registers the sleep tool on an MCP server."""
     mock_mcp = MagicMock()
     mock_decorator = MagicMock(side_effect=lambda fn: fn)
     mock_mcp.tool.return_value = mock_decorator
 
-    tools = UtilityTools()
+    tools = UtilityTools(tool_context)
     tools.register(mock_mcp)
 
     assert mock_mcp.tool.call_count == 1
@@ -28,13 +29,15 @@ def test_utility_tools_registers_sleep_tool() -> None:
         (300, "Slept for 300 seconds."),
     ],
 )
-def test_sleep_valid_values(sleep_seconds: float, expected_message: str) -> None:
+def test_sleep_valid_values(
+    sleep_seconds: float, expected_message: str, tool_context: ToolContext
+) -> None:
     """Test sleep tool with valid values calls time.sleep and returns confirmation."""
     mock_mcp = MagicMock()
     mock_decorator = MagicMock(side_effect=lambda fn: fn)
     mock_mcp.tool.return_value = mock_decorator
 
-    tools = UtilityTools()
+    tools = UtilityTools(tool_context)
     tools.register(mock_mcp)
 
     # Get the registered sleep function
@@ -54,13 +57,15 @@ def test_sleep_valid_values(sleep_seconds: float, expected_message: str) -> None
         (301, "Error: sleep_seconds must be <= 300."),
     ],
 )
-def test_sleep_invalid_values(sleep_seconds: float, expected_error: str) -> None:
+def test_sleep_invalid_values(
+    sleep_seconds: float, expected_error: str, tool_context: ToolContext
+) -> None:
     """Test sleep tool with invalid values returns error and does not call time.sleep."""
     mock_mcp = MagicMock()
     mock_decorator = MagicMock(side_effect=lambda fn: fn)
     mock_mcp.tool.return_value = mock_decorator
 
-    tools = UtilityTools()
+    tools = UtilityTools(tool_context)
     tools.register(mock_mcp)
 
     # Get the registered sleep function

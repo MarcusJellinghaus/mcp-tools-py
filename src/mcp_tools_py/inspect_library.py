@@ -4,8 +4,8 @@ from typing import TYPE_CHECKING
 
 from mcp_tools_py.log_utils import log_function_call
 from mcp_tools_py.utils.environment_info import probe_script_path
-from mcp_tools_py.utils.python_environment import PythonEnvironment
 from mcp_tools_py.utils.subprocess_runner import execute_command
+from mcp_tools_py.utils.tool_context import ToolContext
 
 if TYPE_CHECKING:
     from mcp_tools_py.utils.mcp_protocols import FastMCPProtocol
@@ -63,13 +63,13 @@ def _get_library_source(import_path: str, max_lines: int, interpreter: str) -> s
 class InspectTools:
     """Registers library inspection tools on an MCP server."""
 
-    def __init__(self, environment: PythonEnvironment) -> None:
-        """Store the environment that Python names resolve in.
+    def __init__(self, context: ToolContext) -> None:
+        """Store the context whose environment Python names resolve in.
 
         Args:
-            environment: The project's Python environment.
+            context: The project and environment the tools work in.
         """
-        self._environment = environment
+        self._context = context
 
     def register(self, mcp: "FastMCPProtocol") -> None:
         """Register all inspection tools."""
@@ -77,7 +77,7 @@ class InspectTools:
 
     def _register_get_library_source(self, mcp: "FastMCPProtocol") -> None:
         """Register the get_library_source tool."""
-        interpreter = str(self._environment.interpreter)
+        interpreter = str(self._context.environment.interpreter)
 
         @mcp.tool()
         @log_function_call

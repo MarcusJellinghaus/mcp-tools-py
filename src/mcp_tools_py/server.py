@@ -67,11 +67,11 @@ class ToolServer:
         self._warn_missing_console_scripts()
         CheckerTools(self.context).register(self.mcp)
         FormatterTools(self.context).register(self.mcp)
-        RefactoringTools(
-            self.project_dir, self.environment, timeout=self.refactoring_timeout
-        ).register(self.mcp)
-        UtilityTools().register(self.mcp)
-        InspectTools(self.environment).register(self.mcp)
+        RefactoringTools(self.context, timeout=self.refactoring_timeout).register(
+            self.mcp
+        )
+        UtilityTools(self.context).register(self.mcp)
+        InspectTools(self.context).register(self.mcp)
 
     def _warn_missing_console_scripts(self) -> None:
         """Warn at startup about console scripts missing next to the interpreter.

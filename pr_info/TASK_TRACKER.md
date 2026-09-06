@@ -27,6 +27,6 @@ This tracks **Feature Implementation** consisting of multiple **Tasks**.
 - [x] [Step 4](./steps/step_4.md) — jedi `environment_path` + venv integration test
 - [x] [Step 5](./steps/step_5.md) — Move `FastMCPProtocol` out of `server.py`
 - [x] [Step 6](./steps/step_6.md) — `ToolContext`; `CheckerTools` + `FormatterTools`
-- [ ] [Step 7](./steps/step_7.md) — Remaining three registrars; document the invariant
+- [x] [Step 7](./steps/step_7.md) — Remaining three registrars; document the invariant
 
 ## Pull Request

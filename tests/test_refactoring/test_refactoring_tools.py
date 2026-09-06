@@ -10,8 +10,19 @@ import pytest
 from mcp_tools_py.refactoring import RefactoringTools
 from mcp_tools_py.refactoring.jedi_tools import _get_project
 from mcp_tools_py.utils.python_environment import PythonEnvironment
+from mcp_tools_py.utils.tool_context import ToolContext
 
-TEST_ENV = PythonEnvironment(Path(sys.executable))
+
+def _context(project_dir: Path) -> ToolContext:
+    """Build a context over `project_dir` and the running interpreter.
+
+    Returns:
+        A ToolContext whose environment is the interpreter running the tests.
+    """
+    return ToolContext(
+        project_dir=project_dir,
+        environment=PythonEnvironment(Path(sys.executable)),
+    )
 
 
 @pytest.fixture(autouse=True)
@@ -47,7 +58,7 @@ def test_refactoring_tools_registers_five_tools(
     tmp_path: Path, mock_mcp: MagicMock
 ) -> None:
     """RefactoringTools registers all 5 tools on an MCP server."""
-    tools = RefactoringTools(tmp_path, TEST_ENV)
+    tools = RefactoringTools(_context(tmp_path))
     tools.register(mock_mcp)
 
     assert mock_mcp.tool.call_count == 5
@@ -57,7 +68,7 @@ def test_refactoring_tools_registers_expected_names(
     tmp_path: Path, mock_mcp: MagicMock
 ) -> None:
     """RefactoringTools registers tools with the correct function names."""
-    tools = RefactoringTools(tmp_path, TEST_ENV)
+    tools = RefactoringTools(_context(tmp_path))
     tools.register(mock_mcp)
 
     registered = mock_mcp._registered_functions
@@ -111,7 +122,7 @@ def test_registered_list_symbols_uses_relative_paths(
     src = tmp_path / "mod.py"
     src.write_text("X = 42\n")
 
-    tools = RefactoringTools(tmp_path, TEST_ENV)
+    tools = RefactoringTools(_context(tmp_path))
     tools.register(mock_mcp)
 
     # Find the registered list_symbols function
@@ -131,7 +142,7 @@ def test_registered_find_references_uses_relative_paths(
     (tmp_path / "lib.py").write_text("VAL = 100\n")
     (tmp_path / "main.py").write_text("from lib import VAL\nprint(VAL)\n")
 
-    tools = RefactoringTools(tmp_path, TEST_ENV)
+    tools = RefactoringTools(_context(tmp_path))
     tools.register(mock_mcp)
 
     registered = mock_mcp._registered_functions
