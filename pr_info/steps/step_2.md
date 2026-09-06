@@ -149,15 +149,26 @@ subprocesses:
 ```python
 if tool_name in self._tool_availability:
     return self._tool_availability[tool_name]
-info = get_environment_info(self._resolved_python)
-available = info.importable.get(tool_name, False)
-if info.error:
-    logger.warning(...)          # fail-open: available stays True
-elif not available:
-    logger.warning(...)          # see below
+if TOOL_MODULES.get(tool_name) is None:      # console-script-only tool
+    available = self.environment.binary(tool_name) is not None
+else:
+    info = get_environment_info(self._resolved_python)
+    available = info.importable.get(tool_name, False)
+    if info.error:
+        logger.warning(...)      # fail-open: available stays True
+    elif not available:
+        logger.warning(...)      # see below
 self._tool_availability[tool_name] = available
 return available
 ```
+
+**The console-script branch is load-bearing, not leftover.** `PROBED_MODULES` never carries
+a console-script name, so without it `info.importable.get("lint-imports", False)` answers
+`False` for all five of them. It is also what `test_is_tool_available.py:82`
+(`test_script_only_tool_never_probes`) pins: that test deletes the cache entry, then
+asserts the answer is `False` (`:98`) **and** that no probe ran (`:99`). The test is kept
+below with only its patch target changed, so the branch has to be here. Step 6's
+`ToolContext.is_tool_available` has the same branch.
 
 Actionable warning text (decision 15) — the distributions map turns a flag problem into a
 broken-install diagnosis:
@@ -182,8 +193,10 @@ calls `sleep` pays nothing, and `tests/test_startup_time.py`'s 2 s budget is una
   probe *ran* `python -m pytest --version`. `find_spec` locates without executing.
 - Version logging (`server.py:230`) is preserved through the probe blob's `distributions`
   map — issue decision 15 already relies on it.
-- The console-script fast path (`server.py:202-207`) becomes moot: it saved a per-tool
-  subprocess, and the probe now runs once for all five.
+- The console-script *fast path for module tools* (`server.py:202-207`) becomes moot: it
+  saved a per-tool subprocess, and the probe now runs once for all five. The
+  console-script-**only** branch at `:208-210` is a different thing and stays — see the
+  sketch above.
 
 ## HOW — `.importlinter`
 
@@ -255,13 +268,21 @@ Probe stdout, one line of JSON:
 `prefix` and `is_venv` from the issue's sketch are omitted — nothing consumes them.
 `sys_path` stays for #228; `distributions` stays for the error text and #61.
 
+`sys_path` is the one field kept with **no** production consumer, so the same reasoning
+that drops `prefix` and `is_venv` puts vulture on it: an unread frozen-dataclass field is
+reported as `unused variable 'sys_path' (60% confidence)`, exactly the repo's threshold
+(`vulture ... --min-confidence 60`, `ci.yml:154`). The parser's
+`sys_path=tuple(blob["sys_path"])` is a write, not a read. Test 1 below is its reader.
+
 ## Tests (write first)
 
 `tests/test_environment_info.py`:
 
 1. Parses a well-formed blob into `EnvironmentInfo` (patch
    `mcp_tools_py.utils.environment_info.execute_command`, use `make_command_result` from
-   `tests/conftest.py`).
+   `tests/conftest.py`). Assert on **`info.sys_path` as an attribute**, not by comparing
+   the whole dataclass: dataclass equality is generated code and does not count as a read,
+   so an equality-only test leaves vulture flagging the field (see DATA above).
 2. Caches success — two calls, `execute_command` called once.
 3. Caches failure — non-zero exit, two calls, called once, `error` is set both times.
 4. Timeout → `error` set, no exception.
@@ -314,7 +335,8 @@ patch `execute_command` inside `environment_info`).
 that need no carry-over" above:
 
 - `:43` `test_script_on_disk_skips_subprocess` and `:60`
-  `test_script_group_fast_path_records_binary` — the console-script fast path is gone.
+  `test_script_group_fast_path_records_binary` — the fast path that let a script on disk
+  answer for a *module* tool, and its `_tool_binaries` write, are both gone.
 - `:159` `test_probe_disables_plugin_autoload` — `find_spec` executes nothing, so there is
   no autoload to disable.
 
@@ -369,7 +391,8 @@ The two new tests are `integration`-marked, so run them explicitly as well:
 > `environment_info.py` (moving `PROBE_TIMEOUT_SECONDS`, `TOOL_MODULES` and `TOOL_PACKAGES`
 > there from `server.py` so the ten-tool taxonomy has one home), then rewire
 > `server._is_tool_available` — keeping #229's fail-open policy, so a failed or timed-out
-> probe reports the five module tools available with a warning — drop the now-dead
+> probe reports the five module tools available with a warning, and keeping its
+> console-script-only branch, which the probe cannot answer — drop the now-dead
 > `execute_command` import from `server.py` and fix all 24
 > `patch("mcp_tools_py.server.execute_command")` sites in `tests/test_tool_availability/`,
 > deleting the three tests the step names. Add the `.importlinter`

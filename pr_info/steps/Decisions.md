@@ -143,3 +143,38 @@ Two consequences worth recording:
 and `:75-76`, `tests/test_inspect_library.py`, `refactoring/jedi_tools.py`, and the fourteen
 `TYPE_CHECKING` importers of `FastMCPProtocol`. Steps 3, 4 and 5 therefore stand as written
 apart from the D1/D2 wording changes and the line-reference corrections.
+
+### D9 — `_is_tool_available` keeps its console-script branch after the probe lands
+
+Step 2's sketch went straight from the cache miss to `get_environment_info(...)`. Two
+options: add the console-script early return to the sketch, or rewrite
+`test_is_tool_available.py:82` (`test_script_only_tool_never_probes`) instead of
+repointing it. Chosen: **add the branch**. It keeps steps 2 and 6 consistent — step 6's
+`ToolContext.is_tool_available` already has exactly this branch — and it is not optional
+anyway: `PROBED_MODULES` never carries a console-script name, so `info.importable` cannot
+answer for one.
+
+### D10 — `_dummy_python` is kept, with `tests/test_tool_context.py` as its caller
+
+Step 6 deletes two of `_dummy_python`'s three importers and moves the third out of the
+package, so the helper loses every caller. Options: import it from the new
+`tests/test_tool_context.py`, or delete it with the two files. Chosen: **keep it**. The
+moved `test_unavailable_message` tests still need a pinned script directory — they assert
+the searched directory appears in the message, and console-script availability is a real
+`os.path.exists` check — and step 1 already prescribes `_dummy_python` over patching
+`os.path.exists`, so one idiom covers both.
+
+### Second-order deletions that vulture catches at exactly 60%
+
+Three names lose their last reader because of the plan's own deletions, and the repo runs
+`vulture --min-confidence 60` (`ci.yml:154`), so each fails the vulture job rather than
+pytest. Named in the steps so the implementer is not surprised:
+
+- `_make_server` (`tests/test_server_params.py:736-748`) — all four call sites are inside
+  `TestResolveTimeout`, which moves to `tests/test_tool_context.py` and builds a
+  `ToolContext` directly, so the helper is deleted with the class. Its
+  `_check_tool_availability` patch at `:747` therefore drops out of step 6's repoint list,
+  leaving `:53,105,142,412,798`.
+- `EnvironmentInfo.sys_path` — kept for #228 with no consumer. Step 2's first test asserts
+  on the attribute; a constructor keyword is a write and dataclass equality is not a read.
+- `_dummy_python` — see D10.

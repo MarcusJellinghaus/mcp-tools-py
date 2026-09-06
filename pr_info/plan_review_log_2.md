@@ -209,3 +209,59 @@ at `server.py:264`, and `test_server_params.py:690` carries a section comment th
 with the class.
 
 **Status**: committed
+
+## Round 4 — 2026-09-06
+
+Round 4 verified all four of round 3's edits as exact and ran a final systematic sweep for
+names the plan renames, deletes or re-signatures — `_resolved_python`, `_tool_binaries`,
+`_tool_availability`, `tool_unavailable_message`, `_check_tool_availability`,
+`_is_tool_available`, `_script_path`, `server.venv_path`/`.python_executable`, every
+`patch("mcp_tools_py.server.*")` target, `FastMCPProtocol`/`ToolDecorator`,
+`_get_library_source`, `list_symbols`/`find_references`, and all five registrar
+constructors. Every count and line number held. **The sweep for source names with unlisted
+readers is now exhausted.**
+
+All four findings are a different, second-order shape: a test helper or dataclass field
+that loses its last reader because of the plan's *own* deletions. Three fail against
+vulture at exactly the repo's 60% threshold (`ci.yml:154`), not against pytest — so the
+failure mode is a red vulture job. Round 4 probed vulture to establish each.
+
+**Findings**:
+- `pr_info/steps/step_2.md:150-154` — medium — the `_is_tool_available` sketch has no
+  console-script short-circuit, so on a cache miss it probes. `test_is_tool_available.py:82`
+  (`test_script_only_tool_never_probes`), which step 2 keeps as merely repointed, asserts
+  no probe ran. Step 6's `ToolContext.is_tool_available` already has the missing branch.
+- `pr_info/steps/step_6.md:165` — medium — moving `TestResolveTimeout` orphans
+  `_make_server` (`tests/test_server_params.py:736-748`), its only four callers being
+  inside that class. Vulture flags an unused module-level test helper at 60%.
+- `pr_info/steps/step_2.md:65` — low — `EnvironmentInfo.sys_path` is kept for #228 with no
+  consumer; a constructor keyword is a write, not a read, so vulture flags the field.
+- `pr_info/steps/step_6.md` — low — `_dummy_python` (`_helpers.py:23`) loses every caller:
+  two of its three importers are deleted by step 6 and the third moves out of the package.
+
+**Decisions**: accepted all four. Two sub-choices made without asking, both the simpler
+option and both recorded as D9/D10: keep the console-script branch rather than rewrite
+`test_is_tool_available.py:82`; and keep `_dummy_python`, imported from
+`tests/test_tool_context.py`, rather than delete it — the moved `test_unavailable_message`
+tests genuinely need a pinned script directory (`:30`, `:42` assert the interpreter and bin
+dir appear in the message, and console-script availability is a real `os.path.exists`
+check), and `step_1.md:301-302` already prefers `_dummy_python` over patching
+`os.path.exists`, so one idiom serves both and `_helpers.py` needs no edit.
+
+**User decisions**: none — round 4 raised no design, scope, or requirements question.
+
+**Changes**: applied to `step_2.md`, `step_6.md`, `summary.md`, and `Decisions.md`
+(new D9, D10, plus a note on second-order deletions vulture catches at exactly 60%).
+
+The engineer sharpened the first finding into something larger than the failing assertion:
+`PROBED_MODULES` never carries a console-script name, so without that branch
+`info.importable.get("lint-imports", False)` answers `False` for **all five** console-script
+tools. The sketch would have broken their availability outright, not just one test. Step 2
+now states why the branch is load-bearing, and the "#229 behaviours needing no carry-over"
+bullet was narrowed to retire only the fast path for module tools (`server.py:202-207`),
+explicitly keeping the console-script-only branch (`:208-210`).
+
+Every line reference in the brief matched the tree — the second consecutive clean round on
+that measure.
+
+**Status**: committed

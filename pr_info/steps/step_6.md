@@ -38,10 +38,11 @@ module.
 - `tests/test_tool_availability/` — `test_check_tool_availability.py` and
   `test_is_tool_available.py` are deleted, `test_unavailable_message.py` moves to
   `tests/test_tool_context.py`, `test_handler_short_circuit.py` and
-  `test_resolve_python_executable.py` are rewritten in place
+  `test_resolve_python_executable.py` are rewritten in place; `_helpers.py` is unchanged,
+  but `_dummy_python` gains its only remaining caller in `tests/test_tool_context.py`
 - `tests/test_server_params.py` — patches `_check_tool_availability`, assigns
   `_is_tool_available`, and its `TestResolveTimeout` class calls `ToolServer.resolve_timeout`;
-  all three disappear in this step
+  all three disappear in this step, and the `_make_server` helper goes with the class
 
 ## WHAT
 
@@ -157,12 +158,12 @@ in this commit:
 
 | Removed name | Readers | Fix |
 |---|---|---|
-| `_check_tool_availability` (renamed) | `tests/test_server_params.py:53,105,142,412,747,798` — `patch.object(ToolServer, "_check_tool_availability", return_value={})` | `patch.object` raises `AttributeError` on a missing attribute. Repoint at `_warn_missing_console_scripts` with `return_value=None`; it stores nothing, so the patch is only suppressing startup warnings. |
+| `_check_tool_availability` (renamed) | `tests/test_server_params.py:53,105,142,412,798` — `patch.object(ToolServer, "_check_tool_availability", return_value={})` | `patch.object` raises `AttributeError` on a missing attribute. Repoint at `_warn_missing_console_scripts` with `return_value=None`; it stores nothing, so the patch is only suppressing startup warnings. A sixth site, `:747`, is not in this list: it sits inside `_make_server`, which is deleted — see the `resolve_timeout` row. |
 | `_is_tool_available` | `tests/test_server_params.py:59,109,146,416,501,528,800` — `_server._is_tool_available = lambda tool_name: True  # type: ignore[method-assign]` | The method is gone, so both the assignment and its `type: ignore` are wrong (mypy's `--warn-unused-ignores` flags the latter). Replace with a `ToolContext` whose availability answers `True`: patch `mcp_tools_py.utils.tool_context.get_environment_info` to return an `EnvironmentInfo` marking every probed module importable, from the shared fixture added below. |
 | `_resolved_python` | `test_resolve_python_executable.py:32,49,95,113,126`, `test_handler_short_circuit.py:161,193,218`, `test_unavailable_message.py:30,42` and `tests/test_server_params.py:79,84` | `TestResolvePythonExecutable` becomes assertions on `server.environment.interpreter`, which is what step 1 already rewrote most of them to; finish the conversion here. `test_handler_short_circuit.py:161` asserts `call_kwargs.kwargs["python_executable"] == server._resolved_python` — change the right-hand side to `str(server.context.environment.interpreter)`; `:193` and `:218` become `str(server.context.environment.bin_dir)`. `test_server_params.py:79,84` assert `python_executable=` and `venv_bin=` in the `check_code_with_pytest` kwargs — change to `str(_server.context.environment.interpreter)` and `str(_server.context.environment.bin_dir)`, matching what `pytest_tool.py` now passes. `test_unavailable_message.py` moves to `tests/test_tool_context.py` and reads the context instead. |
 | `_tool_availability` | `test_check_tool_availability.py` (whole file), `test_is_tool_available.py` (whole file), `test_handler_short_circuit.py:24,49,74,108,146,188,206`; `tests/test_checker_tools.py:22,42,197,588,632,676`; `tests/test_formatter_tools.py:19,23,308` | The dict is gone; availability is `ToolContext.is_tool_available`. Two files are deleted and one rewritten — see the fixture migration below. |
 | `_tool_binaries` | `test_check_tool_availability.py:53,68,86,89,114,116,118,133,148,150,188`, `test_is_tool_available.py:73,77`, and the three mock fixtures below | All of them sit in the two files this step deletes, or are covered by the fixture migration. |
-| `resolve_timeout` | `tests/test_server_params.py:751-783` — `TestResolveTimeout`, four tests asserting at `:758,759,765,766,776,777,783`; plus the fixture stubs at `tests/test_checker_tools.py:48-53` and `tests/test_formatter_tools.py:28-30` | Move `TestResolveTimeout` to `tests/test_tool_context.py` against `ToolContext.resolve_timeout`; it is the concrete form of test 4 below, so write it there instead of the sketch. All four cases carry over unchanged — `check_timeout` from the CLI, the 300/120 built-ins, a `pyproject.toml` `mypy-timeout` beating `check_timeout`, and an explicit per-call value winning — by building the context with the same `project_dir` and `check_timeout`. Delete the section comment at `:690`'s mention of `ToolServer.resolve_timeout`; the `--check-timeout` CLI tests above it stay. The two fixture stubs are dropped, not ported — see the fixture migration below. |
+| `resolve_timeout` | `tests/test_server_params.py:751-783` — `TestResolveTimeout`, four tests asserting at `:758,759,765,766,776,777,783`; plus the fixture stubs at `tests/test_checker_tools.py:48-53` and `tests/test_formatter_tools.py:28-30` | Move `TestResolveTimeout` to `tests/test_tool_context.py` against `ToolContext.resolve_timeout`; it is the concrete form of test 4 below, so write it there instead of the sketch. All four cases carry over unchanged — `check_timeout` from the CLI, the 300/120 built-ins, a `pyproject.toml` `mypy-timeout` beating `check_timeout`, and an explicit per-call value winning — by building the context with the same `project_dir` and `check_timeout`. Delete the section comment at `:690`'s mention of `ToolServer.resolve_timeout`; the `--check-timeout` CLI tests above it stay. **Delete the `_make_server` helper (`:736-748`) with the class**: all four of its call sites are the four tests that move, it does not travel with them (they build a `ToolContext` directly), and vulture reports an unused module-level test helper at 60% confidence — exactly the repo's threshold, so both this step's `run_vulture_check` and CI's vulture job (`ci.yml:154`) go red if it is left behind. The two fixture stubs are dropped, not ported — see the fixture migration below. |
 
 ## HOW — the nine tool modules
 
@@ -207,9 +208,10 @@ no cache, no subprocess and no reference to the server. `is_tool_available` retu
 
 `tests/test_tool_context.py`:
 
-1. `is_tool_available` for a console-script tool is a filesystem answer — create
-   `tmp_path/.../ruff(.exe)`, assert `True`; remove it, assert `False`; assert
-   `get_environment_info` was never called.
+1. `is_tool_available` for a console-script tool is a filesystem answer — build the
+   directory with `_dummy_python(tmp_path, "ruff")` from
+   `tests/test_tool_availability/_helpers.py`, assert `True`; remove the file, assert
+   `False`; assert `get_environment_info` was never called.
 2. `is_tool_available` for an `-m` tool reads the probe — patch
    `mcp_tools_py.utils.tool_context.get_environment_info` and assert both outcomes.
 3. `unavailable_message` names the bin dir for a console-script tool and the interpreter
@@ -305,11 +307,24 @@ moment the registrars change, so they move in this same commit:
     order, now `PythonEnvironment.resolve`'s contract as seen through the server. Rename it
     if the class name no longer fits.
 
+  - `_helpers.py` — **keep `_dummy_python` (`:23`) and import it from
+    `tests/test_tool_context.py`.** Its three importers today are
+    `test_check_tool_availability.py:10` and `test_is_tool_available.py:11`, both deleted
+    here, and `test_unavailable_message.py:8`, which moves out of the package — so the
+    helper would otherwise lose every caller and vulture would flag it at 60% confidence,
+    the repo's threshold. The moved message tests still need a pinned script directory:
+    they assert the searched directory appears in the message, and `is_tool_available`
+    for a console-script tool is a real `os.path.exists` check. `_dummy_python(tmp_path,
+    "ruff")` builds exactly the layout test 1 above describes, and step 1 already
+    prescribes it in preference to patching `os.path.exists`, so one idiom covers both.
+    `_create_server` and `_capture_tools` keep their callers in the two files that stay.
+
   Update each surviving module docstring — they name `_resolve_python_executable` and
   `_check_tool_availability`, neither of which exists after this step.
-- `tests/test_server_params.py` — the six `_check_tool_availability` patches and the seven
+- `tests/test_server_params.py` — the five `_check_tool_availability` patches and the seven
   `_is_tool_available` assignments listed in the table above, plus `:79,84`, plus
-  `TestResolveTimeout` (`:751-783`) which moves out to `tests/test_tool_context.py`. This
+  `TestResolveTimeout` (`:751-783`) and the `_make_server` helper (`:736-748`), both of
+  which leave the file — the class to `tests/test_tool_context.py`, the helper deleted. This
   file is not a `ToolContext` fixture holder; it constructs real servers, so it needs the
   patch targets updated rather than a fixture swap.
 - `tests/test_code_checker_bandit/test_integration.py:11-25` — same conversion.
@@ -339,7 +354,9 @@ per site — `CheckerTools(server.context)` — not a rewrite.
 
 `run_format_code`, `run_pylint_check`, `run_pytest_check`, `run_mypy_check`,
 `run_lint_imports_check` (zero ignored imports now), `run_tach_check`, `run_vulture_check`
-(deleted attributes may leave orphaned whitelist entries).
+(deleted attributes may leave orphaned whitelist entries; it must also report neither
+`_make_server` nor `_dummy_python` — the two test helpers this step's deletions could
+orphan).
 
 ## LLM prompt
 
@@ -354,8 +371,10 @@ per site — `CheckerTools(server.context)` — not a rewrite.
 > the removed names — the table in the step lists them, including
 > `tests/test_server_params.py`; they must all move in this commit or pytest goes red.
 > `ToolServer.resolve_timeout` is deleted outright — leave no delegate — and its
-> `TestResolveTimeout` class moves onto `ToolContext`; drop the two fixture timeout stubs
-> rather than porting them. Also
+> `TestResolveTimeout` class moves onto `ToolContext`; delete `_make_server` with it and
+> drop the two fixture timeout stubs rather than porting them. Keep `_dummy_python` in
+> `tests/test_tool_availability/_helpers.py` and import it from
+> `tests/test_tool_context.py`, which is its only remaining caller. Also
 > repoint the 36 real-`ToolServer` `CheckerTools(server)` sites the step tabulates to
 > `CheckerTools(server.context)`; CI runs `mypy --strict src tests`, so each is an
 > `arg-type` error otherwise. In

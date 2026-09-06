@@ -89,7 +89,10 @@ These reduce moving parts without touching any acceptance criterion:
    `environment.binary("ruff")` at use time. Removes one attribute from `server.py` and
    from three test fixtures.
 4. **`prefix` and `is_venv` dropped from the probe blob** — no consumer. `sys_path` stays
-   (#228 names it), `distributions` stays (decision 15's error text, #61).
+   (#228 names it), `distributions` stays (decision 15's error text, #61). `sys_path` is
+   then the one field with no production reader, so step 2's first `EnvironmentInfo` test
+   asserts on the attribute directly — vulture flags an unread dataclass field at the
+   repo's 60% threshold, and dataclass equality does not count as a read.
 5. **One home for the ten-tool taxonomy.** #229 put `PROBE_TIMEOUT_SECONDS`, `_TOOL_MODULES`
    and `_TOOL_PACKAGES` in `server.py`; step 2 moves them to `utils/environment_info.py` and
    everything else derives from them — `PROBED_MODULES` there, `CONSOLE_SCRIPT_TOOLS` in
@@ -202,7 +205,7 @@ One new folder: `src/mcp_tools_py/utils/target_scripts/`.
 | `tests/test_formatter_tools.py` | 6 |
 | `tests/test_utility_tools.py` | 7 |
 | `tests/conftest.py` | 2 (autouse `get_environment_info.cache_clear()`), 6 (shared `ToolContext` fixture) |
-| `tests/test_server_params.py` | 6 (`_check_tool_availability`, `_is_tool_available`, `_resolved_python`; `TestResolveTimeout` moves to `tests/test_tool_context.py`) |
+| `tests/test_server_params.py` | 6 (`_check_tool_availability`, `_is_tool_available`, `_resolved_python`; `TestResolveTimeout` moves to `tests/test_tool_context.py` and `_make_server` is deleted with it) |
 
 `pyproject.toml` needs no change for **package discovery**:
 `[tool.setuptools.packages.find]` sets only `where = ["src"]`, so `namespaces` defaults to
