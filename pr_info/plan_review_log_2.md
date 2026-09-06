@@ -265,3 +265,94 @@ Every line reference in the brief matched the tree — the second consecutive cl
 that measure.
 
 **Status**: committed
+
+## Round 5 — 2026-09-06
+
+**Findings**: none.
+
+Round 5 verified all four of round 4's edits as exact — the console-script branch and the
+narrowed carry-over bullet in step 2, `_make_server` deleted with `TestResolveTimeout` and
+`:747` dropped from the repoint list, the required direct read of `EnvironmentInfo.sys_path`,
+and `_dummy_python` kept for `tests/test_tool_context.py`.
+
+It then ran independent checks rather than only re-verifying: step ordering (no step
+consumes what a later step creates); step 1's dead-import table against every `os`/`shutil`/
+`sys` use in `server.py`; the `.importlinter` 12-of-14 / 2 arithmetic; step 7's "17 tools"
+count against the `@mcp.tool()` decorators; step 7's four `architecture.md` anchors; and
+every production reader of the six names step 6 removes. All clean.
+
+One sweep round 4 had not run: the three names step 2 moves and renames —
+`PROBE_TIMEOUT_SECONDS`, `_TOOL_MODULES`, `_TOOL_PACKAGES` — have no reader outside
+`server.py`, so dropping the underscore breaks nothing. It also confirmed
+`test_unavailable_message.py` survives step 1 untouched, `_dummy_python` returning a
+natively-normalised path so `os.path.dirname(...)` and `str(environment.bin_dir)` agree —
+the same exemption already noted for `test_check_tool_availability.py:188-190`.
+
+**Decisions**: none needed.
+
+**User decisions**: none — the third consecutive round raising no design, scope, or
+requirements question.
+
+**Changes**: none. The loop terminates on this round.
+
+**Status**: no changes needed
+
+---
+
+## Final Status
+
+**Plan is ready for approval.**
+
+Five rounds in this run, on top of five in `plan_review_log_1.md`. Findings per round: 14,
+11, 4, 4, 0. Every acceptance criterion in issue #217 is owned by a named step, with the
+single exception of criterion 4, which #229 delivered on main and D3 formally retired.
+
+### What this run was actually about
+
+The branch was **behind main** at the start, and `60e1cc3` (#229, "detect tools next to the
+resolved interpreter") had landed in the interim. That commit rewrote `server.py`, deleted
+`tests/test_tool_availability.py` and split it into a package, and reworked `main.py`,
+`README.md`, `code_checker_pytest/runners.py` and `docs/architecture/architecture.md`. The
+plan — refined across five prior rounds — was written against the pre-#229 tree, so roughly
+sixty of its line-precise references pointed at code that no longer existed. Reviewing
+before rebasing would have produced findings that were wrong on arrival, so the run began
+with a rebase.
+
+The core of #217 survived intact: `inspect_library.py:38` still imports in the server's own
+process, and `jedi_tools.py:26,99` still build `jedi.Project` with no `environment_path`.
+Steps 3, 4 and 5 needed almost no change. Step 1, however, was largely delivered by #229,
+and step 6 shrank by roughly half.
+
+### User decisions (round 1)
+
+| # | Question | Answer |
+|---|---|---|
+| D1 | `main.py`/`README.md` help text contradicts issue decision 5, and #229 re-asserted it | **Confirm decision 5** — one configurable environment, the project env; correct the framing in all five places |
+| D2 | Acceptance criterion 1 and step 4's test are written around `--venv-path`, deprecated by #229 | Re-express via `--python-executable`; `resolve(venv_path=...)` still honours the deprecated flag |
+| D3 | Does step 1 still earn its place? | **Re-scope, don't delete** — drop criterion 4 as delivered, reword criterion 3, drop the `bin_dir` rename as pure churn |
+| D4 | May the probe drop #229's fail-open timeout policy? | **No** — carry fail-open into the probe; the other three #229 behaviours need no carry-over |
+
+D5–D10 were recorded in later rounds as smaller settled choices (epilog examples;
+`resolve_timeout` deleted with no delegate; the frozen-context mechanism for the
+invalid-timeout test; vulture as the dead-import enforcer; the console-script branch; keeping
+`_dummy_python`).
+
+### Commits
+
+| SHA | Round |
+|---|---|
+| `60f4960` | 1 — rebase plan onto #229 |
+| `42129bb` | 2 — real-`ToolServer` call sites, `build` dev dependency, dead imports, count corrections |
+| `ca1a92c` | 3 — `resolve_timeout` deletion, frozen-context test mechanism, step 3 dead imports |
+| `b1b4af7` | 4 — console-script branch, three vulture orphans |
+
+### Two findings worth carrying into implementation
+
+- **The `build` dev dependency.** `tests/test_packaging.py` uses
+  `pytest.importorskip("build")`, and `build` is in neither `dependencies` nor the `dev`
+  extra. Acceptance criterion 8 would have skipped silently in CI rather than verifying the
+  wheel. Step 2 now adds `build>=1.0`.
+- **The console-script branch in `_is_tool_available`.** `PROBED_MODULES` never carries a
+  console-script name, so without the early return `info.importable.get("lint-imports",
+  False)` answers `False` for all five console-script tools — availability broken outright,
+  not merely one failing assertion.
