@@ -3,7 +3,7 @@
 from typing import TYPE_CHECKING
 
 from mcp_tools_py.log_utils import log_function_call
-from mcp_tools_py.utils.environment_info import probe_script_path
+from mcp_tools_py.utils.environment_info import STDERR_SNIPPET, probe_script_path
 from mcp_tools_py.utils.subprocess_runner import execute_command
 from mcp_tools_py.utils.tool_context import ToolContext
 
@@ -12,9 +12,6 @@ if TYPE_CHECKING:
 
 # Timeout for one name resolution in the target environment.
 SOURCE_TIMEOUT_SECONDS = 30
-
-# How much of the child's stderr to quote back in a failure message.
-_STDERR_SNIPPET = 500
 
 
 def _get_library_source(import_path: str, max_lines: int, interpreter: str) -> str:
@@ -53,7 +50,7 @@ def _get_library_source(import_path: str, max_lines: int, interpreter: str) -> s
     if result.execution_error:
         return f"Error: could not run {interpreter}: {result.execution_error}"
     if result.return_code != 0:
-        detail = result.stderr.strip()[:_STDERR_SNIPPET]
+        detail = result.stderr.strip()[:STDERR_SNIPPET]
         return (
             f"Error resolving '{import_path}' " f"(exit {result.return_code}): {detail}"
         )

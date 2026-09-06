@@ -1,6 +1,7 @@
 """Unit tests for inspect_library: the parent side, and real resolution."""
 
 import sys
+from pathlib import Path
 from unittest.mock import patch
 
 import pytest
@@ -103,6 +104,25 @@ class TestChildProcess:
             _get_library_source("json.encoder", 0, "/some/python")
 
             mock_exec.assert_not_called()
+
+    def test_import_time_output_is_not_returned_as_source(
+        self, tmp_path: Path, monkeypatch: pytest.MonkeyPatch
+    ) -> None:
+        """A module that prints while importing does not pollute the source."""
+        package = tmp_path / "banner_pkg"
+        package.mkdir()
+        (package / "__init__.py").write_text(
+            'print("BANNER: importing banner_pkg")\n', encoding="utf-8"
+        )
+        (package / "thing.py").write_text(
+            "def thing() -> int:\n    return 42\n", encoding="utf-8"
+        )
+        monkeypatch.setenv("PYTHONPATH", str(tmp_path))
+
+        result = _src("banner_pkg.thing.thing")
+
+        assert "BANNER" not in result
+        assert result.startswith("def thing()")
 
     def test_command_uses_the_given_interpreter(self) -> None:
         """The command runs the probe under the interpreter passed in."""

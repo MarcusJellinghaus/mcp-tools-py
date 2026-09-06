@@ -3,6 +3,7 @@
 Standard library only — see the package docstring for why.
 """
 
+import contextlib
 import importlib.metadata
 import importlib.util
 import inspect
@@ -70,6 +71,25 @@ def _info(module_names: list[str]) -> dict[str, object]:
 
 def _source(import_path: str, max_lines: int) -> str:
     """Retrieve source code for any importable Python symbol.
+
+    Resolution imports the target module, which runs its top-level code and
+    may print.  Such output would land on the stdout the caller reads the
+    source from, so stdout is redirected to a throwaway buffer for the
+    duration and restored before anything is written.
+
+    Args:
+        import_path: Dotted import path (e.g. "os.path.join" or "json.JSONEncoder").
+        max_lines: Maximum number of source lines to return.
+
+    Returns:
+        Source code string, or an error message if resolution fails.
+    """
+    with contextlib.redirect_stdout(io.StringIO()):
+        return _resolve_source(import_path, max_lines)
+
+
+def _resolve_source(import_path: str, max_lines: int) -> str:
+    """Import the target module and return the requested symbol's source.
 
     Note: Uses ``importlib.import_module``, which executes module-level code
     as a side effect of importing the target module.

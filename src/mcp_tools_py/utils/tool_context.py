@@ -78,7 +78,11 @@ class ToolContext:
                 info.error,
                 tool_name,
             )
-        available = info.importable.get(tool_name, False)
+            return True
+
+        # `importable` is keyed by module name, not by tool key.
+        module = TOOL_MODULES.get(tool_name)
+        available = module is not None and info.importable.get(module, False)
         if not available:
             logger.warning("%s", self.unavailable_message(tool_name))
         return available
@@ -104,7 +108,8 @@ class ToolContext:
                 f"{tool_name} is not available. No {tool_name} console script was "
                 f"found in {self.environment.bin_dir}. Ensure --python-executable "
                 f"points to an environment where {name} is installed. "
-                f"Restart the server after installing."
+                f"That directory is re-checked on every call, so no restart is "
+                f"needed after installing."
             )
 
         info = get_environment_info(str(self.environment.interpreter))

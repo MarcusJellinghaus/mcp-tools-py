@@ -34,7 +34,7 @@ def test_bandit_not_available_message(tool_context: ToolContext) -> None:
     result = tools["run_bandit_check"]()  # type: ignore[operator]
 
     assert "bandit is not available" in result
-    assert "Restart the server" in result
+    assert "no restart is needed" in result
 
 
 def test_bandit_happy_path(tool_context: ToolContext) -> None:

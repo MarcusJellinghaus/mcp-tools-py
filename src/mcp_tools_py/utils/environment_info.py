@@ -17,8 +17,8 @@ from mcp_tools_py.utils.subprocess_runner import execute_command
 # Timeout for the one-shot environment probe.
 PROBE_TIMEOUT_SECONDS = 30
 
-# How much of the child's stderr to quote back in a failure message.
-_STDERR_SNIPPET = 500
+# How much of a child process's stderr to quote back in a failure message.
+STDERR_SNIPPET = 500
 
 # Tool key -> module for `python -m <module>`, or None when the tool is only
 # ever run through its console script. The console script is named after the key.
@@ -117,7 +117,7 @@ def get_environment_info(interpreter: str) -> EnvironmentInfo:
             f"probe of {interpreter} timed out after {PROBE_TIMEOUT_SECONDS} seconds"
         )
     if result.execution_error or result.return_code != 0:
-        detail = result.execution_error or result.stderr.strip()[:_STDERR_SNIPPET]
+        detail = result.execution_error or result.stderr.strip()[:STDERR_SNIPPET]
         return _failed(f"could not probe {interpreter}: {detail}")
 
     try:

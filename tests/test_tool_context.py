@@ -160,7 +160,7 @@ class TestUnavailableMessage:
 
         assert "ruff is not available" in message
         assert str(context.environment.bin_dir) in message
-        assert "Restart the server" in message
+        assert "no restart is needed" in message
         assert "N/A" not in message
         assert "--venv-path" not in message
 
