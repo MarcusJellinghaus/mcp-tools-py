@@ -21,7 +21,7 @@ This tracks **Feature Implementation** consisting of multiple **Tasks**.
 
 ## Tasks
 
-- [ ] [Step 1](./steps/step_1.md) — `PythonEnvironment` value object
+- [x] [Step 1](./steps/step_1.md) — `PythonEnvironment` value object
 - [ ] [Step 2](./steps/step_2.md) — Probe script and `EnvironmentInfo`
 - [ ] [Step 3](./steps/step_3.md) — `get_library_source` runs in a child process
 - [ ] [Step 4](./steps/step_4.md) — jedi `environment_path` + venv integration test

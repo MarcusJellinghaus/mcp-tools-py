@@ -17,7 +17,10 @@ class TestCheckToolAvailability:
         """When all file-existence tools exist, all should be True."""
         with (
             patch("mcp.server.fastmcp.FastMCP") as mock_fastmcp,
-            patch("mcp_tools_py.server.os.path.exists", return_value=True),
+            patch(
+                "mcp_tools_py.utils.python_environment.os.path.exists",
+                return_value=True,
+            ),
         ):
             mock_fastmcp.return_value.tool.return_value = MagicMock()
 
@@ -57,16 +60,19 @@ class TestCheckToolAvailability:
         project_dir = Path("/project")
         with (
             patch("mcp.server.fastmcp.FastMCP") as mock_fastmcp,
-            patch("mcp_tools_py.server.os.name", "nt"),
-            patch("mcp_tools_py.server.os.path.exists", return_value=True),
+            patch("mcp_tools_py.utils.python_environment._IS_WINDOWS", True),
+            patch(
+                "mcp_tools_py.utils.python_environment.os.path.exists",
+                return_value=True,
+            ),
         ):
             mock_fastmcp.return_value.tool.return_value = MagicMock()
 
             server = _create_server(project_dir=project_dir, venv_path="/mock/venv")
 
             assert server._tool_availability["lint-imports"] is True
-            assert server._tool_binaries["lint-imports"] == os.path.join(
-                "/mock/venv", "Scripts", "lint-imports.exe"
+            assert server._tool_binaries["lint-imports"] == str(
+                Path("/mock/venv") / "Scripts" / "lint-imports.exe"
             )
             assert "vulture" in server._tool_availability
 
@@ -92,17 +98,17 @@ class TestCheckToolAvailability:
         """When venv_path is set but binary doesn't exist, mark unavailable."""
         project_dir = Path("/project")
 
-        def exists_side_effect(path: str) -> bool:
+        def exists_side_effect(path: Path) -> bool:
             # Python executable exists, but lint-imports and vulture do not
-            if "python" in path.lower():
+            if "python" in str(path).lower():
                 return True
             return False
 
         with (
             patch("mcp.server.fastmcp.FastMCP") as mock_fastmcp,
-            patch("mcp_tools_py.server.os.name", "nt"),
+            patch("mcp_tools_py.utils.python_environment._IS_WINDOWS", True),
             patch(
-                "mcp_tools_py.server.os.path.exists",
+                "mcp_tools_py.utils.python_environment.os.path.exists",
                 side_effect=exists_side_effect,
             ),
         ):
@@ -122,16 +128,19 @@ class TestCheckToolAvailability:
         project_dir = Path("/project")
         with (
             patch("mcp.server.fastmcp.FastMCP") as mock_fastmcp,
-            patch("mcp_tools_py.server.os.name", "nt"),
-            patch("mcp_tools_py.server.os.path.exists", return_value=True),
+            patch("mcp_tools_py.utils.python_environment._IS_WINDOWS", True),
+            patch(
+                "mcp_tools_py.utils.python_environment.os.path.exists",
+                return_value=True,
+            ),
         ):
             mock_fastmcp.return_value.tool.return_value = MagicMock()
 
             server = _create_server(project_dir=project_dir, venv_path="/mock/venv")
 
             assert server._tool_availability["vulture"] is True
-            assert server._tool_binaries["vulture"] == os.path.join(
-                "/mock/venv", "Scripts", "vulture.exe"
+            assert server._tool_binaries["vulture"] == str(
+                Path("/mock/venv") / "Scripts" / "vulture.exe"
             )
 
     def test_vulture_unavailable_when_script_not_on_disk(self, tmp_path: Path) -> None:

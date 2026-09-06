@@ -1,9 +1,6 @@
 """MCP server implementation for code checking and formatting tools."""
 
 import logging
-import os
-import shutil
-import sys
 from pathlib import Path
 from typing import Callable, Optional, Protocol, TypeVar
 
@@ -14,6 +11,7 @@ from mcp_tools_py.log_utils import log_function_call
 from mcp_tools_py.refactoring import RefactoringTools
 from mcp_tools_py.utility_tools import UtilityTools
 from mcp_tools_py.utils.project_config import ToolName, get_check_timeout
+from mcp_tools_py.utils.python_environment import PythonEnvironment
 from mcp_tools_py.utils.subprocess_runner import execute_command
 
 # Type definitions for FastMCP
@@ -83,7 +81,7 @@ class ToolServer:
 
         Args:
             project_dir: Path to the project directory to check
-            python_executable: Optional path to Python interpreter to use for running tests. If None, defaults to sys.executable.
+            python_executable: Optional path to the Python interpreter of the project's environment. The checkers run in it and library/symbol lookups resolve against it, so it must be the environment holding the project's dependencies and the checker tools. If None, defaults to sys.executable.
             venv_path: Deprecated, use python_executable instead. Optional path to a virtual environment. When specified, the Python executable from this venv is used instead of python_executable, which is now its only effect: it no longer locates the tools.
             test_folder: Path to the test folder (relative to project_dir). Defaults to 'tests'.
             keep_temp_files: Whether to keep temporary files after test execution. Useful for debugging when tests fail.
@@ -92,8 +90,6 @@ class ToolServer:
             check_timeout: Server-level timeout in seconds for checker and formatter subprocesses. If None, per-tool configuration or the built-in defaults apply.
         """
         self.project_dir = project_dir
-        self.python_executable = python_executable
-        self.venv_path = venv_path
         self.test_folder = test_folder
         self.keep_temp_files = keep_temp_files
         self.refactoring_timeout = refactoring_timeout
@@ -104,7 +100,8 @@ class ToolServer:
         from mcp.server.fastmcp import FastMCP
 
         self.mcp: FastMCPProtocol = FastMCP("MCP Tools Service")
-        self._resolved_python = self._resolve_python_executable()
+        self.environment = PythonEnvironment.resolve(python_executable, venv_path)
+        self._resolved_python = str(self.environment.interpreter)
         self._tool_binaries: dict[str, str] = {}
         self._tool_availability = self._check_tool_availability()
         CheckerTools(self).register(self.mcp)
@@ -114,40 +111,6 @@ class ToolServer:
         )
         UtilityTools().register(self.mcp)
         InspectTools().register(self.mcp)
-
-    def _resolve_python_executable(self) -> str:
-        """Centralize venv -> python_executable -> sys.executable resolution.
-
-        A name without a directory part is looked up on PATH, so
-        `--python-executable python3` resolves to the interpreter a subprocess
-        would have started.
-
-        Returns:
-            Path to the Python interpreter to use for tool subprocesses.
-
-        Raises:
-            FileNotFoundError: If the resolved interpreter neither exists nor
-                is found on PATH.
-        """
-        if self.venv_path:
-            if os.name == "nt":
-                python = os.path.join(self.venv_path, "Scripts", "python.exe")
-            else:
-                python = os.path.join(self.venv_path, "bin", "python")
-            source = "--venv-path"
-        elif self.python_executable:
-            python, source = self.python_executable, "--python-executable"
-        else:
-            python, source = sys.executable, "sys.executable"
-
-        if not os.path.exists(python):
-            on_path = shutil.which(python)
-            if on_path is None:
-                raise FileNotFoundError(
-                    f"Python interpreter not found: {python} (from {source})"
-                )
-            return on_path
-        return python
 
     def _check_tool_availability(self) -> dict[str, bool]:
         """Locate the console-script tools next to the resolved interpreter.
@@ -161,27 +124,14 @@ class ToolServer:
             if module is not None:
                 # Probe group: detected lazily, on first use.
                 continue
-            path = self._script_path(key)
+            path = self.environment.binary(key)
             if path is not None:
-                self._tool_binaries[key] = path
+                self._tool_binaries[key] = str(path)
             else:
                 logger.warning("%s", self.tool_unavailable_message(key))
             availability[key] = path is not None
 
         return availability
-
-    def _script_path(self, key: str) -> Optional[str]:
-        """Locate the console script for a tool next to the resolved interpreter.
-
-        Args:
-            key: Tool key, which is also the console-script filename.
-
-        Returns:
-            Path to the console script, or None when it is not there.
-        """
-        name = f"{key}.exe" if os.name == "nt" else key
-        path = os.path.join(os.path.dirname(self._resolved_python), name)
-        return path if os.path.exists(path) else None
 
     def _is_tool_available(self, tool_name: str) -> bool:
         """Check if a tool is available, probing on first call.
@@ -199,12 +149,12 @@ class ToolServer:
         if tool_name in self._tool_availability:
             return self._tool_availability[tool_name]
 
-        script = self._script_path(tool_name)
+        script = self.environment.binary(tool_name)
         module = _TOOL_MODULES.get(tool_name)
         if script is not None:
             available = True
             if module is None:
-                self._tool_binaries[tool_name] = script
+                self._tool_binaries[tool_name] = str(script)
         elif module is None:
             # Console-script-only tool: file existence is the entire check.
             available = False
@@ -248,7 +198,7 @@ class ToolServer:
         """
         name = _TOOL_PACKAGES.get(key, key)
         if _TOOL_MODULES.get(key) is None:
-            searched = os.path.dirname(self._resolved_python)
+            searched = str(self.environment.bin_dir)
             return (
                 f"{key} is not available. No {key} console script was found in "
                 f"{searched}. Ensure --python-executable points to an environment "
@@ -298,7 +248,7 @@ def create_server(
 
     Args:
         project_dir: Path to the project directory to check
-        python_executable: Optional path to Python interpreter to use for running tests. If None, defaults to sys.executable.
+        python_executable: Optional path to the Python interpreter of the project's environment. The checkers run in it and library/symbol lookups resolve against it, so it must be the environment holding the project's dependencies and the checker tools. If None, defaults to sys.executable.
         venv_path: Deprecated, use python_executable instead. Optional path to a virtual environment. When specified, the Python executable from this venv is used instead of python_executable, which is now its only effect: it no longer locates the tools.
         test_folder: Path to the test folder (relative to project_dir). Defaults to 'tests'.
         keep_temp_files: Whether to keep temporary files after test execution. Useful for debugging when tests fail.

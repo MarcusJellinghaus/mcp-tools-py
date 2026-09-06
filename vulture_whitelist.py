@@ -23,8 +23,6 @@ _.pytest_runtest_setup
 
 # Configuration and data model fields that may appear unused
 _.project_dir
-_.python_executable
-_.venv_path
 _.test_folder
 _.log_level
 

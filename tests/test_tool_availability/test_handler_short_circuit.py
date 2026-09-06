@@ -128,7 +128,10 @@ class TestToolHandlerShortCircuit:
             patch(
                 "mcp_tools_py.checker_tools.pytest_tool.check_code_with_pytest"
             ) as mock_check,
-            patch("mcp_tools_py.server.os.path.exists", return_value=True),
+            patch(
+                "mcp_tools_py.utils.python_environment.os.path.exists",
+                return_value=True,
+            ),
         ):
             registered_tools = _capture_tools(mock_fastmcp)
             mock_exec.return_value = make_command_result(return_code=0, stdout="ok")
@@ -159,7 +162,9 @@ class TestToolHandlerShortCircuit:
             mock_check.assert_called_once()
             call_kwargs = mock_check.call_args
             assert call_kwargs.kwargs["python_executable"] == server._resolved_python
-            assert call_kwargs.kwargs["python_executable"] == "/custom/python"
+            assert call_kwargs.kwargs["python_executable"] == str(
+                Path("/custom/python")
+            )
 
     def test_venv_bin_derived_from_resolved_python(self) -> None:
         """The PATH prepend follows the interpreter, not `--venv-path`."""
@@ -169,7 +174,10 @@ class TestToolHandlerShortCircuit:
             patch(
                 "mcp_tools_py.checker_tools.pytest_tool.check_code_with_pytest"
             ) as mock_check,
-            patch("mcp_tools_py.server.os.path.exists", return_value=True),
+            patch(
+                "mcp_tools_py.utils.python_environment.os.path.exists",
+                return_value=True,
+            ),
         ):
             registered_tools = _capture_tools(mock_fastmcp)
             mock_exec.return_value = make_command_result(return_code=0, stdout="ok")
@@ -184,14 +192,13 @@ class TestToolHandlerShortCircuit:
                 project_dir=Path("/project"),
                 python_executable="/custom/python",
             )
-            assert server.venv_path is None
             server._tool_availability = {"pytest": True}
 
             registered_tools["run_pytest_check"]()
 
             venv_bin = mock_check.call_args.kwargs["venv_bin"]
             assert venv_bin == os.path.dirname(server._resolved_python)
-            assert venv_bin == "/custom"
+            assert venv_bin == str(Path("/custom"))
 
     def test_lint_imports_unavailable_returns_error(self) -> None:
         """When lint-imports is unavailable, tool handler returns error string."""

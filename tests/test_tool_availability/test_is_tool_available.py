@@ -201,7 +201,10 @@ class TestIsToolAvailable:
         """Eager tools populated at init are returned from cache without subprocess."""
         with (
             patch("mcp.server.fastmcp.FastMCP") as mock_fastmcp,
-            patch("mcp_tools_py.server.os.path.exists", return_value=True),
+            patch(
+                "mcp_tools_py.utils.python_environment.os.path.exists",
+                return_value=True,
+            ),
             patch("mcp_tools_py.server.execute_command") as mock_exec,
         ):
             mock_fastmcp.return_value.tool.return_value = MagicMock()

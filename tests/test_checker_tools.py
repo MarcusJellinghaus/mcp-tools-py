@@ -18,7 +18,6 @@ def mock_server() -> MagicMock:
     server.project_dir = Path("/fake/project")
     server.test_folder = "tests"
     server.keep_temp_files = False
-    server.venv_path = "/mock/venv"
     server._resolved_python = "/usr/bin/python3"
     server._tool_availability = {
         "pylint": True,
