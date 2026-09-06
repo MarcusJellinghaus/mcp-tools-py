@@ -1,5 +1,10 @@
 """Shared test utilities and fixtures."""
 
+from typing import Iterator
+
+import pytest
+
+from mcp_tools_py.utils.environment_info import get_environment_info
 from mcp_tools_py.utils.subprocess_runner import CommandResult
 
 
@@ -18,3 +23,15 @@ def make_command_result(
         timed_out=timed_out,
         execution_error=execution_error,
     )
+
+
+@pytest.fixture(autouse=True)
+def _clear_environment_info_cache() -> Iterator[None]:
+    """Keep the process-wide probe cache from leaking between tests.
+
+    The lru_cache lives on the module, not on any server, and an xdist worker
+    runs many modules per process.
+    """
+    get_environment_info.cache_clear()
+    yield
+    get_environment_info.cache_clear()

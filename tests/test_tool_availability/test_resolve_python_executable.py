@@ -6,7 +6,6 @@ from unittest.mock import MagicMock, patch
 
 import pytest
 
-from tests.conftest import make_command_result
 from tests.test_tool_availability._helpers import _create_server
 
 
@@ -18,7 +17,6 @@ class TestResolvePythonExecutable:
         project_dir = Path("/project")
         with (
             patch("mcp.server.fastmcp.FastMCP") as mock_fastmcp,
-            patch("mcp_tools_py.server.execute_command") as mock_exec,
             patch("mcp_tools_py.utils.python_environment._IS_WINDOWS", True),
             patch(
                 "mcp_tools_py.utils.python_environment.os.path.exists",
@@ -26,7 +24,6 @@ class TestResolvePythonExecutable:
             ),
         ):
             mock_fastmcp.return_value.tool.return_value = MagicMock()
-            mock_exec.return_value = make_command_result(return_code=0, stdout="ok")
 
             server = _create_server(project_dir=project_dir, venv_path="/my/venv")
 
@@ -37,7 +34,6 @@ class TestResolvePythonExecutable:
         """When venv_path is set on a POSIX layout, resolve to bin/python."""
         with (
             patch("mcp.server.fastmcp.FastMCP") as mock_fastmcp,
-            patch("mcp_tools_py.server.execute_command") as mock_exec,
             patch("mcp_tools_py.utils.python_environment._IS_WINDOWS", False),
             patch(
                 "mcp_tools_py.utils.python_environment.os.path.exists",
@@ -45,7 +41,6 @@ class TestResolvePythonExecutable:
             ),
         ):
             mock_fastmcp.return_value.tool.return_value = MagicMock()
-            mock_exec.return_value = make_command_result(return_code=0, stdout="ok")
 
             server = _create_server(project_dir=Path("/project"), venv_path="/my/venv")
 
@@ -70,12 +65,8 @@ class TestResolvePythonExecutable:
 
     def test_python_executable_not_found_raises(self) -> None:
         """When python_executable doesn't exist, raise FileNotFoundError."""
-        with (
-            patch("mcp.server.fastmcp.FastMCP") as mock_fastmcp,
-            patch("mcp_tools_py.server.execute_command") as mock_exec,
-        ):
+        with patch("mcp.server.fastmcp.FastMCP") as mock_fastmcp:
             mock_fastmcp.return_value.tool.return_value = MagicMock()
-            mock_exec.return_value = make_command_result(return_code=0, stdout="ok")
 
             with pytest.raises(FileNotFoundError, match="--python-executable"):
                 _create_server(
@@ -87,14 +78,12 @@ class TestResolvePythonExecutable:
         """A name without a directory part is looked up on PATH."""
         with (
             patch("mcp.server.fastmcp.FastMCP") as mock_fastmcp,
-            patch("mcp_tools_py.server.execute_command") as mock_exec,
             patch(
                 "mcp_tools_py.utils.python_environment.shutil.which",
                 return_value="/usr/bin/python3",
             ) as mock_which,
         ):
             mock_fastmcp.return_value.tool.return_value = MagicMock()
-            mock_exec.return_value = make_command_result(return_code=0, stdout="ok")
 
             server = _create_server(
                 project_dir=Path("/project"), python_executable="python3"
@@ -107,14 +96,12 @@ class TestResolvePythonExecutable:
         """When no venv_path but python_executable is set, use it directly."""
         with (
             patch("mcp.server.fastmcp.FastMCP") as mock_fastmcp,
-            patch("mcp_tools_py.server.execute_command") as mock_exec,
             patch(
                 "mcp_tools_py.utils.python_environment.os.path.exists",
                 return_value=True,
             ),
         ):
             mock_fastmcp.return_value.tool.return_value = MagicMock()
-            mock_exec.return_value = make_command_result(return_code=0, stdout="ok")
 
             server = _create_server(
                 project_dir=Path("/project"),
@@ -125,12 +112,8 @@ class TestResolvePythonExecutable:
 
     def test_sys_executable_fallback(self) -> None:
         """When neither venv_path nor python_executable is set, use sys.executable."""
-        with (
-            patch("mcp.server.fastmcp.FastMCP") as mock_fastmcp,
-            patch("mcp_tools_py.server.execute_command") as mock_exec,
-        ):
+        with patch("mcp.server.fastmcp.FastMCP") as mock_fastmcp:
             mock_fastmcp.return_value.tool.return_value = MagicMock()
-            mock_exec.return_value = make_command_result(return_code=0, stdout="ok")
 
             server = _create_server(project_dir=Path("/project"))
 

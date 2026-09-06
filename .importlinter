@@ -52,3 +52,13 @@ ignore_imports =
     mcp_tools_py.log_utils -> mcp_coder_utils
     mcp_tools_py.utils.file_utils -> mcp_coder_utils
     mcp_tools_py.utils.subprocess_runner -> mcp_coder_utils
+
+[importlinter:contract:target-scripts-stdlib-only]
+name = target_scripts import nothing from the project
+type = forbidden
+source_modules =
+    mcp_tools_py.utils.target_scripts.probe
+forbidden_modules =
+    mcp_tools_py.*
+    mcp_tools_py.*.*
+    mcp_tools_py.*.*.*

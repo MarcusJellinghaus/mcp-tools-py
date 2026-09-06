@@ -10,9 +10,14 @@ from mcp_tools_py.inspect_library import InspectTools
 from mcp_tools_py.log_utils import log_function_call
 from mcp_tools_py.refactoring import RefactoringTools
 from mcp_tools_py.utility_tools import UtilityTools
+from mcp_tools_py.utils.environment_info import (
+    TOOL_MODULES,
+    TOOL_PACKAGES,
+    EnvironmentInfo,
+    get_environment_info,
+)
 from mcp_tools_py.utils.project_config import ToolName, get_check_timeout
 from mcp_tools_py.utils.python_environment import PythonEnvironment
-from mcp_tools_py.utils.subprocess_runner import execute_command
 
 # Type definitions for FastMCP
 T = TypeVar("T")
@@ -40,27 +45,6 @@ class FastMCPProtocol(Protocol):
 
 # Initialize logger
 logger = logging.getLogger(__name__)
-
-# Timeout for the `python -m <module> --version` availability probe.
-PROBE_TIMEOUT_SECONDS = 30
-
-# Tool key -> module for `python -m <module>`, or None when the tool is only
-# ever run through its console script. The console script is named after the key.
-_TOOL_MODULES: dict[str, Optional[str]] = {
-    "pytest": "pytest",
-    "pylint": "pylint",
-    "mypy": "mypy",
-    "black": "black",
-    "isort": "isort",
-    "lint-imports": None,
-    "vulture": None,
-    "ruff": None,
-    "bandit": None,
-    "tach": None,
-}
-
-# Tool key -> distribution to install, when it differs from the key.
-_TOOL_PACKAGES: dict[str, str] = {"lint-imports": "import-linter"}
 
 
 class ToolServer:
@@ -120,7 +104,7 @@ class ToolServer:
         """
         availability: dict[str, bool] = {}
 
-        for key, module in _TOOL_MODULES.items():
+        for key, module in TOOL_MODULES.items():
             if module is not None:
                 # Probe group: detected lazily, on first use.
                 continue
@@ -134,11 +118,13 @@ class ToolServer:
         return availability
 
     def _is_tool_available(self, tool_name: str) -> bool:
-        """Check if a tool is available, probing on first call.
+        """Check if a tool is available, probing the environment on first call.
 
-        Checks, in order: the cache, a console script next to the resolved
-        interpreter, then `python -m <module> --version`. A probe that times out
-        is assumed available; a tool with no module never probes.
+        A console-script-only tool is answered from the filesystem; the probe
+        cannot answer for one, because it is asked about module names. Every
+        other tool is answered from the one-shot environment probe, which
+        fails open: a probe that could not be trusted reports the tool
+        available so the call proceeds and surfaces the real error.
 
         Args:
             tool_name: Tool key to look up.
@@ -149,40 +135,50 @@ class ToolServer:
         if tool_name in self._tool_availability:
             return self._tool_availability[tool_name]
 
-        script = self.environment.binary(tool_name)
-        module = _TOOL_MODULES.get(tool_name)
-        if script is not None:
-            available = True
-            if module is None:
-                self._tool_binaries[tool_name] = str(script)
-        elif module is None:
+        if TOOL_MODULES.get(tool_name) is None:
             # Console-script-only tool: file existence is the entire check.
-            available = False
+            available = self.environment.binary(tool_name) is not None
+            if not available:
+                logger.warning("%s", self.tool_unavailable_message(tool_name))
         else:
-            result = execute_command(
-                [self._resolved_python, "-m", module, "--version"],
-                timeout_seconds=PROBE_TIMEOUT_SECONDS,
-                env={"PYTEST_DISABLE_PLUGIN_AUTOLOAD": "1"},
-            )
-            if result.timed_out:
-                available = True
-                logger.warning(
-                    "%s version probe timed out after %s seconds using %s. "
-                    "Assuming %s is available.",
-                    tool_name,
-                    PROBE_TIMEOUT_SECONDS,
-                    self._resolved_python,
-                    tool_name,
-                )
-            else:
-                available = result.return_code == 0 and not result.execution_error
-                if available:
-                    logger.info("%s version: %s", tool_name, result.stdout.strip())
+            info = get_environment_info(self._resolved_python)
+            available = info.importable.get(tool_name, False)
+            if info.error or not available:
+                logger.warning("%s", self._probe_diagnosis(tool_name, info))
 
-        if not available:
-            logger.warning("%s", self.tool_unavailable_message(tool_name))
         self._tool_availability[tool_name] = available
         return available
+
+    def _probe_diagnosis(self, tool_name: str, info: EnvironmentInfo) -> str:
+        """Explain what the environment probe says about `tool_name`.
+
+        Args:
+            tool_name: Tool key that was looked up.
+            info: What the probe reported about the resolved interpreter.
+
+        Returns:
+            One line naming the interpreter and, when the probe succeeded, the
+            installed distribution of the same name if there is one — which
+            turns a flag problem into a broken-install diagnosis.
+        """
+        if info.error:
+            return (
+                f"cannot describe the environment at {self._resolved_python}: "
+                f"{info.error}. Assuming {tool_name} is available."
+            )
+        name = TOOL_PACKAGES.get(tool_name, tool_name)
+        version = info.distributions.get(name.lower())
+        if version is not None:
+            return (
+                f"{tool_name} is not importable by {self._resolved_python} "
+                f"(Python {info.version}), though distribution {name} {version} "
+                f"is installed"
+            )
+        return (
+            f"{tool_name} is not installed in {self._resolved_python} "
+            f"(Python {info.version}). Ensure --python-executable points at "
+            f"the project's environment."
+        )
 
     def tool_unavailable_message(self, key: str) -> str:
         """Build the standard "tool not available" message for `key`.
@@ -192,12 +188,12 @@ class ToolServer:
 
         Returns:
             A message naming --python-executable and the location searched.
-            The distribution to install comes from `_TOOL_PACKAGES`, which maps
+            The distribution to install comes from `TOOL_PACKAGES`, which maps
             a key to its distribution when the two differ (import-linter
             provides `lint-imports`).
         """
-        name = _TOOL_PACKAGES.get(key, key)
-        if _TOOL_MODULES.get(key) is None:
+        name = TOOL_PACKAGES.get(key, key)
+        if TOOL_MODULES.get(key) is None:
             searched = str(self.environment.bin_dir)
             return (
                 f"{key} is not available. No {key} console script was found in "

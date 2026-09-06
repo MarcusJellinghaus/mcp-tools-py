@@ -4,7 +4,6 @@ import os
 from pathlib import Path
 from unittest.mock import patch
 
-from tests.conftest import make_command_result
 from tests.test_tool_availability._helpers import _capture_tools, _create_server
 
 
@@ -13,12 +12,8 @@ class TestToolHandlerShortCircuit:
 
     def test_pytest_unavailable_returns_error(self) -> None:
         """When pytest is unavailable, tool handler returns error string."""
-        with (
-            patch("mcp.server.fastmcp.FastMCP") as mock_fastmcp,
-            patch("mcp_tools_py.server.execute_command") as mock_exec,
-        ):
+        with patch("mcp.server.fastmcp.FastMCP") as mock_fastmcp:
             registered_tools = _capture_tools(mock_fastmcp)
-            mock_exec.return_value = make_command_result(return_code=0, stdout="ok")
 
             server = _create_server(project_dir=Path("/project"))
             server._tool_availability = {
@@ -38,12 +33,8 @@ class TestToolHandlerShortCircuit:
 
     def test_pylint_unavailable_returns_error(self) -> None:
         """When pylint is unavailable, tool handler returns error string."""
-        with (
-            patch("mcp.server.fastmcp.FastMCP") as mock_fastmcp,
-            patch("mcp_tools_py.server.execute_command") as mock_exec,
-        ):
+        with patch("mcp.server.fastmcp.FastMCP") as mock_fastmcp:
             registered_tools = _capture_tools(mock_fastmcp)
-            mock_exec.return_value = make_command_result(return_code=0, stdout="ok")
 
             server = _create_server(project_dir=Path("/project"))
             server._tool_availability = {
@@ -63,12 +54,8 @@ class TestToolHandlerShortCircuit:
 
     def test_mypy_unavailable_returns_error(self) -> None:
         """When mypy is unavailable, tool handler returns error string."""
-        with (
-            patch("mcp.server.fastmcp.FastMCP") as mock_fastmcp,
-            patch("mcp_tools_py.server.execute_command") as mock_exec,
-        ):
+        with patch("mcp.server.fastmcp.FastMCP") as mock_fastmcp:
             registered_tools = _capture_tools(mock_fastmcp)
-            mock_exec.return_value = make_command_result(return_code=0, stdout="ok")
 
             server = _create_server(project_dir=Path("/project"))
             server._tool_availability = {
@@ -90,13 +77,11 @@ class TestToolHandlerShortCircuit:
         """When tool is available, normal execution proceeds."""
         with (
             patch("mcp.server.fastmcp.FastMCP") as mock_fastmcp,
-            patch("mcp_tools_py.server.execute_command") as mock_exec,
             patch(
                 "mcp_tools_py.checker_tools.pytest_tool.check_code_with_pytest"
             ) as mock_check,
         ):
             registered_tools = _capture_tools(mock_fastmcp)
-            mock_exec.return_value = make_command_result(return_code=0, stdout="ok")
 
             mock_check.return_value = {
                 "success": True,
@@ -124,7 +109,6 @@ class TestToolHandlerShortCircuit:
         """Verify that _resolved_python (not python_executable) is passed to the runner."""
         with (
             patch("mcp.server.fastmcp.FastMCP") as mock_fastmcp,
-            patch("mcp_tools_py.server.execute_command") as mock_exec,
             patch(
                 "mcp_tools_py.checker_tools.pytest_tool.check_code_with_pytest"
             ) as mock_check,
@@ -134,7 +118,6 @@ class TestToolHandlerShortCircuit:
             ),
         ):
             registered_tools = _capture_tools(mock_fastmcp)
-            mock_exec.return_value = make_command_result(return_code=0, stdout="ok")
 
             mock_check.return_value = {
                 "success": True,
@@ -170,7 +153,6 @@ class TestToolHandlerShortCircuit:
         """The PATH prepend follows the interpreter, not `--venv-path`."""
         with (
             patch("mcp.server.fastmcp.FastMCP") as mock_fastmcp,
-            patch("mcp_tools_py.server.execute_command") as mock_exec,
             patch(
                 "mcp_tools_py.checker_tools.pytest_tool.check_code_with_pytest"
             ) as mock_check,
@@ -180,7 +162,6 @@ class TestToolHandlerShortCircuit:
             ),
         ):
             registered_tools = _capture_tools(mock_fastmcp)
-            mock_exec.return_value = make_command_result(return_code=0, stdout="ok")
 
             mock_check.return_value = {
                 "success": True,
@@ -202,12 +183,8 @@ class TestToolHandlerShortCircuit:
 
     def test_lint_imports_unavailable_returns_error(self) -> None:
         """When lint-imports is unavailable, tool handler returns error string."""
-        with (
-            patch("mcp.server.fastmcp.FastMCP") as mock_fastmcp,
-            patch("mcp_tools_py.server.execute_command") as mock_exec,
-        ):
+        with patch("mcp.server.fastmcp.FastMCP") as mock_fastmcp:
             registered_tools = _capture_tools(mock_fastmcp)
-            mock_exec.return_value = make_command_result(return_code=0, stdout="ok")
 
             server = _create_server(project_dir=Path("/project"))
             server._tool_availability = {
