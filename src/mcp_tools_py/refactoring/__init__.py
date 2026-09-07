@@ -1,6 +1,5 @@
 """Python refactoring tools powered by rope and jedi."""
 
-from pathlib import Path
 from typing import TYPE_CHECKING
 
 from mcp_tools_py.log_utils import log_function_call
@@ -9,16 +8,25 @@ from mcp_tools_py.refactoring.jedi_tools import list_symbols as jedi_list_symbol
 from mcp_tools_py.refactoring.rope_tools import move_module as rope_move_module
 from mcp_tools_py.refactoring.rope_tools import move_symbol as rope_move_symbol
 from mcp_tools_py.refactoring.rope_tools import rename_symbol as rope_rename_symbol
+from mcp_tools_py.utils.tool_context import ToolContext
 
 if TYPE_CHECKING:
-    from mcp_tools_py.server import FastMCPProtocol
+    from mcp_tools_py.utils.mcp_protocols import FastMCPProtocol
 
 
 class RefactoringTools:
     """Registers refactoring tools on an MCP server."""
 
-    def __init__(self, project_dir: Path, timeout: int = 120) -> None:
-        self._project_dir = project_dir
+    def __init__(self, context: ToolContext, timeout: int = 120) -> None:
+        """Store the context the tools run against.
+
+        Args:
+            context: The project and environment the tools work in.
+            timeout: Timeout in seconds for rope refactoring subprocesses.
+                A rope concern rather than a project or environment one, so
+                it stays out of the context.
+        """
+        self._context = context
         self._timeout = timeout
 
     def register(self, mcp: "FastMCPProtocol") -> None:
@@ -28,7 +36,8 @@ class RefactoringTools:
 
     def _register_jedi_tools(self, mcp: "FastMCPProtocol") -> None:
         """Register jedi-based symbol discovery tools."""
-        project_dir = self._project_dir
+        project_dir = self._context.project_dir
+        interpreter = str(self._context.environment.interpreter)
 
         @mcp.tool()
         @log_function_call
@@ -41,7 +50,7 @@ class RefactoringTools:
             Returns:
                 Formatted listing of top-level symbols, or an error message.
             """
-            return jedi_list_symbols(project_dir, file)
+            return jedi_list_symbols(project_dir, file, interpreter)
 
         @mcp.tool()
         @log_function_call
@@ -55,7 +64,7 @@ class RefactoringTools:
             Returns:
                 Formatted listing of references, or an error message.
             """
-            return jedi_find_references(project_dir, file, symbol_name)
+            return jedi_find_references(project_dir, file, symbol_name, interpreter)
 
     def _register_rope_tools(self, mcp: "FastMCPProtocol") -> None:
         """Register rope-based refactoring tools.
@@ -64,7 +73,7 @@ class RefactoringTools:
         using the same pattern as pytest/pylint/mypy runners. This
         avoids blocking the MCP server's event loop and stdio pipes.
         """
-        project_dir = self._project_dir
+        project_dir = self._context.project_dir
         timeout = self._timeout
 
         @mcp.tool()

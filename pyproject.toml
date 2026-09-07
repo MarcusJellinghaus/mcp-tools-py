@@ -48,6 +48,8 @@ dev = [
     # Architecture and code quality tools
     "pycycle>=0.0.8",
     "pydeps>=1.12.0",
+    # Builds the wheel that tests/test_packaging.py inspects
+    "build>=1.0",
     ]
 typecheck = ["mypy>=1.13.0"]
 

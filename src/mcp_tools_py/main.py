@@ -49,8 +49,8 @@ def _build_parser() -> argparse.ArgumentParser:
 Examples:
   mcp-tools-py --project-dir /path/to/project
   mcp-tools-py --project-dir . --log-level DEBUG --keep-temp-files
-  mcp-tools-py --project-dir . --python-executable /path/to/tools-venv/bin/python --test-folder tests
-  mcp-tools-py --project-dir . --python-executable C:\path\to\tools-venv\Scripts\python.exe
+  mcp-tools-py --project-dir . --python-executable /path/to/project/.venv/bin/python --test-folder tests
+  mcp-tools-py --project-dir . --python-executable C:\path\to\project\.venv\Scripts\python.exe
         """,
     )
     parser.add_argument(
@@ -68,12 +68,11 @@ Examples:
         "--python-executable",
         type=str,
         help=(
-            "Path to the Python interpreter that runs the checker tools. "
-            "pytest, pylint, mypy, black and isort run through it, while ruff, "
-            "bandit, vulture, tach and lint-imports are located next to it, so "
-            "it should point to the environment where they are installed (the "
-            "tool's own venv), not the project's runtime venv. A path that "
-            "neither exists nor resolves on PATH fails at startup. "
+            "Path to the Python interpreter of the project's environment. The "
+            "checkers run in it and library/symbol lookups resolve against it, "
+            "so it must be the environment holding the project's dependencies "
+            "and the checker tools. A path that neither exists nor resolves on "
+            "PATH fails at startup. "
             "Defaults to the current Python interpreter (sys.executable)"
         ),
     )

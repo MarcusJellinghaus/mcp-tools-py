@@ -23,8 +23,6 @@ _.pytest_runtest_setup
 
 # Configuration and data model fields that may appear unused
 _.project_dir
-_.python_executable
-_.venv_path
 _.test_folder
 _.log_level
 
@@ -62,6 +60,9 @@ _.get_detailed_test_summary  # Used conditionally in reporting
 _.mock_pytest_results_success  # Test fixture
 _.side_effect  # Mock attribute used in tests
 _._no_ambient_cache_env  # Autouse fixture, invoked by pytest not by name
+_clear_environment_info_cache  # Autouse fixture in tests/conftest.py
+all_modules_importable  # Fixture requested for its patching, never read by name
+_clear_project_cache  # Autouse fixture in tests/test_refactoring/conftest.py and tests/test_environment_integration.py
 
 # Data file variables used for module resolution
 _.module_file_absolute
@@ -71,7 +72,3 @@ _.get_library_source  # FastMCP tool handler
 
 # MCP tool handler for code formatting
 _.run_format_code  # FastMCP tool handler
-
-# Test mock attributes used for nested attribute resolution
-_.b  # Mock attribute in test_inspect_library
-_.c  # Mock attribute in test_inspect_library

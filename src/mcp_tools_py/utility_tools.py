@@ -4,13 +4,25 @@ import time
 from typing import TYPE_CHECKING
 
 from mcp_tools_py.log_utils import log_function_call
+from mcp_tools_py.utils.tool_context import ToolContext
 
 if TYPE_CHECKING:
-    from mcp_tools_py.server import FastMCPProtocol
+    from mcp_tools_py.utils.mcp_protocols import FastMCPProtocol
 
 
 class UtilityTools:
     """Registers utility tools on an MCP server."""
+
+    def __init__(self, context: ToolContext) -> None:
+        """Take the context every registrar takes.
+
+        `sleep` needs neither the project nor the environment, so the
+        context goes unused. The uniform signature is the point.
+
+        Args:
+            context: The project and environment the tools work in.
+        """
+        self._context = context
 
     def register(self, mcp: "FastMCPProtocol") -> None:
         """Register all utility tools with the MCP server."""

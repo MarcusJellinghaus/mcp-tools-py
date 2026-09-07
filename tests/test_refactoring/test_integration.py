@@ -1,5 +1,6 @@
 """End-to-end integration tests for refactoring workflows."""
 
+import sys
 import time
 from pathlib import Path
 
@@ -75,13 +76,15 @@ def test_full_workflow_split_large_file(multi_module_project: Path) -> None:
     project = multi_module_project
 
     # 1. list_symbols on models.py -> should show User, Address, validate_email
-    symbols_output = list_symbols(project, "myproject/models.py")
+    symbols_output = list_symbols(project, "myproject/models.py", sys.executable)
     assert "User" in symbols_output
     assert "Address" in symbols_output
     assert "validate_email" in symbols_output
 
     # 2. find_references for validate_email -> should show models.py, services.py
-    refs_output = find_references(project, "myproject/models.py", "validate_email")
+    refs_output = find_references(
+        project, "myproject/models.py", "validate_email", sys.executable
+    )
     assert "models.py" in refs_output
     assert "services.py" in refs_output
 
@@ -135,7 +138,9 @@ def test_rename_then_verify_references(multi_module_project: Path) -> None:
     project = multi_module_project
 
     # 1. find_references for User -> should show models.py, services.py
-    refs_output = find_references(project, "myproject/models.py", "User")
+    refs_output = find_references(
+        project, "myproject/models.py", "User", sys.executable
+    )
     assert "models.py" in refs_output
     assert "services.py" in refs_output
 

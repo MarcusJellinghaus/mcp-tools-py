@@ -1,11 +1,26 @@
 """Tests for RefactoringTools registration and relative-path output."""
 
+import sys
 from pathlib import Path
 from unittest.mock import MagicMock
 
 import pytest
 
 from mcp_tools_py.refactoring import RefactoringTools
+from mcp_tools_py.utils.python_environment import PythonEnvironment
+from mcp_tools_py.utils.tool_context import ToolContext
+
+
+def _context(project_dir: Path) -> ToolContext:
+    """Build a context over `project_dir` and the running interpreter.
+
+    Returns:
+        A ToolContext whose environment is the interpreter running the tests.
+    """
+    return ToolContext(
+        project_dir=project_dir,
+        environment=PythonEnvironment(Path(sys.executable)),
+    )
 
 
 @pytest.fixture
@@ -33,7 +48,7 @@ def test_refactoring_tools_registers_five_tools(
     tmp_path: Path, mock_mcp: MagicMock
 ) -> None:
     """RefactoringTools registers all 5 tools on an MCP server."""
-    tools = RefactoringTools(tmp_path)
+    tools = RefactoringTools(_context(tmp_path))
     tools.register(mock_mcp)
 
     assert mock_mcp.tool.call_count == 5
@@ -43,7 +58,7 @@ def test_refactoring_tools_registers_expected_names(
     tmp_path: Path, mock_mcp: MagicMock
 ) -> None:
     """RefactoringTools registers tools with the correct function names."""
-    tools = RefactoringTools(tmp_path)
+    tools = RefactoringTools(_context(tmp_path))
     tools.register(mock_mcp)
 
     registered = mock_mcp._registered_functions
@@ -68,7 +83,7 @@ def test_list_symbols_output_uses_relative_paths(tmp_path: Path) -> None:
 
     from mcp_tools_py.refactoring.jedi_tools import list_symbols
 
-    result = list_symbols(tmp_path, "example.py")
+    result = list_symbols(tmp_path, "example.py", sys.executable)
 
     assert str(tmp_path) not in result
     assert "example.py" in result
@@ -83,7 +98,7 @@ def test_find_references_output_uses_relative_paths(tmp_path: Path) -> None:
 
     from mcp_tools_py.refactoring.jedi_tools import find_references
 
-    result = find_references(tmp_path, "models.py", "Item")
+    result = find_references(tmp_path, "models.py", "Item", sys.executable)
 
     assert str(tmp_path) not in result
     assert "models.py" in result
@@ -97,7 +112,7 @@ def test_registered_list_symbols_uses_relative_paths(
     src = tmp_path / "mod.py"
     src.write_text("X = 42\n")
 
-    tools = RefactoringTools(tmp_path)
+    tools = RefactoringTools(_context(tmp_path))
     tools.register(mock_mcp)
 
     # Find the registered list_symbols function
@@ -117,7 +132,7 @@ def test_registered_find_references_uses_relative_paths(
     (tmp_path / "lib.py").write_text("VAL = 100\n")
     (tmp_path / "main.py").write_text("from lib import VAL\nprint(VAL)\n")
 
-    tools = RefactoringTools(tmp_path)
+    tools = RefactoringTools(_context(tmp_path))
     tools.register(mock_mcp)
 
     registered = mock_mcp._registered_functions
@@ -127,3 +142,54 @@ def test_registered_find_references_uses_relative_paths(
 
     assert str(tmp_path) not in result
     assert "lib.py" in result
+
+
+# --- Cache isolation and error handling ---
+
+
+def test_jedi_uses_a_private_cache_directory(tmp_path: Path) -> None:
+    """jedi caches parse trees per process, not in the shared ~/.cache/jedi."""
+    import jedi
+
+    from mcp_tools_py.refactoring.jedi_tools import (
+        _private_cache_directory,
+        list_symbols,
+    )
+
+    (tmp_path / "mod.py").write_text("X = 42\n")
+
+    list_symbols(tmp_path, "mod.py", sys.executable)
+
+    cache_dir = Path(jedi.settings.cache_directory)
+    assert cache_dir == Path(_private_cache_directory())
+    assert cache_dir.name.startswith("mcp-tools-py-jedi-")
+    assert cache_dir.is_dir()
+
+
+def test_find_references_reports_failures_while_formatting(
+    tmp_path: Path, monkeypatch: pytest.MonkeyPatch
+) -> None:
+    """A failure while reading a reference's details becomes an error message."""
+    import jedi
+
+    from mcp_tools_py.refactoring.jedi_tools import find_references
+
+    (tmp_path / "lib.py").write_text("VAL = 100\n")
+
+    class _ExplodingRef:
+        module_path = None
+        line = 1
+
+        @property
+        def description(self) -> str:
+            raise EOFError("Ran out of input")
+
+    def fake_get_references(self: object, line: int, column: int) -> list[object]:
+        return [_ExplodingRef()]
+
+    monkeypatch.setattr(jedi.Script, "get_references", fake_get_references)
+
+    result = find_references(tmp_path, "lib.py", "VAL", sys.executable)
+
+    assert result.startswith("Error finding references for 'VAL':")
+    assert "Ran out of input" in result
