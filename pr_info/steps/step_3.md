@@ -184,16 +184,29 @@ the `utils.environment_info` module):
    - `locate_packages` returning a string → the result starts with `=== ERROR:`,
      names the package, and `execute_command` is never called;
    - no config → `locate_packages` never called and `env` is `None`;
-   - the existing report/parsing tests keep passing with
-     `python_executable=sys.executable` added to their calls.
-3. `tests/test_checker_tools.py::test_lint_imports_passes_resolved_timeout` — assert
+   - the existing `TestRunLintImportsCheckImpl` report/parsing tests keep passing with
+     `python_executable=sys.executable` added to their calls. Their `project_dir`
+     stays `"/project"`, which holds no config file, so `_root_packages` returns `[]`
+     and neither `locate_packages` nor `PYTHONPATH` enters the picture.
+3. **The `_format_report` signature change reaches the tests that call it directly.**
+   Eight tests in the same file (`tests/test_code_checker_lint_imports/test_runners.py`,
+   roughly lines 247-345: `test_passed_header_first_line`,
+   `test_info_line_appears_above_header`, `test_summary_line_when_present`,
+   `test_broken_state_lists_contracts`, `test_warnings_listed`,
+   `test_error_state_no_summary_no_broken_list`,
+   `test_line_cap_appends_truncation_marker`, `test_empty_body_substituted`) pass
+   `info_line=None` or `info_line="[Info: stripped ...]"` as a keyword. Each becomes
+   `info_lines=[]` / `info_lines=["[Info: stripped ...]"]`, and
+   `test_info_line_appears_above_header` gains a sibling proving two info lines both
+   render, in order, above the state header.
+4. `tests/test_checker_tools.py::test_lint_imports_passes_resolved_timeout` — assert
    on `call_args.kwargs["timeout_seconds"] == 120`,
    `call_args.kwargs["python_executable"] == str(tool_context.environment.interpreter)`
    and `call_args.kwargs["lint_imports_binary"] ==
    str(tool_context.tool_environment.binary("lint-imports"))`, instead of the
    positional `call_args[0][3]`.
 
-4. **`tests/test_code_checker_lint_imports/test_bridge_integration.py`** (new file,
+5. **`tests/test_code_checker_lint_imports/test_bridge_integration.py`** (new file,
    every test `@pytest.mark.integration`). Everything above mocks the bridge; this
    is the one test that runs it. Nothing is patched — not `locate_packages`, not
    `execute_command`. Model it on `tests/test_target_scripts_contract.py`, which

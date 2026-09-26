@@ -14,13 +14,16 @@ PASSED on a stale installed copy — so no commit may leave it in that state.
 ## WHERE
 
 - `src/mcp_tools_py/utils/tool_context.py`
+- `src/mcp_tools_py/utils/environment_info.py` — `TOOL_DISTRIBUTIONS`
 - `src/mcp_tools_py/server.py`
 - `src/mcp_tools_py/main.py`
 - `src/mcp_tools_py/checker_tools/{tach,ruff_check,ruff_fix,vulture,bandit}_tool.py`
 - `tests/conftest.py`, `tests/test_tool_context.py`,
   `tests/test_tool_availability/_helpers.py`,
   `tests/test_tool_availability/test_handler_short_circuit.py`,
-  `tests/test_server_params.py`, `tests/test_checker_tools.py`
+  `tests/test_server_params.py`, `tests/test_checker_tools.py`,
+  `tests/test_environment_info.py`,
+  `tests/test_code_checker_bandit/test_integration.py`
 
 ## WHAT
 
@@ -91,6 +94,29 @@ No other signature changes.
    which code gets checked, and the handler already short-circuits when either the
    answer or the binary is missing. Step 3 removes the skew.
 
+6. **`environment_info.py` — narrow `TOOL_DISTRIBUTIONS`.** It currently spans every
+   key of `TOOL_MODULES`, so the startup line `_log_tool_versions` writes ("tool
+   versions in \<project python\>: ...") reports the ruff/bandit/vulture/tach/
+   import-linter copies found in the *project* interpreter — copies that, after this
+   step, never run. Narrow it to the `python -m` tools, the only ones the probed
+   interpreter still supplies:
+
+   ```python
+   # The distributions the `python -m` tools ship in, lowercased to match the blob.
+   # The console-script tools are deliberately absent: they come from the tool env,
+   # which this probe never describes.
+   TOOL_DISTRIBUTIONS: tuple[str, ...] = tuple(
+       TOOL_PACKAGES.get(key, key).lower()
+       for key, module in TOOL_MODULES.items()
+       if module is not None
+   )
+   ```
+
+   Narrowed rather than re-targeted at the tool env: reporting the tool env's
+   versions would mean a second probe subprocess at startup to restate
+   mcp-tools-py's own pins, and `unavailable_message` already names the tool env
+   directory when one of the five is missing.
+
 ## ALGORITHM
 
 None — the change is a field lookup swap plus message text.
@@ -157,6 +183,20 @@ None — the change is a field lookup swap plus message text.
    assertion read `context.tool_environment.binary(...)`. Same path as before, so
    these are clarity edits, not behaviour changes.
 
+7. **`tests/test_code_checker_bandit/test_integration.py`** —
+   `test_bandit_not_available_message` asserts `"no restart is needed" in result`,
+   which is exactly the sentence HOW item 2 deletes. Replace that assertion with the
+   new wording (`"reinstall mcp-tools-py"`, `"restart the server"`) and keep
+   `"bandit is not available"`. The binary deletion itself stands: the fixture backs
+   both environments with the same directory, so unlinking once still makes bandit
+   unavailable.
+
+8. **`tests/test_environment_info.py::TestToolVersionLogging`** —
+   `test_success_logs_every_found_distribution` feeds a blob holding `pylint` and
+   `import-linter` and asserts both are named. With `TOOL_DISTRIBUTIONS` narrowed,
+   `import-linter` is no longer reported: assert `"pylint 3.2.0"` is named and
+   `"import-linter"` is **not**, which is the regression test for the narrowing.
+
 ## VERIFY
 
 `run_format_code`, then `run_pylint_check`, `run_pytest_check` with
@@ -176,9 +216,10 @@ Commit: `fix(tools): resolve console scripts in the tool env (#233)`
 
 > Implement step 1 of issue #233. Read `pr_info/steps/summary.md` and
 > `pr_info/steps/step_1.md` first. Write the tests listed under TESTS before the
-> implementation, then make them pass. Keep the change to a field swap plus message
-> text — do not touch the `python -m` branch of `is_tool_available`, the cached
-> environment probe, or `lint_imports_tool.py`, whose binary lookup and
+> implementation, then make them pass. Keep the change to a field swap, message text
+> and the `TOOL_DISTRIBUTIONS` narrowing — do not touch the `python -m` branch of
+> `is_tool_available`, the cached environment probe's own logic, or
+> `lint_imports_tool.py`, whose binary lookup and
 > `PYTHONPATH` bridge both move in step 3. Finish with
 > `run_format_code`, `run_pylint_check`, `run_pytest_check(extra_args=["-n","auto"])`
 > and `run_mypy_check`, all passing, then one commit.
