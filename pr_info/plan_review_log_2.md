@@ -59,3 +59,42 @@ converging).
 - Step 2: added a one-sentence docstring caveat that `locate_packages` is
   deliberately uncached.
 **Status**: committed (see commit agent run)
+
+## Round 2 — 2026-09-26
+**Findings**: Engineer confirmed all four round-1 fixes correctly and cleanly
+applied (step 3/4 split is clean and non-tautologically tested, step 2 VERIFY
+correction matches the real contract test, step 1 carve-out consistently
+implemented across `is_tool_available`/`unavailable_message`/registrars,
+docstring note correct). New findings from the full pass:
+- Medium: `_warn_missing_console_scripts` does its own independent
+  `environment`/`tool_environment` check for lint-imports (separate from
+  `is_tool_available`), and neither step 1 nor step 4 has an asymmetric test
+  for it — only the symmetric "missing from both envs" case, which passes
+  whether or not the carve-out is actually implemented there. A buggy
+  step-1 version that routes it through `tool_environment` (or a step-4
+  version that fails to un-carve it) would still pass every test in the plan.
+- Low: `summary.md`'s file-tracking table lists `tool_context.py` and
+  `server.py` as touched only in "Step 1", omitting that step 4 also
+  modifies both (removing the carve-out).
+- Low: `summary.md` says README Troubleshooting is `:203-204`; `step_5.md`
+  says `:199-204` for the same edit. `summary.md`'s figure is the precise
+  one (203-204 are the two bullets actually rewritten).
+- Low (nit): `summary.md`/`step_5.md` cite `README.md:115` for the parameter
+  table row; the actual `--python-executable` row is line 116 (115 is the
+  header divider).
+**Decisions**: All four accepted as straightforward test-coverage/doc-accuracy
+fixes — no scope or architecture impact, no user escalation needed.
+**Changes**: Applied via `/plan_update`:
+- Step 1's `TestStartupConsoleScriptWarnings` sibling case replaced with an
+  asymmetric test, `test_lint_imports_warning_still_checks_project_env`
+  (tool env has lint-imports, project env doesn't → warning still fires,
+  proving step 1's check hasn't switched to `tool_environment` early).
+- Step 4's corresponding test instruction changed from "delete the sibling
+  case" to "invert the asymmetric test's expected outcome" (same setup, now
+  asserting no warning after the carve-out is removed).
+- `summary.md`'s file table now lists `tool_context.py`/`server.py` as
+  touched in steps "1, 4"; `README.md:115` corrected to `:116` in both
+  `summary.md` and `step_5.md`; `step_5.md`'s Troubleshooting citation
+  aligned to `:203-204`.
+- `Decisions.md` updated with decisions 5 and 6.
+**Status**: committed (see commit agent run)

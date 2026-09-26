@@ -228,10 +228,19 @@ None — the change is a field lookup swap plus message text.
 5. **`tests/test_server_params.py::TestStartupConsoleScriptWarnings`** — construct the
    server inside `_patched_tool_env(tmp_path)`; `test_warning_matches_handler_message`
    asserts `"import-linter"` for a tool other than lint-imports, e.g. `tach` (the
-   "is installed" wording is gone for that tool). Add a sibling assertion that a
-   missing-lint-imports startup warning (tool env and project env both lacking it)
-   still uses the "is installed" / `--python-executable` wording, matching the
-   carve-out.
+   "is installed" wording is gone for that tool). Add a new
+   `test_lint_imports_warning_still_checks_project_env`, built the same asymmetric
+   way as `test_lint_imports_unavailable_returns_error` above — server inside
+   `_patched_tool_env(tmp_path, "lint-imports")` (tool env **has** the script) with
+   `python_executable` pointing at a script-less project env — and assert the
+   startup warning list still names lint-imports, with the "is installed" /
+   `--python-executable` wording. The symmetric case (both envs lacking every
+   script) cannot tell a carved-out `_warn_missing_console_scripts` from one that
+   already reads `tool_environment` uniformly for lint-imports, since both would
+   warn either way; only this asymmetric case — tool env has it, project env
+   doesn't — proves the warning check itself, not just `is_tool_available`, is
+   still reading `self.environment` for lint-imports. Step 4 flips this exact test's
+   expected outcome once the carve-out is gone.
 
 6. **`tests/test_checker_tools.py`** — `_remove_console_script` and the tach
    assertion read `context.tool_environment.binary(...)`. Same path as before, so

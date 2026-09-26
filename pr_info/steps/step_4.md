@@ -228,10 +228,18 @@ the `utils.environment_info` module):
      is updated: `_patched_tool_env(tmp_path)` with no scripts now correctly produces
      a message naming the tool env directory (the carve-out that made this
      assertion wrong in step 1 is gone).
-   - `tests/test_server_params.py::TestStartupConsoleScriptWarnings`'s sibling
-     assertion for lint-imports (added in step 1) is removed: lint-imports now
-     follows the same "is installed" → "reinstall mcp-tools-py" transition as the
-     other four, so no separate case remains.
+   - `tests/test_server_params.py::TestStartupConsoleScriptWarnings::test_lint_imports_warning_still_checks_project_env`
+     (added in step 1) is inverted, not deleted: same asymmetric setup —
+     `_patched_tool_env(tmp_path, "lint-imports")` (tool env has the script) with
+     `python_executable` pointing at a script-less project env — but now asserts
+     the startup warning list does **not** name lint-imports, since
+     `_warn_missing_console_scripts` reads `tool_environment` for it too and finds
+     it there. This is what proves `_warn_missing_console_scripts` itself was
+     switched, not just `is_tool_available`/`unavailable_message`: the symmetric
+     "both envs lack everything" scenario used by the plan's other
+     `TestStartupConsoleScriptWarnings` tests would still warn correctly even if
+     this carve-out were left in place by mistake, so it cannot catch a missed
+     switch here.
 4. **`tests/test_code_checker_lint_imports/test_bridge_integration.py`** (new file,
    every test `@pytest.mark.integration`). Everything above mocks the bridge; this
    is the one test that runs it. Nothing is patched — not `locate_packages`, not

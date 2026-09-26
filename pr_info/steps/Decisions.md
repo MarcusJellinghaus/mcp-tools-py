@@ -70,3 +70,36 @@ updating that docstring. Low severity, raised once, never fixed.
 
 **Decision:** step 2 adds a one-sentence caveat to the module docstring noting
 `locate_packages` as the exception.
+
+## 5. Make the `_warn_missing_console_scripts` carve-out test asymmetric
+
+**Problem:** `_warn_missing_console_scripts` does its own direct
+`self.environment.binary(key)` / `self.tool_environment.binary(key)` check for
+lint-imports — a third carve-out site, separate from `is_tool_available` and
+`unavailable_message`. Step 1's and step 4's tests for it (`TestStartupConsole
+ScriptWarnings`) only used the symmetric case (lint-imports missing from both
+envs), where checking either environment gives the same answer, so the test
+passes whether or not the carve-out actually exists. Raised in round 2 review.
+
+**Decision:** replace the symmetric sibling case with an asymmetric one, matching
+the pattern already used for `test_lint_imports_message_still_names_project_env`
+/ `test_lint_imports_binary_comes_from_the_tool_env`: tool env has `lint-imports`,
+project env doesn't. Step 1 adds
+`test_lint_imports_warning_still_checks_project_env` asserting the startup
+warning still fires (proving the check reads `self.environment`); step 4 inverts
+the same test's expected outcome (no warning, since `tool_environment` now has
+it) instead of deleting it.
+
+## 6. Align cross-reference nits left by the step 3/4 split
+
+**Problem:** three small inconsistencies from round 2 review, all cosmetic and
+none blocking implementation: (a) `summary.md`'s file-tracking table listed
+`tool_context.py` and `server.py` as touched only in step 1, though step 4 also
+edits both to remove the lint-imports carve-out; (b) `summary.md` and
+`step_5.md` cited different line ranges (`:203-204` vs `:199-204`) for the same
+README Troubleshooting edit; (c) both cited `README.md:115` for the
+`--python-executable` parameter-table row, which is actually on line 116.
+
+**Decision:** annotate `tool_context.py`/`server.py` as touched in steps "1, 4"
+in `summary.md`'s table; make `step_5.md` use `summary.md`'s more precise
+`:203-204`; correct both files' parameter-table citation to `:116`.

@@ -104,8 +104,8 @@ One new test file (step 4); no new source module.
 
 | File | Change | Step |
 |------|--------|------|
-| `src/mcp_tools_py/utils/tool_context.py` | `tool_environment` field; console-script branches of `is_tool_available` and `unavailable_message` | 1 |
-| `src/mcp_tools_py/server.py` | `_warn_missing_console_scripts`; `python_executable` docstrings (×2) | 1 |
+| `src/mcp_tools_py/utils/tool_context.py` | `tool_environment` field; console-script branches of `is_tool_available` and `unavailable_message` (1); lint-imports carve-out removed from both (4) | 1, 4 |
+| `src/mcp_tools_py/server.py` | `_warn_missing_console_scripts`; `python_executable` docstrings (×2) (1); lint-imports carve-out removed from `_warn_missing_console_scripts` (4) | 1, 4 |
 | `src/mcp_tools_py/main.py` | `--python-executable` help text | 1 |
 | `src/mcp_tools_py/checker_tools/tach_tool.py` | binary lookup → `tool_environment` | 1 |
 | `src/mcp_tools_py/checker_tools/ruff_check_tool.py` | same | 1 |
@@ -123,7 +123,7 @@ One new test file (step 4); no new source module.
 | File | Change | Step |
 |------|--------|------|
 | `.importlinter` | drop the dead `root_package_paths = src` | 4 |
-| `README.md` | parameter table (`:115`), Environment Configuration (`:145-197`), Troubleshooting (`:203-204`) | 5 |
+| `README.md` | parameter table (`:116`), Environment Configuration (`:145-197`), Troubleshooting (`:203-204`) | 5 |
 | `docs/architecture/architecture.md` | §5 `probe.py` and `ToolContext` bullets, §7 two-env description | 5 |
 
 **Tests**
@@ -134,7 +134,7 @@ One new test file (step 4); no new source module.
 | `tests/test_tool_context.py` | `_context` helper, message assertions, split coverage, lint-imports carve-out test (1); carve-out test replaced once it's deleted (4) | 1, 4 |
 | `tests/test_tool_availability/_helpers.py` | `_patched_tool_env` context manager | 1 |
 | `tests/test_tool_availability/test_handler_short_circuit.py` | lint-imports message test; new split test (1); assertion corrected once the carve-out is deleted (4) | 1, 4 |
-| `tests/test_server_params.py` | `TestStartupConsoleScriptWarnings`, incl. a lint-imports sibling case (1); that sibling case removed (4) | 1, 4 |
+| `tests/test_server_params.py` | `TestStartupConsoleScriptWarnings`, incl. an asymmetric `test_lint_imports_warning_still_checks_project_env` case (1); that case's expected outcome inverted (4) | 1, 4 |
 | `tests/test_checker_tools.py` | `_remove_console_script`, tach assertion, lint-imports kwargs (1); binary-switch test (4) | 1, 4 |
 | `tests/test_code_checker_bandit/test_integration.py` | `test_bandit_not_available_message`: the "no restart is needed" assertion becomes the reinstall wording | 1 |
 | `tests/test_environment_info.py` | `TestToolVersionLogging` stops expecting `import-linter` (step 1); `TestLocatePackages`, real-subprocess `locate` test (step 2) | 1, 2 |

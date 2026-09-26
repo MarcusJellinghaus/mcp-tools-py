@@ -6,14 +6,14 @@ Scope: prose only. No source, test or configuration changes.
 
 ## WHERE
 
-- `README.md` — `:115` (parameter table), `:145-197` (Environment Configuration),
-  `:199-204` (Troubleshooting)
+- `README.md` — `:116` (parameter table), `:145-197` (Environment Configuration),
+  `:203-204` (Troubleshooting)
 - `docs/architecture/architecture.md` — §5 Module Overview (`probe.py`,
   `utils/tool_context.py`), §7 Deployment View
 
 ## WHAT
 
-**`README.md:115`** — `--python-executable` is the project interpreter. Drop "and
+**`README.md:116`** — `--python-executable` is the project interpreter. Drop "and
 the checker tools"; add that ruff, bandit, vulture, tach and lint-imports come from
 mcp-tools-py's own environment and need not be installed there.
 
