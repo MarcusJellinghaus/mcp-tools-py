@@ -3,7 +3,7 @@
 Read [summary.md](./summary.md) first.
 
 Scope: the machinery for asking an interpreter where a package lives. Nothing calls
-it yet — step 3 wires it into lint-imports.
+it yet — step 4 wires it into lint-imports.
 
 ## WHERE
 
@@ -57,7 +57,10 @@ def locate_packages(
 
 - `locate_packages` lives next to `probe_script_path()` and reuses it,
   `execute_command`, `PROBE_TIMEOUT_SECONDS` and `STDERR_SNIPPET`. It is **not**
-  cached: the answer can change while the server runs.
+  cached: the answer can change while the server runs. Add a one-sentence caveat to
+  `environment_info.py`'s module docstring, which currently says every value in the
+  module is "probed once" and "cached per interpreter path" — `locate_packages` is
+  the one exception, and the docstring should say so.
 
 ## ALGORITHM
 
@@ -98,7 +101,7 @@ The split lives here rather than in the caller: it is path normalisation
 (`Path(d).resolve()`, then equality or `is_relative_to`) against an answer only the
 probe can give, and every caller wants the same answer. Why a located
 `site-packages` may never be prepended — and why "is it under `--project-dir`" is
-the wrong question — is spelled out in step 3.
+the wrong question — is spelled out in step 4.
 
 ## DATA
 
@@ -151,13 +154,15 @@ In `tests/test_environment_info.py`:
 `run_mypy_check`.
 
 The new probe code lives under `target_scripts/`, so the stdlib-only contract must
-still hold. Check that with
-`run_pytest_check(extra_args=["-n","auto","tests/test_target_scripts_contract.py"],
-markers=["integration"])`, which builds a miniature package and runs the real
-lint-imports against it. Do **not** rely on the MCP `run_lint_imports_check` tool
-here: this session's server predates the edits, and until step 3 lands lint-imports
-has no `PYTHONPATH` bridge, so a green answer from it would say nothing about the
-code just written.
+still hold. `tests/test_target_scripts_contract.py` does **not** verify this for the
+code added here: it builds its own synthetic `fakepkg`/`probe.py` to prove the
+contract's shape isn't a silent no-op, and never reads the real `probe.py`, so a
+green run of it is not evidence about `_locate`. Compliance is established instead
+by inspection — `_locate` and its `main` dispatch use only `importlib.util`, `json`
+and `sys`, no third-party or `mcp_tools_py.*` import — together with the
+real-subprocess `TestProbeScript` test above, which already runs the actual
+`probe.py locate` in a child process. No additional lint-imports run (the MCP tool
+or otherwise) is needed or useful for this step.
 
 Commit: `feat(probe): locate subcommand for finding a package's parent dir (#233)`
 
@@ -167,6 +172,7 @@ Commit: `feat(probe): locate subcommand for finding a package's parent dir (#233
 > `pr_info/steps/step_2.md` first. Write the tests under TESTS before the
 > implementation. Keep `probe.py` standard-library-only and keep `locate_packages`
 > uncached and small — no new module, no new dataclass. Nothing else may call the
-> new code in this step. Finish with `run_format_code`, `run_pylint_check`,
-> `run_pytest_check(extra_args=["-n","auto"])`, `run_mypy_check` and the
-> integration run named under VERIFY, all passing, then one commit.
+> new code in this step. `tests/test_target_scripts_contract.py` is not evidence for
+> this step and does not need to be run as part of it. Finish with
+> `run_format_code`, `run_pylint_check`, `run_pytest_check(extra_args=["-n","auto"])`
+> and `run_mypy_check`, all passing, then one commit.
