@@ -1,0 +1,164 @@
+# Step 1 — Console-script tools resolve in the tool environment
+
+Read [summary.md](./summary.md) first.
+
+Scope: the five console-script tools stop being looked for next to
+`--python-executable` and are looked for next to `sys.executable` instead.
+lint-imports switches with them; its `PYTHONPATH` bridge is step 3.
+
+## WHERE
+
+- `src/mcp_tools_py/utils/tool_context.py`
+- `src/mcp_tools_py/server.py`
+- `src/mcp_tools_py/main.py`
+- `src/mcp_tools_py/checker_tools/{tach,ruff_check,ruff_fix,vulture,bandit,lint_imports}_tool.py`
+- `tests/conftest.py`, `tests/test_tool_context.py`,
+  `tests/test_tool_availability/_helpers.py`,
+  `tests/test_tool_availability/test_handler_short_circuit.py`,
+  `tests/test_server_params.py`, `tests/test_checker_tools.py`
+
+## WHAT
+
+```python
+# utils/tool_context.py — new field, last in the dataclass
+from dataclasses import dataclass, field
+
+@dataclass(frozen=True)
+class ToolContext:
+    project_dir: Path
+    environment: PythonEnvironment
+    test_folder: str = "tests"
+    keep_temp_files: bool = False
+    vulture_whitelist: str = "vulture_whitelist.py"
+    check_timeout: Optional[int] = None
+    tool_environment: PythonEnvironment = field(
+        default_factory=PythonEnvironment.resolve
+    )
+```
+
+Document it in the class docstring: "The environment mcp-tools-py itself runs in,
+holding its console-script dependencies. Defaults to `sys.executable`'s
+environment; not configurable from the CLI."
+
+No other signature changes.
+
+## HOW
+
+1. **`is_tool_available`** — console-script branch only:
+   `self.environment.binary(...)` → `self.tool_environment.binary(...)`.
+   The `get_environment_info` branch below it is untouched.
+
+2. **`unavailable_message`** — replace the console-script branch text:
+
+   ```python
+   if tool_name in CONSOLE_SCRIPT_TOOLS:
+       return (
+           f"{tool_name} is not available. No {tool_name} console script was "
+           f"found in {self.tool_environment.bin_dir}. {name} is a dependency "
+           f"of mcp-tools-py, so its installation is incomplete: reinstall "
+           f"mcp-tools-py and restart the server."
+       )
+   ```
+
+   Drop the `--python-executable` sentence and the "no restart is needed" sentence.
+   Update the method docstring, which currently promises the message names
+   `--python-executable`.
+
+3. **`server.py`** — `_warn_missing_console_scripts` iterates
+   `self.context.tool_environment.binary(key)`; its docstring says "missing from the
+   tool environment" rather than "next to the interpreter". In both
+   `ToolServer.__init__` and `create_server`, the `python_executable` docstring drops
+   "and the checker tools" and gains: "The console-script tools (ruff, bandit,
+   vulture, tach, lint-imports) come from mcp-tools-py's own environment instead."
+
+4. **`main.py`** — the `--python-executable` help text loses "and the checker tools"
+   and gains one sentence: "ruff, bandit, vulture, tach and lint-imports come from
+   mcp-tools-py's own environment and need not be installed here."
+
+5. **Six registrars** — one line each, e.g. in `tach_tool.py`:
+   `tach_binary = context.tool_environment.binary("tach")`. Same for `ruff` (×2),
+   `vulture`, `bandit`, `lint-imports`. Nothing else in these files moves.
+
+## ALGORITHM
+
+None — the change is a field lookup swap plus message text.
+
+## DATA
+
+`ToolContext.tool_environment: PythonEnvironment`, defaulting to
+`PythonEnvironment.resolve()` (no arguments → `Path(sys.executable)`).
+`unavailable_message` still returns `str`; `is_tool_available` still returns `bool`.
+
+## TESTS (write first)
+
+1. **`tests/test_tool_availability/_helpers.py`** — new seam. `PythonEnvironment.resolve()`
+   reads `sys.executable`, so patching it gives the whole server a dummy tool env:
+
+   ```python
+   @contextlib.contextmanager
+   def _patched_tool_env(tmp_path: Path, *scripts: str) -> Iterator[Path]:
+       """Point PythonEnvironment.resolve() at a dummy tool env.
+
+       Yields:
+           The dummy tool env's script directory.
+       """
+       base = tmp_path / "toolenv"
+       base.mkdir(exist_ok=True)
+       interpreter = _dummy_python(base, *scripts)
+       with patch.object(sys, "executable", interpreter):
+           yield Path(interpreter).parent
+   ```
+
+2. **`tests/conftest.py`** — in the `tool_context` fixture build one
+   `env = PythonEnvironment(Path(interpreter))` and pass it as both `environment`
+   and `tool_environment`. Extend the docstring to say both point at the same
+   directory, so a test makes a console-script tool unavailable by deleting its
+   binary once.
+
+3. **`tests/test_tool_context.py`**
+   - `_context()` passes the dummy env as both fields.
+   - New `TestConsoleScriptEnvironment`: a context whose `tool_environment` has
+     `tach` and whose `environment` has none reports `is_tool_available("tach")`
+     True; the mirror case (script only in `environment`) reports False.
+   - `test_script_tool_message_reports_directory`: assert the tool env's `bin_dir`
+     is named, `"reinstall mcp-tools-py"` and `"restart the server"` appear, and
+     `"--python-executable"` does **not**.
+   - `test_lint_imports_message_names_import_linter` /
+     `test_unmapped_tool_installs_under_its_own_name`: assert
+     `"import-linter is a dependency"` and `"ruff is a dependency"`.
+
+4. **`tests/test_tool_availability/test_handler_short_circuit.py`**
+   - `test_lint_imports_unavailable_returns_error`: build the server inside
+     `_patched_tool_env(tmp_path)` (no scripts) and assert the message names the
+     tool env directory, not the project one.
+   - New `test_console_script_runs_from_tool_env`: build the server inside
+     `_patched_tool_env(tmp_path, "tach")` with `python_executable` pointing at a
+     script-less project env; with
+     `mcp_tools_py.checker_tools.tach_tool.run_tach` patched to `"ok"`,
+     `tools["run_tach_check"]()` returns `"ok"`.
+
+5. **`tests/test_server_params.py::TestStartupConsoleScriptWarnings`** — construct the
+   server inside `_patched_tool_env(tmp_path)`; `test_warning_matches_handler_message`
+   asserts `"import-linter"` (the "is installed" wording is gone).
+
+6. **`tests/test_checker_tools.py`** — `_remove_console_script` and the tach
+   assertion read `context.tool_environment.binary(...)`. Same path as before, so
+   these are clarity edits, not behaviour changes.
+
+## VERIFY
+
+`run_format_code`, then `run_pylint_check`, `run_pytest_check` with
+`["-n", "auto"]`, `run_mypy_check`. Also call `run_tach_check` and
+`run_ruff_check` through MCP: they exercise the new lookup against this repo.
+
+Commit: `fix(tools): resolve console scripts in the tool env (#233)`
+
+## LLM PROMPT
+
+> Implement step 1 of issue #233. Read `pr_info/steps/summary.md` and
+> `pr_info/steps/step_1.md` first. Write the tests listed under TESTS before the
+> implementation, then make them pass. Keep the change to a field swap plus message
+> text — do not touch the `python -m` branch of `is_tool_available`, the cached
+> environment probe, or lint-imports' `PYTHONPATH` behaviour (step 3). Finish with
+> `run_format_code`, `run_pylint_check`, `run_pytest_check(extra_args=["-n","auto"])`
+> and `run_mypy_check`, all passing, then one commit.
