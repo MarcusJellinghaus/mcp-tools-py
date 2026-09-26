@@ -200,11 +200,39 @@ the `utils.environment_info` module):
    `test_info_line_appears_above_header` gains a sibling proving two info lines both
    render, in order, above the state header.
 4. `tests/test_checker_tools.py::test_lint_imports_passes_resolved_timeout` — assert
-   on `call_args.kwargs["timeout_seconds"] == 120`,
-   `call_args.kwargs["python_executable"] == str(tool_context.environment.interpreter)`
-   and `call_args.kwargs["lint_imports_binary"] ==
-   str(tool_context.tool_environment.binary("lint-imports"))`, instead of the
-   positional `call_args[0][3]`.
+   on `call_args.kwargs["timeout_seconds"] == 120` and
+   `call_args.kwargs["python_executable"] == str(tool_context.environment.interpreter)`,
+   instead of the positional `call_args[0][3]`.
+
+   Do **not** assert the binary against `tool_context.tool_environment.binary(...)`
+   here: that fixture backs both environments with the same directory, so the two
+   spellings produce the same string and the assertion would pass with the registrar
+   left on `context.environment`. The switch needs a context where the two
+   environments differ, mirroring step 1's `test_console_script_runs_from_tool_env`:
+
+   ```python
+   def test_lint_imports_binary_comes_from_the_tool_env(tmp_path: Path) -> None:
+       """The script is taken from the tool env, not from --python-executable."""
+       proj_base, tool_base = tmp_path / "projenv", tmp_path / "toolenv"
+       proj_base.mkdir()
+       tool_base.mkdir()
+       project_env = PythonEnvironment(Path(_dummy_python(proj_base)))
+       tool_env = PythonEnvironment(Path(_dummy_python(tool_base, "lint-imports")))
+       context = ToolContext(
+           project_dir=tmp_path,
+           environment=project_env,
+           tool_environment=tool_env,
+       )
+       ...
+       assert mock_runner.call_args.kwargs["lint_imports_binary"] == str(
+           tool_env.binary("lint-imports")
+       )
+   ```
+
+   `_dummy_python` builds `<base>/scripts/`, so two bases give two directories. The
+   project env holds no `lint-imports`, so a registrar still reading
+   `context.environment.binary` gets `None`, short-circuits, and never calls the
+   impl — which is what makes this test fail before the switch and pass after it.
 
 5. **`tests/test_code_checker_lint_imports/test_bridge_integration.py`** (new file,
    every test `@pytest.mark.integration`). Everything above mocks the bridge; this
