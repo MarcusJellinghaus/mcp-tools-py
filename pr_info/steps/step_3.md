@@ -108,24 +108,34 @@ if names:
     located = locate_packages(python_executable, names)
     if isinstance(located, str):
         return f"=== ERROR: could not locate {', '.join(names)}: {located} ==="
-    root = Path(project_dir).resolve()
-    inside = [d for d in located if Path(d).resolve().is_relative_to(root)]
-    outside = [d for d in located if d not in inside]
-    if outside:
+    usable, skipped = located
+    if skipped:
         info_lines.append(
-            f"[Info: not added to PYTHONPATH, outside --project-dir: "
-            f"{', '.join(outside)} — lint-imports may be reading an installed copy]"
+            f"[Info: not added to PYTHONPATH, site-packages of the project "
+            f"interpreter: {', '.join(skipped)} — lint-imports may be reading "
+            f"an installed copy]"
         )
-    env = _pythonpath_env(inside) if inside else None
+    env = _pythonpath_env(usable) if usable else None
 result = execute_command(command, cwd=project_dir, timeout_seconds=..., env=env)
 ```
 
-**Why the `outside` filter exists.** A located directory outside the project is a
-whole `site-packages` (the project pip-installed non-editable into its own venv).
-Prepending it would put that entire directory ahead of the tool env's `grimp` and
-`click` — and `grimp` ships a compiled extension, so a version or ABI mismatch can
-crash the run. That is the one thing the issue rules out explicitly, so the filter
-stays.
+**Why the `skipped` filter exists, and why it asks about site directories rather
+than about `--project-dir`.** A located directory that is a `site-packages` holds
+the project pip-installed non-editable — and every other distribution in that
+environment with it. Prepending it would put that whole directory ahead of the tool
+env's `grimp` and `click`, and `grimp` ships a compiled extension, so a version or
+ABI mismatch can crash the run. That is the one thing the issue rules out
+explicitly.
+
+"Is the directory under `--project-dir`?" does not answer that question. The
+ordinary project venv lives *inside* the project — `<project>/.venv`, which is what
+`${VIRTUAL_ENV}` usually points at — so for a non-editable install `locate_packages`
+returns `<project>/.venv/Lib/site-packages`, a directory under `--project-dir` that
+is exactly the kind that must never be prepended. Hence the predicate is "is this
+one of the project interpreter's own site/purelib directories", answered by the
+probe in step 2, and `--project-dir` does not enter into it. A located directory
+that is *not* a site directory is a source tree, whichever side of the project root
+it sits on, and prepending it is the whole point of the bridge.
 
 What the filter does **not** do is make things safe: skipping leaves lint-imports
 resolving the root package the way it would have without the bridge, which for a
@@ -151,6 +161,9 @@ return {"PYTHONPATH": os.pathsep.join(parts)}
   section here".
 - `_root_packages` → `list[str]`, empty when nothing could be read.
 - `_pythonpath_env` → `{"PYTHONPATH": "<dir>[<sep><dir>...][<sep><existing>]"}`.
+- `locate_packages` → `(usable, skipped)` on success; only `usable` is prepended,
+  only `skipped` is reported. Nothing here re-tests the directories against
+  `project_dir`.
 - Locate failure → the single-line `=== ERROR: ... ===` form already used for
   timeouts, before any lint-imports subprocess runs.
 - Info lines → `list[str]`, rendered above the state header as before.
@@ -173,14 +186,21 @@ the `utils.environment_info` module):
    - a `setup.cfg` carrying an `[importlinter]` section that names no root package,
      next to a `.importlinter` that names `pkg` → `[]`, not `["pkg"]`: discovery
      stops at the file the CLI would open.
-2. `run_lint_imports_check_impl` behaviour, with `locate_packages` patched:
-   - a located directory inside the project dir reaches `execute_command` as
-     `env={"PYTHONPATH": ...}` starting with that directory;
+2. `run_lint_imports_check_impl` behaviour, with `locate_packages` patched to return
+   a `(usable, skipped)` tuple:
+   - a usable directory reaches `execute_command` as `env={"PYTHONPATH": ...}`
+     starting with that directory;
    - an existing `PYTHONPATH` (via `monkeypatch.setenv`) is appended after it,
      separated by `os.pathsep`;
-   - a located directory outside the project dir is skipped, `env` is `None`, and
-     the report carries the `[Info: not added to PYTHONPATH, outside --project-dir`
-     line naming that directory, above the state header;
+   - a skipped directory produces `env is None` and a report carrying the
+     `[Info: not added to PYTHONPATH, site-packages of the project interpreter`
+     line naming that directory, above the state header. Spell the case out as the
+     in-project-venv layout the predicate exists for: `project_dir=tmp_path`,
+     `skipped=[str(tmp_path / ".venv" / "Lib" / "site-packages")]` — a directory
+     *under* the project dir that must still be skipped, so a reviewer can see the
+     old `is_relative_to(project_dir)` test would have prepended it;
+   - a `(usable, skipped)` pair with one of each → `PYTHONPATH` holds only the usable
+     directory, and the info line names only the skipped one;
    - `locate_packages` returning a string → the result starts with `=== ERROR:`,
      names the package, and `execute_command` is never called;
    - no config → `locate_packages` never called and `env` is `None`;
@@ -251,6 +271,9 @@ the `utils.environment_info` module):
      `.pth` file containing the absolute path of `tmp_path/proj/src` into that venv's
      site-packages (ask the new interpreter for the directory with
      `-c "import site; print(site.getsitepackages()[-1])"`). No pip, no network.
+     The `.pth` points at a source tree, not at that `site-packages`, so the real
+     probe reports `<tmp>/proj/src` as usable and the run exercises the prepend
+     rather than the skip.
    - Call `run_lint_imports_check_impl(str(binary), str(project), extra_args=["--no-cache"],
      python_executable=<venv python>)` and assert the report is `BROKEN` and names
      the contract. `<pkg>` is importable by nothing but that venv, so a `BROKEN`

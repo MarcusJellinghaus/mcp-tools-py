@@ -40,12 +40,14 @@ copy and report PASSED. So before each run, `code_checker_lint_imports.runners`:
 1. reads the root package name(s) from the import-linter config (CLI discovery order,
    `--config` honoured),
 2. asks the **project** interpreter where those packages live, via a new stdlib-only
-   `probe.py locate` subcommand (`importlib.util.find_spec`), uncached,
-3. prepends the resulting directories to `PYTHONPATH` for the subprocess.
+   `probe.py locate` subcommand (`importlib.util.find_spec`), uncached — the same
+   answer also names that interpreter's site/purelib directories,
+3. prepends the located directories that are not site directories to `PYTHONPATH`
+   for the subprocess, and reports the ones that are.
 
-Only the root package's parent directory goes on `PYTHONPATH` — never the project
-env's whole `sys.path`, which would shadow the tool env's `grimp` (compiled
-extension) and `click`.
+Only a root package's parent source directory goes on `PYTHONPATH` — never a
+`site-packages`, and never the project env's whole `sys.path`, either of which would
+shadow the tool env's `grimp` (compiled extension) and `click`.
 
 **4. `probe.py` grows a third subcommand.** It stays standard-library-only, so the
 `target-scripts-stdlib-only` contract is unaffected. No new source module is
@@ -57,19 +59,22 @@ created anywhere in this change.
   switch and the `PYTHONPATH` bridge land in the same commit. The tool env's
   lint-imports without the bridge is the stale-copy read this whole change exists to
   prevent; no commit may leave it in that state.
-- **Directories outside `--project-dir` are skipped, and the skip is reported.** If
-  the project is pip-installed non-editable in its own venv, `find_spec` returns that
-  venv's `site-packages`; prepending a whole `site-packages` would put it ahead of the
-  tool env's `grimp`, whose compiled extension can then crash on a version or ABI
-  mismatch — the one thing the issue rules out explicitly. Skipping is not safe
-  either: it leaves lint-imports resolving the package as if there were no bridge
-  (*not* today's behaviour, which runs lint-imports from the project env with the
-  project's `sys.path` underneath it). So the skipped directory goes into the report
-  as an info line above the state header, where a reader can see that a PASSED may
-  not be about their working tree.
-- **`locate_packages` returns `list[str] | str`** (directories, or the reason it could
-  not be asked) — the same idiom as `resolve_target_directories`, rather than a new
-  result type.
+- **A located `site-packages` is skipped, and the skip is reported.** If the project
+  is pip-installed non-editable, `find_spec` returns its venv's `site-packages`;
+  prepending a whole `site-packages` would put it ahead of the tool env's `grimp`,
+  whose compiled extension can then crash on a version or ABI mismatch — the one
+  thing the issue rules out explicitly. The test is "is this one of the project
+  interpreter's own site/purelib directories", which the `locate` probe reports
+  alongside the directories; **not** "is it under `--project-dir`", which the
+  ordinary `<project>/.venv` layout answers yes. Skipping is not safe either: it
+  leaves lint-imports resolving the package as if there were no bridge (*not*
+  today's behaviour, which runs lint-imports from the project env with the project's
+  `sys.path` underneath it). So the skipped directory goes into the report as an info
+  line above the state header, where a reader can see that a PASSED may not be about
+  their working tree.
+- **`locate_packages` returns `tuple[list[str], list[str]] | str`** — the directories
+  to prepend and the site directories skipped, or the reason it could not be asked.
+  The `str`-means-failure idiom is `resolve_target_directories`'; no new result type.
 - **The config reader never raises**: any problem yields no names, which means "run
   lint-imports anyway, without `PYTHONPATH`", exactly as the issue specifies. It does
   distinguish "this file has no import-linter section" from "it has one and names

@@ -15,8 +15,12 @@ it yet — step 3 wires it into lint-imports.
 
 ```python
 # utils/target_scripts/probe.py
-def _locate(names: list[str]) -> list[str]:
-    """Directories to put on sys.path so each name in `names` is importable."""
+def _locate(names: list[str]) -> dict[str, list[str]]:
+    """Where each name in `names` lives, and this interpreter's site directories.
+
+    The site directories are reported so the caller can tell a source tree
+    from a `site-packages`, which must never go on PYTHONPATH.
+    """
 
 _USAGE = (
     "usage: probe.py info [MODULE ...] | probe.py source IMPORT_PATH MAX_LINES"
@@ -26,20 +30,24 @@ _USAGE = (
 
 ```python
 # utils/environment_info.py
-def locate_packages(interpreter: str, names: list[str]) -> list[str] | str:
+def locate_packages(
+    interpreter: str, names: list[str]
+) -> tuple[list[str], list[str]] | str:
     """Ask `interpreter` where each package in `names` lives.
 
     Returns:
-        The directories to prepend to PYTHONPATH, or a string saying why the
+        `(usable, skipped)` — the directories to prepend to PYTHONPATH, and
+        the located directories that are `interpreter`'s own site/purelib
+        directories and must not be prepended.  Or a string saying why the
         probe could not be trusted.
     """
 ```
 
 ## HOW
 
-- `probe.py` stays standard-library-only (`os.path` and `json` are already fine
-  under the `target-scripts-stdlib-only` contract). Add to `main`'s dispatch, before
-  the `_USAGE` fallback:
+- `probe.py` stays standard-library-only (`os.path`, `json`, `site` and `sysconfig`
+  are all fine under the `target-scripts-stdlib-only` contract). Add to `main`'s
+  dispatch, before the `_USAGE` fallback:
 
   ```python
   if len(argv) >= 3 and argv[1] == "locate":
@@ -56,34 +64,51 @@ def locate_packages(interpreter: str, names: list[str]) -> list[str] | str:
 `_locate` (in the target interpreter):
 
 ```
+directories = []
 for name in names:
     spec = find_spec(name)            # swallow any exception, skip the name
     if spec is None: continue
     locations = list(spec.submodule_search_locations or [])   # packages + namespace
     parents = [dirname(loc) for loc in locations] or (
         [dirname(spec.origin)] if spec.origin looks like a file else [])
-    append each new, non-empty parent to an order-preserving result
+    append each new, non-empty parent to `directories` (order-preserving)
+
+site_dirs = sysconfig.get_paths()["purelib"], ["platlib"], plus
+            site.getsitepackages()        # each call wrapped, de-duplicated,
+                                          # empties dropped
+return {"directories": directories, "site_dirs": site_dirs}
 ```
 
 `locate_packages` (in the server):
 
 ```
-if not names: return []                       # no subprocess
+if not names: return [], []                   # no subprocess
 result = execute_command([interpreter, probe_script_path(), "locate", *names],
                          timeout_seconds=PROBE_TIMEOUT_SECONDS)
 if result.timed_out: return "probe of <interpreter> timed out after N seconds"
 if execution_error or return_code: return "could not locate ...: <detail[:STDERR_SNIPPET]>"
-parse JSON; if it is not a list of str: return "probe of <interpreter> returned unparsable output"
-return the list
+parse JSON; if it is not {"directories": [str], "site_dirs": [str]}:
+    return "probe of <interpreter> returned unparsable output"
+skipped = [d for d in directories if d is, or sits under, a site_dir]
+usable  = [d for d in directories if d not in skipped]
+return usable, skipped
 ```
+
+The split lives here rather than in the caller: it is path normalisation
+(`Path(d).resolve()`, then equality or `is_relative_to`) against an answer only the
+probe can give, and every caller wants the same answer. Why a located
+`site-packages` may never be prepended — and why "is it under `--project-dir`" is
+the wrong question — is spelled out in step 3.
 
 ## DATA
 
-- Probe stdout: a JSON array of directory strings, e.g.
-  `["C:\\repo\\src"]`. Empty array when nothing resolves.
-- `locate_packages` → `list[str]` on success, `str` (a reason) on failure. The
-  caller distinguishes with `isinstance(..., str)`, as `resolve_target_directories`
-  callers already do.
+- Probe stdout: a JSON object with two arrays of directory strings, e.g.
+  `{"directories": ["C:\\repo\\src"], "site_dirs": ["C:\\venv\\Lib\\site-packages"]}`.
+  `directories` is empty when nothing resolves; `site_dirs` describes the
+  interpreter, not the request, so it is filled either way.
+- `locate_packages` → `tuple[list[str], list[str]]` on success, `str` (a reason) on
+  failure. The caller distinguishes with `isinstance(..., str)`, as
+  `resolve_target_directories` callers already do, and unpacks otherwise.
 
 ## TESTS (write first)
 
@@ -91,20 +116,32 @@ In `tests/test_environment_info.py`:
 
 1. New `TestLocatePackages`, patching
    `mcp_tools_py.utils.environment_info.execute_command`:
-   - JSON array → the same list back.
+   - a `directories` entry under no `site_dirs` entry → `(["<dir>"], [])`.
+   - a `directories` entry that *is* one of the `site_dirs` → `([], ["<dir>"])`.
+   - a `directories` entry *inside* a `site_dirs` entry (the package's own
+     subdirectory of `site-packages`, spelled with a different drive-letter case)
+     → `([], ["<dir>"])`: the comparison resolves both sides.
+   - a source dir and a site dir in one answer → each lands on its own side,
+     order preserved.
    - `timed_out=True` → a string containing `"timed out"` and the interpreter path.
    - `return_code=1, stderr="boom"` → a string containing `"boom"`.
-   - stdout `"not json"` → a string containing `"unparsable"`.
-   - `names=[]` → `[]` and `execute_command` never called.
+   - stdout `"not json"`, and a JSON array instead of the object → a string
+     containing `"unparsable"`.
+   - `names=[]` → `([], [])` and `execute_command` never called.
    - A second call re-runs the subprocess (no caching).
 2. In `TestProbeScript`, a real-subprocess test mirroring
    `test_real_child_reports_importability`: run
    `[sys.executable, probe_script_path(), "locate", "mcp_tools_py", "nosuchpkg_xyz"]`
-   and assert the result is a one-element list holding the directory that contains
-   the installed `mcp_tools_py` package.
+   and assert that exactly one directory came back — the one containing the
+   installed `mcp_tools_py` package — and that `site_dirs` is non-empty.
+
+   Assert on `usable + skipped`, not on `usable` alone: whether that directory is a
+   `site-packages` depends on how `mcp_tools_py` is installed in the interpreter
+   running the tests (editable here, non-editable in CI, which installs `.[dev]`),
+   and the test must pass either way.
 
    Compare resolved `Path` objects, not the raw strings the probe emits:
-   `Path(result[0]).resolve() == Path(mcp_tools_py.__file__).resolve().parent.parent`.
+   `Path(found).resolve() == Path(mcp_tools_py.__file__).resolve().parent.parent`.
    The probe returns whatever `os.path.dirname` produced in the child, whose
    drive-letter case and separators need not match this process's spelling.
 
