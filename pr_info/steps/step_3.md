@@ -1,18 +1,22 @@
-# Step 3 — lint-imports puts the project's root package on `PYTHONPATH`
+# Step 3 — lint-imports moves to the tool env with its `PYTHONPATH` bridge
 
 Read [summary.md](./summary.md) first.
 
-Scope: lint-imports now runs from the tool env (step 1), so the project's root
-package must be made findable, or it silently checks an installed copy and reports
-PASSED on stale code. Also drops the dead `root_package_paths` line from this repo's
-`.importlinter`, which is the same subject: how the root package is located.
+Scope: lint-imports moves to the tool env **here**, together with the bridge that
+makes the project's root package findable. The two land in one commit on purpose —
+the tool env's lint-imports without the bridge silently checks an installed copy and
+reports PASSED on stale code, so step 1 deliberately left the binary lookup alone.
+Also drops the dead `root_package_paths` line from this repo's `.importlinter`,
+which is the same subject: how the root package is located.
 
 ## WHERE
 
 - `src/mcp_tools_py/code_checker_lint_imports/runners.py`
 - `src/mcp_tools_py/checker_tools/lint_imports_tool.py`
 - `.importlinter`
-- `tests/test_code_checker_lint_imports/test_runners.py`, `tests/test_checker_tools.py`
+- `tests/test_code_checker_lint_imports/test_runners.py`,
+  `tests/test_code_checker_lint_imports/test_bridge_integration.py` (new),
+  `tests/test_checker_tools.py`
 
 ## WHAT
 
@@ -20,11 +24,23 @@ PASSED on stale code. Also drops the dead `root_package_paths` line from this re
 # code_checker_lint_imports/runners.py — new module-private helpers
 _CONFIG_CANDIDATES: tuple[str, ...] = ("setup.cfg", ".importlinter", "pyproject.toml")
 
-def _read_ini(path: Path) -> list[str]:      # [importlinter] root_package(s)
-def _read_toml(path: Path) -> list[str]:     # [tool.importlinter] root_package(s)
+# None = this file has no import-linter section (or cannot be read); [] = it has
+# one but names no root package.  The distinction is what stops discovery at the
+# right file — see ALGORITHM.
+def _read_ini(path: Path) -> list[str] | None:   # [importlinter] root_package(s)
+def _read_toml(path: Path) -> list[str] | None:  # [tool.importlinter] root_package(s)
 def _root_packages(project_dir: str, extra_args: list[str]) -> list[str]:
 def _pythonpath_env(directories: list[str]) -> dict[str, str]:
 ```
+
+```python
+# _format_report's last parameter carries more than one line now
+def _format_report(..., info_lines: list[str]) -> str:   # was info_line: str | None
+```
+
+The stripped-flags notice becomes the first entry of that list; the skipped-directory
+notice of the ALGORITHM section is the second. Both still precede the state header,
+so "the first non-empty line is an info line or the header" keeps holding.
 
 ```python
 # changed signature — python_executable is keyword-only and required
@@ -45,8 +61,10 @@ def run_lint_imports_check_impl(
   `mcp_tools_py.utils.environment_info` (allowed: `code_checker_*` → `utils`) and
   uses `configparser`, `tomllib`, `os` and `pathlib` from the stdlib. Do not import
   anything from `importlinter`.
-- `lint_imports_tool.py` calls the impl with keyword arguments, like the other five
-  registrars: `lint_imports_binary=str(binary)` (tool env, from step 1),
+- `lint_imports_tool.py` switches its binary lookup to
+  `context.tool_environment.binary("lint-imports")` — the move deferred from step 1 —
+  and calls the impl with keyword arguments, like the other five registrars:
+  `lint_imports_binary=str(binary)` (tool env),
   `python_executable=str(context.environment.interpreter)` (project env).
 - `.importlinter`: delete `root_package_paths = src`. It is not an import-linter
   option and is silently ignored; the repo works because `mcp_tools_py` is installed
@@ -59,32 +77,64 @@ Config discovery, mirroring the lint-imports CLI:
 ```
 if "--config" in extra_args (or "--config=VALUE"):
     path = project_dir / value
-    return _read_toml(path) if path.suffix == ".toml" else _read_ini(path)
+    return (_read_toml if path.suffix == ".toml" else _read_ini)(path) or []
 for candidate in ("setup.cfg", ".importlinter", "pyproject.toml"):
     names = _read_toml/_read_ini(project_dir / candidate)   # by suffix
-    if names: return names
+    if names is not None: return names          # first file WITH the section wins
 return []
 ```
 
+Discovery stops at the first candidate that *has* an import-linter section, even
+when that section names no root package — that is the file the CLI opens, and
+falling through to the next one would read a file lint-imports never looks at and
+put someone else's package on `PYTHONPATH`. Hence `is not None` rather than a
+truthiness test: `None` means "no section here, keep looking", `[]` means "this is
+the config, and it named nothing".
+
 Each reader wraps everything in `try/except Exception`, logs at debug and returns
-`[]`: a missing file, a missing `[importlinter]` / `[tool.importlinter]` section,
-malformed TOML and a section without a root package are all "keep going". INI reads
-`root_packages` as newline-separated, else `root_package`; TOML reads the list key,
-else the scalar.
+`None`: a missing file, a missing `[importlinter]` / `[tool.importlinter]` section
+and malformed TOML are all "keep going". A section that parses but names no root
+package returns `[]`. INI reads `root_packages` as newline-separated, else
+`root_package`; TOML reads the list key, else the scalar. Either way `_root_packages`
+hands back a plain `list[str]`, empty when nothing could be read.
 
 Inside `run_lint_imports_check_impl`, after `_strip_verbose_flags`:
 
 ```
+info_lines = ["[Info: stripped --verbose/-v from extra_args]"] if stripped else []
 names = _root_packages(project_dir, cleaned_args)
 env = None
 if names:
     located = locate_packages(python_executable, names)
     if isinstance(located, str):
         return f"=== ERROR: could not locate {', '.join(names)}: {located} ==="
-    inside = [d for d in located if Path(d).resolve().is_relative_to(Path(project_dir).resolve())]
+    root = Path(project_dir).resolve()
+    inside = [d for d in located if Path(d).resolve().is_relative_to(root)]
+    outside = [d for d in located if d not in inside]
+    if outside:
+        info_lines.append(
+            f"[Info: not added to PYTHONPATH, outside --project-dir: "
+            f"{', '.join(outside)} — lint-imports may be reading an installed copy]"
+        )
     env = _pythonpath_env(inside) if inside else None
 result = execute_command(command, cwd=project_dir, timeout_seconds=..., env=env)
 ```
+
+**Why the `outside` filter exists.** A located directory outside the project is a
+whole `site-packages` (the project pip-installed non-editable into its own venv).
+Prepending it would put that entire directory ahead of the tool env's `grimp` and
+`click` — and `grimp` ships a compiled extension, so a version or ABI mismatch can
+crash the run. That is the one thing the issue rules out explicitly, so the filter
+stays.
+
+What the filter does **not** do is make things safe: skipping leaves lint-imports
+resolving the root package the way it would have without the bridge, which for a
+project that is also installed in the tool env is exactly the stale-copy read this
+step exists to prevent. (It is not "today's behaviour" — today lint-imports runs
+from the *project* env, with the project's own `sys.path` underneath it.) So the
+skip is never silent: it goes into the report as the info line above, ahead of the
+state header, where a reader can see that a PASSED may not be about their working
+tree.
 
 `_pythonpath_env` prepends rather than replaces, because `execute_command` merges the
 dict over `os.environ` key by key:
@@ -97,10 +147,13 @@ return {"PYTHONPATH": os.pathsep.join(parts)}
 
 ## DATA
 
+- `_read_ini` / `_read_toml` → `list[str] | None`; `None` means "no import-linter
+  section here".
 - `_root_packages` → `list[str]`, empty when nothing could be read.
 - `_pythonpath_env` → `{"PYTHONPATH": "<dir>[<sep><dir>...][<sep><existing>]"}`.
 - Locate failure → the single-line `=== ERROR: ... ===` form already used for
   timeouts, before any lint-imports subprocess runs.
+- Info lines → `list[str]`, rendered above the state header as before.
 - Everything else about the report is unchanged.
 
 ## TESTS (write first)
@@ -117,28 +170,71 @@ the `utils.environment_info` module):
    - `--config custom.ini` and `--config custom.toml` in `extra_args` are honoured,
      resolved relative to the project dir.
    - no config file / no section / malformed TOML → `[]`.
+   - a `setup.cfg` carrying an `[importlinter]` section that names no root package,
+     next to a `.importlinter` that names `pkg` → `[]`, not `["pkg"]`: discovery
+     stops at the file the CLI would open.
 2. `run_lint_imports_check_impl` behaviour, with `locate_packages` patched:
    - a located directory inside the project dir reaches `execute_command` as
      `env={"PYTHONPATH": ...}` starting with that directory;
    - an existing `PYTHONPATH` (via `monkeypatch.setenv`) is appended after it,
      separated by `os.pathsep`;
-   - a located directory outside the project dir is skipped and `env` is `None`;
+   - a located directory outside the project dir is skipped, `env` is `None`, and
+     the report carries the `[Info: not added to PYTHONPATH, outside --project-dir`
+     line naming that directory, above the state header;
    - `locate_packages` returning a string → the result starts with `=== ERROR:`,
      names the package, and `execute_command` is never called;
    - no config → `locate_packages` never called and `env` is `None`;
    - the existing report/parsing tests keep passing with
      `python_executable=sys.executable` added to their calls.
 3. `tests/test_checker_tools.py::test_lint_imports_passes_resolved_timeout` — assert
-   on `call_args.kwargs["timeout_seconds"] == 120` and
+   on `call_args.kwargs["timeout_seconds"] == 120`,
    `call_args.kwargs["python_executable"] == str(tool_context.environment.interpreter)`
-   instead of the positional `call_args[0][3]`.
+   and `call_args.kwargs["lint_imports_binary"] ==
+   str(tool_context.tool_environment.binary("lint-imports"))`, instead of the
+   positional `call_args[0][3]`.
+
+4. **`tests/test_code_checker_lint_imports/test_bridge_integration.py`** (new file,
+   every test `@pytest.mark.integration`). Everything above mocks the bridge; this
+   is the one test that runs it. Nothing is patched — not `locate_packages`, not
+   `execute_command`. Model it on `tests/test_target_scripts_contract.py`, which
+   already drives the real tool-env binary.
+
+   - Skip when `PythonEnvironment.resolve().binary("lint-imports")` is `None`.
+   - Build a **src-layout** project under `tmp_path/proj`: `src/<pkg>/__init__.py`,
+     `src/<pkg>/a.py` importing `<pkg>.b`, `src/<pkg>/b.py`, and a `.importlinter`
+     with `root_package = <pkg>` plus one `forbidden` contract that `a -> b` breaks.
+     Give `<pkg>` a unique suffix so it collides with nothing installed anywhere.
+     It must not exist at the project root — only under `src/` — so lint-imports'
+     own cwd entry cannot find it.
+   - Build the *project interpreter*: `python -m venv tmp_path/venv`, then write a
+     `.pth` file containing the absolute path of `tmp_path/proj/src` into that venv's
+     site-packages (ask the new interpreter for the directory with
+     `-c "import site; print(site.getsitepackages()[-1])"`). No pip, no network.
+   - Call `run_lint_imports_check_impl(str(binary), str(project), extra_args=["--no-cache"],
+     python_executable=<venv python>)` and assert the report is `BROKEN` and names
+     the contract. `<pkg>` is importable by nothing but that venv, so a `BROKEN`
+     verdict can only come from the config read, the real `locate` probe and the
+     real `PYTHONPATH` handover having all worked.
+   - Negative case, covering the silent-PASSED path directly: rewrite `.importlinter`
+     to name a `root_package` no interpreter can find, and assert the report is
+     **not** `PASSED` — lint-imports must surface its own "package not found" error
+     rather than report green about code it never read.
 
 ## VERIFY
 
 `run_format_code`, `run_pylint_check`, `run_pytest_check(["-n","auto"])`,
-`run_mypy_check`, then `run_lint_imports_check` — it must still report the four
-contracts as kept after `root_package_paths` is removed, which is the check that the
-`PYTHONPATH` bridge works end to end.
+`run_mypy_check`, then the new integration file:
+`run_pytest_check(extra_args=["-n","auto",
+"tests/test_code_checker_lint_imports/test_bridge_integration.py"],
+markers=["integration"])`. That run is the evidence the bridge works; it is also
+the only thing that would catch a stale-copy read.
+
+The MCP `run_lint_imports_check` tool is **not** evidence here. This session's
+server process was started from the pre-edit modules, so it still runs lint-imports
+the old way — from the project env, with no bridge — and would report the four
+contracts kept no matter what this step did to the code. Use it only to confirm the
+`.importlinter` edit is harmless: removing `root_package_paths` must leave the four
+contracts kept, which that (old) code path does test.
 
 Commit: `fix(lint-imports): find the project's root package from the tool env (#233)`
 
@@ -150,6 +246,7 @@ Commit: `fix(lint-imports): find the project's root package from the tool env (#
 > empty list and lint-imports runs unchanged — and keep the locate-failure path as a
 > single `=== ERROR: ... ===` line that runs no subprocess. Do not import anything
 > from `importlinter`, and do not put the project env's whole `sys.path` on
-> `PYTHONPATH`. Finish with `run_format_code`, `run_pylint_check`,
-> `run_pytest_check(extra_args=["-n","auto"])`, `run_mypy_check` and
-> `run_lint_imports_check`, all passing, then one commit.
+> `PYTHONPATH`. The new integration file must patch nothing — it is the only proof
+> the bridge works. Finish with `run_format_code`, `run_pylint_check`,
+> `run_pytest_check(extra_args=["-n","auto"])`, `run_mypy_check` and the integration
+> run named under VERIFY, all passing, then one commit.

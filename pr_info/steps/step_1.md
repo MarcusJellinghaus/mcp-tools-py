@@ -1,17 +1,22 @@
-# Step 1 — Console-script tools resolve in the tool environment
+# Step 1 — tach, ruff, vulture and bandit resolve in the tool environment
 
 Read [summary.md](./summary.md) first.
 
-Scope: the five console-script tools stop being looked for next to
+Scope: the console-script tools stop being looked for next to
 `--python-executable` and are looked for next to `sys.executable` instead.
-lint-imports switches with them; its `PYTHONPATH` bridge is step 3.
+
+**lint-imports is deliberately left behind.** Its handler keeps taking the binary
+from `context.environment` until step 3, where it moves together with the
+`PYTHONPATH` bridge. Running the tool env's lint-imports without that bridge lets
+it resolve the root package from the tool env's own site-packages and report
+PASSED on a stale installed copy — so no commit may leave it in that state.
 
 ## WHERE
 
 - `src/mcp_tools_py/utils/tool_context.py`
 - `src/mcp_tools_py/server.py`
 - `src/mcp_tools_py/main.py`
-- `src/mcp_tools_py/checker_tools/{tach,ruff_check,ruff_fix,vulture,bandit,lint_imports}_tool.py`
+- `src/mcp_tools_py/checker_tools/{tach,ruff_check,ruff_fix,vulture,bandit}_tool.py`
 - `tests/conftest.py`, `tests/test_tool_context.py`,
   `tests/test_tool_availability/_helpers.py`,
   `tests/test_tool_availability/test_handler_short_circuit.py`,
@@ -75,9 +80,16 @@ No other signature changes.
    and gains one sentence: "ruff, bandit, vulture, tach and lint-imports come from
    mcp-tools-py's own environment and need not be installed here."
 
-5. **Six registrars** — one line each, e.g. in `tach_tool.py`:
+5. **Five registrars** — one line each, e.g. in `tach_tool.py`:
    `tach_binary = context.tool_environment.binary("tach")`. Same for `ruff` (×2),
-   `vulture`, `bandit`, `lint-imports`. Nothing else in these files moves.
+   `vulture` and `bandit`. Nothing else in these files moves.
+   `lint_imports_tool.py` is **not** touched here — see the scope note above.
+
+   For that one commit, lint-imports' availability answer comes from the tool env
+   (it shares the `CONSOLE_SCRIPT_TOOLS` branch) while its binary still comes from
+   the project env. That skew is harmless: an availability answer never decides
+   which code gets checked, and the handler already short-circuits when either the
+   answer or the binary is missing. Step 3 removes the skew.
 
 ## ALGORITHM
 
@@ -148,8 +160,15 @@ None — the change is a field lookup swap plus message text.
 ## VERIFY
 
 `run_format_code`, then `run_pylint_check`, `run_pytest_check` with
-`["-n", "auto"]`, `run_mypy_check`. Also call `run_tach_check` and
-`run_ruff_check` through MCP: they exercise the new lookup against this repo.
+`["-n", "auto"]`, `run_mypy_check`.
+
+Do **not** treat the MCP `run_tach_check` / `run_ruff_check` tools as evidence:
+this session's server process was started from the pre-edit modules and will not
+import the change, so those calls exercise the old lookup whatever the result.
+The new lookup is covered by the tests above. For a manual end-to-end look, start
+a fresh server process instead — `mcp-tools-py --project-dir . --python-executable
+<interpreter of a venv without tach>` — and confirm its startup warnings no longer
+name the five console scripts.
 
 Commit: `fix(tools): resolve console scripts in the tool env (#233)`
 
@@ -159,6 +178,7 @@ Commit: `fix(tools): resolve console scripts in the tool env (#233)`
 > `pr_info/steps/step_1.md` first. Write the tests listed under TESTS before the
 > implementation, then make them pass. Keep the change to a field swap plus message
 > text — do not touch the `python -m` branch of `is_tool_available`, the cached
-> environment probe, or lint-imports' `PYTHONPATH` behaviour (step 3). Finish with
+> environment probe, or `lint_imports_tool.py`, whose binary lookup and
+> `PYTHONPATH` bridge both move in step 3. Finish with
 > `run_format_code`, `run_pylint_check`, `run_pytest_check(extra_args=["-n","auto"])`
 > and `run_mypy_check`, all passing, then one commit.

@@ -100,15 +100,27 @@ In `tests/test_environment_info.py`:
 2. In `TestProbeScript`, a real-subprocess test mirroring
    `test_real_child_reports_importability`: run
    `[sys.executable, probe_script_path(), "locate", "mcp_tools_py", "nosuchpkg_xyz"]`
-   and assert the result is a one-element list whose entry is the directory holding
-   the installed `mcp_tools_py` package — compare against
-   `Path(mcp_tools_py.__file__).parent.parent`.
+   and assert the result is a one-element list holding the directory that contains
+   the installed `mcp_tools_py` package.
+
+   Compare resolved `Path` objects, not the raw strings the probe emits:
+   `Path(result[0]).resolve() == Path(mcp_tools_py.__file__).resolve().parent.parent`.
+   The probe returns whatever `os.path.dirname` produced in the child, whose
+   drive-letter case and separators need not match this process's spelling.
 
 ## VERIFY
 
 `run_format_code`, `run_pylint_check`, `run_pytest_check(["-n","auto"])`,
-`run_mypy_check`, plus `run_lint_imports_check` — the new probe code lives under
-`target_scripts/`, so the stdlib-only contract must still pass.
+`run_mypy_check`.
+
+The new probe code lives under `target_scripts/`, so the stdlib-only contract must
+still hold. Check that with
+`run_pytest_check(extra_args=["-n","auto","tests/test_target_scripts_contract.py"],
+markers=["integration"])`, which builds a miniature package and runs the real
+lint-imports against it. Do **not** rely on the MCP `run_lint_imports_check` tool
+here: this session's server predates the edits, and until step 3 lands lint-imports
+has no `PYTHONPATH` bridge, so a green answer from it would say nothing about the
+code just written.
 
 Commit: `feat(probe): locate subcommand for finding a package's parent dir (#233)`
 
@@ -119,5 +131,5 @@ Commit: `feat(probe): locate subcommand for finding a package's parent dir (#233
 > implementation. Keep `probe.py` standard-library-only and keep `locate_packages`
 > uncached and small — no new module, no new dataclass. Nothing else may call the
 > new code in this step. Finish with `run_format_code`, `run_pylint_check`,
-> `run_pytest_check(extra_args=["-n","auto"])`, `run_mypy_check` and
-> `run_lint_imports_check`, all passing, then one commit.
+> `run_pytest_check(extra_args=["-n","auto"])`, `run_mypy_check` and the
+> integration run named under VERIFY, all passing, then one commit.
