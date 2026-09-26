@@ -12,7 +12,8 @@ which is the same subject: how the root package is located.
 ## WHERE
 
 - `src/mcp_tools_py/code_checker_lint_imports/runners.py`
-- `src/mcp_tools_py/checker_tools/lint_imports_tool.py`
+- `src/mcp_tools_py/checker_tools/lint_imports_tool.py` — binary lookup, impl call,
+  and the `run_lint_imports_check` docstring's report contract
 - `.importlinter`
 - `tests/test_code_checker_lint_imports/test_runners.py`,
   `tests/test_code_checker_lint_imports/test_bridge_integration.py` (new),
@@ -42,6 +43,28 @@ The stripped-flags notice becomes the first entry of that list; the skipped-dire
 notice of the ALGORITHM section is the second. Both still precede the state header,
 so "the first non-empty line is an info line or the header" keeps holding.
 
+That makes `run_lint_imports_check`'s own docstring wrong, and it must be fixed in
+this commit. It currently promises callers:
+
+> Structured report. The first non-empty line is the state header
+> (PASSED / BROKEN / ERROR), so truncation cannot hide failures.
+
+A stripped-flags info line already breaks that, but only when the caller passed
+`-v`. The skipped-directory line appears without the caller asking for anything —
+an ordinary non-editable install of the project is enough — so a caller that reads
+line one as the state header now mis-parses a normal run. State the real contract:
+
+```python
+Returns:
+    Structured report. Zero or more `[Info: ...]` lines come first,
+    then the state header (PASSED / BROKEN / ERROR), so truncation
+    cannot hide failures.
+```
+
+`run_lint_imports_check_impl`'s docstring says "either an info line (when flags were
+stripped) or the state header"; drop the parenthesis, since stripped flags are no
+longer the only reason for one.
+
 ```python
 # changed signature — python_executable is keyword-only and required
 @log_function_call
@@ -66,6 +89,8 @@ def run_lint_imports_check_impl(
   and calls the impl with keyword arguments, like the other five registrars:
   `lint_imports_binary=str(binary)` (tool env),
   `python_executable=str(context.environment.interpreter)` (project env).
+  Its `run_lint_imports_check` docstring gets the corrected report contract above —
+  info lines first, then the state header.
 - `.importlinter`: delete `root_package_paths = src`. It is not an import-linter
   option and is silently ignored; the repo works because `mcp_tools_py` is installed
   editable.
