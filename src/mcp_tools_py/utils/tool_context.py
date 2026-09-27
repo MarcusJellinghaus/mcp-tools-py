@@ -35,13 +35,16 @@ class ToolContext:
 
     Attributes:
         project_dir: Path to the project the tools run against.
-        environment: The Python environment the tools run in.
+        environment: The project's Python environment, named by
+            `--python-executable`.  pytest, pylint, mypy, black and isort run
+            in it, and Python names resolve against it.
         test_folder: Path to the test folder, relative to `project_dir`.
         keep_temp_files: Whether to keep temporary files after a test run.
         vulture_whitelist: Filename of the vulture whitelist.
         check_timeout: Server-level subprocess timeout in seconds, if any.
         tool_environment: The environment mcp-tools-py itself runs in, holding
-            its console-script dependencies.  Defaults to `sys.executable`'s
+            its console-script dependencies.  ruff, bandit, vulture, tach and
+            lint-imports run from it.  Defaults to `sys.executable`'s
             environment; not configurable from the CLI.
     """
 

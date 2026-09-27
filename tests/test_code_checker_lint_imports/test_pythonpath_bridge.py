@@ -181,7 +181,7 @@ class TestPythonpathBridge:
     ) -> None:
         """A source tree goes on PYTHONPATH, asked of the project interpreter."""
         monkeypatch.delenv("PYTHONPATH", raising=False)
-        mock_locate.return_value = (["/repo/src"], [])
+        mock_locate.return_value = (["/repo/src"], {})
         mock_exec.return_value = make_command_result(return_code=0, stdout=CLEAN_OUTPUT)
 
         run_lint_imports_check_impl(
@@ -204,7 +204,7 @@ class TestPythonpathBridge:
     ) -> None:
         """An inherited PYTHONPATH keeps its entries, behind the located one."""
         monkeypatch.setenv("PYTHONPATH", "/already/there")
-        mock_locate.return_value = (["/repo/src"], [])
+        mock_locate.return_value = (["/repo/src"], {})
         mock_exec.return_value = make_command_result(return_code=0, stdout=CLEAN_OUTPUT)
 
         run_lint_imports_check_impl(
@@ -235,7 +235,7 @@ class TestPythonpathBridge:
         """
         monkeypatch.delenv("PYTHONPATH", raising=False)
         site_packages = str(tmp_path / ".venv" / "Lib" / "site-packages")
-        mock_locate.return_value = ([], [site_packages])
+        mock_locate.return_value = ([], {"pkg": [site_packages]})
         mock_exec.return_value = make_command_result(return_code=0, stdout=CLEAN_OUTPUT)
 
         result = run_lint_imports_check_impl(
@@ -249,7 +249,8 @@ class TestPythonpathBridge:
         assert lines[0].startswith(
             "[Info: not added to PYTHONPATH, site-packages of the project interpreter"
         )
-        assert site_packages in lines[0]
+        assert f"pkg in {site_packages}" in lines[0]
+        assert "an installed copy of pkg" in lines[0]
         assert lines[1] == "=== PASSED ==="
 
     @patch(f"{MODULE_PATH}.execute_command")
@@ -261,20 +262,32 @@ class TestPythonpathBridge:
         tmp_path: Path,
         monkeypatch: pytest.MonkeyPatch,
     ) -> None:
-        """Only the usable directory is prepended, only the skipped one named."""
+        """With two root packages, the info line names the unbridged one.
+
+        `bridged` was handed over on PYTHONPATH and `installed` was not, so a
+        reader can tell which of the two a PASSED is not about.
+        """
         monkeypatch.delenv("PYTHONPATH", raising=False)
-        mock_locate.return_value = (["/repo/src"], ["/venv/lib/site-packages"])
+        (tmp_path / ".importlinter").write_text(
+            "[importlinter]\nroot_packages =\n    bridged\n    installed\n",
+            encoding="utf-8",
+        )
+        mock_locate.return_value = (
+            ["/repo/src"],
+            {"installed": ["/venv/lib/site-packages"]},
+        )
         mock_exec.return_value = make_command_result(return_code=0, stdout=CLEAN_OUTPUT)
 
         result = run_lint_imports_check_impl(
             lint_imports_binary="/usr/bin/lint-imports",
-            project_dir=self._project(tmp_path),
+            project_dir=str(tmp_path),
             python_executable=sys.executable,
         )
 
         assert mock_exec.call_args.kwargs["env"] == {"PYTHONPATH": "/repo/src"}
         info_line = result.splitlines()[0]
-        assert "/venv/lib/site-packages" in info_line
+        assert "installed in /venv/lib/site-packages" in info_line
+        assert "bridged" not in info_line
         assert "/repo/src" not in info_line
 
     @patch(f"{MODULE_PATH}.execute_command")
@@ -292,7 +305,7 @@ class TestPythonpathBridge:
         answer for it, and a PASSED then says nothing about the working tree.
         """
         monkeypatch.delenv("PYTHONPATH", raising=False)
-        mock_locate.return_value = ([], [])
+        mock_locate.return_value = ([], {})
         mock_exec.return_value = make_command_result(return_code=0, stdout=CLEAN_OUTPUT)
 
         result = run_lint_imports_check_impl(

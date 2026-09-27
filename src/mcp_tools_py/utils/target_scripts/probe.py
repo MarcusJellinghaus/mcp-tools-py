@@ -110,21 +110,23 @@ def _site_dirs() -> list[str]:
     return result
 
 
-def _locate(names: list[str]) -> dict[str, list[str]]:
+def _locate(names: list[str]) -> dict[str, object]:
     """Where each name in `names` lives, and this interpreter's site directories.
 
     The site directories are reported so the caller can tell a source tree
-    from a `site-packages`, which must never go on PYTHONPATH.
+    from a `site-packages`, which must never go on PYTHONPATH.  Directories
+    stay attributed to the name they were found for, so a caller checking
+    several packages can say which one of them a verdict is about.
 
     Args:
         names: Package or module names to find.
 
     Returns:
-        ``directories``, the directory each name that resolved is importable
-        from, in request order and without repeats; and ``site_dirs``, which
-        describes the interpreter rather than the request.
+        ``packages``, the directories each name is importable from, keyed by
+        name and omitting a name that did not resolve; and ``site_dirs``,
+        which describes the interpreter rather than the request.
     """
-    directories: list[str] = []
+    packages: dict[str, list[str]] = {}
     for name in names:
         try:
             spec = importlib.util.find_spec(name)
@@ -134,10 +136,10 @@ def _locate(names: list[str]) -> dict[str, list[str]]:
             continue
         if spec is None:
             continue
-        for parent in _parents(spec):
-            if parent and parent not in directories:
-                directories.append(parent)
-    return {"directories": directories, "site_dirs": _site_dirs()}
+        found = [parent for parent in _parents(spec) if parent]
+        if found:
+            packages[name] = found
+    return {"packages": packages, "site_dirs": _site_dirs()}
 
 
 def _distributions() -> dict[str, str]:

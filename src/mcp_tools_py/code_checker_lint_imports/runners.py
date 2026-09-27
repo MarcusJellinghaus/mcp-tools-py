@@ -146,6 +146,26 @@ def _pythonpath_env(directories: list[str]) -> dict[str, str]:
     return {"PYTHONPATH": os.pathsep.join(parts)}
 
 
+def _skipped_info_line(skipped: dict[str, list[str]]) -> str:
+    """Report the root packages that resolved into the project's site-packages.
+
+    Args:
+        skipped: Site directories keyed by the root package found in them.
+
+    Returns:
+        An info line naming each such package, so a multi-package config
+        makes clear which package went unbridged and which did not.
+    """
+    located_in = ", ".join(
+        f"{name} in {', '.join(directories)}" for name, directories in skipped.items()
+    )
+    return (
+        f"[Info: not added to PYTHONPATH, site-packages of the project "
+        f"interpreter: {located_in} — lint-imports may be reading an "
+        f"installed copy of {', '.join(skipped)}]"
+    )
+
+
 def _parse_summary(combined: str) -> tuple[int, int] | None:
     """Return (kept, broken) or None if summary line not found."""
     match = _SUMMARY_RE.search(combined)
@@ -319,11 +339,7 @@ def run_lint_imports_check_impl(
             return f"=== ERROR: could not locate {', '.join(names)}: {located} ==="
         usable, skipped = located
         if skipped:
-            info_lines.append(
-                f"[Info: not added to PYTHONPATH, site-packages of the project "
-                f"interpreter: {', '.join(skipped)} — lint-imports may be reading "
-                f"an installed copy]"
-            )
+            info_lines.append(_skipped_info_line(skipped))
         elif not usable:
             info_lines.append(
                 f"[Info: nothing added to PYTHONPATH, the project interpreter "

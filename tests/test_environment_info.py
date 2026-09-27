@@ -177,10 +177,15 @@ class TestToolVersionLogging:
         assert self._version_messages(caplog) == []
 
 
-def _locate_blob(directories: list[Path], site_dirs: list[str]) -> str:
+def _locate_blob(packages: dict[str, list[Path]], site_dirs: list[str]) -> str:
     """Build the JSON a `probe.py locate` run writes to stdout."""
     return json.dumps(
-        {"directories": [str(d) for d in directories], "site_dirs": site_dirs}
+        {
+            "packages": {
+                name: [str(d) for d in dirs] for name, dirs in packages.items()
+            },
+            "site_dirs": site_dirs,
+        }
     )
 
 
@@ -201,21 +206,24 @@ class TestLocatePackages:
         with patch("mcp_tools_py.utils.environment_info.execute_command") as mock_exec:
             mock_exec.return_value = make_command_result(
                 stdout=_locate_blob(
-                    [source], [str(tmp_path / "venv" / "site-packages")]
+                    {"pkg": [source]}, [str(tmp_path / "venv" / "site-packages")]
                 )
             )
 
-            assert locate_packages("/some/python", ["pkg"]) == ([str(source)], [])
+            assert locate_packages("/some/python", ["pkg"]) == ([str(source)], {})
 
     def test_site_directory_itself_is_skipped(self, tmp_path: Path) -> None:
         """A located directory that is a site directory may not be prepended."""
         site = tmp_path / "venv" / "site-packages"
         with patch("mcp_tools_py.utils.environment_info.execute_command") as mock_exec:
             mock_exec.return_value = make_command_result(
-                stdout=_locate_blob([site], [str(site)])
+                stdout=_locate_blob({"pkg": [site]}, [str(site)])
             )
 
-            assert locate_packages("/some/python", ["pkg"]) == ([], [str(site)])
+            assert locate_packages("/some/python", ["pkg"]) == (
+                [],
+                {"pkg": [str(site)]},
+            )
 
     def test_directory_inside_site_directory_is_skipped(self, tmp_path: Path) -> None:
         """A subdirectory of a site directory is skipped, whatever its spelling."""
@@ -224,25 +232,56 @@ class TestLocatePackages:
         inside.mkdir(parents=True)
         with patch("mcp_tools_py.utils.environment_info.execute_command") as mock_exec:
             mock_exec.return_value = make_command_result(
-                stdout=_locate_blob([inside], [_other_case(site)])
+                stdout=_locate_blob({"pkg": [inside]}, [_other_case(site)])
             )
 
-            assert locate_packages("/some/python", ["pkg"]) == ([], [str(inside)])
+            assert locate_packages("/some/python", ["pkg"]) == (
+                [],
+                {"pkg": [str(inside)]},
+            )
 
     def test_each_directory_lands_on_its_own_side(self, tmp_path: Path) -> None:
-        """Source and site directories separate, each keeping the probe's order."""
+        """Source and site directories separate, and the skip keeps its name.
+
+        Only `b` resolved into a site directory, so only `b` may be named as
+        unbridged — `a` and `c` are handed over on PYTHONPATH.
+        """
         first = tmp_path / "repo" / "src"
         site = tmp_path / "venv" / "site-packages"
         second = tmp_path / "other" / "src"
         with patch("mcp_tools_py.utils.environment_info.execute_command") as mock_exec:
             mock_exec.return_value = make_command_result(
-                stdout=_locate_blob([first, site, second], [str(site)])
+                stdout=_locate_blob(
+                    {"a": [first], "b": [site], "c": [second]}, [str(site)]
+                )
             )
 
             assert locate_packages("/some/python", ["a", "b", "c"]) == (
                 [str(first), str(second)],
-                [str(site)],
+                {"b": [str(site)]},
             )
+
+    def test_usable_directories_follow_request_order_without_repeats(
+        self, tmp_path: Path
+    ) -> None:
+        """Two packages in one source tree contribute that tree once."""
+        source = tmp_path / "repo" / "src"
+        with patch("mcp_tools_py.utils.environment_info.execute_command") as mock_exec:
+            mock_exec.return_value = make_command_result(
+                stdout=_locate_blob({"a": [source], "b": [source]}, [])
+            )
+
+            assert locate_packages("/some/python", ["a", "b"]) == ([str(source)], {})
+
+    def test_unresolved_name_contributes_nothing(self, tmp_path: Path) -> None:
+        """A name the probe left out is neither usable nor reported as skipped."""
+        source = tmp_path / "repo" / "src"
+        with patch("mcp_tools_py.utils.environment_info.execute_command") as mock_exec:
+            mock_exec.return_value = make_command_result(
+                stdout=_locate_blob({"a": [source]}, [])
+            )
+
+            assert locate_packages("/some/python", ["a", "b"]) == ([str(source)], {})
 
     def test_timeout_reports_the_interpreter(self) -> None:
         """A probe that times out yields a reason naming the interpreter."""
@@ -269,9 +308,18 @@ class TestLocatePackages:
             assert isinstance(reason, str)
             assert "boom" in reason
 
-    @pytest.mark.parametrize("stdout", ["not json", '["/some/dir"]'])
+    @pytest.mark.parametrize(
+        "stdout",
+        [
+            "not json",
+            '["/some/dir"]',
+            '{"directories": ["/some/dir"], "site_dirs": []}',
+            '{"packages": {"pkg": "/some/dir"}, "site_dirs": []}',
+            '{"packages": {"pkg": [1]}, "site_dirs": []}',
+        ],
+    )
     def test_unexpected_stdout_is_unparsable(self, stdout: str) -> None:
-        """Anything but the two-array object is reported as unparsable."""
+        """Anything but a name-to-directories object is reported as unparsable."""
         with patch("mcp_tools_py.utils.environment_info.execute_command") as mock_exec:
             mock_exec.return_value = make_command_result(stdout=stdout)
 
@@ -283,7 +331,7 @@ class TestLocatePackages:
     def test_no_names_runs_no_subprocess(self) -> None:
         """Nothing to locate is answered without a probe."""
         with patch("mcp_tools_py.utils.environment_info.execute_command") as mock_exec:
-            assert locate_packages("/some/python", []) == ([], [])
+            assert locate_packages("/some/python", []) == ([], {})
 
             mock_exec.assert_not_called()
 
@@ -307,16 +355,18 @@ class TestLocatePackages:
         under_root = str(Path(sys.prefix) / "src")
         with patch("mcp_tools_py.utils.environment_info.execute_command") as mock_exec:
             mock_exec.return_value = make_command_result(
-                stdout=json.dumps({"directories": [under_root], "site_dirs": site_dirs})
+                stdout=json.dumps(
+                    {"packages": {"pkg": [under_root]}, "site_dirs": site_dirs}
+                )
             )
 
-            assert locate_packages(sys.executable, ["pkg"]) == ([under_root], [])
+            assert locate_packages(sys.executable, ["pkg"]) == ([under_root], {})
 
     def test_answer_is_not_cached(self, tmp_path: Path) -> None:
         """Each call probes again: the answer can change while the server runs."""
         with patch("mcp_tools_py.utils.environment_info.execute_command") as mock_exec:
             mock_exec.return_value = make_command_result(
-                stdout=_locate_blob([tmp_path / "src"], [])
+                stdout=_locate_blob({"pkg": [tmp_path / "src"]}, [])
             )
 
             locate_packages("/some/python", ["pkg"])
@@ -356,7 +406,7 @@ class TestProbeScript:
         assert blob["version"] == platform.python_version()
 
     def test_real_child_locates_an_installed_package(self) -> None:
-        """The script finds this interpreter's mcp_tools_py, and skips the rest.
+        """The script finds this interpreter's mcp_tools_py, and omits the rest.
 
         Whether that directory is a site-packages depends on how mcp_tools_py is
         installed here, so the assertion is on the located directories as a
@@ -380,6 +430,8 @@ class TestProbeScript:
         assert result.return_code == 0, result.stderr
         blob = json.loads(result.stdout)
         assert blob["site_dirs"]
-        assert len(blob["directories"]) == 1
-        found = Path(blob["directories"][0]).resolve()
+        assert list(blob["packages"]) == ["mcp_tools_py"]
+        directories = blob["packages"]["mcp_tools_py"]
+        assert len(directories) == 1
+        found = Path(directories[0]).resolve()
         assert (found / "mcp_tools_py" / "__init__.py").is_file()

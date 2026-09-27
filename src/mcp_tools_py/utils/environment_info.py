@@ -89,7 +89,7 @@ def probe_script_path() -> Path:
 
 def locate_packages(
     interpreter: str, names: list[str]
-) -> tuple[list[str], list[str]] | str:
+) -> tuple[list[str], dict[str, list[str]]] | str:
     """Ask `interpreter` where each package in `names` lives.
 
     Args:
@@ -97,13 +97,14 @@ def locate_packages(
         names: Package names to locate.
 
     Returns:
-        `(usable, skipped)` — the directories to prepend to PYTHONPATH, and
-        the located directories that are `interpreter`'s own site/purelib
-        directories and must not be prepended.  Or a string saying why the
-        probe could not be trusted.
+        `(usable, skipped)` — the directories to prepend to PYTHONPATH, in
+        request order and without repeats; and, keyed by the package name they
+        were found for, the located directories that are `interpreter`'s own
+        site/purelib directories and must not be prepended.  Or a string
+        saying why the probe could not be trusted.
     """
     if not names:
-        return [], []
+        return [], {}
 
     result = execute_command(
         [interpreter, str(probe_script_path()), "locate", *names],
@@ -115,27 +116,50 @@ def locate_packages(
         detail = result.execution_error or result.stderr.strip()[:STDERR_SNIPPET]
         return f"could not locate {', '.join(names)} in {interpreter}: {detail}"
 
-    try:
-        blob = json.loads(result.stdout)
-        directories = blob["directories"]
-        site_dirs = blob["site_dirs"]
-    except (ValueError, KeyError, TypeError):
+    located = _parse_locate_blob(result.stdout)
+    if located is None:
         return f"probe of {interpreter} returned unparsable output"
-    if not (
-        isinstance(directories, list)
-        and isinstance(site_dirs, list)
-        and all(isinstance(entry, str) for entry in directories + site_dirs)
-    ):
-        return f"probe of {interpreter} returned unparsable output"
+    packages, site_dirs = located
 
     resolved_sites = [Path(site_dir).resolve() for site_dir in site_dirs]
     usable: list[str] = []
-    skipped: list[str] = []
-    for directory in directories:
-        resolved = Path(directory).resolve()
-        target = skipped if _under_any(resolved, resolved_sites) else usable
-        target.append(directory)
+    skipped: dict[str, list[str]] = {}
+    for name in names:
+        for directory in packages.get(name, []):
+            if _under_any(Path(directory).resolve(), resolved_sites):
+                skipped.setdefault(name, []).append(directory)
+            elif directory not in usable:
+                usable.append(directory)
     return usable, skipped
+
+
+def _parse_locate_blob(
+    stdout: str,
+) -> tuple[dict[str, list[str]], list[str]] | None:
+    """Read a `probe.py locate` blob, rejecting anything of the wrong shape.
+
+    Args:
+        stdout: What the probe wrote.
+
+    Returns:
+        `(packages, site_dirs)`, or None when the blob cannot be trusted.
+    """
+    try:
+        blob = json.loads(stdout)
+        packages = blob["packages"]
+        site_dirs = blob["site_dirs"]
+    except (ValueError, KeyError, TypeError):
+        return None
+    if not (isinstance(packages, dict) and isinstance(site_dirs, list)):
+        return None
+    if not all(isinstance(site_dir, str) for site_dir in site_dirs):
+        return None
+    for name, directories in packages.items():
+        if not (isinstance(name, str) and isinstance(directories, list)):
+            return None
+        if not all(isinstance(directory, str) for directory in directories):
+            return None
+    return packages, site_dirs
 
 
 def _under_any(directory: Path, site_dirs: list[Path]) -> bool:
