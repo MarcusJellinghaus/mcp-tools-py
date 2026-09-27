@@ -1,6 +1,5 @@
 [importlinter]
 root_package = mcp_tools_py
-root_package_paths = src
 include_external_packages = True
 
 [importlinter:contract:layers]

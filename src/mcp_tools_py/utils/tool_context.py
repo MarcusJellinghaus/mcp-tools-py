@@ -59,12 +59,11 @@ class ToolContext:
         """Check whether `tool_name` can be run in this environment.
 
         A console-script-only tool is answered from the filesystem; the probe
-        cannot answer for one, because it is asked about module names.  It is
-        looked for in `tool_environment`, since mcp-tools-py depends on it —
-        except `lint-imports`, whose binary lookup has not moved yet.  Every
-        other tool is answered from the one-shot environment probe, which
-        fails open: a probe that could not be trusted reports the tool
-        available so the call proceeds and surfaces the real error.
+        cannot answer for one, because it is asked about module names.  All
+        five are looked for in `tool_environment`, since mcp-tools-py depends
+        on them.  Every other tool is answered from the one-shot environment
+        probe, which fails open: a probe that could not be trusted reports the
+        tool available so the call proceeds and surfaces the real error.
 
         Args:
             tool_name: Tool key to look up.
@@ -73,12 +72,7 @@ class ToolContext:
             True if the tool is available.
         """
         if tool_name in CONSOLE_SCRIPT_TOOLS:
-            env = (
-                self.environment
-                if tool_name == "lint-imports"
-                else self.tool_environment
-            )
-            available = env.binary(tool_name) is not None
+            available = self.tool_environment.binary(tool_name) is not None
             if not available:
                 logger.warning("%s", self.unavailable_message(tool_name))
             return available
@@ -107,31 +101,17 @@ class ToolContext:
             tool_name: Tool key that could not be run.
 
         Returns:
-            A message naming the location searched.  Four of the five
-            console-script tools name the tool env and say mcp-tools-py's own
-            install is incomplete; `lint-imports` keeps the
-            --python-executable wording until its binary lookup moves too.
-            The distribution to install comes from `TOOL_PACKAGES`, which maps
-            a key to its distribution when the two differ (import-linter
-            provides `lint-imports`).  For a `python -m` tool the probe adds
-            the Python version and, when the distribution is installed but the
-            module will not import, says so — a broken install rather than a
-            missing one.
+            A message naming the location searched.  All five console-script
+            tools name the tool env and say mcp-tools-py's own install is
+            incomplete.  The distribution to install comes from
+            `TOOL_PACKAGES`, which maps a key to its distribution when the two
+            differ (import-linter provides `lint-imports`).  For a `python -m`
+            tool the probe adds the Python version and, when the distribution
+            is installed but the module will not import, says so — a broken
+            install rather than a missing one.
         """
         name = TOOL_PACKAGES.get(tool_name, tool_name)
         if tool_name in CONSOLE_SCRIPT_TOOLS:
-            if tool_name == "lint-imports":
-                # Its binary lookup hasn't moved yet (checker_tools/
-                # lint_imports_tool.py still reads self.environment).  Naming
-                # the tool env here would blame a broken mcp-tools-py install
-                # when the tool env copy is the one that exists.
-                return (
-                    f"{tool_name} is not available. No {tool_name} console script was "
-                    f"found in {self.environment.bin_dir}. Ensure --python-executable "
-                    f"points to an environment where {name} is installed. "
-                    f"That directory is re-checked on every call, so no restart is "
-                    f"needed after installing."
-                )
             return (
                 f"{tool_name} is not available. No {tool_name} console script was "
                 f"found in {self.tool_environment.bin_dir}. {name} is a dependency "

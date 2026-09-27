@@ -155,16 +155,11 @@ class TestToolHandlerShortCircuit:
             assert venv_bin == str(Path("/custom"))
 
     def test_lint_imports_unavailable_returns_error(self, tmp_path: Path) -> None:
-        """lint-imports is still answered from the project env, not the tool env.
-
-        The issue's own scenario: the tool env has the script and the project
-        env does not.  Its binary lookup has not moved yet, so the message must
-        name the project env rather than blame a broken mcp-tools-py install.
-        """
-        with _patched_tool_env(tmp_path, "lint-imports") as tool_bin_dir:
+        """A tool env without the script names that directory, like the others."""
+        with _patched_tool_env(tmp_path) as tool_bin_dir:
             with patch("mcp.server.fastmcp.FastMCP") as mock_fastmcp:
                 tools = _capture_tools(mock_fastmcp)
-                server = _create_server(
+                _create_server(
                     project_dir=Path("/project"),
                     python_executable=_dummy_python(tmp_path),
                 )
@@ -172,10 +167,27 @@ class TestToolHandlerShortCircuit:
             result = tools["run_lint_imports_check"]()
 
         assert "lint-imports is not available" in result
-        assert str(server.context.environment.bin_dir) in result
-        assert str(tool_bin_dir) not in result
-        assert "--python-executable" in result
-        assert "reinstall mcp-tools-py" not in result
+        assert str(tool_bin_dir) in result
+        assert "reinstall mcp-tools-py" in result
+
+    def test_lint_imports_runs_from_the_tool_env(self, tmp_path: Path) -> None:
+        """lint-imports runs from the tool env even when the project env lacks it."""
+        with _patched_tool_env(tmp_path, "lint-imports"):
+            with patch("mcp.server.fastmcp.FastMCP") as mock_fastmcp:
+                tools = _capture_tools(mock_fastmcp)
+                _create_server(
+                    project_dir=Path("/project"),
+                    python_executable=_dummy_python(tmp_path),
+                )
+
+            with patch(
+                "mcp_tools_py.checker_tools.lint_imports_tool."
+                "run_lint_imports_check_impl",
+                return_value="=== PASSED ===",
+            ):
+                result = tools["run_lint_imports_check"]()
+
+        assert result == "=== PASSED ==="
 
     def test_console_script_runs_from_tool_env(self, tmp_path: Path) -> None:
         """tach runs from the tool env even when the project env lacks it."""

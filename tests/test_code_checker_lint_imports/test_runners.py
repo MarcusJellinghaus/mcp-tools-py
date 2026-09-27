@@ -1,6 +1,7 @@
 """Tests for code_checker_lint_imports.runners module."""
 
 import os
+import sys
 from pathlib import Path
 from typing import Any
 from unittest.mock import patch
@@ -379,6 +380,7 @@ class TestRunLintImportsCheckImpl:
         result = run_lint_imports_check_impl(
             lint_imports_binary="/usr/bin/lint-imports",
             project_dir="/project",
+            python_executable=sys.executable,
         )
         first = result.splitlines()[0]
         assert first == "=== PASSED ==="
@@ -392,6 +394,7 @@ class TestRunLintImportsCheckImpl:
         result = run_lint_imports_check_impl(
             lint_imports_binary="/usr/bin/lint-imports",
             project_dir="/project",
+            python_executable=sys.executable,
         )
         first = result.splitlines()[0]
         assert first == "=== BROKEN: 1 of 2 contracts failed ==="
@@ -405,6 +408,7 @@ class TestRunLintImportsCheckImpl:
         result = run_lint_imports_check_impl(
             lint_imports_binary="/usr/bin/lint-imports",
             project_dir="/project",
+            python_executable=sys.executable,
         )
         first = result.splitlines()[0]
         assert first == ("=== ERROR: lint-imports output could not be parsed ===")
@@ -417,6 +421,7 @@ class TestRunLintImportsCheckImpl:
             lint_imports_binary="/usr/bin/lint-imports",
             project_dir="/project",
             extra_args=["--verbose"],
+            python_executable=sys.executable,
         )
         lines = result.splitlines()
         assert lines[0] == "[Info: stripped --verbose/-v from extra_args]"
@@ -432,6 +437,7 @@ class TestRunLintImportsCheckImpl:
             lint_imports_binary="/usr/bin/lint-imports",
             project_dir="/project",
             extra_args=["-v"],
+            python_executable=sys.executable,
         )
         lines = result.splitlines()
         assert lines[0] == "[Info: stripped --verbose/-v from extra_args]"
@@ -447,6 +453,7 @@ class TestRunLintImportsCheckImpl:
         result = run_lint_imports_check_impl(
             lint_imports_binary="/usr/bin/lint-imports",
             project_dir="/project",
+            python_executable=sys.executable,
         )
         last = result.splitlines()[-1]
         assert "[output truncated" in last
@@ -459,6 +466,7 @@ class TestRunLintImportsCheckImpl:
         result = run_lint_imports_check_impl(
             lint_imports_binary="/usr/bin/lint-imports",
             project_dir="/project",
+            python_executable=sys.executable,
         )
         assert "(no output)" in result
         assert result.splitlines()[0].startswith("===")
@@ -470,6 +478,7 @@ class TestRunLintImportsCheckImpl:
             lint_imports_binary="/usr/bin/lint-imports",
             project_dir="/project",
             extra_args=["--contract", "layers", "--verbose"],
+            python_executable=sys.executable,
         )
         cmd = mock_exec.call_args[0][0]
         assert cmd == [
@@ -495,6 +504,7 @@ class TestRunLintImportsTimeout:
             lint_imports_binary="/usr/bin/lint-imports",
             project_dir="/project",
             timeout_seconds=45,
+            python_executable=sys.executable,
         )
 
         first = next(line for line in result.splitlines() if line.strip())
@@ -516,6 +526,7 @@ class TestRunLintImportsTimeout:
             project_dir="/project",
             extra_args=["--verbose"],
             timeout_seconds=45,
+            python_executable=sys.executable,
         )
 
         assert result.splitlines() == [
@@ -533,6 +544,7 @@ class TestRunLintImportsTimeout:
         result = run_lint_imports_check_impl(
             lint_imports_binary="/usr/bin/lint-imports",
             project_dir="/project",
+            python_executable=sys.executable,
         )
 
         first = next(line for line in result.splitlines() if line.strip())
@@ -549,6 +561,7 @@ class TestRunLintImportsTimeout:
             lint_imports_binary="/usr/bin/lint-imports",
             project_dir="/project",
             timeout_seconds=45,
+            python_executable=sys.executable,
         )
 
         assert mock_exec.call_args.kwargs["timeout_seconds"] == 45
@@ -561,6 +574,7 @@ class TestRunLintImportsTimeout:
         run_lint_imports_check_impl(
             lint_imports_binary="/usr/bin/lint-imports",
             project_dir="/project",
+            python_executable=sys.executable,
         )
 
         assert mock_exec.call_args.kwargs["timeout_seconds"] == 120
@@ -702,3 +716,168 @@ class TestPythonpathEnv:
     ) -> None:
         monkeypatch.setenv("PYTHONPATH", "")
         assert _pythonpath_env(["/src"]) == {"PYTHONPATH": "/src"}
+
+
+class TestPythonpathBridge:
+    """The located root package reaches the subprocess on PYTHONPATH."""
+
+    @staticmethod
+    def _project(tmp_path: Path) -> str:
+        """Write a config naming one root package.
+
+        Returns:
+            The project directory, as `run_lint_imports_check_impl` takes it.
+        """
+        (tmp_path / ".importlinter").write_text(
+            "[importlinter]\nroot_package = pkg\n", encoding="utf-8"
+        )
+        return str(tmp_path)
+
+    @patch(f"{MODULE_PATH}.execute_command")
+    @patch(f"{MODULE_PATH}.locate_packages")
+    def test_usable_directory_is_prepended(
+        self,
+        mock_locate: Any,
+        mock_exec: Any,
+        tmp_path: Path,
+        monkeypatch: pytest.MonkeyPatch,
+    ) -> None:
+        """A source tree goes on PYTHONPATH, asked of the project interpreter."""
+        monkeypatch.delenv("PYTHONPATH", raising=False)
+        mock_locate.return_value = (["/repo/src"], [])
+        mock_exec.return_value = make_command_result(return_code=0, stdout=CLEAN_OUTPUT)
+
+        run_lint_imports_check_impl(
+            lint_imports_binary="/usr/bin/lint-imports",
+            project_dir=self._project(tmp_path),
+            python_executable="/project/venv/bin/python",
+        )
+
+        assert mock_exec.call_args.kwargs["env"] == {"PYTHONPATH": "/repo/src"}
+        assert mock_locate.call_args[0] == ("/project/venv/bin/python", ["pkg"])
+
+    @patch(f"{MODULE_PATH}.execute_command")
+    @patch(f"{MODULE_PATH}.locate_packages")
+    def test_existing_pythonpath_is_appended(
+        self,
+        mock_locate: Any,
+        mock_exec: Any,
+        tmp_path: Path,
+        monkeypatch: pytest.MonkeyPatch,
+    ) -> None:
+        """An inherited PYTHONPATH keeps its entries, behind the located one."""
+        monkeypatch.setenv("PYTHONPATH", "/already/there")
+        mock_locate.return_value = (["/repo/src"], [])
+        mock_exec.return_value = make_command_result(return_code=0, stdout=CLEAN_OUTPUT)
+
+        run_lint_imports_check_impl(
+            lint_imports_binary="/usr/bin/lint-imports",
+            project_dir=self._project(tmp_path),
+            python_executable=sys.executable,
+        )
+
+        assert mock_exec.call_args.kwargs["env"] == {
+            "PYTHONPATH": os.pathsep.join(["/repo/src", "/already/there"])
+        }
+
+    @patch(f"{MODULE_PATH}.execute_command")
+    @patch(f"{MODULE_PATH}.locate_packages")
+    def test_site_packages_under_the_project_dir_is_still_skipped(
+        self,
+        mock_locate: Any,
+        mock_exec: Any,
+        tmp_path: Path,
+        monkeypatch: pytest.MonkeyPatch,
+    ) -> None:
+        """The ordinary in-project venv layout: under the project, still skipped.
+
+        `<project>/.venv/Lib/site-packages` is what a non-editable install of
+        the project resolves to, and prepending it would put the whole
+        environment ahead of the tool env's grimp.  A predicate asking "is it
+        under --project-dir" would have prepended it.
+        """
+        monkeypatch.delenv("PYTHONPATH", raising=False)
+        site_packages = str(tmp_path / ".venv" / "Lib" / "site-packages")
+        mock_locate.return_value = ([], [site_packages])
+        mock_exec.return_value = make_command_result(return_code=0, stdout=CLEAN_OUTPUT)
+
+        result = run_lint_imports_check_impl(
+            lint_imports_binary="/usr/bin/lint-imports",
+            project_dir=self._project(tmp_path),
+            python_executable=sys.executable,
+        )
+
+        assert mock_exec.call_args.kwargs["env"] is None
+        lines = result.splitlines()
+        assert lines[0].startswith(
+            "[Info: not added to PYTHONPATH, site-packages of the project interpreter"
+        )
+        assert site_packages in lines[0]
+        assert lines[1] == "=== PASSED ==="
+
+    @patch(f"{MODULE_PATH}.execute_command")
+    @patch(f"{MODULE_PATH}.locate_packages")
+    def test_usable_and_skipped_are_reported_separately(
+        self,
+        mock_locate: Any,
+        mock_exec: Any,
+        tmp_path: Path,
+        monkeypatch: pytest.MonkeyPatch,
+    ) -> None:
+        """Only the usable directory is prepended, only the skipped one named."""
+        monkeypatch.delenv("PYTHONPATH", raising=False)
+        mock_locate.return_value = (["/repo/src"], ["/venv/lib/site-packages"])
+        mock_exec.return_value = make_command_result(return_code=0, stdout=CLEAN_OUTPUT)
+
+        result = run_lint_imports_check_impl(
+            lint_imports_binary="/usr/bin/lint-imports",
+            project_dir=self._project(tmp_path),
+            python_executable=sys.executable,
+        )
+
+        assert mock_exec.call_args.kwargs["env"] == {"PYTHONPATH": "/repo/src"}
+        info_line = result.splitlines()[0]
+        assert "/venv/lib/site-packages" in info_line
+        assert "/repo/src" not in info_line
+
+    @patch(f"{MODULE_PATH}.execute_command")
+    @patch(f"{MODULE_PATH}.locate_packages")
+    def test_locate_failure_reports_error_and_runs_nothing(
+        self,
+        mock_locate: Any,
+        mock_exec: Any,
+        tmp_path: Path,
+    ) -> None:
+        """A probe that could not be trusted stops the run before it starts."""
+        mock_locate.return_value = "probe of /bad/python timed out after 30 seconds"
+
+        result = run_lint_imports_check_impl(
+            lint_imports_binary="/usr/bin/lint-imports",
+            project_dir=self._project(tmp_path),
+            python_executable="/bad/python",
+        )
+
+        assert result.startswith("=== ERROR:")
+        assert "pkg" in result
+        assert "timed out" in result
+        mock_exec.assert_not_called()
+
+    @patch(f"{MODULE_PATH}.execute_command")
+    @patch(f"{MODULE_PATH}.locate_packages")
+    def test_no_config_asks_nothing_and_sets_no_pythonpath(
+        self,
+        mock_locate: Any,
+        mock_exec: Any,
+        tmp_path: Path,
+    ) -> None:
+        """Without a config there is no root package to bridge."""
+        mock_exec.return_value = make_command_result(return_code=0, stdout=CLEAN_OUTPUT)
+
+        run_lint_imports_check_impl(
+            lint_imports_binary="/usr/bin/lint-imports",
+            project_dir=str(tmp_path),
+            python_executable=sys.executable,
+        )
+
+        mock_locate.assert_not_called()
+        assert mock_exec.call_args.kwargs["env"] is None

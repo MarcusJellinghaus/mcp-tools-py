@@ -9,7 +9,9 @@ import pytest
 
 from mcp_tools_py.checker_tools import CheckerTools
 from mcp_tools_py.code_checker_mypy.reporting import MYPY_FAILURE_PREFIX
+from mcp_tools_py.utils.python_environment import PythonEnvironment
 from mcp_tools_py.utils.tool_context import ToolContext
+from tests.test_tool_availability._helpers import _dummy_python
 
 
 def _remove_console_script(context: ToolContext, tool_name: str) -> None:
@@ -260,7 +262,7 @@ def test_vulture_passes_resolved_timeout(tool_context: ToolContext) -> None:
 
 
 def test_lint_imports_passes_resolved_timeout(tool_context: ToolContext) -> None:
-    """The resolved timeout is passed to run_lint_imports_check_impl."""
+    """The resolved timeout and the project interpreter reach the runner."""
     run_lint_imports = _capture_tool(tool_context, "run_lint_imports_check")
 
     with patch(
@@ -269,7 +271,44 @@ def test_lint_imports_passes_resolved_timeout(tool_context: ToolContext) -> None
     ) as mock_runner:
         run_lint_imports()
 
-    assert mock_runner.call_args[0][3] == 120
+    assert mock_runner.call_args.kwargs["timeout_seconds"] == 120
+    assert mock_runner.call_args.kwargs["python_executable"] == str(
+        tool_context.environment.interpreter
+    )
+
+
+def test_lint_imports_binary_comes_from_the_tool_env(tmp_path: Path) -> None:
+    """The script is taken from the tool env, not from --python-executable.
+
+    The shared fixture backs both environments with one directory, so only a
+    context where they differ can tell the two lookups apart.  The project env
+    holds no lint-imports, so a registrar still reading `context.environment`
+    short-circuits and never calls the impl at all.
+    """
+    proj_base, tool_base = tmp_path / "projenv", tmp_path / "toolenv"
+    proj_base.mkdir()
+    tool_base.mkdir()
+    project_env = PythonEnvironment(Path(_dummy_python(proj_base)))
+    tool_env = PythonEnvironment(Path(_dummy_python(tool_base, "lint-imports")))
+    context = ToolContext(
+        project_dir=tmp_path,
+        environment=project_env,
+        tool_environment=tool_env,
+    )
+    run_lint_imports = _capture_tool(context, "run_lint_imports_check")
+
+    with patch(
+        "mcp_tools_py.checker_tools.lint_imports_tool.run_lint_imports_check_impl",
+        return_value="=== PASSED ===",
+    ) as mock_runner:
+        run_lint_imports()
+
+    assert mock_runner.call_args.kwargs["lint_imports_binary"] == str(
+        tool_env.binary("lint-imports")
+    )
+    assert mock_runner.call_args.kwargs["python_executable"] == str(
+        project_env.interpreter
+    )
 
 
 # --- Bandit handler tests ---

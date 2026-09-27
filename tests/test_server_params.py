@@ -814,16 +814,17 @@ class TestStartupConsoleScriptWarnings:
         for tool_name in CONSOLE_SCRIPT_TOOLS:
             assert server.context.unavailable_message(tool_name) in warnings
         assert any("tach is a dependency" in text for text in warnings)
-        assert any("import-linter is installed" in text for text in warnings)
+        assert any("import-linter is a dependency" in text for text in warnings)
 
-    def test_lint_imports_warning_still_checks_project_env(
+    def test_lint_imports_warning_reads_the_tool_env(
         self, tmp_path: Path, caplog: pytest.LogCaptureFixture
     ) -> None:
-        """The startup check for lint-imports still reads the project env.
+        """The startup check for lint-imports reads the tool env too.
 
-        Asymmetric on purpose: the tool env has the script and the project env
-        does not, so the warning can only fire if the check itself — not just
-        `is_tool_available` — is the carved-out one.
+        Asymmetric on purpose: the tool env has every script and the project
+        env has none.  A symmetric "both envs lack everything" case would warn
+        correctly even with the old carve-out in place, so only this one proves
+        `_warn_missing_console_scripts` itself was switched.
         """
         from mcp_tools_py.server import ToolServer
 
@@ -840,8 +841,7 @@ class TestStartupConsoleScriptWarnings:
                 )
 
         warnings = [record.getMessage() for record in caplog.records]
-        assert any("lint-imports is not available" in text for text in warnings)
-        assert any("import-linter is installed" in text for text in warnings)
+        assert not any("lint-imports is not available" in text for text in warnings)
         assert not any("tach is not available" in text for text in warnings)
 
     def test_server_stores_no_availability(self, tmp_path: Path) -> None:

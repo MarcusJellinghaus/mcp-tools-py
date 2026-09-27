@@ -8,6 +8,7 @@ import tomllib
 from pathlib import Path
 
 from mcp_tools_py.log_utils import log_function_call
+from mcp_tools_py.utils.environment_info import locate_packages
 from mcp_tools_py.utils.project_config import DEFAULT_CHECK_TIMEOUT
 from mcp_tools_py.utils.subprocess_runner import execute_command
 
@@ -284,26 +285,51 @@ def run_lint_imports_check_impl(
     project_dir: str,
     extra_args: list[str] | None = None,
     timeout_seconds: int = DEFAULT_CHECK_TIMEOUT,
+    *,
+    python_executable: str,
 ) -> str:
     """Run lint-imports and return an LLM-optimised structured report.
 
-    The first non-empty line is always either an info line (when flags
-    were stripped) or the state header. Truncation cannot hide it.
+    The first non-empty line is always either an info line or the state
+    header. Truncation cannot hide it.
 
     Args:
-        lint_imports_binary: Path to the lint-imports executable.
+        lint_imports_binary: Path to the lint-imports executable, which
+            comes from mcp-tools-py's own environment.
         project_dir: Directory to run lint-imports in.
         extra_args: Additional lint-imports arguments.
         timeout_seconds: Maximum seconds to wait for lint-imports.
+        python_executable: Interpreter of the project's environment, asked
+            where the root package lives.  Without that answer the script
+            would check whatever copy of the project happens to be installed
+            next to itself.
 
     Returns:
-        Structured report (state header + summary + raw output, capped).
+        Structured report (info lines + state header + summary + raw output,
+        capped), or a single `=== ERROR: ... ===` line.
     """
     cleaned_args, stripped = _strip_verbose_flags(extra_args)
     info_lines = ["[Info: stripped --verbose/-v from extra_args]"] if stripped else []
 
+    names = _root_packages(project_dir, cleaned_args)
+    env: dict[str, str] | None = None
+    if names:
+        located = locate_packages(python_executable, names)
+        if isinstance(located, str):
+            return f"=== ERROR: could not locate {', '.join(names)}: {located} ==="
+        usable, skipped = located
+        if skipped:
+            info_lines.append(
+                f"[Info: not added to PYTHONPATH, site-packages of the project "
+                f"interpreter: {', '.join(skipped)} — lint-imports may be reading "
+                f"an installed copy]"
+            )
+        env = _pythonpath_env(usable) if usable else None
+
     command = [lint_imports_binary] + cleaned_args
-    result = execute_command(command, cwd=project_dir, timeout_seconds=timeout_seconds)
+    result = execute_command(
+        command, cwd=project_dir, timeout_seconds=timeout_seconds, env=env
+    )
 
     if result.timed_out:
         return f"=== ERROR: lint-imports timed out after {timeout_seconds} seconds ==="

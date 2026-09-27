@@ -245,26 +245,26 @@ class TestUnavailableMessage:
         message = context.unavailable_message("lint-imports")
 
         assert "lint-imports is not available" in message
-        assert "import-linter is installed" in message
+        assert "import-linter is a dependency" in message
 
-    def test_lint_imports_message_still_names_project_env(self, tmp_path: Path) -> None:
-        """The carve-out keeps lint-imports on the project env until step 4.
+    def test_lint_imports_reads_the_tool_env_like_the_others(
+        self, tmp_path: Path
+    ) -> None:
+        """The issue's own scenario: only the tool env has the script.
 
-        The issue's own scenario: the tool env has the script and the project
-        env does not.  Because lint-imports' binary lookup has not moved yet,
-        the message must not blame a broken mcp-tools-py install.
+        lint-imports is no longer carved out, so the tool env's copy answers
+        for it, and the message names that directory when neither env has it.
         """
         context = _split_context(tmp_path, tool_scripts=("lint-imports",))
 
-        assert context.is_tool_available("lint-imports") is False
+        assert context.is_tool_available("lint-imports") is True
 
         message = context.unavailable_message("lint-imports")
 
-        assert str(context.environment.bin_dir) in message
-        assert str(context.tool_environment.bin_dir) not in message
-        assert "import-linter" in message
-        assert "--python-executable" in message
-        assert "reinstall mcp-tools-py" not in message
+        assert str(context.tool_environment.bin_dir) in message
+        assert str(context.environment.bin_dir) not in message
+        assert "reinstall mcp-tools-py" in message
+        assert "--python-executable" not in message
 
     def test_unmapped_tool_installs_under_its_own_name(self, tmp_path: Path) -> None:
         """A tool absent from the package map is named by its key."""
