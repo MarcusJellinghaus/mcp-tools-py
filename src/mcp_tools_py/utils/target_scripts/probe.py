@@ -44,6 +44,27 @@ def _importable(module_names: list[str]) -> dict[str, bool]:
     return result
 
 
+def _importable_from(path: str, name: str) -> str:
+    """Strip the components `name` itself accounts for off `path`.
+
+    A dotted name needs a directory that many levels further up: `ns.pkg`
+    lives in ``<dir>/ns/pkg``, but ``<dir>`` is what makes it importable.
+    grimp accepts such a name when the parent is a namespace package, and
+    handing over ``<dir>/ns`` would import nothing.
+
+    Args:
+        path: The package directory, or the module file, behind the name.
+        name: The dotted name that was looked up.
+
+    Returns:
+        The directory `name` is importable from.
+    """
+    directory = path
+    for _ in range(name.count(".") + 1):
+        directory = os.path.dirname(directory)
+    return directory
+
+
 def _parents(spec: importlib.machinery.ModuleSpec) -> list[str]:
     """Report the directories a found name is importable from.
 
@@ -53,13 +74,15 @@ def _parents(spec: importlib.machinery.ModuleSpec) -> list[str]:
     Returns:
         One directory per location of a package or namespace portion, the
         containing directory of a plain module, or nothing for a name with no
-        file behind it (built-in, frozen or extension-less).
+        file behind it (built-in, frozen or extension-less).  A dotted name
+        reports the directory its *root* is importable from, not its own
+        parent.
     """
     locations = list(spec.submodule_search_locations or [])
     if locations:
-        return [os.path.dirname(location) for location in locations]
+        return [_importable_from(location, spec.name) for location in locations]
     if spec.origin and os.path.isfile(spec.origin):
-        return [os.path.dirname(spec.origin)]
+        return [_importable_from(spec.origin, spec.name)]
     return []
 
 

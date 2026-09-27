@@ -362,11 +362,8 @@ def run_lint_imports_check_impl(
     The first non-empty line is always either an info line or the state
     header. Truncation cannot hide it.
 
-    Caching is left to import-linter's own default: nothing is injected, and a
-    `--cache-dir` or `--no-cache` in `extra_args` reaches the CLI untouched.
-    grimp guards its own cache — the data file carries a format version and a
-    mismatch rebuilds the graph — so the tool env's grimp reading a cache
-    written by another one cannot produce a stale verdict on that account.
+    Caching is left to import-linter's own default: a `--cache-dir` or
+    `--no-cache` in `extra_args` reaches the CLI on its own.
 
     Args:
         lint_imports_binary: Path to the lint-imports executable, which

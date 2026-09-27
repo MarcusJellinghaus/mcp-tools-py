@@ -435,3 +435,28 @@ class TestProbeScript:
         assert len(directories) == 1
         found = Path(directories[0]).resolve()
         assert (found / "mcp_tools_py" / "__init__.py").is_file()
+
+    def test_real_child_locates_a_dotted_name_from_its_root(
+        self, tmp_path: Path
+    ) -> None:
+        """A dotted name reports the directory its root is importable from.
+
+        grimp raises `NotATopLevelModule` only when the parent has a location,
+        so `ns.pkg` under a namespace `ns` is a root package import-linter
+        accepts.  Reporting `<root>/ns` would put a directory on PYTHONPATH
+        that imports nothing, and the bridge would fail without saying so.
+        """
+        package = tmp_path / "ns" / "pkg"
+        package.mkdir(parents=True)
+        (package / "__init__.py").write_text("", encoding="utf-8")
+
+        result = execute_command(
+            [sys.executable, str(probe_script_path()), "locate", "ns.pkg"],
+            timeout_seconds=60,
+            env={"PYTHONPATH": str(tmp_path)},
+        )
+
+        assert result.return_code == 0, result.stderr
+        blob = json.loads(result.stdout)
+        directories = blob["packages"]["ns.pkg"]
+        assert [Path(directory) for directory in directories] == [tmp_path]
