@@ -816,20 +816,24 @@ class TestStartupConsoleScriptWarnings:
         assert any("tach is a dependency" in text for text in warnings)
         assert any("import-linter is a dependency" in text for text in warnings)
 
-    def test_lint_imports_warning_reads_the_tool_env(
+    def test_warnings_read_the_tool_env_not_the_project_env(
         self, tmp_path: Path, caplog: pytest.LogCaptureFixture
     ) -> None:
-        """The startup check for lint-imports reads the tool env too.
+        """The startup check answers every name from the tool env.
 
-        Asymmetric on purpose: the tool env has every script and the project
-        env has none.  A symmetric "both envs lack everything" case would warn
-        correctly even with the old carve-out in place, so only this one proves
-        `_warn_missing_console_scripts` itself was switched.
+        Asymmetric on purpose: the project env has no script at all, while the
+        tool env has `lint-imports` and nothing else.  A symmetric "both envs
+        lack everything" case would warn correctly even with the old carve-out
+        in place, so only this one proves `_warn_missing_console_scripts`
+        itself was switched.  tach, missing from the tool env, is the other
+        half of the same case: its warning shows the loop ran, so silence
+        about lint-imports means the check looked in the tool env and found it
+        there — not that nothing was checked.
         """
         from mcp_tools_py.server import ToolServer
 
         with (
-            _patched_tool_env(tmp_path, *sorted(CONSOLE_SCRIPT_TOOLS)),
+            _patched_tool_env(tmp_path, "lint-imports"),
             patch("mcp.server.fastmcp.FastMCP") as mock_fastmcp,
         ):
             mock_fastmcp.return_value.tool.return_value = MagicMock()
@@ -841,8 +845,8 @@ class TestStartupConsoleScriptWarnings:
                 )
 
         warnings = [record.getMessage() for record in caplog.records]
+        assert any("tach is not available" in text for text in warnings)
         assert not any("lint-imports is not available" in text for text in warnings)
-        assert not any("tach is not available" in text for text in warnings)
 
     def test_server_stores_no_availability(self, tmp_path: Path) -> None:
         """Availability is answered at use time, never cached on the server."""

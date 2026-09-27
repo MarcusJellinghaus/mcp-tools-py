@@ -1,11 +1,9 @@
 """Functions for running import-linter contract checks with structured output."""
 
 import configparser
-import importlib.metadata
 import logging
 import os
 import re
-import sys
 import tomllib
 from pathlib import Path
 
@@ -18,10 +16,6 @@ logger = logging.getLogger(__name__)
 
 _VERBOSE_FLAGS: tuple[str, ...] = ("-v", "--verbose")
 _CONFIG_CANDIDATES: tuple[str, ...] = ("setup.cfg", ".importlinter", "pyproject.toml")
-_CACHE_FLAGS: tuple[str, ...] = ("--no-cache", "--cache-dir")
-# import-linter's own default cache directory. Our per-version directories go
-# inside it so that a project already ignoring this path ignores them too.
-_CACHE_ROOT: str = ".import_linter_cache"
 MAX_OUTPUT_LINES: int = 300
 _TRUNCATION_MARKER: str = (
     "[output truncated — run with --contract <name> for individual results]"
@@ -44,63 +38,6 @@ def _strip_verbose_flags(
         return [], False
     cleaned = [arg for arg in extra_args if arg not in _VERBOSE_FLAGS]
     return cleaned, len(cleaned) != len(extra_args)
-
-
-def _cache_scope() -> str | None:
-    """Name a cache directory that only this grimp build can read.
-
-    The name carries the tool env's grimp version and Python version, the two
-    things that decide whether a cache entry written earlier still means what
-    it says.  Both are read in-process: `lint_imports_binary` comes from the
-    environment `mcp_tools_py` itself runs in, so this interpreter's metadata
-    describes the grimp the subprocess will import — and reading the version
-    from metadata does not import grimp's compiled extension.
-
-    Returns:
-        A directory relative to the project directory, or None when grimp's
-        version cannot be read and so no safe scope can be named.
-    """
-    try:
-        version = importlib.metadata.version("grimp")
-    except importlib.metadata.PackageNotFoundError:
-        return None
-    token = re.sub(r"[^A-Za-z0-9._-]", "_", version)
-    python = f"{sys.version_info.major}.{sys.version_info.minor}"
-    return f"{_CACHE_ROOT}/grimp-{token}-py{python}"
-
-
-def _scope_cache(extra_args: list[str]) -> list[str]:
-    """Point grimp's cache at a directory no other grimp version can read.
-
-    Running lint-imports from the tool env means its grimp version can differ
-    from whatever else runs lint-imports against this project (CI, pre-commit,
-    a terminal) — and grimp validates its cache by file mtime only, with no
-    version guard, so two grimp versions sharing one `.import_linter_cache`
-    would each trust the other's stale entries.  Giving each build its own
-    directory keeps that apart without giving up the cache: it lives in the
-    project directory and is reused by every later call, so disabling it would
-    make every run rebuild the whole import graph.  A different build simply
-    misses and writes its own entries.
-
-    When grimp's version cannot be read there is no scope to name, and
-    `--no-cache` is the safe answer: correctness over the speedup.
-
-    A caller-supplied `--cache-dir` or `--no-cache` is left alone rather than
-    fought.
-
-    Args:
-        extra_args: Cleaned lint-imports arguments.
-
-    Returns:
-        `extra_args`, with the caching flags appended unless caching is
-        already addressed.
-    """
-    if any(arg in _CACHE_FLAGS or arg.startswith("--cache-dir=") for arg in extra_args):
-        return extra_args
-    scope = _cache_scope()
-    if scope is None:
-        return [*extra_args, "--no-cache"]
-    return [*extra_args, "--cache-dir", scope]
 
 
 def _read_ini(path: Path) -> list[str] | None:
@@ -425,12 +362,11 @@ def run_lint_imports_check_impl(
     The first non-empty line is always either an info line or the state
     header. Truncation cannot hide it.
 
-    Unless `extra_args` already names `--cache-dir` or `--no-cache`, a
-    `--cache-dir` of its own is appended: `lint_imports_binary` runs from the
-    tool env, so its grimp version can differ from whatever else runs
-    lint-imports against this project, and grimp's on-disk cache is validated
-    by file mtime only — sharing it across grimp versions risks a stale, wrong
-    verdict, while turning it off would rebuild the whole graph every call.
+    Caching is left to import-linter's own default: nothing is injected, and a
+    `--cache-dir` or `--no-cache` in `extra_args` reaches the CLI untouched.
+    grimp guards its own cache — the data file carries a format version and a
+    mismatch rebuilds the graph — so the tool env's grimp reading a cache
+    written by another one cannot produce a stale verdict on that account.
 
     Args:
         lint_imports_binary: Path to the lint-imports executable, which
@@ -470,7 +406,7 @@ def run_lint_imports_check_impl(
             info_lines.append(_cwd_info_line(in_cwd))
         env = _pythonpath_env(usable) if usable else None
 
-    command = [lint_imports_binary] + _scope_cache(cleaned_args)
+    command = [lint_imports_binary] + cleaned_args
     result = execute_command(
         command, cwd=project_dir, timeout_seconds=timeout_seconds, env=env
     )
