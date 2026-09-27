@@ -4,17 +4,24 @@ Standard library only — see the package docstring for why.
 """
 
 import contextlib
+import importlib.machinery
 import importlib.metadata
 import importlib.util
 import inspect
 import io
 import json
+import os.path
 import platform
+import site
 import sys
+import sysconfig
 import types
 from typing import Any, Callable, Union, cast
 
-_USAGE = "usage: probe.py info [MODULE ...] | probe.py source IMPORT_PATH MAX_LINES"
+_USAGE = (
+    "usage: probe.py info [MODULE ...] | probe.py source IMPORT_PATH MAX_LINES"
+    " | probe.py locate NAME [NAME ...]"
+)
 
 
 def _importable(module_names: list[str]) -> dict[str, bool]:
@@ -35,6 +42,82 @@ def _importable(module_names: list[str]) -> dict[str, bool]:
             # parent package raises on import. Either way the module is unusable.
             result[name] = False
     return result
+
+
+def _parents(spec: importlib.machinery.ModuleSpec) -> list[str]:
+    """Report the directories a found name is importable from.
+
+    Args:
+        spec: The spec ``find_spec`` returned for the name.
+
+    Returns:
+        One directory per location of a package or namespace portion, the
+        containing directory of a plain module, or nothing for a name with no
+        file behind it (built-in, frozen or extension-less).
+    """
+    locations = list(spec.submodule_search_locations or [])
+    if locations:
+        return [os.path.dirname(location) for location in locations]
+    if spec.origin and os.path.isfile(spec.origin):
+        return [os.path.dirname(spec.origin)]
+    return []
+
+
+def _site_dirs() -> list[str]:
+    """Collect this interpreter's site and install directories.
+
+    Returns:
+        Every directory reported by ``sysconfig`` or ``site``, de-duplicated in
+        that order.  Either source can be absent or unhappy in an unusual
+        environment, so each is asked separately and a failure just contributes
+        nothing.
+    """
+    candidates: list[str] = []
+    try:
+        paths = sysconfig.get_paths()
+        candidates += [paths.get("purelib", ""), paths.get("platlib", "")]
+    except Exception:  # pylint: disable=broad-exception-caught
+        pass
+    try:
+        candidates += list(site.getsitepackages())
+    except Exception:  # pylint: disable=broad-exception-caught
+        pass
+
+    result: list[str] = []
+    for candidate in candidates:
+        if candidate and candidate not in result:
+            result.append(candidate)
+    return result
+
+
+def _locate(names: list[str]) -> dict[str, list[str]]:
+    """Where each name in `names` lives, and this interpreter's site directories.
+
+    The site directories are reported so the caller can tell a source tree
+    from a `site-packages`, which must never go on PYTHONPATH.
+
+    Args:
+        names: Package or module names to find.
+
+    Returns:
+        ``directories``, the directory each name that resolved is importable
+        from, in request order and without repeats; and ``site_dirs``, which
+        describes the interpreter rather than the request.
+    """
+    directories: list[str] = []
+    for name in names:
+        try:
+            spec = importlib.util.find_spec(name)
+        except Exception:  # pylint: disable=broad-exception-caught
+            # As in _importable: a malformed name, or a parent package that
+            # raises on import, leaves nothing to locate.
+            continue
+        if spec is None:
+            continue
+        for parent in _parents(spec):
+            if parent and parent not in directories:
+                directories.append(parent)
+    return {"directories": directories, "site_dirs": _site_dirs()}
 
 
 def _distributions() -> dict[str, str]:
@@ -191,6 +274,9 @@ def main(argv: list[str]) -> int:
             # locale's on Windows.
             sys.stdout.reconfigure(encoding="utf-8", errors="replace")
         sys.stdout.write(_source(argv[2], int(argv[3])))
+        return 0
+    if len(argv) >= 3 and argv[1] == "locate":
+        json.dump(_locate(argv[2:]), sys.stdout)
         return 0
     print(_USAGE, file=sys.stderr)
     return 2

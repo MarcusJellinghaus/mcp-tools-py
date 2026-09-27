@@ -12,6 +12,7 @@ import pytest
 from mcp_tools_py.utils.environment_info import (
     PROBED_MODULES,
     get_environment_info,
+    locate_packages,
     probe_script_path,
 )
 from mcp_tools_py.utils.subprocess_runner import execute_command
@@ -176,6 +177,129 @@ class TestToolVersionLogging:
         assert self._version_messages(caplog) == []
 
 
+def _locate_blob(directories: list[Path], site_dirs: list[str]) -> str:
+    """Build the JSON a `probe.py locate` run writes to stdout."""
+    return json.dumps(
+        {"directories": [str(d) for d in directories], "site_dirs": site_dirs}
+    )
+
+
+def _other_case(directory: Path) -> str:
+    """Spell `directory` with the other drive-letter case, where there is one."""
+    spelled = str(directory)
+    if spelled[1:2] == ":":
+        return spelled[0].swapcase() + spelled[1:]
+    return spelled
+
+
+class TestLocatePackages:
+    """Test asking an interpreter where packages live, and the site-dir split."""
+
+    def test_source_directory_is_usable(self, tmp_path: Path) -> None:
+        """A directory under no site directory is one to prepend."""
+        source = tmp_path / "repo" / "src"
+        with patch("mcp_tools_py.utils.environment_info.execute_command") as mock_exec:
+            mock_exec.return_value = make_command_result(
+                stdout=_locate_blob(
+                    [source], [str(tmp_path / "venv" / "site-packages")]
+                )
+            )
+
+            assert locate_packages("/some/python", ["pkg"]) == ([str(source)], [])
+
+    def test_site_directory_itself_is_skipped(self, tmp_path: Path) -> None:
+        """A located directory that is a site directory may not be prepended."""
+        site = tmp_path / "venv" / "site-packages"
+        with patch("mcp_tools_py.utils.environment_info.execute_command") as mock_exec:
+            mock_exec.return_value = make_command_result(
+                stdout=_locate_blob([site], [str(site)])
+            )
+
+            assert locate_packages("/some/python", ["pkg"]) == ([], [str(site)])
+
+    def test_directory_inside_site_directory_is_skipped(self, tmp_path: Path) -> None:
+        """A subdirectory of a site directory is skipped, whatever its spelling."""
+        site = tmp_path / "venv" / "site-packages"
+        inside = site / "namespace"
+        inside.mkdir(parents=True)
+        with patch("mcp_tools_py.utils.environment_info.execute_command") as mock_exec:
+            mock_exec.return_value = make_command_result(
+                stdout=_locate_blob([inside], [_other_case(site)])
+            )
+
+            assert locate_packages("/some/python", ["pkg"]) == ([], [str(inside)])
+
+    def test_each_directory_lands_on_its_own_side(self, tmp_path: Path) -> None:
+        """Source and site directories separate, each keeping the probe's order."""
+        first = tmp_path / "repo" / "src"
+        site = tmp_path / "venv" / "site-packages"
+        second = tmp_path / "other" / "src"
+        with patch("mcp_tools_py.utils.environment_info.execute_command") as mock_exec:
+            mock_exec.return_value = make_command_result(
+                stdout=_locate_blob([first, site, second], [str(site)])
+            )
+
+            assert locate_packages("/some/python", ["a", "b", "c"]) == (
+                [str(first), str(second)],
+                [str(site)],
+            )
+
+    def test_timeout_reports_the_interpreter(self) -> None:
+        """A probe that times out yields a reason naming the interpreter."""
+        with patch("mcp_tools_py.utils.environment_info.execute_command") as mock_exec:
+            mock_exec.return_value = make_command_result(
+                return_code=-1,
+                timed_out=True,
+                execution_error="Process timed out after 30 seconds",
+            )
+
+            reason = locate_packages("/some/python", ["pkg"])
+
+            assert isinstance(reason, str)
+            assert "timed out" in reason
+            assert "/some/python" in reason
+
+    def test_failed_exit_reports_stderr(self) -> None:
+        """A non-zero exit yields a reason quoting the child's stderr."""
+        with patch("mcp_tools_py.utils.environment_info.execute_command") as mock_exec:
+            mock_exec.return_value = make_command_result(return_code=1, stderr="boom")
+
+            reason = locate_packages("/some/python", ["pkg"])
+
+            assert isinstance(reason, str)
+            assert "boom" in reason
+
+    @pytest.mark.parametrize("stdout", ["not json", '["/some/dir"]'])
+    def test_unexpected_stdout_is_unparsable(self, stdout: str) -> None:
+        """Anything but the two-array object is reported as unparsable."""
+        with patch("mcp_tools_py.utils.environment_info.execute_command") as mock_exec:
+            mock_exec.return_value = make_command_result(stdout=stdout)
+
+            reason = locate_packages("/some/python", ["pkg"])
+
+            assert isinstance(reason, str)
+            assert "unparsable" in reason
+
+    def test_no_names_runs_no_subprocess(self) -> None:
+        """Nothing to locate is answered without a probe."""
+        with patch("mcp_tools_py.utils.environment_info.execute_command") as mock_exec:
+            assert locate_packages("/some/python", []) == ([], [])
+
+            mock_exec.assert_not_called()
+
+    def test_answer_is_not_cached(self, tmp_path: Path) -> None:
+        """Each call probes again: the answer can change while the server runs."""
+        with patch("mcp_tools_py.utils.environment_info.execute_command") as mock_exec:
+            mock_exec.return_value = make_command_result(
+                stdout=_locate_blob([tmp_path / "src"], [])
+            )
+
+            locate_packages("/some/python", ["pkg"])
+            locate_packages("/some/python", ["pkg"])
+
+            assert mock_exec.call_count == 2
+
+
 class TestProbeScript:
     """Test the script itself, run under the current interpreter."""
 
@@ -205,3 +329,32 @@ class TestProbeScript:
             "nosuchmodule_xyz": False,
         }
         assert blob["version"] == platform.python_version()
+
+    def test_real_child_locates_an_installed_package(self) -> None:
+        """The script finds this interpreter's mcp_tools_py, and skips the rest.
+
+        Whether that directory is a site-packages depends on how mcp_tools_py is
+        installed here, so the assertion is on the located directories as a
+        whole, before any split.  It is not compared against this process's
+        ``mcp_tools_py.__file__`` either: pytest's ``pythonpath = ["src"]``
+        imports the source tree here, while the child — which gets no such
+        entry — finds whichever copy is installed.  What must hold of the
+        answer in both cases is that the package really sits inside it.
+        """
+        result = execute_command(
+            [
+                sys.executable,
+                str(probe_script_path()),
+                "locate",
+                "mcp_tools_py",
+                "nosuchpkg_xyz",
+            ],
+            timeout_seconds=60,
+        )
+
+        assert result.return_code == 0, result.stderr
+        blob = json.loads(result.stdout)
+        assert blob["site_dirs"]
+        assert len(blob["directories"]) == 1
+        found = Path(blob["directories"][0]).resolve()
+        assert (found / "mcp_tools_py" / "__init__.py").is_file()

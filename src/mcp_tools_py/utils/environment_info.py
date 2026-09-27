@@ -4,6 +4,9 @@ Layer 2 of the environment model: the questions that are fixed for a whole
 server run — Python version, which modules are importable, which
 distributions are installed.  One subprocess answers all of them, and the
 answer is cached per interpreter path.
+
+`locate_packages` is the exception: where a package lives can change while the
+server runs, so it probes afresh on every call.
 """
 
 import json
@@ -82,6 +85,70 @@ def probe_script_path() -> Path:
         in the target environment.
     """
     return Path(__file__).parent / "target_scripts" / "probe.py"
+
+
+def locate_packages(
+    interpreter: str, names: list[str]
+) -> tuple[list[str], list[str]] | str:
+    """Ask `interpreter` where each package in `names` lives.
+
+    Args:
+        interpreter: Path to the Python interpreter to ask.
+        names: Package names to locate.
+
+    Returns:
+        `(usable, skipped)` — the directories to prepend to PYTHONPATH, and
+        the located directories that are `interpreter`'s own site/purelib
+        directories and must not be prepended.  Or a string saying why the
+        probe could not be trusted.
+    """
+    if not names:
+        return [], []
+
+    result = execute_command(
+        [interpreter, str(probe_script_path()), "locate", *names],
+        timeout_seconds=PROBE_TIMEOUT_SECONDS,
+    )
+    if result.timed_out:
+        return f"probe of {interpreter} timed out after {PROBE_TIMEOUT_SECONDS} seconds"
+    if result.execution_error or result.return_code != 0:
+        detail = result.execution_error or result.stderr.strip()[:STDERR_SNIPPET]
+        return f"could not locate {', '.join(names)} in {interpreter}: {detail}"
+
+    try:
+        blob = json.loads(result.stdout)
+        directories = blob["directories"]
+        site_dirs = blob["site_dirs"]
+    except (ValueError, KeyError, TypeError):
+        return f"probe of {interpreter} returned unparsable output"
+    if not (
+        isinstance(directories, list)
+        and isinstance(site_dirs, list)
+        and all(isinstance(entry, str) for entry in directories + site_dirs)
+    ):
+        return f"probe of {interpreter} returned unparsable output"
+
+    resolved_sites = [Path(site_dir).resolve() for site_dir in site_dirs]
+    usable: list[str] = []
+    skipped: list[str] = []
+    for directory in directories:
+        resolved = Path(directory).resolve()
+        target = skipped if _under_any(resolved, resolved_sites) else usable
+        target.append(directory)
+    return usable, skipped
+
+
+def _under_any(directory: Path, site_dirs: list[Path]) -> bool:
+    """Report whether `directory` is, or sits inside, one of `site_dirs`.
+
+    Args:
+        directory: A resolved located directory.
+        site_dirs: The interpreter's resolved site directories.
+
+    Returns:
+        True when the directory may not go on PYTHONPATH.
+    """
+    return any(directory.is_relative_to(site_dir) for site_dir in site_dirs)
 
 
 def _failed(reason: str) -> EnvironmentInfo:
