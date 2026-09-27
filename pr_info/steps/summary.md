@@ -138,7 +138,9 @@ One new test file (step 4); no new source module.
 | `tests/test_checker_tools.py` | `_remove_console_script`, tach assertion (1); lint-imports kwargs, binary-switch test (4) | 1, 4 |
 | `tests/test_code_checker_bandit/test_integration.py` | `test_bandit_not_available_message`: the "no restart is needed" assertion becomes the reinstall wording | 1 |
 | `tests/test_environment_info.py` | `TestToolVersionLogging` stops expecting `import-linter` (step 1); `TestLocatePackages`, real-subprocess `locate` test (step 2) | 1, 2 |
-| `tests/test_code_checker_lint_imports/test_runners.py` | config-reader/`_pythonpath_env`/`_format_report` call-site tests, unwired (3); `locate_packages` wiring, `PYTHONPATH`, ERROR path (4) | 3, 4 |
+| `tests/test_code_checker_lint_imports/test_runners.py` | `_format_report` call-site tests (3) | 3 |
+| `tests/test_code_checker_lint_imports/test_pythonpath_bridge.py` | new; config-reader/`_pythonpath_env` tests, unwired (3); `locate_packages` wiring, `PYTHONPATH`, ERROR path (4) | 3, 4 |
+| `tests/test_code_checker_lint_imports/_fixtures.py` | new; captured output samples shared by the two unit-test files | 3 |
 | `tests/test_code_checker_lint_imports/test_bridge_integration.py` | new; real lint-imports against a src-layout project, nothing patched | 4 |
 
 The bandit integration test needs no change to *how* it makes bandit unavailable —

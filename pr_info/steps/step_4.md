@@ -25,7 +25,7 @@ package is located.
 - `.importlinter`
 - `tests/test_tool_context.py`, `tests/test_tool_availability/test_handler_short_circuit.py`,
   `tests/test_server_params.py` — delete or update the step-1 carve-out tests
-- `tests/test_code_checker_lint_imports/test_runners.py`,
+- `tests/test_code_checker_lint_imports/test_pythonpath_bridge.py`,
   `tests/test_code_checker_lint_imports/test_bridge_integration.py` (new),
   `tests/test_checker_tools.py`
 
@@ -157,7 +157,7 @@ tree.
 
 ## TESTS (write first)
 
-In `tests/test_code_checker_lint_imports/test_runners.py` (patch
+In `tests/test_code_checker_lint_imports/test_pythonpath_bridge.py` (patch
 `{MODULE_PATH}.locate_packages`, not `execute_command` — the locate call goes through
 the `utils.environment_info` module):
 

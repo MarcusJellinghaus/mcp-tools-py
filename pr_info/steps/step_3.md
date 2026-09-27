@@ -17,6 +17,11 @@ registrar, or what lint-imports actually runs.
 ## WHERE
 
 - `src/mcp_tools_py/code_checker_lint_imports/runners.py`
+- `tests/test_code_checker_lint_imports/test_pythonpath_bridge.py` (new; the
+  bridge tests live here, apart from `test_runners.py`, to keep both files
+  under the 750-line limit)
+- `tests/test_code_checker_lint_imports/_fixtures.py` (new; captured
+  lint-imports output samples shared by both test files)
 - `tests/test_code_checker_lint_imports/test_runners.py`
 
 ## WHAT
@@ -110,7 +115,8 @@ return {"PYTHONPATH": os.pathsep.join(parts)}
 
 ## TESTS (write first)
 
-In `tests/test_code_checker_lint_imports/test_runners.py`:
+In `tests/test_code_checker_lint_imports/test_pythonpath_bridge.py` (1 and 2);
+the `_format_report` call-site tests stay in `test_runners.py`:
 
 1. `_root_packages`, against files written into `tmp_path`:
    - `.importlinter` with `root_package = pkg` → `["pkg"]`.
