@@ -6,6 +6,7 @@ from unittest.mock import patch
 
 from mcp_tools_py.code_checker_lint_imports.runners import (
     _classify_state,
+    _ensure_no_cache,
     _format_report,
     _parse_broken_contracts,
     _parse_summary,
@@ -56,6 +57,34 @@ class TestStripVerboseFlags:
         cleaned, stripped = _strip_verbose_flags(["--contract", "layers"])
         assert cleaned == ["--contract", "layers"]
         assert stripped is False
+
+
+class TestEnsureNoCache:
+    """_ensure_no_cache appends --no-cache unless caching is already addressed."""
+
+    def test_appends_when_absent(self) -> None:
+        assert _ensure_no_cache(["--contract", "layers"]) == [
+            "--contract",
+            "layers",
+            "--no-cache",
+        ]
+
+    def test_empty_args_gets_the_flag(self) -> None:
+        assert _ensure_no_cache([]) == ["--no-cache"]
+
+    def test_existing_no_cache_is_not_duplicated(self) -> None:
+        assert _ensure_no_cache(["--no-cache"]) == ["--no-cache"]
+
+    def test_existing_cache_dir_separate_value_is_left_alone(self) -> None:
+        assert _ensure_no_cache(["--cache-dir", "/tmp/cache"]) == [
+            "--cache-dir",
+            "/tmp/cache",
+        ]
+
+    def test_existing_cache_dir_equals_value_is_left_alone(self) -> None:
+        assert _ensure_no_cache(["--cache-dir=/tmp/cache"]) == [
+            "--cache-dir=/tmp/cache",
+        ]
 
 
 class TestParseSummary:
@@ -409,8 +438,33 @@ class TestRunLintImportsCheckImpl:
             "/usr/bin/lint-imports",
             "--contract",
             "layers",
+            "--no-cache",
         ]
         assert mock_exec.call_args.kwargs["cwd"] == "/project"
+
+    @patch(f"{MODULE_PATH}.execute_command")
+    def test_no_cache_appended_by_default(self, mock_exec: Any) -> None:
+        mock_exec.return_value = make_command_result(return_code=0, stdout=CLEAN_OUTPUT)
+        run_lint_imports_check_impl(
+            lint_imports_binary="/usr/bin/lint-imports",
+            project_dir="/project",
+            python_executable=sys.executable,
+        )
+        cmd = mock_exec.call_args[0][0]
+        assert cmd == ["/usr/bin/lint-imports", "--no-cache"]
+
+    @patch(f"{MODULE_PATH}.execute_command")
+    def test_caller_supplied_cache_dir_is_not_overridden(self, mock_exec: Any) -> None:
+        mock_exec.return_value = make_command_result(return_code=0, stdout=CLEAN_OUTPUT)
+        run_lint_imports_check_impl(
+            lint_imports_binary="/usr/bin/lint-imports",
+            project_dir="/project",
+            extra_args=["--cache-dir", "/scoped/cache"],
+            python_executable=sys.executable,
+        )
+        cmd = mock_exec.call_args[0][0]
+        assert cmd == ["/usr/bin/lint-imports", "--cache-dir", "/scoped/cache"]
+        assert "--no-cache" not in cmd
 
 
 class TestRunLintImportsTimeout:

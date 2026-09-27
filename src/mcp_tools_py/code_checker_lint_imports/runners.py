@@ -40,6 +40,32 @@ def _strip_verbose_flags(
     return cleaned, len(cleaned) != len(extra_args)
 
 
+def _ensure_no_cache(extra_args: list[str]) -> list[str]:
+    """Disable grimp's on-disk cache unless the caller already controls it.
+
+    Running lint-imports from the tool env means its grimp version can differ
+    from whatever else runs lint-imports against this project (CI, pre-commit,
+    a terminal) — and grimp validates its cache by file mtime only, with no
+    version guard, so two grimp versions sharing one `.import_linter_cache`
+    can each trust the other's stale entries.  `--no-cache` is import-linter's
+    own way of turning the cache off, so a caller-supplied `--cache-dir` or
+    `--no-cache` is left alone rather than fought.
+
+    Args:
+        extra_args: Cleaned lint-imports arguments.
+
+    Returns:
+        `extra_args`, with `--no-cache` appended unless caching is already
+        addressed.
+    """
+    if any(
+        arg == "--no-cache" or arg == "--cache-dir" or arg.startswith("--cache-dir=")
+        for arg in extra_args
+    ):
+        return extra_args
+    return [*extra_args, "--no-cache"]
+
+
 def _read_ini(path: Path) -> list[str] | None:
     """Read root package names from an INI-style import-linter config.
 
@@ -313,6 +339,12 @@ def run_lint_imports_check_impl(
     The first non-empty line is always either an info line or the state
     header. Truncation cannot hide it.
 
+    Unless `extra_args` already names `--cache-dir` or `--no-cache`,
+    `--no-cache` is appended: `lint_imports_binary` runs from the tool env, so
+    its grimp version can differ from whatever else runs lint-imports against
+    this project, and grimp's on-disk cache is validated by file mtime only —
+    sharing it across grimp versions risks a stale, wrong verdict.
+
     Args:
         lint_imports_binary: Path to the lint-imports executable, which
             comes from mcp-tools-py's own environment.
@@ -348,7 +380,7 @@ def run_lint_imports_check_impl(
             )
         env = _pythonpath_env(usable) if usable else None
 
-    command = [lint_imports_binary] + cleaned_args
+    command = [lint_imports_binary] + _ensure_no_cache(cleaned_args)
     result = execute_command(
         command, cwd=project_dir, timeout_seconds=timeout_seconds, env=env
     )
