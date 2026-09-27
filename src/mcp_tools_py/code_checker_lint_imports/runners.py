@@ -1,7 +1,11 @@
 """Functions for running import-linter contract checks with structured output."""
 
+import configparser
 import logging
+import os
 import re
+import tomllib
+from pathlib import Path
 
 from mcp_tools_py.log_utils import log_function_call
 from mcp_tools_py.utils.project_config import DEFAULT_CHECK_TIMEOUT
@@ -10,6 +14,7 @@ from mcp_tools_py.utils.subprocess_runner import execute_command
 logger = logging.getLogger(__name__)
 
 _VERBOSE_FLAGS: tuple[str, ...] = ("-v", "--verbose")
+_CONFIG_CANDIDATES: tuple[str, ...] = ("setup.cfg", ".importlinter", "pyproject.toml")
 MAX_OUTPUT_LINES: int = 300
 _TRUNCATION_MARKER: str = (
     "[output truncated — run with --contract <name> for individual results]"
@@ -32,6 +37,112 @@ def _strip_verbose_flags(
         return [], False
     cleaned = [arg for arg in extra_args if arg not in _VERBOSE_FLAGS]
     return cleaned, len(cleaned) != len(extra_args)
+
+
+def _read_ini(path: Path) -> list[str] | None:
+    """Read root package names from an INI-style import-linter config.
+
+    Args:
+        path: Path to a `setup.cfg`/`.importlinter`-style file.
+
+    Returns:
+        The root package names, `[]` when the `[importlinter]` section
+        names none, or `None` when there is no such section to read.
+    """
+    try:
+        parser = configparser.ConfigParser(interpolation=None)
+        if not parser.read(path, encoding="utf-8"):
+            return None
+        if not parser.has_section("importlinter"):
+            return None
+        section = parser["importlinter"]
+        raw_list = section.get("root_packages")
+        if raw_list is not None:
+            return [line.strip() for line in raw_list.splitlines() if line.strip()]
+        scalar = section.get("root_package")
+        if scalar and scalar.strip():
+            return [scalar.strip()]
+        return []
+    except Exception as exc:  # pylint: disable=broad-exception-caught
+        logger.debug("Could not read import-linter config %s: %s", path, exc)
+        return None
+
+
+def _read_toml(path: Path) -> list[str] | None:
+    """Read root package names from a TOML import-linter config.
+
+    Args:
+        path: Path to a `pyproject.toml`-style file.
+
+    Returns:
+        The root package names, `[]` when the `[tool.importlinter]`
+        section names none, or `None` when there is no such section.
+    """
+    try:
+        with open(path, "rb") as handle:
+            data = tomllib.load(handle)
+        tool = data.get("tool")
+        section = tool.get("importlinter") if isinstance(tool, dict) else None
+        if not isinstance(section, dict):
+            return None
+        raw_list = section.get("root_packages")
+        if isinstance(raw_list, list):
+            return [str(name).strip() for name in raw_list if str(name).strip()]
+        scalar = section.get("root_package")
+        if isinstance(scalar, str) and scalar.strip():
+            return [scalar.strip()]
+        return []
+    except Exception as exc:  # pylint: disable=broad-exception-caught
+        logger.debug("Could not read import-linter config %s: %s", path, exc)
+        return None
+
+
+def _root_packages(project_dir: str, extra_args: list[str]) -> list[str]:
+    """Return the root package names lint-imports will check.
+
+    Mirrors the CLI's discovery: an explicit `--config` wins, otherwise the
+    first of `setup.cfg`, `.importlinter`, `pyproject.toml` that *has* an
+    import-linter section is the config — even when it names no package.
+
+    Args:
+        project_dir: Directory lint-imports runs in.
+        extra_args: lint-imports arguments, scanned for `--config`.
+
+    Returns:
+        The root package names, empty when nothing could be read.
+    """
+    override: str | None = None
+    for index, arg in enumerate(extra_args):
+        if arg.startswith("--config="):
+            override = arg[len("--config=") :]
+            break
+        if arg == "--config" and index + 1 < len(extra_args):
+            override = extra_args[index + 1]
+            break
+
+    candidates = (override,) if override else _CONFIG_CANDIDATES
+    for candidate in candidates:
+        path = Path(project_dir) / candidate
+        reader = _read_toml if path.suffix == ".toml" else _read_ini
+        names = reader(path)
+        if names is not None:
+            return names
+    return []
+
+
+def _pythonpath_env(directories: list[str]) -> dict[str, str]:
+    """Build a `PYTHONPATH` override that prepends `directories`.
+
+    Args:
+        directories: Directories to place ahead of any inherited entries.
+
+    Returns:
+        A single-key env dict suitable for `execute_command(env=...)`,
+        which merges it over `os.environ` key by key.
+    """
+    existing = os.environ.get("PYTHONPATH")
+    parts = [*directories, existing] if existing else list(directories)
+    return {"PYTHONPATH": os.pathsep.join(parts)}
 
 
 def _parse_summary(combined: str) -> tuple[int, int] | None:
@@ -130,17 +241,14 @@ def _format_report(
     broken_contracts: list[str],
     warnings: list[str],
     raw_body: str,
-    info_line: str | None,
+    info_lines: list[str],
 ) -> str:
     """Assemble the final string and apply the line cap.
 
     Returns:
         Multi-line report text, truncated to `MAX_OUTPUT_LINES`.
     """
-    lines: list[str] = []
-
-    if info_line:
-        lines.append(info_line)
+    lines: list[str] = list(info_lines)
 
     header = _format_state_header(state, summary)
     lines.append(f"=== {header} ===")
@@ -192,7 +300,7 @@ def run_lint_imports_check_impl(
         Structured report (state header + summary + raw output, capped).
     """
     cleaned_args, stripped = _strip_verbose_flags(extra_args)
-    info_line = "[Info: stripped --verbose/-v from extra_args]" if stripped else None
+    info_lines = ["[Info: stripped --verbose/-v from extra_args]"] if stripped else []
 
     command = [lint_imports_binary] + cleaned_args
     result = execute_command(command, cwd=project_dir, timeout_seconds=timeout_seconds)
@@ -210,5 +318,5 @@ def run_lint_imports_check_impl(
     state = _classify_state(result.return_code, summary)
 
     return _format_report(
-        state, summary, broken_contracts, warnings, combined, info_line
+        state, summary, broken_contracts, warnings, combined, info_lines
     )

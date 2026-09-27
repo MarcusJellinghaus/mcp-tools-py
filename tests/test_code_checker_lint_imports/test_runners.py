@@ -1,7 +1,11 @@
 """Tests for code_checker_lint_imports.runners module."""
 
+import os
+from pathlib import Path
 from typing import Any
 from unittest.mock import patch
+
+import pytest
 
 from mcp_tools_py.code_checker_lint_imports.runners import (
     _classify_state,
@@ -9,6 +13,8 @@ from mcp_tools_py.code_checker_lint_imports.runners import (
     _parse_broken_contracts,
     _parse_summary,
     _parse_warnings,
+    _pythonpath_env,
+    _root_packages,
     _strip_verbose_flags,
     run_lint_imports_check_impl,
 )
@@ -250,7 +256,7 @@ class TestFormatReport:
             broken_contracts=[],
             warnings=[],
             raw_body="some body",
-            info_line=None,
+            info_lines=[],
         )
         first_line = result.splitlines()[0]
         assert first_line == "=== PASSED ==="
@@ -262,11 +268,25 @@ class TestFormatReport:
             broken_contracts=[],
             warnings=[],
             raw_body="body",
-            info_line="[Info: stripped --verbose/-v from extra_args]",
+            info_lines=["[Info: stripped --verbose/-v from extra_args]"],
         )
         lines = result.splitlines()
         assert lines[0] == "[Info: stripped --verbose/-v from extra_args]"
         assert lines[1] == "=== PASSED ==="
+
+    def test_two_info_lines_render_in_order_above_header(self) -> None:
+        result = _format_report(
+            state="PASSED",
+            summary=(3, 0),
+            broken_contracts=[],
+            warnings=[],
+            raw_body="body",
+            info_lines=["[Info: first]", "[Info: second]"],
+        )
+        lines = result.splitlines()
+        assert lines[0] == "[Info: first]"
+        assert lines[1] == "[Info: second]"
+        assert lines[2] == "=== PASSED ==="
 
     def test_summary_line_when_present(self) -> None:
         result = _format_report(
@@ -275,7 +295,7 @@ class TestFormatReport:
             broken_contracts=[],
             warnings=[],
             raw_body="body",
-            info_line=None,
+            info_lines=[],
         )
         assert "Contracts: 3 kept, 0 broken" in result
 
@@ -286,7 +306,7 @@ class TestFormatReport:
             broken_contracts=["Foo", "Bar"],
             warnings=[],
             raw_body="body",
-            info_line=None,
+            info_lines=[],
         )
         assert "=== BROKEN: 2 of 3 contracts failed ===" in result
         assert "Broken contracts:" in result
@@ -300,7 +320,7 @@ class TestFormatReport:
             broken_contracts=[],
             warnings=["No matches for ignored import a -> b."],
             raw_body="body",
-            info_line=None,
+            info_lines=[],
         )
         assert "Warnings:" in result
         assert "  - No matches for ignored import a -> b." in result
@@ -312,7 +332,7 @@ class TestFormatReport:
             broken_contracts=[],
             warnings=[],
             raw_body="raw error text",
-            info_line=None,
+            info_lines=[],
         )
         assert result.splitlines()[0] == (
             "=== ERROR: lint-imports output could not be parsed ==="
@@ -329,7 +349,7 @@ class TestFormatReport:
             broken_contracts=[],
             warnings=[],
             raw_body=large_body,
-            info_line=None,
+            info_lines=[],
         )
         last_line = result.splitlines()[-1]
         assert "[output truncated" in last_line
@@ -342,7 +362,7 @@ class TestFormatReport:
             broken_contracts=[],
             warnings=[],
             raw_body="   \n  \n",
-            info_line=None,
+            info_lines=[],
         )
         assert "(no output)" in result
         # First non-empty line is still the header.
@@ -544,3 +564,141 @@ class TestRunLintImportsTimeout:
         )
 
         assert mock_exec.call_args.kwargs["timeout_seconds"] == 120
+
+
+class TestRootPackages:
+    """_root_packages mirrors the lint-imports CLI's config discovery."""
+
+    def test_importlinter_scalar_root_package(self, tmp_path: Path) -> None:
+        (tmp_path / ".importlinter").write_text(
+            "[importlinter]\nroot_package = pkg\n", encoding="utf-8"
+        )
+        assert _root_packages(str(tmp_path), []) == ["pkg"]
+
+    def test_setup_cfg_wins_over_importlinter(self, tmp_path: Path) -> None:
+        (tmp_path / "setup.cfg").write_text(
+            "[importlinter]\nroot_package = from_setup_cfg\n", encoding="utf-8"
+        )
+        (tmp_path / ".importlinter").write_text(
+            "[importlinter]\nroot_package = from_importlinter\n", encoding="utf-8"
+        )
+        assert _root_packages(str(tmp_path), []) == ["from_setup_cfg"]
+
+    def test_pyproject_toml_root_packages_list(self, tmp_path: Path) -> None:
+        (tmp_path / "pyproject.toml").write_text(
+            '[tool.importlinter]\nroot_packages = ["a", "b"]\n', encoding="utf-8"
+        )
+        assert _root_packages(str(tmp_path), []) == ["a", "b"]
+
+    def test_pyproject_toml_scalar_root_package(self, tmp_path: Path) -> None:
+        (tmp_path / "pyproject.toml").write_text(
+            '[tool.importlinter]\nroot_package = "solo"\n', encoding="utf-8"
+        )
+        assert _root_packages(str(tmp_path), []) == ["solo"]
+
+    def test_ini_newline_separated_root_packages(self, tmp_path: Path) -> None:
+        (tmp_path / ".importlinter").write_text(
+            "[importlinter]\nroot_packages =\n    first\n    second\n", encoding="utf-8"
+        )
+        assert _root_packages(str(tmp_path), []) == ["first", "second"]
+
+    def test_config_flag_separate_value_ini(self, tmp_path: Path) -> None:
+        (tmp_path / ".importlinter").write_text(
+            "[importlinter]\nroot_package = ignored\n", encoding="utf-8"
+        )
+        (tmp_path / "custom.ini").write_text(
+            "[importlinter]\nroot_package = chosen\n", encoding="utf-8"
+        )
+        result = _root_packages(str(tmp_path), ["--config", "custom.ini"])
+        assert result == ["chosen"]
+
+    def test_config_flag_equals_value_toml(self, tmp_path: Path) -> None:
+        (tmp_path / ".importlinter").write_text(
+            "[importlinter]\nroot_package = ignored\n", encoding="utf-8"
+        )
+        (tmp_path / "custom.toml").write_text(
+            '[tool.importlinter]\nroot_package = "chosen"\n', encoding="utf-8"
+        )
+        result = _root_packages(str(tmp_path), ["--config=custom.toml"])
+        assert result == ["chosen"]
+
+    def test_config_flag_resolved_relative_to_project_dir(self, tmp_path: Path) -> None:
+        nested = tmp_path / "conf"
+        nested.mkdir()
+        (nested / "custom.ini").write_text(
+            "[importlinter]\nroot_package = nested_pkg\n", encoding="utf-8"
+        )
+        result = _root_packages(str(tmp_path), ["--config", "conf/custom.ini"])
+        assert result == ["nested_pkg"]
+
+    def test_config_flag_missing_file_returns_empty(self, tmp_path: Path) -> None:
+        result = _root_packages(str(tmp_path), ["--config", "nope.ini"])
+        assert result == []
+
+    def test_no_config_file_returns_empty(self, tmp_path: Path) -> None:
+        assert _root_packages(str(tmp_path), []) == []
+
+    def test_no_importlinter_section_returns_empty(self, tmp_path: Path) -> None:
+        (tmp_path / "setup.cfg").write_text(
+            "[metadata]\nname = something\n", encoding="utf-8"
+        )
+        (tmp_path / "pyproject.toml").write_text(
+            "[tool.black]\nline-length = 88\n", encoding="utf-8"
+        )
+        assert _root_packages(str(tmp_path), []) == []
+
+    def test_malformed_toml_returns_empty(self, tmp_path: Path) -> None:
+        (tmp_path / "pyproject.toml").write_text(
+            "[tool.importlinter\nroot_package = broken", encoding="utf-8"
+        )
+        assert _root_packages(str(tmp_path), []) == []
+
+    def test_discovery_stops_at_section_naming_nothing(self, tmp_path: Path) -> None:
+        """setup.cfg with an empty section wins; .importlinter is never read."""
+        (tmp_path / "setup.cfg").write_text("[importlinter]\n", encoding="utf-8")
+        (tmp_path / ".importlinter").write_text(
+            "[importlinter]\nroot_package = pkg\n", encoding="utf-8"
+        )
+        assert _root_packages(str(tmp_path), []) == []
+
+    def test_section_without_root_package_skips_to_next_file(
+        self, tmp_path: Path
+    ) -> None:
+        """pyproject.toml without the section falls through to .importlinter."""
+        (tmp_path / "pyproject.toml").write_text(
+            "[tool.black]\nline-length = 88\n", encoding="utf-8"
+        )
+        (tmp_path / ".importlinter").write_text(
+            "[importlinter]\nroot_package = pkg\n", encoding="utf-8"
+        )
+        assert _root_packages(str(tmp_path), []) == ["pkg"]
+
+
+class TestPythonpathEnv:
+    """_pythonpath_env prepends directories to any existing PYTHONPATH."""
+
+    def test_single_directory_without_existing(
+        self, monkeypatch: pytest.MonkeyPatch
+    ) -> None:
+        monkeypatch.delenv("PYTHONPATH", raising=False)
+        assert _pythonpath_env(["/src"]) == {"PYTHONPATH": "/src"}
+
+    def test_two_directories_joined_in_order(
+        self, monkeypatch: pytest.MonkeyPatch
+    ) -> None:
+        monkeypatch.delenv("PYTHONPATH", raising=False)
+        result = _pythonpath_env(["/first", "/second"])
+        assert result == {"PYTHONPATH": os.pathsep.join(["/first", "/second"])}
+
+    def test_existing_pythonpath_appended_last(
+        self, monkeypatch: pytest.MonkeyPatch
+    ) -> None:
+        monkeypatch.setenv("PYTHONPATH", "/already/there")
+        result = _pythonpath_env(["/src"])
+        assert result == {"PYTHONPATH": os.pathsep.join(["/src", "/already/there"])}
+
+    def test_empty_existing_pythonpath_ignored(
+        self, monkeypatch: pytest.MonkeyPatch
+    ) -> None:
+        monkeypatch.setenv("PYTHONPATH", "")
+        assert _pythonpath_env(["/src"]) == {"PYTHONPATH": "/src"}
