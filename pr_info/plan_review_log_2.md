@@ -98,3 +98,37 @@ fixes — no scope or architecture impact, no user escalation needed.
   aligned to `:203-204`.
 - `Decisions.md` updated with decisions 5 and 6.
 **Status**: committed (see commit agent run)
+
+## Round 3 — 2026-09-27
+**Findings**: Round-2 asymmetric-test fix confirmed correct and complete.
+New findings:
+- Medium: round 2's `README.md:115`→`:116` "fix" was itself wrong — line 115
+  is actually the `--python-executable` row (114 is the divider); 116 is
+  `--venv-path`. Both `summary.md` and `step_5.md` now cite the wrong line.
+  Revert to `:115`.
+- Low/medium: `summary.md`'s file table misattributes the
+  `test_lint_imports_passes_resolved_timeout` kwargs-assertion change to
+  step 1; it actually only happens in step 4 (the positional→kwargs switch
+  depends on step 4's signature change, confirmed against current source
+  still using `call_args[0][3]`).
+- Medium: step 4 deletes the lint-imports carve-out, which changes
+  `unavailable_message("lint-imports")` from the "is installed" template to
+  the tool-env "reinstall mcp-tools-py" template — but
+  `tests/test_tool_context.py::test_lint_imports_message_names_import_linter`
+  (pre-existing, asserts `"import-linter is installed" in message`) isn't in
+  step 4's TESTS list or summary.md's file table. An implementer following
+  step 4 literally hits an unplanned failing test.
+**Decisions**: All three accepted as mechanical fixes (two citations, one
+missing test-list entry) — no design impact, no escalation needed.
+**Changes**: Applied via `/plan_update`:
+- Reverted `README.md:116`→`:115` in `summary.md`'s docs table and
+  `step_5.md` (WHERE line + WHAT heading) — 115 is confirmed to be the
+  `--python-executable` row.
+- Reworded `summary.md`'s `tests/test_checker_tools.py` row so "lint-imports
+  kwargs" is attributed to step 4, not step 1.
+- Added a bullet to `step_4.md`'s TESTS covering
+  `test_lint_imports_message_names_import_linter` (assertion changes from
+  `"import-linter is installed"` to `"import-linter is a dependency"`), and
+  updated `summary.md`'s `tests/test_tool_context.py` row accordingly.
+- `Decisions.md` updated with decision 7.
+**Status**: committed (see commit agent run)

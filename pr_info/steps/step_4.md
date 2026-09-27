@@ -224,6 +224,18 @@ the `utils.environment_info` module):
      does not reports `is_tool_available("lint-imports")` **True**, and
      `unavailable_message("lint-imports")` (when neither environment has it) names
      `tool_environment.bin_dir` and contains `"reinstall mcp-tools-py"`.
+   - `tests/test_tool_context.py::TestUnavailableMessage::test_lint_imports_message_names_import_linter`
+     predates step 1 and isn't one of its carve-out tests, but it breaks here anyway:
+     it asserts `"import-linter is installed" in message`, which was true only
+     because the carve-out kept lint-imports on the old `--python-executable`
+     wording. Once this step deletes that carve-out, `unavailable_message("lint-imports")`
+     uses the same tool-env template as the other four ("... {name} is a dependency
+     of mcp-tools-py ... reinstall mcp-tools-py and restart the server"), which never
+     contains "is installed". Update its assertion to `"import-linter is a dependency" in message`
+     — mirroring step 1's
+     `test_unmapped_tool_installs_under_its_own_name`, which asserts `"ruff is a
+     dependency"` for the same template — and keep the existing `"lint-imports is
+     not available"` assertion.
    - `tests/test_tool_availability/test_handler_short_circuit.py::test_lint_imports_unavailable_returns_error`
      is updated: `_patched_tool_env(tmp_path)` with no scripts now correctly produces
      a message naming the tool env directory (the carve-out that made this

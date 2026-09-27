@@ -103,3 +103,41 @@ README Troubleshooting edit; (c) both cited `README.md:115` for the
 **Decision:** annotate `tool_context.py`/`server.py` as touched in steps "1, 4"
 in `summary.md`'s table; make `step_5.md` use `summary.md`'s more precise
 `:203-204`; correct both files' parameter-table citation to `:116`.
+
+## 7. Fix three round-3 findings: a citation regression, a misattributed table row, and a missing test
+
+**Problem (a):** round 2's decision 6(c) claimed `README.md:115` was wrong and the
+`--python-executable` parameter-table row was actually line 116, and both
+`summary.md` and `step_5.md` were changed accordingly. Direct inspection of the live
+file shows the opposite: line 114 is the header divider, line 115 is the
+`--python-executable` row, and line 116 is `--venv-path`. Round 2's fix introduced
+the citation error it was meant to remove.
+
+**Decision:** revert both files' parameter-table citation from `:116` back to
+`:115`.
+
+**Problem (b):** `summary.md`'s file-tracking table row for
+`tests/test_checker_tools.py` attributed "lint-imports kwargs" (switching
+`test_lint_imports_passes_resolved_timeout` from positional `call_args[0][3]` to
+`call_args.kwargs[...]`) to step 1. That change depends on step 4's
+`python_executable` keyword-only signature change and is only described in step
+4's own TESTS section; step 1's TESTS item 6 covers only `_remove_console_script`
+and the tach assertion.
+
+**Decision:** reword the row to `_remove_console_script`, tach assertion (1);
+lint-imports kwargs, binary-switch test (4).
+
+**Problem (c):** `tests/test_tool_context.py::TestUnavailableMessage::test_lint_imports_message_names_import_linter`
+predates step 1 and asserts `"import-linter is installed" in message`. That holds
+only while step 1's carve-out keeps lint-imports on the old `--python-executable`
+wording. Step 4 deletes the carve-out, moving `unavailable_message("lint-imports")`
+to the tool-env template ("... is a dependency of mcp-tools-py ... reinstall
+mcp-tools-py and restart the server"), which never contains "is installed" — so
+this test breaks, but step 4's TESTS section didn't mention it because it isn't one
+of the tests step 1 introduced for the carve-out.
+
+**Decision:** add a bullet to step 4's TESTS item 3 updating this test's assertion
+to `"import-linter is a dependency" in message` (mirroring step 1's
+`test_unmapped_tool_installs_under_its_own_name`), keeping the existing
+`"lint-imports is not available"` assertion. `summary.md`'s
+`tests/test_tool_context.py` row description now names this update under step 4.
