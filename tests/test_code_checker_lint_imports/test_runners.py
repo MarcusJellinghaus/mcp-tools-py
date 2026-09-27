@@ -1,16 +1,18 @@
 """Tests for code_checker_lint_imports.runners module."""
 
+import importlib.metadata
 import sys
 from typing import Any
 from unittest.mock import patch
 
 from mcp_tools_py.code_checker_lint_imports.runners import (
+    _cache_scope,
     _classify_state,
-    _ensure_no_cache,
     _format_report,
     _parse_broken_contracts,
     _parse_summary,
     _parse_warnings,
+    _scope_cache,
     _strip_verbose_flags,
     run_lint_imports_check_impl,
 )
@@ -59,30 +61,59 @@ class TestStripVerboseFlags:
         assert stripped is False
 
 
-class TestEnsureNoCache:
-    """_ensure_no_cache appends --no-cache unless caching is already addressed."""
+class TestCacheScope:
+    """_cache_scope names a directory keyed on the grimp build that reads it."""
 
-    def test_appends_when_absent(self) -> None:
-        assert _ensure_no_cache(["--contract", "layers"]) == [
+    def test_names_grimp_and_python_version_under_the_conventional_root(self) -> None:
+        scope = _cache_scope()
+        assert scope is not None
+        assert scope.startswith(".import_linter_cache/grimp-")
+        assert scope.endswith(f"-py{sys.version_info.major}.{sys.version_info.minor}")
+
+    def test_version_with_a_local_segment_is_path_safe(self) -> None:
+        with patch(f"{MODULE_PATH}.importlib.metadata.version", return_value="3.2+a/b"):
+            scope = _cache_scope()
+        assert scope is not None
+        assert scope.count("/") == 1
+        assert "grimp-3.2_a_b-py" in scope
+
+    def test_unreadable_grimp_version_names_no_scope(self) -> None:
+        with patch(
+            f"{MODULE_PATH}.importlib.metadata.version",
+            side_effect=importlib.metadata.PackageNotFoundError("grimp"),
+        ):
+            assert _cache_scope() is None
+
+
+class TestScopeCache:
+    """_scope_cache appends caching flags unless the caller already set them."""
+
+    def test_appends_scoped_cache_dir_when_absent(self) -> None:
+        assert _scope_cache(["--contract", "layers"]) == [
             "--contract",
             "layers",
-            "--no-cache",
+            "--cache-dir",
+            _cache_scope(),
         ]
 
-    def test_empty_args_gets_the_flag(self) -> None:
-        assert _ensure_no_cache([]) == ["--no-cache"]
+    def test_empty_args_gets_the_flags(self) -> None:
+        assert _scope_cache([]) == ["--cache-dir", _cache_scope()]
 
-    def test_existing_no_cache_is_not_duplicated(self) -> None:
-        assert _ensure_no_cache(["--no-cache"]) == ["--no-cache"]
+    def test_falls_back_to_no_cache_without_a_scope(self) -> None:
+        with patch(f"{MODULE_PATH}._cache_scope", return_value=None):
+            assert _scope_cache([]) == ["--no-cache"]
+
+    def test_existing_no_cache_is_left_alone(self) -> None:
+        assert _scope_cache(["--no-cache"]) == ["--no-cache"]
 
     def test_existing_cache_dir_separate_value_is_left_alone(self) -> None:
-        assert _ensure_no_cache(["--cache-dir", "/tmp/cache"]) == [
+        assert _scope_cache(["--cache-dir", "/tmp/cache"]) == [
             "--cache-dir",
             "/tmp/cache",
         ]
 
     def test_existing_cache_dir_equals_value_is_left_alone(self) -> None:
-        assert _ensure_no_cache(["--cache-dir=/tmp/cache"]) == [
+        assert _scope_cache(["--cache-dir=/tmp/cache"]) == [
             "--cache-dir=/tmp/cache",
         ]
 
@@ -438,12 +469,13 @@ class TestRunLintImportsCheckImpl:
             "/usr/bin/lint-imports",
             "--contract",
             "layers",
-            "--no-cache",
+            "--cache-dir",
+            _cache_scope(),
         ]
         assert mock_exec.call_args.kwargs["cwd"] == "/project"
 
     @patch(f"{MODULE_PATH}.execute_command")
-    def test_no_cache_appended_by_default(self, mock_exec: Any) -> None:
+    def test_scoped_cache_dir_appended_by_default(self, mock_exec: Any) -> None:
         mock_exec.return_value = make_command_result(return_code=0, stdout=CLEAN_OUTPUT)
         run_lint_imports_check_impl(
             lint_imports_binary="/usr/bin/lint-imports",
@@ -451,7 +483,7 @@ class TestRunLintImportsCheckImpl:
             python_executable=sys.executable,
         )
         cmd = mock_exec.call_args[0][0]
-        assert cmd == ["/usr/bin/lint-imports", "--no-cache"]
+        assert cmd == ["/usr/bin/lint-imports", "--cache-dir", _cache_scope()]
 
     @patch(f"{MODULE_PATH}.execute_command")
     def test_caller_supplied_cache_dir_is_not_overridden(self, mock_exec: Any) -> None:

@@ -292,6 +292,65 @@ class TestPythonpathBridge:
 
     @patch(f"{MODULE_PATH}.execute_command")
     @patch(f"{MODULE_PATH}.locate_packages")
+    def test_working_directory_is_not_prepended(
+        self,
+        mock_locate: Any,
+        mock_exec: Any,
+        tmp_path: Path,
+        monkeypatch: pytest.MonkeyPatch,
+    ) -> None:
+        """The flat layout: the repo root resolves the package without the bridge.
+
+        lint-imports puts its own working directory on `sys.path`, so the entry
+        would buy nothing — while `PYTHONPATH` is read at interpreter startup,
+        ahead of the tool env's `site-packages`, so a repository root on it lets
+        a stray top-level module shadow one of lint-imports' dependencies.
+        """
+        monkeypatch.delenv("PYTHONPATH", raising=False)
+        project_dir = self._project(tmp_path)
+        mock_locate.return_value = ([project_dir], {})
+        mock_exec.return_value = make_command_result(return_code=0, stdout=CLEAN_OUTPUT)
+
+        result = run_lint_imports_check_impl(
+            lint_imports_binary="/usr/bin/lint-imports",
+            project_dir=project_dir,
+            python_executable=sys.executable,
+        )
+
+        assert mock_exec.call_args.kwargs["env"] is None
+        lines = result.splitlines()
+        assert lines[0].startswith(
+            "[Info: not added to PYTHONPATH, already lint-imports' working directory"
+        )
+        assert project_dir in lines[0]
+        assert "cannot import" not in result
+        assert lines[1] == "=== PASSED ==="
+
+    @patch(f"{MODULE_PATH}.execute_command")
+    @patch(f"{MODULE_PATH}.locate_packages")
+    def test_source_tree_still_bridged_alongside_the_working_directory(
+        self,
+        mock_locate: Any,
+        mock_exec: Any,
+        tmp_path: Path,
+        monkeypatch: pytest.MonkeyPatch,
+    ) -> None:
+        """Dropping the working directory leaves a src-layout entry bridged."""
+        monkeypatch.delenv("PYTHONPATH", raising=False)
+        project_dir = self._project(tmp_path)
+        mock_locate.return_value = ([project_dir, "/repo/src"], {})
+        mock_exec.return_value = make_command_result(return_code=0, stdout=CLEAN_OUTPUT)
+
+        run_lint_imports_check_impl(
+            lint_imports_binary="/usr/bin/lint-imports",
+            project_dir=project_dir,
+            python_executable=sys.executable,
+        )
+
+        assert mock_exec.call_args.kwargs["env"] == {"PYTHONPATH": "/repo/src"}
+
+    @patch(f"{MODULE_PATH}.execute_command")
+    @patch(f"{MODULE_PATH}.locate_packages")
     def test_nothing_located_is_reported(
         self,
         mock_locate: Any,

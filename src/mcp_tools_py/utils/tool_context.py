@@ -2,8 +2,12 @@
 
 Layer 1 and 2 of the environment model, seen from a registrar: the values a
 tool needs to build its command line, plus the two questions it asks about
-the target environment — is this tool there, and what do I say when it is
-not.
+its own environment — is this tool there, and what do I say when it is not.
+
+Which environment answers depends on the tool.  The five console-script tools
+are mcp-tools-py's own dependencies and are answered from `tool_environment`;
+the five `python -m` tools must import the project's dependencies and are
+answered from `environment`, the interpreter `--python-executable` names.
 """
 
 import logging

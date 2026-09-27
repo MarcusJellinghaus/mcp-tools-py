@@ -133,7 +133,6 @@ def test_root_package_is_found_through_the_bridge(tmp_path: Path) -> None:
     report = run_lint_imports_check_impl(
         str(binary),
         str(project),
-        extra_args=["--no-cache"],
         python_executable=str(interpreter),
     )
 
@@ -155,7 +154,6 @@ def test_unfindable_root_package_never_reports_passed(tmp_path: Path) -> None:
     report = run_lint_imports_check_impl(
         str(binary),
         str(project),
-        extra_args=["--no-cache"],
         python_executable=str(interpreter),
     )
 

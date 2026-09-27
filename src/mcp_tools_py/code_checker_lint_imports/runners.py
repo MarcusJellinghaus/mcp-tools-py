@@ -1,9 +1,11 @@
 """Functions for running import-linter contract checks with structured output."""
 
 import configparser
+import importlib.metadata
 import logging
 import os
 import re
+import sys
 import tomllib
 from pathlib import Path
 
@@ -16,6 +18,10 @@ logger = logging.getLogger(__name__)
 
 _VERBOSE_FLAGS: tuple[str, ...] = ("-v", "--verbose")
 _CONFIG_CANDIDATES: tuple[str, ...] = ("setup.cfg", ".importlinter", "pyproject.toml")
+_CACHE_FLAGS: tuple[str, ...] = ("--no-cache", "--cache-dir")
+# import-linter's own default cache directory. Our per-version directories go
+# inside it so that a project already ignoring this path ignores them too.
+_CACHE_ROOT: str = ".import_linter_cache"
 MAX_OUTPUT_LINES: int = 300
 _TRUNCATION_MARKER: str = (
     "[output truncated — run with --contract <name> for individual results]"
@@ -40,30 +46,61 @@ def _strip_verbose_flags(
     return cleaned, len(cleaned) != len(extra_args)
 
 
-def _ensure_no_cache(extra_args: list[str]) -> list[str]:
-    """Disable grimp's on-disk cache unless the caller already controls it.
+def _cache_scope() -> str | None:
+    """Name a cache directory that only this grimp build can read.
+
+    The name carries the tool env's grimp version and Python version, the two
+    things that decide whether a cache entry written earlier still means what
+    it says.  Both are read in-process: `lint_imports_binary` comes from the
+    environment `mcp_tools_py` itself runs in, so this interpreter's metadata
+    describes the grimp the subprocess will import — and reading the version
+    from metadata does not import grimp's compiled extension.
+
+    Returns:
+        A directory relative to the project directory, or None when grimp's
+        version cannot be read and so no safe scope can be named.
+    """
+    try:
+        version = importlib.metadata.version("grimp")
+    except importlib.metadata.PackageNotFoundError:
+        return None
+    token = re.sub(r"[^A-Za-z0-9._-]", "_", version)
+    python = f"{sys.version_info.major}.{sys.version_info.minor}"
+    return f"{_CACHE_ROOT}/grimp-{token}-py{python}"
+
+
+def _scope_cache(extra_args: list[str]) -> list[str]:
+    """Point grimp's cache at a directory no other grimp version can read.
 
     Running lint-imports from the tool env means its grimp version can differ
     from whatever else runs lint-imports against this project (CI, pre-commit,
     a terminal) — and grimp validates its cache by file mtime only, with no
     version guard, so two grimp versions sharing one `.import_linter_cache`
-    can each trust the other's stale entries.  `--no-cache` is import-linter's
-    own way of turning the cache off, so a caller-supplied `--cache-dir` or
-    `--no-cache` is left alone rather than fought.
+    would each trust the other's stale entries.  Giving each build its own
+    directory keeps that apart without giving up the cache: it lives in the
+    project directory and is reused by every later call, so disabling it would
+    make every run rebuild the whole import graph.  A different build simply
+    misses and writes its own entries.
+
+    When grimp's version cannot be read there is no scope to name, and
+    `--no-cache` is the safe answer: correctness over the speedup.
+
+    A caller-supplied `--cache-dir` or `--no-cache` is left alone rather than
+    fought.
 
     Args:
         extra_args: Cleaned lint-imports arguments.
 
     Returns:
-        `extra_args`, with `--no-cache` appended unless caching is already
-        addressed.
+        `extra_args`, with the caching flags appended unless caching is
+        already addressed.
     """
-    if any(
-        arg == "--no-cache" or arg == "--cache-dir" or arg.startswith("--cache-dir=")
-        for arg in extra_args
-    ):
+    if any(arg in _CACHE_FLAGS or arg.startswith("--cache-dir=") for arg in extra_args):
         return extra_args
-    return [*extra_args, "--no-cache"]
+    scope = _cache_scope()
+    if scope is None:
+        return [*extra_args, "--no-cache"]
+    return [*extra_args, "--cache-dir", scope]
 
 
 def _read_ini(path: Path) -> list[str] | None:
@@ -170,6 +207,55 @@ def _pythonpath_env(directories: list[str]) -> dict[str, str]:
     existing = os.environ.get("PYTHONPATH")
     parts = [*directories, existing] if existing else list(directories)
     return {"PYTHONPATH": os.pathsep.join(parts)}
+
+
+def _without_cwd(
+    directories: list[str], project_dir: str
+) -> tuple[list[str], list[str]]:
+    """Split off the located directories lint-imports already resolves itself.
+
+    The CLI does `sys.path.insert(0, os.getcwd())` before it builds the graph
+    and the subprocess runs with `cwd=project_dir`, so a located directory that
+    *is* that working directory needs no `PYTHONPATH` entry.  Leaving it out
+    matters rather than merely tidying: `PYTHONPATH` is read at interpreter
+    startup, ahead of the tool env's own `site-packages`, so putting a
+    flat-layout repository root there lets a stray top-level module shadow one
+    of lint-imports' own dependencies.
+
+    Args:
+        directories: The usable located directories.
+        project_dir: Directory lint-imports runs in.
+
+    Returns:
+        `(bridged, in_cwd)` — the directories still to prepend, and those that
+        are the working directory itself.
+    """
+    root = Path(project_dir).resolve()
+    bridged: list[str] = []
+    in_cwd: list[str] = []
+    for directory in directories:
+        if Path(directory).resolve() == root:
+            in_cwd.append(directory)
+        else:
+            bridged.append(directory)
+    return bridged, in_cwd
+
+
+def _cwd_info_line(directories: list[str]) -> str:
+    """Report the located directories that are lint-imports' working directory.
+
+    Args:
+        directories: Located directories equal to the project directory.
+
+    Returns:
+        An info line saying the package is found without the bridge, so a
+        reader is not left wondering why nothing was prepended.
+    """
+    return (
+        f"[Info: not added to PYTHONPATH, already lint-imports' working "
+        f"directory: {', '.join(directories)} — the package is importable "
+        f"from there without it]"
+    )
 
 
 def _skipped_info_line(skipped: dict[str, list[str]]) -> str:
@@ -339,11 +425,12 @@ def run_lint_imports_check_impl(
     The first non-empty line is always either an info line or the state
     header. Truncation cannot hide it.
 
-    Unless `extra_args` already names `--cache-dir` or `--no-cache`,
-    `--no-cache` is appended: `lint_imports_binary` runs from the tool env, so
-    its grimp version can differ from whatever else runs lint-imports against
-    this project, and grimp's on-disk cache is validated by file mtime only —
-    sharing it across grimp versions risks a stale, wrong verdict.
+    Unless `extra_args` already names `--cache-dir` or `--no-cache`, a
+    `--cache-dir` of its own is appended: `lint_imports_binary` runs from the
+    tool env, so its grimp version can differ from whatever else runs
+    lint-imports against this project, and grimp's on-disk cache is validated
+    by file mtime only — sharing it across grimp versions risks a stale, wrong
+    verdict, while turning it off would rebuild the whole graph every call.
 
     Args:
         lint_imports_binary: Path to the lint-imports executable, which
@@ -370,17 +457,20 @@ def run_lint_imports_check_impl(
         if isinstance(located, str):
             return f"=== ERROR: could not locate {', '.join(names)}: {located} ==="
         usable, skipped = located
+        usable, in_cwd = _without_cwd(usable, project_dir)
         if skipped:
             info_lines.append(_skipped_info_line(skipped))
-        elif not usable:
+        elif not usable and not in_cwd:
             info_lines.append(
                 f"[Info: nothing added to PYTHONPATH, the project interpreter "
                 f"cannot import {', '.join(names)} — lint-imports may be reading "
                 f"an installed copy]"
             )
+        if in_cwd:
+            info_lines.append(_cwd_info_line(in_cwd))
         env = _pythonpath_env(usable) if usable else None
 
-    command = [lint_imports_binary] + _ensure_no_cache(cleaned_args)
+    command = [lint_imports_binary] + _scope_cache(cleaned_args)
     result = execute_command(
         command, cwd=project_dir, timeout_seconds=timeout_seconds, env=env
     )
