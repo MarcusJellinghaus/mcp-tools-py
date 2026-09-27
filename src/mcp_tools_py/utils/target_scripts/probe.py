@@ -63,14 +63,30 @@ def _parents(spec: importlib.machinery.ModuleSpec) -> list[str]:
     return []
 
 
+def _normalized(path: str) -> str:
+    """Spell `path` so that two spellings of one directory compare equal.
+
+    Args:
+        path: A filesystem path.
+
+    Returns:
+        The path with redundant separators and, on Windows, letter case
+        normalized away.
+    """
+    return os.path.normcase(os.path.normpath(path))
+
+
 def _site_dirs() -> list[str]:
     """Collect this interpreter's site and install directories.
 
     Returns:
-        Every directory reported by ``sysconfig`` or ``site``, de-duplicated in
-        that order.  Either source can be absent or unhappy in an unusual
-        environment, so each is asked separately and a failure just contributes
-        nothing.
+        Every install directory reported by ``sysconfig`` or ``site``,
+        de-duplicated in that order.  Either source can be absent or unhappy in
+        an unusual environment, so each is asked separately and a failure just
+        contributes nothing.  The environment's own root is dropped:
+        ``site.getsitepackages()`` includes it on Windows, and treating it as an
+        install directory would classify every source tree under a venv created
+        at the project root as a ``site-packages``.
     """
     candidates: list[str] = []
     try:
@@ -83,10 +99,14 @@ def _site_dirs() -> list[str]:
     except Exception:  # pylint: disable=broad-exception-caught
         pass
 
+    roots = {_normalized(sys.prefix), _normalized(sys.base_prefix)}
     result: list[str] = []
     for candidate in candidates:
-        if candidate and candidate not in result:
-            result.append(candidate)
+        if not candidate or candidate in result:
+            continue
+        if _normalized(candidate) in roots:
+            continue
+        result.append(candidate)
     return result
 
 

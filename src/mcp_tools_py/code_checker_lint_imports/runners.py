@@ -324,6 +324,12 @@ def run_lint_imports_check_impl(
                 f"interpreter: {', '.join(skipped)} — lint-imports may be reading "
                 f"an installed copy]"
             )
+        elif not usable:
+            info_lines.append(
+                f"[Info: nothing added to PYTHONPATH, the project interpreter "
+                f"cannot import {', '.join(names)} — lint-imports may be reading "
+                f"an installed copy]"
+            )
         env = _pythonpath_env(usable) if usable else None
 
     command = [lint_imports_binary] + cleaned_args

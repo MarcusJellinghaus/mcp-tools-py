@@ -279,6 +279,37 @@ class TestPythonpathBridge:
 
     @patch(f"{MODULE_PATH}.execute_command")
     @patch(f"{MODULE_PATH}.locate_packages")
+    def test_nothing_located_is_reported(
+        self,
+        mock_locate: Any,
+        mock_exec: Any,
+        tmp_path: Path,
+        monkeypatch: pytest.MonkeyPatch,
+    ) -> None:
+        """A root package the project interpreter cannot import is named.
+
+        Running silently would let the tool env's own copy of the project
+        answer for it, and a PASSED then says nothing about the working tree.
+        """
+        monkeypatch.delenv("PYTHONPATH", raising=False)
+        mock_locate.return_value = ([], [])
+        mock_exec.return_value = make_command_result(return_code=0, stdout=CLEAN_OUTPUT)
+
+        result = run_lint_imports_check_impl(
+            lint_imports_binary="/usr/bin/lint-imports",
+            project_dir=self._project(tmp_path),
+            python_executable=sys.executable,
+        )
+
+        assert mock_exec.call_args.kwargs["env"] is None
+        lines = result.splitlines()
+        assert lines[0].startswith("[Info: nothing added to PYTHONPATH")
+        assert "pkg" in lines[0]
+        assert "an installed copy" in lines[0]
+        assert lines[1] == "=== PASSED ==="
+
+    @patch(f"{MODULE_PATH}.execute_command")
+    @patch(f"{MODULE_PATH}.locate_packages")
     def test_locate_failure_reports_error_and_runs_nothing(
         self,
         mock_locate: Any,

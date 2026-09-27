@@ -287,6 +287,31 @@ class TestLocatePackages:
 
             mock_exec.assert_not_called()
 
+    def test_directory_under_the_environment_root_is_usable(self) -> None:
+        """A source tree directly under `sys.prefix` is not a site directory.
+
+        `site.getsitepackages()` names `sys.prefix` itself on Windows, so a venv
+        created at the project root would otherwise make every source tree
+        under it read as a `site-packages` and suppress the bridge.  The real
+        probe answers here, so the test fails if the bare root comes back.
+        """
+        probed = execute_command(
+            [sys.executable, str(probe_script_path()), "locate", "mcp_tools_py"],
+            timeout_seconds=60,
+        )
+        assert probed.return_code == 0, probed.stderr
+        site_dirs = json.loads(probed.stdout)["site_dirs"]
+        assert site_dirs
+        assert not any(Path(d) == Path(sys.prefix) for d in site_dirs), site_dirs
+
+        under_root = str(Path(sys.prefix) / "src")
+        with patch("mcp_tools_py.utils.environment_info.execute_command") as mock_exec:
+            mock_exec.return_value = make_command_result(
+                stdout=json.dumps({"directories": [under_root], "site_dirs": site_dirs})
+            )
+
+            assert locate_packages(sys.executable, ["pkg"]) == ([under_root], [])
+
     def test_answer_is_not_cached(self, tmp_path: Path) -> None:
         """Each call probes again: the answer can change while the server runs."""
         with patch("mcp_tools_py.utils.environment_info.execute_command") as mock_exec:
