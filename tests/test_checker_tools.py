@@ -14,7 +14,7 @@ from mcp_tools_py.utils.tool_context import ToolContext
 
 def _remove_console_script(context: ToolContext, tool_name: str) -> None:
     """Make a console-script tool unavailable by deleting its binary."""
-    binary = context.environment.binary(tool_name)
+    binary = context.tool_environment.binary(tool_name)
     assert binary is not None
     binary.unlink()
 
@@ -665,7 +665,7 @@ def test_tach_success_returns_raw_output(tool_context: ToolContext) -> None:
 
     assert result == "tach check passed (no output)."
     mock_runner.assert_called_once_with(
-        tach_binary=str(tool_context.environment.binary("tach")),
+        tach_binary=str(tool_context.tool_environment.binary("tach")),
         project_dir=str(tool_context.project_dir),
         timeout_seconds=120,
     )

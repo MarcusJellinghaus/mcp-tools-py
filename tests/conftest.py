@@ -67,14 +67,18 @@ def tool_context(tmp_path: Path) -> Iterator[ToolContext]:
 
     Console-script availability is a real filesystem check against the pinned
     script directory, so a test makes one unavailable by deleting its binary.
+    Both `environment` and `tool_environment` point at that one directory, so
+    deleting a binary once is enough whichever of the two the tool reads.
     Module availability is answered by the patched probe.
     """
     interpreter = _dummy_python(tmp_path, *sorted(CONSOLE_SCRIPT_TOOLS))
     project_dir = tmp_path / "project"
     project_dir.mkdir()
+    environment = PythonEnvironment(Path(interpreter))
     context = ToolContext(
         project_dir=project_dir,
-        environment=PythonEnvironment(Path(interpreter)),
+        environment=environment,
+        tool_environment=environment,
     )
     with patch(_GET_ENVIRONMENT_INFO, return_value=make_environment_info()):
         yield context

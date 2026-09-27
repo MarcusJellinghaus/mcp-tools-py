@@ -29,10 +29,34 @@ def _context(
         A ToolContext over a pinned dummy environment.
     """
     interpreter = _dummy_python(tmp_path, *scripts)
+    environment = PythonEnvironment(Path(interpreter))
     return ToolContext(
         project_dir=tmp_path,
-        environment=PythonEnvironment(Path(interpreter)),
+        environment=environment,
+        tool_environment=environment,
         check_timeout=check_timeout,
+    )
+
+
+def _split_context(
+    tmp_path: Path,
+    *,
+    project_scripts: tuple[str, ...] = (),
+    tool_scripts: tuple[str, ...] = (),
+) -> ToolContext:
+    """Build a context whose two environments hold different scripts.
+
+    Returns:
+        A ToolContext over two pinned dummy environments.
+    """
+    tool_base = tmp_path / "toolenv"
+    tool_base.mkdir(exist_ok=True)
+    return ToolContext(
+        project_dir=tmp_path,
+        environment=PythonEnvironment(Path(_dummy_python(tmp_path, *project_scripts))),
+        tool_environment=PythonEnvironment(
+            Path(_dummy_python(tool_base, *tool_scripts))
+        ),
     )
 
 
@@ -69,6 +93,22 @@ class TestIsToolAvailableConsoleScripts:
 
             assert context.is_tool_available(tool_name) is False
             mock_info.assert_not_called()
+
+
+class TestConsoleScriptEnvironment:
+    """A console-script tool is looked for in the tool env, not the project."""
+
+    def test_script_in_tool_env_is_available(self, tmp_path: Path) -> None:
+        """The tool env's copy is the one that counts."""
+        context = _split_context(tmp_path, tool_scripts=("tach",))
+
+        assert context.is_tool_available("tach") is True
+
+    def test_script_only_in_project_env_is_unavailable(self, tmp_path: Path) -> None:
+        """A copy next to --python-executable no longer answers for tach."""
+        context = _split_context(tmp_path, project_scripts=("tach",))
+
+        assert context.is_tool_available("tach") is False
 
 
 class TestIsToolAvailableModules:
@@ -153,14 +193,16 @@ class TestUnavailableMessage:
     """Test the two unavailable-tool message templates."""
 
     def test_script_tool_message_reports_directory(self, tmp_path: Path) -> None:
-        """A console-script tool names the directory searched, never 'N/A'."""
-        context = _context(tmp_path)
+        """A console-script tool names the tool env searched, never 'N/A'."""
+        context = _split_context(tmp_path)
 
-        message = context.unavailable_message("ruff")
+        message = context.unavailable_message("tach")
 
-        assert "ruff is not available" in message
-        assert str(context.environment.bin_dir) in message
-        assert "no restart is needed" in message
+        assert "tach is not available" in message
+        assert str(context.tool_environment.bin_dir) in message
+        assert "reinstall mcp-tools-py" in message
+        assert "restart the server" in message
+        assert "--python-executable" not in message
         assert "N/A" not in message
         assert "--venv-path" not in message
 
@@ -205,13 +247,32 @@ class TestUnavailableMessage:
         assert "lint-imports is not available" in message
         assert "import-linter is installed" in message
 
+    def test_lint_imports_message_still_names_project_env(self, tmp_path: Path) -> None:
+        """The carve-out keeps lint-imports on the project env until step 4.
+
+        The issue's own scenario: the tool env has the script and the project
+        env does not.  Because lint-imports' binary lookup has not moved yet,
+        the message must not blame a broken mcp-tools-py install.
+        """
+        context = _split_context(tmp_path, tool_scripts=("lint-imports",))
+
+        assert context.is_tool_available("lint-imports") is False
+
+        message = context.unavailable_message("lint-imports")
+
+        assert str(context.environment.bin_dir) in message
+        assert str(context.tool_environment.bin_dir) not in message
+        assert "import-linter" in message
+        assert "--python-executable" in message
+        assert "reinstall mcp-tools-py" not in message
+
     def test_unmapped_tool_installs_under_its_own_name(self, tmp_path: Path) -> None:
-        """A tool absent from the package map is installed under its key."""
+        """A tool absent from the package map is named by its key."""
         context = _context(tmp_path)
 
         message = context.unavailable_message("ruff")
 
-        assert "ruff is installed" in message
+        assert "ruff is a dependency" in message
 
 
 class TestResolveTimeout:

@@ -11,7 +11,7 @@ from unittest.mock import MagicMock, patch
 import pytest
 
 from mcp_tools_py.utils.tool_context import CONSOLE_SCRIPT_TOOLS
-from tests.test_tool_availability._helpers import _dummy_python
+from tests.test_tool_availability._helpers import _dummy_python, _patched_tool_env
 
 
 def _get_tool(mock_tool: MagicMock, name: str) -> Any:
@@ -798,7 +798,10 @@ class TestStartupConsoleScriptWarnings:
         """Each of the five names is warned about with the handler's message."""
         from mcp_tools_py.server import ToolServer
 
-        with patch("mcp.server.fastmcp.FastMCP") as mock_fastmcp:
+        with (
+            _patched_tool_env(tmp_path),
+            patch("mcp.server.fastmcp.FastMCP") as mock_fastmcp,
+        ):
             mock_fastmcp.return_value.tool.return_value = MagicMock()
 
             with caplog.at_level(logging.WARNING, logger="mcp_tools_py.server"):
@@ -810,7 +813,36 @@ class TestStartupConsoleScriptWarnings:
         warnings = [record.getMessage() for record in caplog.records]
         for tool_name in CONSOLE_SCRIPT_TOOLS:
             assert server.context.unavailable_message(tool_name) in warnings
+        assert any("tach is a dependency" in text for text in warnings)
         assert any("import-linter is installed" in text for text in warnings)
+
+    def test_lint_imports_warning_still_checks_project_env(
+        self, tmp_path: Path, caplog: pytest.LogCaptureFixture
+    ) -> None:
+        """The startup check for lint-imports still reads the project env.
+
+        Asymmetric on purpose: the tool env has the script and the project env
+        does not, so the warning can only fire if the check itself — not just
+        `is_tool_available` — is the carved-out one.
+        """
+        from mcp_tools_py.server import ToolServer
+
+        with (
+            _patched_tool_env(tmp_path, *sorted(CONSOLE_SCRIPT_TOOLS)),
+            patch("mcp.server.fastmcp.FastMCP") as mock_fastmcp,
+        ):
+            mock_fastmcp.return_value.tool.return_value = MagicMock()
+
+            with caplog.at_level(logging.WARNING, logger="mcp_tools_py.server"):
+                ToolServer(
+                    project_dir=Path("/project"),
+                    python_executable=_dummy_python(tmp_path),
+                )
+
+        warnings = [record.getMessage() for record in caplog.records]
+        assert any("lint-imports is not available" in text for text in warnings)
+        assert any("import-linter is installed" in text for text in warnings)
+        assert not any("tach is not available" in text for text in warnings)
 
     def test_server_stores_no_availability(self, tmp_path: Path) -> None:
         """Availability is answered at use time, never cached on the server."""

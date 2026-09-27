@@ -44,9 +44,13 @@ TOOL_PACKAGES: dict[str, str] = {"lint-imports": "import-linter"}
 # The modules the probe is asked about: every tool invoked as `python -m`.
 PROBED_MODULES: tuple[str, ...] = tuple(m for m in TOOL_MODULES.values() if m)
 
-# The distributions the tools ship in, lowercased to match the probe blob.
+# The distributions the `python -m` tools ship in, lowercased to match the blob.
+# The console-script tools are deliberately absent: they come from the tool env,
+# which this probe never describes.
 TOOL_DISTRIBUTIONS: tuple[str, ...] = tuple(
-    TOOL_PACKAGES.get(key, key).lower() for key in TOOL_MODULES
+    TOOL_PACKAGES.get(key, key).lower()
+    for key, module in TOOL_MODULES.items()
+    if module is not None
 )
 
 

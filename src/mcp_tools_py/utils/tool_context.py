@@ -7,7 +7,7 @@ not.
 """
 
 import logging
-from dataclasses import dataclass
+from dataclasses import dataclass, field
 from pathlib import Path
 from typing import Optional
 
@@ -40,6 +40,9 @@ class ToolContext:
         keep_temp_files: Whether to keep temporary files after a test run.
         vulture_whitelist: Filename of the vulture whitelist.
         check_timeout: Server-level subprocess timeout in seconds, if any.
+        tool_environment: The environment mcp-tools-py itself runs in, holding
+            its console-script dependencies.  Defaults to `sys.executable`'s
+            environment; not configurable from the CLI.
     """
 
     project_dir: Path
@@ -48,12 +51,17 @@ class ToolContext:
     keep_temp_files: bool = False
     vulture_whitelist: str = "vulture_whitelist.py"
     check_timeout: Optional[int] = None
+    tool_environment: PythonEnvironment = field(
+        default_factory=PythonEnvironment.resolve
+    )
 
     def is_tool_available(self, tool_name: str) -> bool:
         """Check whether `tool_name` can be run in this environment.
 
         A console-script-only tool is answered from the filesystem; the probe
-        cannot answer for one, because it is asked about module names.  Every
+        cannot answer for one, because it is asked about module names.  It is
+        looked for in `tool_environment`, since mcp-tools-py depends on it —
+        except `lint-imports`, whose binary lookup has not moved yet.  Every
         other tool is answered from the one-shot environment probe, which
         fails open: a probe that could not be trusted reports the tool
         available so the call proceeds and surfaces the real error.
@@ -65,7 +73,12 @@ class ToolContext:
             True if the tool is available.
         """
         if tool_name in CONSOLE_SCRIPT_TOOLS:
-            available = self.environment.binary(tool_name) is not None
+            env = (
+                self.environment
+                if tool_name == "lint-imports"
+                else self.tool_environment
+            )
+            available = env.binary(tool_name) is not None
             if not available:
                 logger.warning("%s", self.unavailable_message(tool_name))
             return available
@@ -94,7 +107,10 @@ class ToolContext:
             tool_name: Tool key that could not be run.
 
         Returns:
-            A message naming --python-executable and the location searched.
+            A message naming the location searched.  Four of the five
+            console-script tools name the tool env and say mcp-tools-py's own
+            install is incomplete; `lint-imports` keeps the
+            --python-executable wording until its binary lookup moves too.
             The distribution to install comes from `TOOL_PACKAGES`, which maps
             a key to its distribution when the two differ (import-linter
             provides `lint-imports`).  For a `python -m` tool the probe adds
@@ -104,12 +120,23 @@ class ToolContext:
         """
         name = TOOL_PACKAGES.get(tool_name, tool_name)
         if tool_name in CONSOLE_SCRIPT_TOOLS:
+            if tool_name == "lint-imports":
+                # Its binary lookup hasn't moved yet (checker_tools/
+                # lint_imports_tool.py still reads self.environment).  Naming
+                # the tool env here would blame a broken mcp-tools-py install
+                # when the tool env copy is the one that exists.
+                return (
+                    f"{tool_name} is not available. No {tool_name} console script was "
+                    f"found in {self.environment.bin_dir}. Ensure --python-executable "
+                    f"points to an environment where {name} is installed. "
+                    f"That directory is re-checked on every call, so no restart is "
+                    f"needed after installing."
+                )
             return (
                 f"{tool_name} is not available. No {tool_name} console script was "
-                f"found in {self.environment.bin_dir}. Ensure --python-executable "
-                f"points to an environment where {name} is installed. "
-                f"That directory is re-checked on every call, so no restart is "
-                f"needed after installing."
+                f"found in {self.tool_environment.bin_dir}. {name} is a dependency "
+                f"of mcp-tools-py, so its installation is incomplete: reinstall "
+                f"mcp-tools-py and restart the server."
             )
 
         info = get_environment_info(str(self.environment.interpreter))

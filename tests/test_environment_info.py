@@ -138,7 +138,11 @@ class TestToolVersionLogging:
     def test_success_logs_every_found_distribution(
         self, caplog: pytest.LogCaptureFixture
     ) -> None:
-        """A successful probe logs one record naming each tool it found."""
+        """A successful probe logs one record naming each `python -m` tool found.
+
+        The console-script distributions are left out: they come from the tool
+        env, which this probe never describes.
+        """
         blob = json.dumps(
             {
                 "version": "3.11.9",
@@ -157,7 +161,7 @@ class TestToolVersionLogging:
         assert len(messages) == 1
         assert "/some/python" in messages[0]
         assert "pylint 3.2.0" in messages[0]
-        assert "import-linter 2.0" in messages[0]
+        assert "import-linter" not in messages[0]
 
     def test_failure_logs_no_versions(self, caplog: pytest.LogCaptureFixture) -> None:
         """A failed probe has no versions to report, so it logs none."""
