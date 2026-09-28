@@ -574,6 +574,84 @@ class TestPythonpathBridge:
         assert "cannot import b" in lines[1]
         assert lines[2] == "=== PASSED ==="
 
+    @patch(f"{MODULE_PATH}.execute_command")
+    @patch(f"{MODULE_PATH}.locate_packages")
+    def test_skipped_package_present_in_the_project_dir_is_not_warned_about(
+        self,
+        mock_locate: Any,
+        mock_exec: Any,
+        tmp_path: Path,
+        monkeypatch: pytest.MonkeyPatch,
+    ) -> None:
+        """A non-editable install of a flat-layout project carries no risk.
+
+        The root package resolves into site-packages, but `<project>/pkg` is
+        what lint-imports' own working-directory entry reads.
+        """
+        monkeypatch.delenv("PYTHONPATH", raising=False)
+        project_dir = self._project(tmp_path)
+        (tmp_path / "pkg").mkdir()
+        mock_locate.return_value = ([], {"pkg": ["/venv/lib/site-packages"]}, [])
+        mock_exec.return_value = make_command_result(return_code=0, stdout=CLEAN_OUTPUT)
+
+        result = run_lint_imports_check_impl(
+            lint_imports_binary="/usr/bin/lint-imports",
+            project_dir=project_dir,
+            python_executable=sys.executable,
+        )
+
+        assert mock_exec.call_args.kwargs["env"] is None
+        assert "installed copy" not in result
+        lines = result.splitlines()
+        assert lines[0].startswith(
+            "[Info: not added to PYTHONPATH, already lint-imports' working directory"
+        )
+        assert project_dir in lines[0]
+        assert lines[1] == "=== PASSED ==="
+
+    @patch(f"{MODULE_PATH}.execute_command")
+    @patch(f"{MODULE_PATH}.locate_packages")
+    def test_skipped_package_absent_from_the_project_dir_is_still_warned_about(
+        self,
+        mock_locate: Any,
+        mock_exec: Any,
+        tmp_path: Path,
+        monkeypatch: pytest.MonkeyPatch,
+    ) -> None:
+        """Only `local` is in the working tree, so `installed` keeps its warning."""
+        monkeypatch.delenv("PYTHONPATH", raising=False)
+        (tmp_path / ".importlinter").write_text(
+            "[importlinter]\nroot_packages =\n    local\n    installed\n",
+            encoding="utf-8",
+        )
+        (tmp_path / "local").mkdir()
+        mock_locate.return_value = (
+            [],
+            {
+                "local": ["/venv/lib/site-packages"],
+                "installed": ["/venv/lib/site-packages"],
+            },
+            [],
+        )
+        mock_exec.return_value = make_command_result(return_code=0, stdout=CLEAN_OUTPUT)
+
+        result = run_lint_imports_check_impl(
+            lint_imports_binary="/usr/bin/lint-imports",
+            project_dir=str(tmp_path),
+            python_executable=sys.executable,
+        )
+
+        lines = result.splitlines()
+        assert lines[0].startswith(
+            "[Info: not added to PYTHONPATH, site-packages of the project interpreter"
+        )
+        assert "installed in /venv/lib/site-packages" in lines[0]
+        assert "local" not in lines[0]
+        assert "an installed copy of installed]" in lines[0]
+        assert lines[1].startswith(
+            "[Info: not added to PYTHONPATH, already lint-imports' working directory"
+        )
+
     @pytest.mark.parametrize(
         "reason",
         [
