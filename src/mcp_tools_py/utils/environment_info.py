@@ -102,10 +102,11 @@ def locate_packages(
         name they were found for, the located directories that are
         `interpreter`'s own site/purelib directories and must not be prepended;
         and the names `interpreter` could not locate at all, in request order.
-        Every requested name appears in `skipped` or `unresolved`, or
-        contributed a directory to `usable`, so a caller checking several
-        packages is never left without an answer about one of them.  Or a
-        string saying why the probe could not be trusted.
+        Every requested name is accounted for: it appears in `skipped` or
+        `unresolved`, or a directory in `usable` covers it — two names sharing
+        a parent directory contribute that directory once.  So a caller
+        checking several packages is never left without an answer about one of
+        them.  Or a string saying why the probe could not be trusted.
     """
     if not names:
         return [], {}, []

@@ -104,9 +104,11 @@ def _site_dirs() -> list[str]:
 
     Returns:
         Every install directory reported by ``sysconfig`` or ``site``,
-        de-duplicated in that order.  The user site directory is among them: a
-        project installed with ``pip install --user`` resolves there, and
-        prepending that whole tree would shadow the tool environment's own
+        de-duplicated in that order.  The user site directory is among them as
+        defence in depth: the current caller runs this script with the user
+        site disabled, so nothing resolves there, but a caller that does not
+        isolate it would see a ``pip install --user`` package as usable and
+        prepend that whole tree, shadowing the tool environment's own
         dependencies.  Each source can be absent or unhappy in an unusual
         environment, so each is asked separately and a failure just
         contributes nothing.  The environment's own root is dropped:

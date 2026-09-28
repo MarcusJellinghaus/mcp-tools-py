@@ -376,7 +376,9 @@ class TestPythonpathBridge:
 
         assert mock_exec.call_args.kwargs["env"] is None
         lines = result.splitlines()
-        assert lines[0].startswith("[Info: nothing added to PYTHONPATH")
+        assert lines[0].startswith(
+            "[Info: not added to PYTHONPATH, the project interpreter cannot import"
+        )
         assert "pkg" in lines[0]
         assert "an installed copy" in lines[0]
         assert lines[1] == "=== PASSED ==="
@@ -410,7 +412,9 @@ class TestPythonpathBridge:
 
         assert mock_exec.call_args.kwargs["env"] == {"PYTHONPATH": "/repo/src"}
         info_line = result.splitlines()[0]
-        assert info_line.startswith("[Info: nothing added to PYTHONPATH")
+        assert info_line.startswith(
+            "[Info: not added to PYTHONPATH, the project interpreter cannot import"
+        )
         assert "cannot import b" in info_line
         assert "installed copy of b" in info_line
 
@@ -447,7 +451,9 @@ class TestPythonpathBridge:
             "[Info: not added to PYTHONPATH, site-packages of the project interpreter"
         )
         assert "a in /venv/lib/site-packages" in lines[0]
-        assert lines[1].startswith("[Info: nothing added to PYTHONPATH")
+        assert lines[1].startswith(
+            "[Info: not added to PYTHONPATH, the project interpreter cannot import"
+        )
         assert "cannot import b" in lines[1]
         assert lines[2] == "=== PASSED ==="
 

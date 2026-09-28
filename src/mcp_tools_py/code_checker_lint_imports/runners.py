@@ -231,7 +231,7 @@ def _unresolved_info_line(names: list[str]) -> str:
     """
     joined = ", ".join(names)
     return (
-        f"[Info: nothing added to PYTHONPATH, the project interpreter cannot "
+        f"[Info: not added to PYTHONPATH, the project interpreter cannot "
         f"import {joined} — lint-imports may be reading an installed copy of "
         f"{joined}]"
     )
