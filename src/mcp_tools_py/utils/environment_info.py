@@ -89,7 +89,7 @@ def probe_script_path() -> Path:
 
 def locate_packages(
     interpreter: str, names: list[str]
-) -> tuple[list[str], dict[str, list[str]]] | str:
+) -> tuple[list[str], dict[str, list[str]], list[str]] | str:
     """Ask `interpreter` where each package in `names` lives.
 
     Args:
@@ -97,14 +97,18 @@ def locate_packages(
         names: Package names to locate.
 
     Returns:
-        `(usable, skipped)` — the directories to prepend to PYTHONPATH, in
-        request order and without repeats; and, keyed by the package name they
-        were found for, the located directories that are `interpreter`'s own
-        site/purelib directories and must not be prepended.  Or a string
-        saying why the probe could not be trusted.
+        `(usable, skipped, unresolved)` — the directories to prepend to
+        PYTHONPATH, in request order and without repeats; keyed by the package
+        name they were found for, the located directories that are
+        `interpreter`'s own site/purelib directories and must not be prepended;
+        and the names `interpreter` could not locate at all, in request order.
+        Every requested name appears in `skipped` or `unresolved`, or
+        contributed a directory to `usable`, so a caller checking several
+        packages is never left without an answer about one of them.  Or a
+        string saying why the probe could not be trusted.
     """
     if not names:
-        return [], {}
+        return [], {}, []
 
     result = execute_command(
         [interpreter, str(probe_script_path()), "locate", *names],
@@ -114,7 +118,7 @@ def locate_packages(
         return f"probe of {interpreter} timed out after {PROBE_TIMEOUT_SECONDS} seconds"
     if result.execution_error or result.return_code != 0:
         detail = result.execution_error or result.stderr.strip()[:STDERR_SNIPPET]
-        return f"could not locate {', '.join(names)} in {interpreter}: {detail}"
+        return f"probe of {interpreter} failed: {detail}"
 
     located = _parse_locate_blob(result.stdout)
     if located is None:
@@ -124,13 +128,18 @@ def locate_packages(
     resolved_sites = [Path(site_dir).resolve() for site_dir in site_dirs]
     usable: list[str] = []
     skipped: dict[str, list[str]] = {}
+    unresolved: list[str] = []
     for name in names:
-        for directory in packages.get(name, []):
+        directories = packages.get(name, [])
+        if not directories:
+            unresolved.append(name)
+            continue
+        for directory in directories:
             if _under_any(Path(directory).resolve(), resolved_sites):
                 skipped.setdefault(name, []).append(directory)
             elif directory not in usable:
                 usable.append(directory)
-    return usable, skipped
+    return usable, skipped, unresolved
 
 
 def _parse_locate_blob(

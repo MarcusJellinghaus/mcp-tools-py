@@ -181,7 +181,7 @@ class TestPythonpathBridge:
     ) -> None:
         """A source tree goes on PYTHONPATH, asked of the project interpreter."""
         monkeypatch.delenv("PYTHONPATH", raising=False)
-        mock_locate.return_value = (["/repo/src"], {})
+        mock_locate.return_value = (["/repo/src"], {}, [])
         mock_exec.return_value = make_command_result(return_code=0, stdout=CLEAN_OUTPUT)
 
         run_lint_imports_check_impl(
@@ -204,7 +204,7 @@ class TestPythonpathBridge:
     ) -> None:
         """An inherited PYTHONPATH keeps its entries, behind the located one."""
         monkeypatch.setenv("PYTHONPATH", "/already/there")
-        mock_locate.return_value = (["/repo/src"], {})
+        mock_locate.return_value = (["/repo/src"], {}, [])
         mock_exec.return_value = make_command_result(return_code=0, stdout=CLEAN_OUTPUT)
 
         run_lint_imports_check_impl(
@@ -235,7 +235,7 @@ class TestPythonpathBridge:
         """
         monkeypatch.delenv("PYTHONPATH", raising=False)
         site_packages = str(tmp_path / ".venv" / "Lib" / "site-packages")
-        mock_locate.return_value = ([], {"pkg": [site_packages]})
+        mock_locate.return_value = ([], {"pkg": [site_packages]}, [])
         mock_exec.return_value = make_command_result(return_code=0, stdout=CLEAN_OUTPUT)
 
         result = run_lint_imports_check_impl(
@@ -275,6 +275,7 @@ class TestPythonpathBridge:
         mock_locate.return_value = (
             ["/repo/src"],
             {"installed": ["/venv/lib/site-packages"]},
+            [],
         )
         mock_exec.return_value = make_command_result(return_code=0, stdout=CLEAN_OUTPUT)
 
@@ -308,7 +309,7 @@ class TestPythonpathBridge:
         """
         monkeypatch.delenv("PYTHONPATH", raising=False)
         project_dir = self._project(tmp_path)
-        mock_locate.return_value = ([project_dir], {})
+        mock_locate.return_value = ([project_dir], {}, [])
         mock_exec.return_value = make_command_result(return_code=0, stdout=CLEAN_OUTPUT)
 
         result = run_lint_imports_check_impl(
@@ -338,7 +339,7 @@ class TestPythonpathBridge:
         """Dropping the working directory leaves a src-layout entry bridged."""
         monkeypatch.delenv("PYTHONPATH", raising=False)
         project_dir = self._project(tmp_path)
-        mock_locate.return_value = ([project_dir, "/repo/src"], {})
+        mock_locate.return_value = ([project_dir, "/repo/src"], {}, [])
         mock_exec.return_value = make_command_result(return_code=0, stdout=CLEAN_OUTPUT)
 
         run_lint_imports_check_impl(
@@ -364,7 +365,7 @@ class TestPythonpathBridge:
         answer for it, and a PASSED then says nothing about the working tree.
         """
         monkeypatch.delenv("PYTHONPATH", raising=False)
-        mock_locate.return_value = ([], {})
+        mock_locate.return_value = ([], {}, ["pkg"])
         mock_exec.return_value = make_command_result(return_code=0, stdout=CLEAN_OUTPUT)
 
         result = run_lint_imports_check_impl(
@@ -382,14 +383,97 @@ class TestPythonpathBridge:
 
     @patch(f"{MODULE_PATH}.execute_command")
     @patch(f"{MODULE_PATH}.locate_packages")
-    def test_locate_failure_reports_error_and_runs_nothing(
+    def test_unlocated_package_is_named_although_another_was_bridged(
         self,
         mock_locate: Any,
         mock_exec: Any,
         tmp_path: Path,
+        monkeypatch: pytest.MonkeyPatch,
     ) -> None:
-        """A probe that could not be trusted stops the run before it starts."""
-        mock_locate.return_value = "probe of /bad/python timed out after 30 seconds"
+        """`a` resolving to a source tree must not silence `b` resolving nowhere.
+
+        lint-imports builds `b`'s graph from whatever copy sits in the tool
+        env's site-packages, so a PASSED may be about stale code.
+        """
+        monkeypatch.delenv("PYTHONPATH", raising=False)
+        (tmp_path / ".importlinter").write_text(
+            "[importlinter]\nroot_packages =\n    a\n    b\n", encoding="utf-8"
+        )
+        mock_locate.return_value = (["/repo/src"], {}, ["b"])
+        mock_exec.return_value = make_command_result(return_code=0, stdout=CLEAN_OUTPUT)
+
+        result = run_lint_imports_check_impl(
+            lint_imports_binary="/usr/bin/lint-imports",
+            project_dir=str(tmp_path),
+            python_executable=sys.executable,
+        )
+
+        assert mock_exec.call_args.kwargs["env"] == {"PYTHONPATH": "/repo/src"}
+        info_line = result.splitlines()[0]
+        assert info_line.startswith("[Info: nothing added to PYTHONPATH")
+        assert "cannot import b" in info_line
+        assert "installed copy of b" in info_line
+
+    @patch(f"{MODULE_PATH}.execute_command")
+    @patch(f"{MODULE_PATH}.locate_packages")
+    def test_unlocated_package_is_named_alongside_a_skipped_one(
+        self,
+        mock_locate: Any,
+        mock_exec: Any,
+        tmp_path: Path,
+        monkeypatch: pytest.MonkeyPatch,
+    ) -> None:
+        """A site-packages hit for `a` does not hide that `b` resolved nowhere.
+
+        The site-skip line names only `a`, so without its own line `b` would
+        leave no trace in the report at all.
+        """
+        monkeypatch.delenv("PYTHONPATH", raising=False)
+        (tmp_path / ".importlinter").write_text(
+            "[importlinter]\nroot_packages =\n    a\n    b\n", encoding="utf-8"
+        )
+        mock_locate.return_value = ([], {"a": ["/venv/lib/site-packages"]}, ["b"])
+        mock_exec.return_value = make_command_result(return_code=0, stdout=CLEAN_OUTPUT)
+
+        result = run_lint_imports_check_impl(
+            lint_imports_binary="/usr/bin/lint-imports",
+            project_dir=str(tmp_path),
+            python_executable=sys.executable,
+        )
+
+        assert mock_exec.call_args.kwargs["env"] is None
+        lines = result.splitlines()
+        assert lines[0].startswith(
+            "[Info: not added to PYTHONPATH, site-packages of the project interpreter"
+        )
+        assert "a in /venv/lib/site-packages" in lines[0]
+        assert lines[1].startswith("[Info: nothing added to PYTHONPATH")
+        assert "cannot import b" in lines[1]
+        assert lines[2] == "=== PASSED ==="
+
+    @pytest.mark.parametrize(
+        "reason",
+        [
+            "probe of /bad/python timed out after 30 seconds",
+            "probe of /bad/python failed: No such file or directory",
+            "probe of /bad/python returned unparsable output",
+        ],
+    )
+    @patch(f"{MODULE_PATH}.execute_command")
+    @patch(f"{MODULE_PATH}.locate_packages")
+    def test_locate_failure_reports_error_and_runs_nothing(
+        self,
+        mock_locate: Any,
+        mock_exec: Any,
+        reason: str,
+        tmp_path: Path,
+    ) -> None:
+        """A probe that could not be trusted stops the run before it starts.
+
+        Whichever reason comes back, the report names the packages and the
+        failure once each.
+        """
+        mock_locate.return_value = reason
 
         result = run_lint_imports_check_impl(
             lint_imports_binary="/usr/bin/lint-imports",
@@ -397,9 +481,8 @@ class TestPythonpathBridge:
             python_executable="/bad/python",
         )
 
-        assert result.startswith("=== ERROR:")
-        assert "pkg" in result
-        assert "timed out" in result
+        assert result == f"=== ERROR: could not locate pkg: {reason} ==="
+        assert result.count("pkg") == 1
         mock_exec.assert_not_called()
 
     @patch(f"{MODULE_PATH}.execute_command")

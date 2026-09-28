@@ -3,6 +3,7 @@
 import json
 import logging
 import platform
+import site
 import sys
 from pathlib import Path
 from unittest.mock import MagicMock, patch
@@ -210,7 +211,7 @@ class TestLocatePackages:
                 )
             )
 
-            assert locate_packages("/some/python", ["pkg"]) == ([str(source)], {})
+            assert locate_packages("/some/python", ["pkg"]) == ([str(source)], {}, [])
 
     def test_site_directory_itself_is_skipped(self, tmp_path: Path) -> None:
         """A located directory that is a site directory may not be prepended."""
@@ -223,6 +224,7 @@ class TestLocatePackages:
             assert locate_packages("/some/python", ["pkg"]) == (
                 [],
                 {"pkg": [str(site)]},
+                [],
             )
 
     def test_directory_inside_site_directory_is_skipped(self, tmp_path: Path) -> None:
@@ -238,6 +240,7 @@ class TestLocatePackages:
             assert locate_packages("/some/python", ["pkg"]) == (
                 [],
                 {"pkg": [str(inside)]},
+                [],
             )
 
     def test_each_directory_lands_on_its_own_side(self, tmp_path: Path) -> None:
@@ -259,6 +262,7 @@ class TestLocatePackages:
             assert locate_packages("/some/python", ["a", "b", "c"]) == (
                 [str(first), str(second)],
                 {"b": [str(site)]},
+                [],
             )
 
     def test_usable_directories_follow_request_order_without_repeats(
@@ -271,17 +275,47 @@ class TestLocatePackages:
                 stdout=_locate_blob({"a": [source], "b": [source]}, [])
             )
 
-            assert locate_packages("/some/python", ["a", "b"]) == ([str(source)], {})
+            assert locate_packages("/some/python", ["a", "b"]) == (
+                [str(source)],
+                {},
+                [],
+            )
 
-    def test_unresolved_name_contributes_nothing(self, tmp_path: Path) -> None:
-        """A name the probe left out is neither usable nor reported as skipped."""
+    def test_unresolved_name_is_reported_alongside_a_resolved_one(
+        self, tmp_path: Path
+    ) -> None:
+        """A name the probe left out is named, although `a` did resolve.
+
+        The caller must be able to say lint-imports will build `b`'s graph
+        from whatever copy sits next to the script.
+        """
         source = tmp_path / "repo" / "src"
         with patch("mcp_tools_py.utils.environment_info.execute_command") as mock_exec:
             mock_exec.return_value = make_command_result(
                 stdout=_locate_blob({"a": [source]}, [])
             )
 
-            assert locate_packages("/some/python", ["a", "b"]) == ([str(source)], {})
+            assert locate_packages("/some/python", ["a", "b"]) == (
+                [str(source)],
+                {},
+                ["b"],
+            )
+
+    def test_unresolved_name_is_reported_alongside_a_skipped_one(
+        self, tmp_path: Path
+    ) -> None:
+        """A site-packages hit for `a` does not hide that `b` resolved nowhere."""
+        site = tmp_path / "venv" / "site-packages"
+        with patch("mcp_tools_py.utils.environment_info.execute_command") as mock_exec:
+            mock_exec.return_value = make_command_result(
+                stdout=_locate_blob({"a": [site]}, [str(site)])
+            )
+
+            assert locate_packages("/some/python", ["a", "b"]) == (
+                [],
+                {"a": [str(site)]},
+                ["b"],
+            )
 
     def test_timeout_reports_the_interpreter(self) -> None:
         """A probe that times out yields a reason naming the interpreter."""
@@ -299,14 +333,19 @@ class TestLocatePackages:
             assert "/some/python" in reason
 
     def test_failed_exit_reports_stderr(self) -> None:
-        """A non-zero exit yields a reason quoting the child's stderr."""
+        """A non-zero exit yields a reason quoting the child's stderr.
+
+        The reason leaves the requested names out: the caller has them, and
+        repeating them here made its own message say them twice.
+        """
         with patch("mcp_tools_py.utils.environment_info.execute_command") as mock_exec:
             mock_exec.return_value = make_command_result(return_code=1, stderr="boom")
 
             reason = locate_packages("/some/python", ["pkg"])
 
             assert isinstance(reason, str)
-            assert "boom" in reason
+            assert reason == "probe of /some/python failed: boom"
+            assert "could not locate" not in reason
 
     @pytest.mark.parametrize(
         "stdout",
@@ -331,7 +370,7 @@ class TestLocatePackages:
     def test_no_names_runs_no_subprocess(self) -> None:
         """Nothing to locate is answered without a probe."""
         with patch("mcp_tools_py.utils.environment_info.execute_command") as mock_exec:
-            assert locate_packages("/some/python", []) == ([], {})
+            assert locate_packages("/some/python", []) == ([], {}, [])
 
             mock_exec.assert_not_called()
 
@@ -360,7 +399,7 @@ class TestLocatePackages:
                 )
             )
 
-            assert locate_packages(sys.executable, ["pkg"]) == ([under_root], {})
+            assert locate_packages(sys.executable, ["pkg"]) == ([under_root], {}, [])
 
     def test_answer_is_not_cached(self, tmp_path: Path) -> None:
         """Each call probes again: the answer can change while the server runs."""
@@ -435,6 +474,22 @@ class TestProbeScript:
         assert len(directories) == 1
         found = Path(directories[0]).resolve()
         assert (found / "mcp_tools_py" / "__init__.py").is_file()
+
+    def test_real_child_reports_the_user_site_directory(self) -> None:
+        """The user site directory counts as a site directory.
+
+        A project installed with `pip install --user` resolves there, and
+        prepending that whole tree to PYTHONPATH would put it ahead of the tool
+        environment's own grimp and click.
+        """
+        result = execute_command(
+            [sys.executable, str(probe_script_path()), "locate", "json"],
+            timeout_seconds=60,
+        )
+
+        assert result.return_code == 0, result.stderr
+        site_dirs = [Path(d) for d in json.loads(result.stdout)["site_dirs"]]
+        assert Path(site.getusersitepackages()) in site_dirs
 
     def test_real_child_locates_a_dotted_name_from_its_root(
         self, tmp_path: Path

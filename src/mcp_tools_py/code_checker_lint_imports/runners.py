@@ -215,6 +215,28 @@ def _skipped_info_line(skipped: dict[str, list[str]]) -> str:
     )
 
 
+def _unresolved_info_line(names: list[str]) -> str:
+    """Report the root packages the project interpreter could not locate.
+
+    Reported independently of whether *other* root packages resolved: with a
+    multi-package config, a silent drop would leave lint-imports building this
+    package's graph from whatever copy sits next to the script, and a PASSED
+    would then say nothing about the working tree.
+
+    Args:
+        names: Root package names with no directory behind them.
+
+    Returns:
+        An info line naming each such package.
+    """
+    joined = ", ".join(names)
+    return (
+        f"[Info: nothing added to PYTHONPATH, the project interpreter cannot "
+        f"import {joined} — lint-imports may be reading an installed copy of "
+        f"{joined}]"
+    )
+
+
 def _parse_summary(combined: str) -> tuple[int, int] | None:
     """Return (kept, broken) or None if summary line not found."""
     match = _SUMMARY_RE.search(combined)
@@ -389,16 +411,12 @@ def run_lint_imports_check_impl(
         located = locate_packages(python_executable, names)
         if isinstance(located, str):
             return f"=== ERROR: could not locate {', '.join(names)}: {located} ==="
-        usable, skipped = located
+        usable, skipped, unresolved = located
         usable, in_cwd = _without_cwd(usable, project_dir)
         if skipped:
             info_lines.append(_skipped_info_line(skipped))
-        elif not usable and not in_cwd:
-            info_lines.append(
-                f"[Info: nothing added to PYTHONPATH, the project interpreter "
-                f"cannot import {', '.join(names)} — lint-imports may be reading "
-                f"an installed copy]"
-            )
+        if unresolved:
+            info_lines.append(_unresolved_info_line(unresolved))
         if in_cwd:
             info_lines.append(_cwd_info_line(in_cwd))
         env = _pythonpath_env(usable) if usable else None

@@ -104,8 +104,11 @@ def _site_dirs() -> list[str]:
 
     Returns:
         Every install directory reported by ``sysconfig`` or ``site``,
-        de-duplicated in that order.  Either source can be absent or unhappy in
-        an unusual environment, so each is asked separately and a failure just
+        de-duplicated in that order.  The user site directory is among them: a
+        project installed with ``pip install --user`` resolves there, and
+        prepending that whole tree would shadow the tool environment's own
+        dependencies.  Each source can be absent or unhappy in an unusual
+        environment, so each is asked separately and a failure just
         contributes nothing.  The environment's own root is dropped:
         ``site.getsitepackages()`` includes it on Windows, and treating it as an
         install directory would classify every source tree under a venv created
@@ -119,6 +122,10 @@ def _site_dirs() -> list[str]:
         pass
     try:
         candidates += list(site.getsitepackages())
+    except Exception:  # pylint: disable=broad-exception-caught
+        pass
+    try:
+        candidates.append(site.getusersitepackages())
     except Exception:  # pylint: disable=broad-exception-caught
         pass
 
