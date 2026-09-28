@@ -464,16 +464,18 @@ def run_lint_imports_check_impl(
         usable, skipped, unresolved = located
         usable, in_cwd = _without_cwd(usable, project_dir)
         unresolved, cwd_names, cwd_portions = _provided_by_cwd(unresolved, project_dir)
-        # Nothing installed can outrank a namespace portion when the project
-        # interpreter found the name nowhere, so it too is read from the
-        # working tree.
+        # The tool env lint-imports imports from is never probed, so neither
+        # branch here is provable.  An unresolved portion is taken as read from
+        # the working tree, to avoid warning about every flat-layout namespace
+        # directory.
         cwd_names += cwd_portions
         installed, skipped_in_cwd, skipped_portions = _provided_by_cwd(
             list(skipped), project_dir
         )
-        # A `skipped` name has an installed regular package behind it, which
-        # outranks a portion, so that copy is what lint-imports reads: keep
-        # the warning.
+        # A `skipped` portion keeps its hedged warning instead: something is
+        # known to be installed under that name.  Either way the exposure needs
+        # a root package name matching a bare project-dir directory plus a copy
+        # of that name in the tool env.
         warned = {*installed, *skipped_portions}
         skipped = {name: dirs for name, dirs in skipped.items() if name in warned}
         cwd_names += skipped_in_cwd
