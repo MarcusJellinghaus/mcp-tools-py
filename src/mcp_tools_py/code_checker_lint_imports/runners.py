@@ -1,15 +1,21 @@
 """Functions for running import-linter contract checks with structured output."""
 
+import configparser
 import logging
+import os
 import re
+import tomllib
+from pathlib import Path
 
 from mcp_tools_py.log_utils import log_function_call
+from mcp_tools_py.utils.environment_info import locate_packages
 from mcp_tools_py.utils.project_config import DEFAULT_CHECK_TIMEOUT
 from mcp_tools_py.utils.subprocess_runner import execute_command
 
 logger = logging.getLogger(__name__)
 
 _VERBOSE_FLAGS: tuple[str, ...] = ("-v", "--verbose")
+_CONFIG_CANDIDATES: tuple[str, ...] = ("setup.cfg", ".importlinter", "pyproject.toml")
 MAX_OUTPUT_LINES: int = 300
 _TRUNCATION_MARKER: str = (
     "[output truncated — run with --contract <name> for individual results]"
@@ -32,6 +38,253 @@ def _strip_verbose_flags(
         return [], False
     cleaned = [arg for arg in extra_args if arg not in _VERBOSE_FLAGS]
     return cleaned, len(cleaned) != len(extra_args)
+
+
+def _read_ini(path: Path) -> list[str] | None:
+    """Read root package names from an INI-style import-linter config.
+
+    Args:
+        path: Path to a `setup.cfg`/`.importlinter`-style file.
+
+    Returns:
+        The root package names, `[]` when the `[importlinter]` section
+        names none, or `None` when there is no such section to read.
+    """
+    try:
+        parser = configparser.ConfigParser(interpolation=None)
+        if not parser.read(path, encoding="utf-8"):
+            return None
+        if not parser.has_section("importlinter"):
+            return None
+        section = parser["importlinter"]
+        raw_list = section.get("root_packages")
+        if raw_list is not None:
+            return [line.strip() for line in raw_list.splitlines() if line.strip()]
+        scalar = section.get("root_package")
+        if scalar and scalar.strip():
+            return [scalar.strip()]
+        return []
+    except Exception as exc:  # pylint: disable=broad-exception-caught
+        logger.debug("Could not read import-linter config %s: %s", path, exc)
+        return None
+
+
+def _read_toml(path: Path) -> list[str] | None:
+    """Read root package names from a TOML import-linter config.
+
+    Args:
+        path: Path to a `pyproject.toml`-style file.
+
+    Returns:
+        The root package names, `[]` when the `[tool.importlinter]`
+        section names none, or `None` when there is no such section.
+    """
+    try:
+        with open(path, "rb") as handle:
+            data = tomllib.load(handle)
+        tool = data.get("tool")
+        section = tool.get("importlinter") if isinstance(tool, dict) else None
+        if not isinstance(section, dict):
+            return None
+        raw_list = section.get("root_packages")
+        if isinstance(raw_list, list):
+            return [str(name).strip() for name in raw_list if str(name).strip()]
+        scalar = section.get("root_package")
+        if isinstance(scalar, str) and scalar.strip():
+            return [scalar.strip()]
+        return []
+    except Exception as exc:  # pylint: disable=broad-exception-caught
+        logger.debug("Could not read import-linter config %s: %s", path, exc)
+        return None
+
+
+def _root_packages(project_dir: str, extra_args: list[str]) -> list[str]:
+    """Return the root package names lint-imports will check.
+
+    Mirrors the CLI's discovery: an explicit `--config` wins, otherwise the
+    first of `setup.cfg`, `.importlinter`, `pyproject.toml` that *has* an
+    import-linter section is the config — even when it names no package.
+
+    Args:
+        project_dir: Directory lint-imports runs in.
+        extra_args: lint-imports arguments, scanned for `--config`.
+
+    Returns:
+        The root package names, empty when nothing could be read.
+    """
+    override: str | None = None
+    for index, arg in enumerate(extra_args):
+        if arg.startswith("--config="):
+            override = arg[len("--config=") :]
+            break
+        if arg == "--config" and index + 1 < len(extra_args):
+            override = extra_args[index + 1]
+            break
+
+    candidates = (override,) if override else _CONFIG_CANDIDATES
+    for candidate in candidates:
+        path = Path(project_dir) / candidate
+        reader = _read_toml if path.suffix == ".toml" else _read_ini
+        names = reader(path)
+        if names is not None:
+            return names
+    return []
+
+
+def _pythonpath_env(directories: list[str]) -> dict[str, str]:
+    """Build a `PYTHONPATH` override that prepends `directories`.
+
+    Args:
+        directories: Directories to place ahead of any inherited entries.
+
+    Returns:
+        A single-key env dict suitable for `execute_command(env=...)`,
+        which merges it over `os.environ` key by key.
+    """
+    existing = os.environ.get("PYTHONPATH")
+    parts = [*directories, existing] if existing else list(directories)
+    return {"PYTHONPATH": os.pathsep.join(parts)}
+
+
+def _without_cwd(
+    directories: list[str], project_dir: str
+) -> tuple[list[str], list[str]]:
+    """Split off the located directories lint-imports already resolves itself.
+
+    The CLI does `sys.path.insert(0, os.getcwd())` before it builds the graph
+    and the subprocess runs with `cwd=project_dir`, so a located directory that
+    *is* that working directory needs no `PYTHONPATH` entry.  Leaving it out
+    matters rather than merely tidying: `PYTHONPATH` is read at interpreter
+    startup, ahead of the tool env's own `site-packages`, so putting a
+    flat-layout repository root there lets a stray top-level module shadow one
+    of lint-imports' own dependencies.
+
+    Args:
+        directories: The usable located directories.
+        project_dir: Directory lint-imports runs in.
+
+    Returns:
+        `(bridged, in_cwd)` — the directories still to prepend, and those that
+        are the working directory itself.
+    """
+    root = Path(project_dir).resolve()
+    bridged: list[str] = []
+    in_cwd: list[str] = []
+    for directory in directories:
+        if Path(directory).resolve() == root:
+            in_cwd.append(directory)
+        else:
+            bridged.append(directory)
+    return bridged, in_cwd
+
+
+def _provided_by_cwd(
+    names: list[str], project_dir: str
+) -> tuple[list[str], list[str], list[str]]:
+    """Split off the names the project directory itself provides.
+
+    `locate_packages` runs the probe by absolute path, so the child's
+    `sys.path[0]` is the probe's own directory and the project directory is
+    never on its `sys.path`.  A flat-layout package therefore comes back
+    unresolved when it is not installed in the project environment, and in
+    `skipped` when it is installed non-editably — yet either way
+    lint-imports' own `sys.path.insert(0, os.getcwd())` reads the working
+    tree, ahead of both `PYTHONPATH` and site-packages.  Such a name carries
+    no stale-read risk, so it must not be warned about.
+
+    A directory with no `__init__.py` is the exception: it is only a
+    namespace *portion*, so the import machinery records it and keeps
+    scanning, and a regular package further along `sys.path` wins.  It
+    provides the name only when nothing else on the path does.
+
+    Args:
+        names: Root package names that were not bridged.
+        project_dir: Directory lint-imports runs in.
+
+    Returns:
+        `(elsewhere, provided, portion)` — the names the project directory
+        does not provide, those it provides outright, and those it provides
+        only as a namespace portion.  A dotted name is looked for along its
+        components, as it is importable from the project directory only when
+        the whole chain is there.
+    """
+    root = Path(project_dir)
+    elsewhere: list[str] = []
+    provided: list[str] = []
+    portion: list[str] = []
+    for name in names:
+        *parents, last = name.split(".")
+        base = root.joinpath(*parents)
+        target = base / last
+        if (target / "__init__.py").is_file() or (base / f"{last}.py").is_file():
+            provided.append(name)
+        elif target.is_dir():
+            portion.append(name)
+        else:
+            elsewhere.append(name)
+    return elsewhere, provided, portion
+
+
+def _cwd_info_line(directories: list[str]) -> str:
+    """Report the directories that are lint-imports' own working directory.
+
+    Args:
+        directories: Directories lint-imports imports from without a bridge —
+            located directories equal to the project directory, and the
+            project directory itself when it provides a name that was not
+            located there.
+
+    Returns:
+        An info line saying the package is found without the bridge, so a
+        reader is not left wondering why nothing was prepended.
+    """
+    return (
+        f"[Info: not added to PYTHONPATH, already lint-imports' working "
+        f"directory: {', '.join(directories)} — the package is importable "
+        f"from there without it]"
+    )
+
+
+def _skipped_info_line(skipped: dict[str, list[str]]) -> str:
+    """Report the root packages that resolved into the project's site-packages.
+
+    Args:
+        skipped: Site directories keyed by the root package found in them.
+
+    Returns:
+        An info line naming each such package, so a multi-package config
+        makes clear which package went unbridged and which did not.
+    """
+    located_in = ", ".join(
+        f"{name} in {', '.join(directories)}" for name, directories in skipped.items()
+    )
+    return (
+        f"[Info: not added to PYTHONPATH, site-packages of the project "
+        f"interpreter: {located_in} — lint-imports may be reading an "
+        f"installed copy of {', '.join(skipped)}]"
+    )
+
+
+def _unresolved_info_line(names: list[str]) -> str:
+    """Report the root packages the project interpreter could not locate.
+
+    Reported independently of whether *other* root packages resolved: with a
+    multi-package config, a silent drop would leave lint-imports building this
+    package's graph from whatever copy sits next to the script, and a PASSED
+    would then say nothing about the working tree.
+
+    Args:
+        names: Root package names with no directory behind them.
+
+    Returns:
+        An info line naming each such package.
+    """
+    joined = ", ".join(names)
+    return (
+        f"[Info: not added to PYTHONPATH, the project interpreter cannot "
+        f"import {joined} — lint-imports may be reading an installed copy of "
+        f"{joined}]"
+    )
 
 
 def _parse_summary(combined: str) -> tuple[int, int] | None:
@@ -130,17 +383,14 @@ def _format_report(
     broken_contracts: list[str],
     warnings: list[str],
     raw_body: str,
-    info_line: str | None,
+    info_lines: list[str],
 ) -> str:
     """Assemble the final string and apply the line cap.
 
     Returns:
         Multi-line report text, truncated to `MAX_OUTPUT_LINES`.
     """
-    lines: list[str] = []
-
-    if info_line:
-        lines.append(info_line)
+    lines: list[str] = list(info_lines)
 
     header = _format_state_header(state, summary)
     lines.append(f"=== {header} ===")
@@ -176,26 +426,73 @@ def run_lint_imports_check_impl(
     project_dir: str,
     extra_args: list[str] | None = None,
     timeout_seconds: int = DEFAULT_CHECK_TIMEOUT,
+    *,
+    python_executable: str,
 ) -> str:
     """Run lint-imports and return an LLM-optimised structured report.
 
-    The first non-empty line is always either an info line (when flags
-    were stripped) or the state header. Truncation cannot hide it.
+    The first non-empty line is always either an info line or the state
+    header. Truncation cannot hide it.
+
+    Caching is left to import-linter's own default: a `--cache-dir` or
+    `--no-cache` in `extra_args` reaches the CLI on its own.
 
     Args:
-        lint_imports_binary: Path to the lint-imports executable.
+        lint_imports_binary: Path to the lint-imports executable, which
+            comes from mcp-tools-py's own environment.
         project_dir: Directory to run lint-imports in.
         extra_args: Additional lint-imports arguments.
         timeout_seconds: Maximum seconds to wait for lint-imports.
+        python_executable: Interpreter of the project's environment, asked
+            where the root package lives.  Without that answer the script
+            would check whatever copy of the project happens to be installed
+            next to itself.
 
     Returns:
-        Structured report (state header + summary + raw output, capped).
+        Structured report (info lines + state header + summary + raw output,
+        capped), or a single `=== ERROR: ... ===` line.
     """
     cleaned_args, stripped = _strip_verbose_flags(extra_args)
-    info_line = "[Info: stripped --verbose/-v from extra_args]" if stripped else None
+    info_lines = ["[Info: stripped --verbose/-v from extra_args]"] if stripped else []
+
+    names = _root_packages(project_dir, cleaned_args)
+    env: dict[str, str] | None = None
+    if names:
+        located = locate_packages(python_executable, names)
+        if isinstance(located, str):
+            return f"=== ERROR: could not locate {', '.join(names)}: {located} ==="
+        usable, skipped, unresolved = located
+        usable, in_cwd = _without_cwd(usable, project_dir)
+        unresolved, cwd_names, cwd_portions = _provided_by_cwd(unresolved, project_dir)
+        # The tool env lint-imports imports from is never probed, so neither
+        # branch here is provable.  An unresolved portion is taken as read from
+        # the working tree, to avoid warning about every flat-layout namespace
+        # directory.
+        cwd_names += cwd_portions
+        installed, skipped_in_cwd, skipped_portions = _provided_by_cwd(
+            list(skipped), project_dir
+        )
+        # A `skipped` portion keeps its hedged warning instead: something is
+        # known to be installed under that name.  Either way the exposure needs
+        # a root package name matching a bare project-dir directory plus a copy
+        # of that name in the tool env.
+        warned = {*installed, *skipped_portions}
+        skipped = {name: dirs for name, dirs in skipped.items() if name in warned}
+        cwd_names += skipped_in_cwd
+        if cwd_names and not in_cwd:
+            in_cwd.append(project_dir)
+        if skipped:
+            info_lines.append(_skipped_info_line(skipped))
+        if unresolved:
+            info_lines.append(_unresolved_info_line(unresolved))
+        if in_cwd:
+            info_lines.append(_cwd_info_line(in_cwd))
+        env = _pythonpath_env(usable) if usable else None
 
     command = [lint_imports_binary] + cleaned_args
-    result = execute_command(command, cwd=project_dir, timeout_seconds=timeout_seconds)
+    result = execute_command(
+        command, cwd=project_dir, timeout_seconds=timeout_seconds, env=env
+    )
 
     if result.timed_out:
         return f"=== ERROR: lint-imports timed out after {timeout_seconds} seconds ==="
@@ -210,5 +507,5 @@ def run_lint_imports_check_impl(
     state = _classify_state(result.return_code, summary)
 
     return _format_report(
-        state, summary, broken_contracts, warnings, combined, info_line
+        state, summary, broken_contracts, warnings, combined, info_lines
     )

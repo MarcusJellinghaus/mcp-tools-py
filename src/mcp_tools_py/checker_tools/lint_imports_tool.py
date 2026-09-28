@@ -31,20 +31,21 @@ def register(mcp: "FastMCPProtocol", checker_tools: "CheckerTools") -> None:
                 Examples: ["--contract", "layers"], ["--verbose"]
 
         Returns:
-            Structured report. The first non-empty line is the state
-            header (PASSED / BROKEN / ERROR), so truncation cannot hide
-            failures.
+            Structured report. Zero or more `[Info: ...]` lines come first,
+            then the state header (PASSED / BROKEN / ERROR), so truncation
+            cannot hide failures.
         """
-        binary = context.environment.binary("lint-imports")
+        binary = context.tool_environment.binary("lint-imports")
         if not context.is_tool_available("lint-imports") or binary is None:
             return context.unavailable_message("lint-imports")
 
         try:
             return run_lint_imports_check_impl(
-                str(binary),
-                str(context.project_dir),
-                extra_args,
-                context.resolve_timeout("lint-imports"),
+                lint_imports_binary=str(binary),
+                project_dir=str(context.project_dir),
+                extra_args=extra_args,
+                timeout_seconds=context.resolve_timeout("lint-imports"),
+                python_executable=str(context.environment.interpreter),
             )
         except Exception as e:
             error_msg = (

@@ -34,7 +34,8 @@ def test_bandit_not_available_message(tool_context: ToolContext) -> None:
     result = tools["run_bandit_check"]()  # type: ignore[operator]
 
     assert "bandit is not available" in result
-    assert "no restart is needed" in result
+    assert "reinstall mcp-tools-py" in result
+    assert "restart the server" in result
 
 
 def test_bandit_happy_path(tool_context: ToolContext) -> None:

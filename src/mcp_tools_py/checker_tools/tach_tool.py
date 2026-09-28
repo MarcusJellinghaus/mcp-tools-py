@@ -25,7 +25,7 @@ def register(mcp: "FastMCPProtocol", checker_tools: "CheckerTools") -> None:
         Returns:
             Status line followed by raw JSON output from `tach check --output json`.
         """
-        tach_binary = context.environment.binary("tach")
+        tach_binary = context.tool_environment.binary("tach")
         if not context.is_tool_available("tach") or tach_binary is None:
             return context.unavailable_message("tach")
 

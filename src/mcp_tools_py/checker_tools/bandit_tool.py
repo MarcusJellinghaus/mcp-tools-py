@@ -38,7 +38,7 @@ def register(mcp: "FastMCPProtocol", checker_tools: "CheckerTools") -> None:
         Returns:
             Formatted bandit report, or an error message string.
         """
-        bandit_binary = context.environment.binary("bandit")
+        bandit_binary = context.tool_environment.binary("bandit")
         if not context.is_tool_available("bandit") or bandit_binary is None:
             return context.unavailable_message("bandit")
 

@@ -36,7 +36,7 @@ def register(mcp: "FastMCPProtocol", checker_tools: "CheckerTools") -> None:
         Returns:
             Raw vulture output (stdout + stderr combined)
         """
-        vulture_binary = context.environment.binary("vulture")
+        vulture_binary = context.tool_environment.binary("vulture")
         if not context.is_tool_available("vulture") or vulture_binary is None:
             return context.unavailable_message("vulture")
 

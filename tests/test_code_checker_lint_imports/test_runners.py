@@ -1,5 +1,6 @@
 """Tests for code_checker_lint_imports.runners module."""
 
+import sys
 from typing import Any
 from unittest.mock import patch
 
@@ -13,84 +14,14 @@ from mcp_tools_py.code_checker_lint_imports.runners import (
     run_lint_imports_check_impl,
 )
 from tests.conftest import make_command_result
-
-MODULE_PATH = "mcp_tools_py.code_checker_lint_imports.runners"
-
-
-# Captured from import-linter 2.x on 2026-05-04 (clean run, this repo).
-CLEAN_OUTPUT = """\
-=================
-import-linter 2.0
-=================
-
----------
-Contracts
----------
-
-Analyzed 50 files, 100 dependencies.
-
-Layered Architecture KEPT
-Forbidden imports KEPT
-Independence KEPT
-
----
-Contracts: 3 kept, 0 broken.
-"""
-
-
-# Captured from import-linter 2.x on 2026-05-04 (synthetic broken run).
-BROKEN_OUTPUT = """\
-=================
-import-linter 2.0
-=================
-
----------
-Contracts
----------
-
-Analyzed 50 files, 100 dependencies.
-
-Layered Architecture BROKEN [12 violations]
-Forbidden imports KEPT
-
----
-Contracts: 1 kept, 1 broken.
-"""
-
-
-# Captured from import-linter 2.x on 2026-05-04 (synthetic warnings run).
-WARNINGS_OUTPUT = """\
-=================
-import-linter 2.0
-=================
-
-Analyzed 50 files, 100 dependencies.
-
-No matches for ignored import mcp_coder.mcp_workspace_git -> mcp_workspace.git_operations.
-
-Layered Architecture KEPT
-
-Contracts: 1 kept, 0 broken.
-"""
-
-
-# Verbatim wrapped form from issue #171 reproduction.
-WRAPPED_WARNING_OUTPUT = """\
-Analyzed 50 files, 100 dependencies.
-
-No matches for ignored import mcp_coder.mcp_workspace_git -> 
-mcp_workspace.git_operations.
-
-Layered Architecture KEPT
-
-Contracts: 1 kept, 0 broken.
-"""
-
-
-# Captured from import-linter 2.x on 2026-05-04 (malformed/error run).
-MALFORMED_OUTPUT = """\
-Could not read any configuration. Please check that .importlinter exists.
-"""
+from tests.test_code_checker_lint_imports._fixtures import (
+    BROKEN_OUTPUT,
+    CLEAN_OUTPUT,
+    MALFORMED_OUTPUT,
+    MODULE_PATH,
+    WARNINGS_OUTPUT,
+    WRAPPED_WARNING_OUTPUT,
+)
 
 
 class TestStripVerboseFlags:
@@ -250,7 +181,7 @@ class TestFormatReport:
             broken_contracts=[],
             warnings=[],
             raw_body="some body",
-            info_line=None,
+            info_lines=[],
         )
         first_line = result.splitlines()[0]
         assert first_line == "=== PASSED ==="
@@ -262,11 +193,25 @@ class TestFormatReport:
             broken_contracts=[],
             warnings=[],
             raw_body="body",
-            info_line="[Info: stripped --verbose/-v from extra_args]",
+            info_lines=["[Info: stripped --verbose/-v from extra_args]"],
         )
         lines = result.splitlines()
         assert lines[0] == "[Info: stripped --verbose/-v from extra_args]"
         assert lines[1] == "=== PASSED ==="
+
+    def test_two_info_lines_render_in_order_above_header(self) -> None:
+        result = _format_report(
+            state="PASSED",
+            summary=(3, 0),
+            broken_contracts=[],
+            warnings=[],
+            raw_body="body",
+            info_lines=["[Info: first]", "[Info: second]"],
+        )
+        lines = result.splitlines()
+        assert lines[0] == "[Info: first]"
+        assert lines[1] == "[Info: second]"
+        assert lines[2] == "=== PASSED ==="
 
     def test_summary_line_when_present(self) -> None:
         result = _format_report(
@@ -275,7 +220,7 @@ class TestFormatReport:
             broken_contracts=[],
             warnings=[],
             raw_body="body",
-            info_line=None,
+            info_lines=[],
         )
         assert "Contracts: 3 kept, 0 broken" in result
 
@@ -286,7 +231,7 @@ class TestFormatReport:
             broken_contracts=["Foo", "Bar"],
             warnings=[],
             raw_body="body",
-            info_line=None,
+            info_lines=[],
         )
         assert "=== BROKEN: 2 of 3 contracts failed ===" in result
         assert "Broken contracts:" in result
@@ -300,7 +245,7 @@ class TestFormatReport:
             broken_contracts=[],
             warnings=["No matches for ignored import a -> b."],
             raw_body="body",
-            info_line=None,
+            info_lines=[],
         )
         assert "Warnings:" in result
         assert "  - No matches for ignored import a -> b." in result
@@ -312,7 +257,7 @@ class TestFormatReport:
             broken_contracts=[],
             warnings=[],
             raw_body="raw error text",
-            info_line=None,
+            info_lines=[],
         )
         assert result.splitlines()[0] == (
             "=== ERROR: lint-imports output could not be parsed ==="
@@ -329,7 +274,7 @@ class TestFormatReport:
             broken_contracts=[],
             warnings=[],
             raw_body=large_body,
-            info_line=None,
+            info_lines=[],
         )
         last_line = result.splitlines()[-1]
         assert "[output truncated" in last_line
@@ -342,7 +287,7 @@ class TestFormatReport:
             broken_contracts=[],
             warnings=[],
             raw_body="   \n  \n",
-            info_line=None,
+            info_lines=[],
         )
         assert "(no output)" in result
         # First non-empty line is still the header.
@@ -359,6 +304,7 @@ class TestRunLintImportsCheckImpl:
         result = run_lint_imports_check_impl(
             lint_imports_binary="/usr/bin/lint-imports",
             project_dir="/project",
+            python_executable=sys.executable,
         )
         first = result.splitlines()[0]
         assert first == "=== PASSED ==="
@@ -372,6 +318,7 @@ class TestRunLintImportsCheckImpl:
         result = run_lint_imports_check_impl(
             lint_imports_binary="/usr/bin/lint-imports",
             project_dir="/project",
+            python_executable=sys.executable,
         )
         first = result.splitlines()[0]
         assert first == "=== BROKEN: 1 of 2 contracts failed ==="
@@ -385,6 +332,7 @@ class TestRunLintImportsCheckImpl:
         result = run_lint_imports_check_impl(
             lint_imports_binary="/usr/bin/lint-imports",
             project_dir="/project",
+            python_executable=sys.executable,
         )
         first = result.splitlines()[0]
         assert first == ("=== ERROR: lint-imports output could not be parsed ===")
@@ -397,6 +345,7 @@ class TestRunLintImportsCheckImpl:
             lint_imports_binary="/usr/bin/lint-imports",
             project_dir="/project",
             extra_args=["--verbose"],
+            python_executable=sys.executable,
         )
         lines = result.splitlines()
         assert lines[0] == "[Info: stripped --verbose/-v from extra_args]"
@@ -412,6 +361,7 @@ class TestRunLintImportsCheckImpl:
             lint_imports_binary="/usr/bin/lint-imports",
             project_dir="/project",
             extra_args=["-v"],
+            python_executable=sys.executable,
         )
         lines = result.splitlines()
         assert lines[0] == "[Info: stripped --verbose/-v from extra_args]"
@@ -427,6 +377,7 @@ class TestRunLintImportsCheckImpl:
         result = run_lint_imports_check_impl(
             lint_imports_binary="/usr/bin/lint-imports",
             project_dir="/project",
+            python_executable=sys.executable,
         )
         last = result.splitlines()[-1]
         assert "[output truncated" in last
@@ -439,6 +390,7 @@ class TestRunLintImportsCheckImpl:
         result = run_lint_imports_check_impl(
             lint_imports_binary="/usr/bin/lint-imports",
             project_dir="/project",
+            python_executable=sys.executable,
         )
         assert "(no output)" in result
         assert result.splitlines()[0].startswith("===")
@@ -450,13 +402,10 @@ class TestRunLintImportsCheckImpl:
             lint_imports_binary="/usr/bin/lint-imports",
             project_dir="/project",
             extra_args=["--contract", "layers", "--verbose"],
+            python_executable=sys.executable,
         )
         cmd = mock_exec.call_args[0][0]
-        assert cmd == [
-            "/usr/bin/lint-imports",
-            "--contract",
-            "layers",
-        ]
+        assert cmd == ["/usr/bin/lint-imports", "--contract", "layers"]
         assert mock_exec.call_args.kwargs["cwd"] == "/project"
 
 
@@ -475,6 +424,7 @@ class TestRunLintImportsTimeout:
             lint_imports_binary="/usr/bin/lint-imports",
             project_dir="/project",
             timeout_seconds=45,
+            python_executable=sys.executable,
         )
 
         first = next(line for line in result.splitlines() if line.strip())
@@ -496,6 +446,7 @@ class TestRunLintImportsTimeout:
             project_dir="/project",
             extra_args=["--verbose"],
             timeout_seconds=45,
+            python_executable=sys.executable,
         )
 
         assert result.splitlines() == [
@@ -513,6 +464,7 @@ class TestRunLintImportsTimeout:
         result = run_lint_imports_check_impl(
             lint_imports_binary="/usr/bin/lint-imports",
             project_dir="/project",
+            python_executable=sys.executable,
         )
 
         first = next(line for line in result.splitlines() if line.strip())
@@ -529,6 +481,7 @@ class TestRunLintImportsTimeout:
             lint_imports_binary="/usr/bin/lint-imports",
             project_dir="/project",
             timeout_seconds=45,
+            python_executable=sys.executable,
         )
 
         assert mock_exec.call_args.kwargs["timeout_seconds"] == 45
@@ -541,6 +494,7 @@ class TestRunLintImportsTimeout:
         run_lint_imports_check_impl(
             lint_imports_binary="/usr/bin/lint-imports",
             project_dir="/project",
+            python_executable=sys.executable,
         )
 
         assert mock_exec.call_args.kwargs["timeout_seconds"] == 120

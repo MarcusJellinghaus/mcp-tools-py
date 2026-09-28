@@ -11,7 +11,7 @@ from unittest.mock import MagicMock, patch
 import pytest
 
 from mcp_tools_py.utils.tool_context import CONSOLE_SCRIPT_TOOLS
-from tests.test_tool_availability._helpers import _dummy_python
+from tests.test_tool_availability._helpers import _dummy_python, _patched_tool_env
 
 
 def _get_tool(mock_tool: MagicMock, name: str) -> Any:
@@ -798,7 +798,10 @@ class TestStartupConsoleScriptWarnings:
         """Each of the five names is warned about with the handler's message."""
         from mcp_tools_py.server import ToolServer
 
-        with patch("mcp.server.fastmcp.FastMCP") as mock_fastmcp:
+        with (
+            _patched_tool_env(tmp_path),
+            patch("mcp.server.fastmcp.FastMCP") as mock_fastmcp,
+        ):
             mock_fastmcp.return_value.tool.return_value = MagicMock()
 
             with caplog.at_level(logging.WARNING, logger="mcp_tools_py.server"):
@@ -810,7 +813,40 @@ class TestStartupConsoleScriptWarnings:
         warnings = [record.getMessage() for record in caplog.records]
         for tool_name in CONSOLE_SCRIPT_TOOLS:
             assert server.context.unavailable_message(tool_name) in warnings
-        assert any("import-linter is installed" in text for text in warnings)
+        assert any("tach is a dependency" in text for text in warnings)
+        assert any("import-linter is a dependency" in text for text in warnings)
+
+    def test_warnings_read_the_tool_env_not_the_project_env(
+        self, tmp_path: Path, caplog: pytest.LogCaptureFixture
+    ) -> None:
+        """The startup check answers every name from the tool env.
+
+        Asymmetric on purpose: the project env has no script at all, while the
+        tool env has `lint-imports` and nothing else.  A symmetric "both envs
+        lack everything" case would warn correctly even with the old carve-out
+        in place, so only this one proves `_warn_missing_console_scripts`
+        itself was switched.  tach, missing from the tool env, is the other
+        half of the same case: its warning shows the loop ran, so silence
+        about lint-imports means the check looked in the tool env and found it
+        there — not that nothing was checked.
+        """
+        from mcp_tools_py.server import ToolServer
+
+        with (
+            _patched_tool_env(tmp_path, "lint-imports"),
+            patch("mcp.server.fastmcp.FastMCP") as mock_fastmcp,
+        ):
+            mock_fastmcp.return_value.tool.return_value = MagicMock()
+
+            with caplog.at_level(logging.WARNING, logger="mcp_tools_py.server"):
+                ToolServer(
+                    project_dir=Path("/project"),
+                    python_executable=_dummy_python(tmp_path),
+                )
+
+        warnings = [record.getMessage() for record in caplog.records]
+        assert any("tach is not available" in text for text in warnings)
+        assert not any("lint-imports is not available" in text for text in warnings)
 
     def test_server_stores_no_availability(self, tmp_path: Path) -> None:
         """Availability is answered at use time, never cached on the server."""

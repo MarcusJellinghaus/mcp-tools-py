@@ -38,7 +38,7 @@ def register(mcp: "FastMCPProtocol", checker_tools: "CheckerTools") -> None:
         Returns:
             Formatted fix report, or an error message string.
         """
-        ruff_binary = context.environment.binary("ruff")
+        ruff_binary = context.tool_environment.binary("ruff")
         if not context.is_tool_available("ruff") or ruff_binary is None:
             return context.unavailable_message("ruff")
 

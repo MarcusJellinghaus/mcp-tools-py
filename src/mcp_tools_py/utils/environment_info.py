@@ -4,6 +4,9 @@ Layer 2 of the environment model: the questions that are fixed for a whole
 server run — Python version, which modules are importable, which
 distributions are installed.  One subprocess answers all of them, and the
 answer is cached per interpreter path.
+
+`locate_packages` is the exception: where a package lives can change while the
+server runs, so it probes afresh on every call.
 """
 
 import json
@@ -44,9 +47,13 @@ TOOL_PACKAGES: dict[str, str] = {"lint-imports": "import-linter"}
 # The modules the probe is asked about: every tool invoked as `python -m`.
 PROBED_MODULES: tuple[str, ...] = tuple(m for m in TOOL_MODULES.values() if m)
 
-# The distributions the tools ship in, lowercased to match the probe blob.
+# The distributions the `python -m` tools ship in, lowercased to match the blob.
+# The console-script tools are deliberately absent: they come from the tool env,
+# which this probe never describes.
 TOOL_DISTRIBUTIONS: tuple[str, ...] = tuple(
-    TOOL_PACKAGES.get(key, key).lower() for key in TOOL_MODULES
+    TOOL_PACKAGES.get(key, key).lower()
+    for key, module in TOOL_MODULES.items()
+    if module is not None
 )
 
 
@@ -78,6 +85,104 @@ def probe_script_path() -> Path:
         in the target environment.
     """
     return Path(__file__).parent / "target_scripts" / "probe.py"
+
+
+def locate_packages(
+    interpreter: str, names: list[str]
+) -> tuple[list[str], dict[str, list[str]], list[str]] | str:
+    """Ask `interpreter` where each package in `names` lives.
+
+    Args:
+        interpreter: Path to the Python interpreter to ask.
+        names: Package names to locate.
+
+    Returns:
+        `(usable, skipped, unresolved)` — the directories to prepend to
+        PYTHONPATH, in request order and without repeats; keyed by the package
+        name they were found for, the located directories that are
+        `interpreter`'s own site/purelib directories and must not be prepended;
+        and the names `interpreter` could not locate at all, in request order.
+        Every requested name is accounted for: it appears in `skipped` or
+        `unresolved`, or a directory in `usable` covers it — two names sharing
+        a parent directory contribute that directory once.  So a caller
+        checking several packages is never left without an answer about one of
+        them.  Or a string saying why the probe could not be trusted.
+    """
+    if not names:
+        return [], {}, []
+
+    result = execute_command(
+        [interpreter, str(probe_script_path()), "locate", *names],
+        timeout_seconds=PROBE_TIMEOUT_SECONDS,
+    )
+    if result.timed_out:
+        return f"probe of {interpreter} timed out after {PROBE_TIMEOUT_SECONDS} seconds"
+    if result.execution_error or result.return_code != 0:
+        detail = result.execution_error or result.stderr.strip()[:STDERR_SNIPPET]
+        return f"probe of {interpreter} failed: {detail}"
+
+    located = _parse_locate_blob(result.stdout)
+    if located is None:
+        return f"probe of {interpreter} returned unparsable output"
+    packages, site_dirs = located
+
+    resolved_sites = [Path(site_dir).resolve() for site_dir in site_dirs]
+    usable: list[str] = []
+    skipped: dict[str, list[str]] = {}
+    unresolved: list[str] = []
+    for name in names:
+        directories = packages.get(name, [])
+        if not directories:
+            unresolved.append(name)
+            continue
+        for directory in directories:
+            if _under_any(Path(directory).resolve(), resolved_sites):
+                skipped.setdefault(name, []).append(directory)
+            elif directory not in usable:
+                usable.append(directory)
+    return usable, skipped, unresolved
+
+
+def _parse_locate_blob(
+    stdout: str,
+) -> tuple[dict[str, list[str]], list[str]] | None:
+    """Read a `probe.py locate` blob, rejecting anything of the wrong shape.
+
+    Args:
+        stdout: What the probe wrote.
+
+    Returns:
+        `(packages, site_dirs)`, or None when the blob cannot be trusted.
+    """
+    try:
+        blob = json.loads(stdout)
+        packages = blob["packages"]
+        site_dirs = blob["site_dirs"]
+    except (ValueError, KeyError, TypeError):
+        return None
+    if not (isinstance(packages, dict) and isinstance(site_dirs, list)):
+        return None
+    if not all(isinstance(site_dir, str) for site_dir in site_dirs):
+        return None
+    for name, directories in packages.items():
+        if not (isinstance(name, str) and isinstance(directories, list)):
+            return None
+        if not all(isinstance(directory, str) for directory in directories):
+            return None
+    return packages, site_dirs
+
+
+def _under_any(directory: Path, site_dirs: list[Path]) -> bool:
+    """Report whether `directory` is, or sits inside, one of `site_dirs`.
+
+    Args:
+        directory: A resolved located directory.
+        site_dirs: The interpreter's resolved site directories.
+
+    Returns:
+        True when the directory may not go on PYTHONPATH.
+    """
+    return any(directory.is_relative_to(site_dir) for site_dir in site_dirs)
 
 
 def _failed(reason: str) -> EnvironmentInfo:

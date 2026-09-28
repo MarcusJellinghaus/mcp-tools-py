@@ -1,9 +1,11 @@
 """Shared helpers for the tool-availability tests."""
 
+import contextlib
 import os
+import sys
 from pathlib import Path
-from typing import Any
-from unittest.mock import MagicMock
+from typing import Any, Iterator
+from unittest.mock import MagicMock, patch
 
 
 def _create_server(**kwargs: Any) -> Any:
@@ -37,6 +39,24 @@ def _dummy_python(tmp_path: Path, *scripts: str) -> str:
     for name in scripts:
         (script_dir / f"{name}{suffix}").write_text("")
     return str(python)
+
+
+@contextlib.contextmanager
+def _patched_tool_env(tmp_path: Path, *scripts: str) -> Iterator[Path]:
+    """Point PythonEnvironment.resolve() at a dummy tool env.
+
+    `ToolContext.tool_environment` defaults to `PythonEnvironment.resolve()`,
+    which reads `sys.executable`, so patching that gives the whole server a
+    tool env holding exactly `scripts`.
+
+    Yields:
+        The dummy tool env's script directory.
+    """
+    base = tmp_path / "toolenv"
+    base.mkdir(exist_ok=True)
+    interpreter = _dummy_python(base, *scripts)
+    with patch.object(sys, "executable", interpreter):
+        yield Path(interpreter).parent
 
 
 def _capture_tools(mock_fastmcp: MagicMock) -> dict[str, Any]:

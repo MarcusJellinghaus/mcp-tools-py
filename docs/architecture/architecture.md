@@ -169,9 +169,9 @@ registrar modules: `code_checker_ruff` backs two of them, `ruff_check_tool.py` a
 - **`code_checker_*`** — eight checker packages, one per external tool (pytest, pylint, mypy, ruff, bandit, vulture, tach, lint_imports), each following the Checker Module Pattern above
 - **`code_checker_pytest`** — the most complex of them: JSON report parsing, `OutputBuilder`, `show_details` logic, `ProcessResult` adapter
 - **`utils/python_environment.py`** — `PythonEnvironment`: the target interpreter, its script directory, and existence-checked console scripts. Pure path work, no subprocess
-- **`utils/environment_info.py`** — `EnvironmentInfo` and the cached one-shot probe: Python version, `sys.path`, installed distributions, and which of the `python -m` tools import
-- **`utils/target_scripts/probe.py`** — the script that probe runs. Executed under the *target* interpreter by absolute path and stdlib-only, so it works in an environment that has never heard of `mcp_tools_py` (enforced by the `target-scripts-stdlib-only` contract). Not interchangeable with `refactoring/rope_cli.py`, which runs under `sys.executable` with `-m` precisely because it must import `mcp_tools_py`
-- **`utils/tool_context.py`** — `ToolContext`: the single argument every registrar takes — project directory and environment, plus the two questions a tool asks about the environment: is this tool there, and what to say when it is not
+- **`utils/environment_info.py`** — `EnvironmentInfo` and the cached one-shot probe: Python version, `sys.path`, installed distributions, and which of the `python -m` tools import. Also `locate_packages`, which asks the target interpreter where named packages live and splits the answer into directories safe to put on `PYTHONPATH`, ones that are its own site-packages, and names it could not locate — uncached, because that answer can change while the server runs
+- **`utils/target_scripts/probe.py`** — the script that probe runs, with three subcommands: `info` (the cached environment probe), `source` (library source for `get_library_source`) and `locate` (where a package lives, for the lint-imports `PYTHONPATH` bridge). Executed under the *target* interpreter by absolute path and stdlib-only, so it works in an environment that has never heard of `mcp_tools_py` (enforced by the `target-scripts-stdlib-only` contract). Not interchangeable with `refactoring/rope_cli.py`, which runs under `sys.executable` with `-m` precisely because it must import `mcp_tools_py`
+- **`utils/tool_context.py`** — `ToolContext`: the single argument every registrar takes — project directory and both environments (`environment`, the configured project env used by pytest, pylint, mypy, black and isort; `tool_environment`, where mcp-tools-py runs, used by the five console-script tools), plus the two questions a tool asks about its environment: is this tool there, and what to say when it is not
 - **`utils/mcp_protocols.py`** — `FastMCPProtocol`: the structural type of the server object a registrar registers against, so no tool module imports FastMCP
 - **`utils/subprocess_runner.py`** — thin re-export shim over `mcp_coder_utils.subprocess_runner`: `execute_command()`, `CommandResult`, STDIO isolation for Python commands, cross-platform process termination
 - **`utils/file_utils.py`** — thin re-export shim over `mcp_coder_utils.fs`: `read_file()` with encoding fallback
@@ -227,10 +227,10 @@ See [README.md](../../README.md) for installation, CLI parameters, and MCP clien
 - Runs as STDIO-based MCP server, launched by the MCP client
 - Requires `--project-dir` pointing to the target codebase
 - Optional: `--python-executable` to select the environment the tools work against (the deprecated `--venv-path` still resolves the interpreter from a venv). Two environments are in play, and the phrase "tool venv" has been used for both:
-  - **project env** — holds the project's dependencies and the checker tools. This is what the flags configure.
+  - **project env** — holds the project's dependencies, and pytest, pylint, mypy, black and isort. This is what the flags configure.
   - **tool env** — holds `mcp_tools_py` itself, launched by the MCP client. Not configurable through the flags.
 
-  There is one configurable environment because the checkers must import the project's dependencies in order to check them; the same interpreter therefore resolves library and symbol lookups.
+  Only pytest, pylint, mypy, black and isort need the configurable environment, because they must import the project's dependencies in order to check them; the same interpreter therefore resolves library and symbol lookups. The console-script tools — ruff, bandit, vulture, tach and lint-imports — are mcp-tools-py's own dependencies and resolve in the tool env.
 
 ---
 

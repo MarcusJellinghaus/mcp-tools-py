@@ -2,12 +2,16 @@
 
 Layer 1 and 2 of the environment model, seen from a registrar: the values a
 tool needs to build its command line, plus the two questions it asks about
-the target environment — is this tool there, and what do I say when it is
-not.
+its own environment — is this tool there, and what do I say when it is not.
+
+Which environment answers depends on the tool.  The five console-script tools
+are mcp-tools-py's own dependencies and are answered from `tool_environment`;
+the five `python -m` tools must import the project's dependencies and are
+answered from `environment`, the interpreter `--python-executable` names.
 """
 
 import logging
-from dataclasses import dataclass
+from dataclasses import dataclass, field
 from pathlib import Path
 from typing import Optional
 
@@ -35,11 +39,17 @@ class ToolContext:
 
     Attributes:
         project_dir: Path to the project the tools run against.
-        environment: The Python environment the tools run in.
+        environment: The project's Python environment, named by
+            `--python-executable`.  pytest, pylint, mypy, black and isort run
+            in it, and Python names resolve against it.
         test_folder: Path to the test folder, relative to `project_dir`.
         keep_temp_files: Whether to keep temporary files after a test run.
         vulture_whitelist: Filename of the vulture whitelist.
         check_timeout: Server-level subprocess timeout in seconds, if any.
+        tool_environment: The environment mcp-tools-py itself runs in, holding
+            its console-script dependencies.  ruff, bandit, vulture, tach and
+            lint-imports run from it.  Defaults to `sys.executable`'s
+            environment; not configurable from the CLI.
     """
 
     project_dir: Path
@@ -48,15 +58,19 @@ class ToolContext:
     keep_temp_files: bool = False
     vulture_whitelist: str = "vulture_whitelist.py"
     check_timeout: Optional[int] = None
+    tool_environment: PythonEnvironment = field(
+        default_factory=PythonEnvironment.resolve
+    )
 
     def is_tool_available(self, tool_name: str) -> bool:
         """Check whether `tool_name` can be run in this environment.
 
         A console-script-only tool is answered from the filesystem; the probe
-        cannot answer for one, because it is asked about module names.  Every
-        other tool is answered from the one-shot environment probe, which
-        fails open: a probe that could not be trusted reports the tool
-        available so the call proceeds and surfaces the real error.
+        cannot answer for one, because it is asked about module names.  All
+        five are looked for in `tool_environment`, since mcp-tools-py depends
+        on them.  Every other tool is answered from the one-shot environment
+        probe, which fails open: a probe that could not be trusted reports the
+        tool available so the call proceeds and surfaces the real error.
 
         Args:
             tool_name: Tool key to look up.
@@ -65,7 +79,7 @@ class ToolContext:
             True if the tool is available.
         """
         if tool_name in CONSOLE_SCRIPT_TOOLS:
-            available = self.environment.binary(tool_name) is not None
+            available = self.tool_environment.binary(tool_name) is not None
             if not available:
                 logger.warning("%s", self.unavailable_message(tool_name))
             return available
@@ -94,22 +108,22 @@ class ToolContext:
             tool_name: Tool key that could not be run.
 
         Returns:
-            A message naming --python-executable and the location searched.
-            The distribution to install comes from `TOOL_PACKAGES`, which maps
-            a key to its distribution when the two differ (import-linter
-            provides `lint-imports`).  For a `python -m` tool the probe adds
-            the Python version and, when the distribution is installed but the
-            module will not import, says so — a broken install rather than a
-            missing one.
+            A message naming the location searched.  All five console-script
+            tools name the tool env and say mcp-tools-py's own install is
+            incomplete.  The distribution to install comes from
+            `TOOL_PACKAGES`, which maps a key to its distribution when the two
+            differ (import-linter provides `lint-imports`).  For a `python -m`
+            tool the probe adds the Python version and, when the distribution
+            is installed but the module will not import, says so — a broken
+            install rather than a missing one.
         """
         name = TOOL_PACKAGES.get(tool_name, tool_name)
         if tool_name in CONSOLE_SCRIPT_TOOLS:
             return (
                 f"{tool_name} is not available. No {tool_name} console script was "
-                f"found in {self.environment.bin_dir}. Ensure --python-executable "
-                f"points to an environment where {name} is installed. "
-                f"That directory is re-checked on every call, so no restart is "
-                f"needed after installing."
+                f"found in {self.tool_environment.bin_dir}. {name} is a dependency "
+                f"of mcp-tools-py, so its installation is incomplete: reinstall "
+                f"mcp-tools-py and restart the server."
             )
 
         info = get_environment_info(str(self.environment.interpreter))
