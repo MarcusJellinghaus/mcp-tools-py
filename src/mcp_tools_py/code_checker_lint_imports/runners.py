@@ -178,7 +178,9 @@ def _without_cwd(
     return bridged, in_cwd
 
 
-def _provided_by_cwd(names: list[str], project_dir: str) -> tuple[list[str], list[str]]:
+def _provided_by_cwd(
+    names: list[str], project_dir: str
+) -> tuple[list[str], list[str], list[str]]:
     """Split off the names the project directory itself provides.
 
     `locate_packages` runs the probe by absolute path, so the child's
@@ -190,27 +192,37 @@ def _provided_by_cwd(names: list[str], project_dir: str) -> tuple[list[str], lis
     tree, ahead of both `PYTHONPATH` and site-packages.  Such a name carries
     no stale-read risk, so it must not be warned about.
 
+    A directory with no `__init__.py` is the exception: it is only a
+    namespace *portion*, so the import machinery records it and keeps
+    scanning, and a regular package further along `sys.path` wins.  It
+    provides the name only when nothing else on the path does.
+
     Args:
         names: Root package names that were not bridged.
         project_dir: Directory lint-imports runs in.
 
     Returns:
-        `(elsewhere, in_cwd)` — the names the project directory does not
-        provide, and those it does.  A dotted name is looked for along its
+        `(elsewhere, provided, portion)` — the names the project directory
+        does not provide, those it provides outright, and those it provides
+        only as a namespace portion.  A dotted name is looked for along its
         components, as it is importable from the project directory only when
         the whole chain is there.
     """
     root = Path(project_dir)
     elsewhere: list[str] = []
-    in_cwd: list[str] = []
+    provided: list[str] = []
+    portion: list[str] = []
     for name in names:
         *parents, last = name.split(".")
         base = root.joinpath(*parents)
-        if (base / last).is_dir() or (base / f"{last}.py").is_file():
-            in_cwd.append(name)
+        target = base / last
+        if (target / "__init__.py").is_file() or (base / f"{last}.py").is_file():
+            provided.append(name)
+        elif target.is_dir():
+            portion.append(name)
         else:
             elsewhere.append(name)
-    return elsewhere, in_cwd
+    return elsewhere, provided, portion
 
 
 def _cwd_info_line(directories: list[str]) -> str:
@@ -451,9 +463,19 @@ def run_lint_imports_check_impl(
             return f"=== ERROR: could not locate {', '.join(names)}: {located} ==="
         usable, skipped, unresolved = located
         usable, in_cwd = _without_cwd(usable, project_dir)
-        unresolved, cwd_names = _provided_by_cwd(unresolved, project_dir)
-        installed, skipped_in_cwd = _provided_by_cwd(list(skipped), project_dir)
-        skipped = {name: skipped[name] for name in installed}
+        unresolved, cwd_names, cwd_portions = _provided_by_cwd(unresolved, project_dir)
+        # Nothing installed can outrank a namespace portion when the project
+        # interpreter found the name nowhere, so it too is read from the
+        # working tree.
+        cwd_names += cwd_portions
+        installed, skipped_in_cwd, skipped_portions = _provided_by_cwd(
+            list(skipped), project_dir
+        )
+        # A `skipped` name has an installed regular package behind it, which
+        # outranks a portion, so that copy is what lint-imports reads: keep
+        # the warning.
+        warned = {*installed, *skipped_portions}
+        skipped = {name: dirs for name, dirs in skipped.items() if name in warned}
         cwd_names += skipped_in_cwd
         if cwd_names and not in_cwd:
             in_cwd.append(project_dir)

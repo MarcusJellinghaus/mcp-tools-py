@@ -591,6 +591,7 @@ class TestPythonpathBridge:
         monkeypatch.delenv("PYTHONPATH", raising=False)
         project_dir = self._project(tmp_path)
         (tmp_path / "pkg").mkdir()
+        (tmp_path / "pkg" / "__init__.py").write_text("", encoding="utf-8")
         mock_locate.return_value = ([], {"pkg": ["/venv/lib/site-packages"]}, [])
         mock_exec.return_value = make_command_result(return_code=0, stdout=CLEAN_OUTPUT)
 
@@ -611,6 +612,40 @@ class TestPythonpathBridge:
 
     @patch(f"{MODULE_PATH}.execute_command")
     @patch(f"{MODULE_PATH}.locate_packages")
+    def test_skipped_package_shadowed_only_by_a_bare_directory_is_warned_about(
+        self,
+        mock_locate: Any,
+        mock_exec: Any,
+        tmp_path: Path,
+        monkeypatch: pytest.MonkeyPatch,
+    ) -> None:
+        """`<project>/pkg` without `__init__.py` loses to the installed copy.
+
+        The finder records the bare directory as a namespace portion and keeps
+        scanning, so the regular package in site-packages wins and the
+        stale-read warning has to stay.
+        """
+        monkeypatch.delenv("PYTHONPATH", raising=False)
+        project_dir = self._project(tmp_path)
+        (tmp_path / "pkg").mkdir()
+        mock_locate.return_value = ([], {"pkg": ["/venv/lib/site-packages"]}, [])
+        mock_exec.return_value = make_command_result(return_code=0, stdout=CLEAN_OUTPUT)
+
+        result = run_lint_imports_check_impl(
+            lint_imports_binary="/usr/bin/lint-imports",
+            project_dir=project_dir,
+            python_executable=sys.executable,
+        )
+
+        lines = result.splitlines()
+        assert lines[0].startswith(
+            "[Info: not added to PYTHONPATH, site-packages of the project interpreter"
+        )
+        assert "an installed copy of pkg]" in lines[0]
+        assert "already lint-imports' working directory" not in result
+
+    @patch(f"{MODULE_PATH}.execute_command")
+    @patch(f"{MODULE_PATH}.locate_packages")
     def test_skipped_package_absent_from_the_project_dir_is_still_warned_about(
         self,
         mock_locate: Any,
@@ -625,6 +660,7 @@ class TestPythonpathBridge:
             encoding="utf-8",
         )
         (tmp_path / "local").mkdir()
+        (tmp_path / "local" / "__init__.py").write_text("", encoding="utf-8")
         mock_locate.return_value = (
             [],
             {
