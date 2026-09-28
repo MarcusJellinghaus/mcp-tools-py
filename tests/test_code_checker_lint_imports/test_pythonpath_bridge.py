@@ -385,6 +385,123 @@ class TestPythonpathBridge:
 
     @patch(f"{MODULE_PATH}.execute_command")
     @patch(f"{MODULE_PATH}.locate_packages")
+    def test_unresolved_package_present_in_the_project_dir_is_not_warned_about(
+        self,
+        mock_locate: Any,
+        mock_exec: Any,
+        tmp_path: Path,
+        monkeypatch: pytest.MonkeyPatch,
+    ) -> None:
+        """A flat-layout package that is not installed carries no stale risk.
+
+        The probe runs by path, so it never sees the project directory and the
+        package comes back unresolved — but lint-imports' own working-directory
+        entry reads the working tree, which is what the report should say.
+        """
+        monkeypatch.delenv("PYTHONPATH", raising=False)
+        project_dir = self._project(tmp_path)
+        (tmp_path / "pkg").mkdir()
+        mock_locate.return_value = ([], {}, ["pkg"])
+        mock_exec.return_value = make_command_result(return_code=0, stdout=CLEAN_OUTPUT)
+
+        result = run_lint_imports_check_impl(
+            lint_imports_binary="/usr/bin/lint-imports",
+            project_dir=project_dir,
+            python_executable=sys.executable,
+        )
+
+        assert mock_exec.call_args.kwargs["env"] is None
+        assert "cannot import" not in result
+        lines = result.splitlines()
+        assert lines[0].startswith(
+            "[Info: not added to PYTHONPATH, already lint-imports' working directory"
+        )
+        assert project_dir in lines[0]
+        assert lines[1] == "=== PASSED ==="
+
+    @patch(f"{MODULE_PATH}.execute_command")
+    @patch(f"{MODULE_PATH}.locate_packages")
+    def test_unresolved_dotted_package_present_in_the_project_dir_is_not_warned_about(
+        self,
+        mock_locate: Any,
+        mock_exec: Any,
+        tmp_path: Path,
+        monkeypatch: pytest.MonkeyPatch,
+    ) -> None:
+        """A dotted root package is looked for along its components."""
+        monkeypatch.delenv("PYTHONPATH", raising=False)
+        (tmp_path / ".importlinter").write_text(
+            "[importlinter]\nroot_package = ns.pkg\n", encoding="utf-8"
+        )
+        (tmp_path / "ns" / "pkg").mkdir(parents=True)
+        mock_locate.return_value = ([], {}, ["ns.pkg"])
+        mock_exec.return_value = make_command_result(return_code=0, stdout=CLEAN_OUTPUT)
+
+        result = run_lint_imports_check_impl(
+            lint_imports_binary="/usr/bin/lint-imports",
+            project_dir=str(tmp_path),
+            python_executable=sys.executable,
+        )
+
+        assert "cannot import" not in result
+
+    @patch(f"{MODULE_PATH}.execute_command")
+    @patch(f"{MODULE_PATH}.locate_packages")
+    def test_unresolved_package_absent_from_the_project_dir_is_still_named(
+        self,
+        mock_locate: Any,
+        mock_exec: Any,
+        tmp_path: Path,
+        monkeypatch: pytest.MonkeyPatch,
+    ) -> None:
+        """A name findable nowhere keeps its warning: only `ns/other` is there."""
+        monkeypatch.delenv("PYTHONPATH", raising=False)
+        (tmp_path / ".importlinter").write_text(
+            "[importlinter]\nroot_packages =\n    pkg\n    ns.pkg\n", encoding="utf-8"
+        )
+        (tmp_path / "ns" / "other").mkdir(parents=True)
+        mock_locate.return_value = ([], {}, ["pkg", "ns.pkg"])
+        mock_exec.return_value = make_command_result(return_code=0, stdout=CLEAN_OUTPUT)
+
+        result = run_lint_imports_check_impl(
+            lint_imports_binary="/usr/bin/lint-imports",
+            project_dir=str(tmp_path),
+            python_executable=sys.executable,
+        )
+
+        lines = result.splitlines()
+        assert lines[0].startswith(
+            "[Info: not added to PYTHONPATH, the project interpreter cannot import"
+        )
+        assert "cannot import pkg, ns.pkg" in lines[0]
+        assert "already lint-imports' working directory" not in result
+
+    @patch(f"{MODULE_PATH}.execute_command")
+    @patch(f"{MODULE_PATH}.locate_packages")
+    def test_unresolved_module_file_in_the_project_dir_is_not_warned_about(
+        self,
+        mock_locate: Any,
+        mock_exec: Any,
+        tmp_path: Path,
+        monkeypatch: pytest.MonkeyPatch,
+    ) -> None:
+        """A single-module root package is a `.py` file, not a directory."""
+        monkeypatch.delenv("PYTHONPATH", raising=False)
+        project_dir = self._project(tmp_path)
+        (tmp_path / "pkg.py").write_text("", encoding="utf-8")
+        mock_locate.return_value = ([], {}, ["pkg"])
+        mock_exec.return_value = make_command_result(return_code=0, stdout=CLEAN_OUTPUT)
+
+        result = run_lint_imports_check_impl(
+            lint_imports_binary="/usr/bin/lint-imports",
+            project_dir=project_dir,
+            python_executable=sys.executable,
+        )
+
+        assert "cannot import" not in result
+
+    @patch(f"{MODULE_PATH}.execute_command")
+    @patch(f"{MODULE_PATH}.locate_packages")
     def test_unlocated_package_is_named_although_another_was_bridged(
         self,
         mock_locate: Any,

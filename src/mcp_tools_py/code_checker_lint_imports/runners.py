@@ -178,6 +178,39 @@ def _without_cwd(
     return bridged, in_cwd
 
 
+def _provided_by_cwd(names: list[str], project_dir: str) -> tuple[list[str], list[str]]:
+    """Split off the unresolved names the project directory itself provides.
+
+    `locate_packages` runs the probe by absolute path, so the child's
+    `sys.path[0]` is the probe's own directory and the project directory is
+    never on its `sys.path`.  A flat-layout package that is not installed in
+    the project environment therefore comes back unresolved even though
+    lint-imports' own `sys.path.insert(0, os.getcwd())` reads it correctly.
+    Such a name carries no stale-read risk, so it must not be warned about.
+
+    Args:
+        names: The unresolved root package names.
+        project_dir: Directory lint-imports runs in.
+
+    Returns:
+        `(unresolved, in_cwd)` — the names still findable nowhere, and those
+        the project directory provides.  A dotted name is looked for along its
+        components, as it is importable from the project directory only when
+        the whole chain is there.
+    """
+    root = Path(project_dir)
+    unresolved: list[str] = []
+    in_cwd: list[str] = []
+    for name in names:
+        *parents, last = name.split(".")
+        base = root.joinpath(*parents)
+        if (base / last).is_dir() or (base / f"{last}.py").is_file():
+            in_cwd.append(name)
+        else:
+            unresolved.append(name)
+    return unresolved, in_cwd
+
+
 def _cwd_info_line(directories: list[str]) -> str:
     """Report the located directories that are lint-imports' working directory.
 
@@ -413,6 +446,9 @@ def run_lint_imports_check_impl(
             return f"=== ERROR: could not locate {', '.join(names)}: {located} ==="
         usable, skipped, unresolved = located
         usable, in_cwd = _without_cwd(usable, project_dir)
+        unresolved, cwd_names = _provided_by_cwd(unresolved, project_dir)
+        if cwd_names and not in_cwd:
+            in_cwd.append(project_dir)
         if skipped:
             info_lines.append(_skipped_info_line(skipped))
         if unresolved:
