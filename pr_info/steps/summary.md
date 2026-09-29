@@ -104,9 +104,11 @@ acceptance criterion:
   module holds exactly one symbol; mirroring the split preserves structure that existed
   only by convention. Both source modules are deleted.
 - **Versions read via `importlib.metadata.version()`**, not a `--version` subprocess per
-  step. All four formatters now resolve from `tool_environment()` — the single cached
-  accessor in `utils/python_environment.py` that `ToolContext.tool_environment` also
-  defaults to, so the availability check and the invoked binary cannot diverge. It is
+  step. The environment is threaded from the caller — `formatter_binary(name,
+  environment)`, with the MCP layer passing `self.context.tool_environment`, which is
+  injectable and is what `tests/conftest.py:78` replaces. `None` falls back to the cached
+  `tool_environment()` accessor in `utils/python_environment.py`, which is also
+  `ToolContext.tool_environment`'s `default_factory`. In production that fallback is
   `sys.executable`'s environment, the process mcp-tools-py runs in, not configurable from
   the CLI. So the metadata lookup
   names the exact distribution whose console script is about to be invoked. This removes
@@ -141,7 +143,10 @@ acceptance criterion:
 | parse errors | exit 2 + `error: Failed to parse` on stderr, plus the `invalid-syntax:` marker paths in `--check` mode | JSON syntax-error diagnostics |
 
 Both runners report `files_changed` and `unparsable_files` as **project-relative paths with
-forward slashes**, via one `relative_path` helper in `formatter/common.py`.
+forward slashes**, via one `relative_path` helper in `formatter/common.py` that
+relativizes **only absolute** paths — ruff prints relative to its `cwd=project_dir` and
+`parse_ruff_json_output` has already relativized `filename`, so an unconditional
+`os.path.relpath` would re-anchor them against the process's cwd.
 `ruff_imports` check-mode `success` is keyed on *any* `I` diagnostic, not only the fixable
 subset, so an unfixable unsorted import still fails the check.
 
@@ -185,12 +190,12 @@ code cannot discriminate — hence the JSON route.
 - `src/mcp_tools_py/code_checker_ruff/reporting.py` — `RuffMessage` import (5 annotation uses)
 - `src/mcp_tools_py/code_checker_ruff/runners.py` — `parse_ruff_json_output` import; calls at lines 81, 132, 162
 - `src/mcp_tools_py/utils/environment_info.py` — `TOOL_MODULES`; `_failed` docstring count
-- `src/mcp_tools_py/utils/python_environment.py` — cached `tool_environment()` accessor, the single seam both the availability check and `formatter_binary` resolve through
+- `src/mcp_tools_py/utils/python_environment.py` — cached `tool_environment()` accessor, the default when no environment is passed in
 - `src/mcp_tools_py/utils/tool_context.py` — `tool_environment` `default_factory`; module docstring, class docstring, `is_tool_available`, `unavailable_message`
 - `src/mcp_tools_py/utils/project_config.py` — new public `read_pyproject_tool_tables(Path)`, the single `pyproject.toml` reader `resolve_steps` and `_read_mcp_tools_section` share (step 6)
 - `src/mcp_tools_py/formatter/__init__.py` — exports `resolve_steps`, drops `DEFAULT_STEPS`; module docstring
-- `src/mcp_tools_py/formatter/runner.py` — `resolve_steps`, `_STEP_TOOLS`, `_BLACK_STEPS`/`_RUFF_STEPS`, `validate_steps`, deprecated `python_executable`
-- `src/mcp_tools_py/formatter/formatter_tools.py` — resolution call, step→tool mapping, timeout dict, MCP docstring, `_unparsable_block` wording (the isort-only "Windows, piped stdout" explanation is wrong for a ruff syntax error)
+- `src/mcp_tools_py/formatter/runner.py` — `resolve_steps`, `_STEP_TOOLS`, `_BLACK_STEPS`/`_RUFF_STEPS`, `validate_steps`, deprecated `python_executable`, keyword-only `environment` passed through to the runners
+- `src/mcp_tools_py/formatter/formatter_tools.py` — `environment=self.context.tool_environment`, resolution call, step→tool mapping, timeout dict, MCP docstring, `_unparsable_block` wording (the isort-only "Windows, piped stdout" explanation is wrong for a ruff syntax error)
 - `src/mcp_tools_py/formatter/black_runner.py` — tool-env console script; deprecated param; shared helpers
 - `src/mcp_tools_py/formatter/isort_runner.py` — same
 - `src/mcp_tools_py/server.py` — docstrings at lines 39, 101; count at line 73

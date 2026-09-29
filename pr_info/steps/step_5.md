@@ -21,10 +21,12 @@ def run_ruff_imports(
     project_dir: str,
     check_only: bool = False,
     timeout_seconds: int = DEFAULT_CHECK_TIMEOUT,
+    *,
+    environment: PythonEnvironment | None = None,
 ) -> FormatterResult:
 ```
 
-Same signature as the other three.
+Same signature as the other three, including the trailing keyword-only `environment`.
 
 ## Why this is two invocations in write mode
 
@@ -62,7 +64,7 @@ Expected shape: a syntax-error diagnostic carries no rule code, so
 ## ALGORITHM
 
 ```
-binary = formatter_binary("ruff");  if None -> unavailable FormatterResult
+binary = formatter_binary("ruff", environment);  if None -> unavailable FormatterResult
 json_cmd = [binary, "check", "--select", "I", "--output-format", "json"] + target_dirs
 pre = execute_command(json_cmd, cwd=project_dir, timeout_seconds=...)
 timed_out / execution_error -> early return, no version banner
@@ -85,11 +87,24 @@ it correct in write mode, where the fix run's JSON would report nothing.
 
 `parse_ruff_json_output` already relativises `filename` with `os.path.relpath`, which on
 Windows yields `src\bad.py`. **Both lists in both ruff runners hold project-relative paths
-with forward slashes**, so the `norm()` above is
-`os.path.relpath(path, project_dir).replace(os.sep, "/")`. One helper in
-`formatter/common.py`, used by `run_ruff_format` (`step_4.md`) and `run_ruff_imports`
-alike. Every assertion names the full relative path — `"src/bad.py"`, never a bare
-`"bad.py"`.
+with forward slashes**, so the `norm()` above is the single guarded
+`relative_path(path, project_dir)` helper in `formatter/common.py`, introduced in
+`step_4.md` and used by `run_ruff_format` and `run_ruff_imports` alike:
+
+```python
+if os.path.isabs(path):
+    path = os.path.relpath(path, project_dir)
+return path.replace(os.sep, "/")
+```
+
+**Do not relativize twice.** The paths reaching `norm()` here are already relative — the
+parser applied `os.path.relpath` to them — so an unconditional second
+`os.path.relpath(path, project_dir)` re-anchors them against the *process's* cwd rather
+than `project_dir` and turns `src/bad.py` into `../../../repo/src/bad.py`. The
+`os.path.isabs` guard is what makes one helper correct for both the parser's output here
+and ruff's raw stdout in `step_4.md`.
+
+Every assertion names the full relative path — `"src/bad.py"`, never a bare `"bad.py"`.
 
 ### Check mode fails on *any* `I` diagnostic, not only fixable ones
 
@@ -222,9 +237,11 @@ specifically: it is what catches an accidental `from mcp_tools_py.code_checker_r
 > `files_changed` stays the fixable subset.
 >
 > Normalize every path in `files_changed` and `unparsable_files` to **project-relative with
-> forward slashes** — `parse_ruff_json_output` returns `os.path.relpath` output, which is
-> backslash-separated on Windows. Put the one-line helper in `formatter/common.py`;
-> `run_ruff_format` (step 4) uses the same one.
+> forward slashes** through the `relative_path(path, project_dir)` helper step 4 added to
+> `formatter/common.py`. `parse_ruff_json_output` has **already** relativized `filename`,
+> so the helper must relativize only when `os.path.isabs(path)` and otherwise just swap
+> separators — calling `os.path.relpath` a second time re-anchors the path against the
+> process's cwd and yields `"../.."` garbage.
 >
 > Import `parse_ruff_json_output` from `mcp_tools_py.utils.ruff_parsing`. Do **not** import
 > anything from `code_checker_ruff` — tach forbids it, they are the same layer.

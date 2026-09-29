@@ -9,9 +9,11 @@ wires up.
 **Create** `src/mcp_tools_py/formatter/ruff_runner.py` (holds both ruff runners;
 `run_ruff_imports` arrives in step 5)
 **Create** `tests/test_ruff_format_runner.py`
-**Modify** `src/mcp_tools_py/formatter/common.py` — add the one-line path-normalization
-helper (`relative_path(path, project_dir)`), which `run_ruff_imports` reuses in step 5
-**Modify** `tests/test_formatter_common.py` — cover that helper
+**Modify** `src/mcp_tools_py/formatter/common.py` — add the path-normalization helper
+`relative_path(path, project_dir)`, which relativizes **only absolute** paths and which
+`run_ruff_imports` reuses in step 5
+**Modify** `tests/test_formatter_common.py` — cover that helper, including an
+already-relative input passing through unchanged
 
 ## WHAT
 
@@ -22,15 +24,19 @@ def run_ruff_format(
     project_dir: str,
     check_only: bool = False,
     timeout_seconds: int = DEFAULT_CHECK_TIMEOUT,
+    *,
+    environment: PythonEnvironment | None = None,
 ) -> FormatterResult:
 ```
 
 Signature matches `run_black` / `run_isort` exactly, so `_STEP_RUNNERS` can call all four
-uniformly. `python_executable` is accepted and ignored here too, for signature uniformity
-rather than for a caller — nothing has ever passed it.
+uniformly — including the trailing keyword-only `environment` step 2 introduced.
+`python_executable` is accepted and ignored here too, for signature uniformity rather than
+for a caller — nothing has ever passed it.
 
 Command: `[ruff_binary, "format"] + (["--check"] if check_only else []) + target_dirs`,
-with `ruff_binary` from the same `formatter_binary("ruff")` helper step 2 introduced.
+with `ruff_binary` from the same `formatter_binary("ruff", environment)` helper step 2
+introduced.
 
 ## FIRST: confirm the output format
 
@@ -50,7 +56,7 @@ done — CI blocks a PR carrying one.
 ## ALGORITHM
 
 ```
-binary = formatter_binary("ruff");  if None -> unavailable FormatterResult
+binary = formatter_binary("ruff", environment);  if None -> unavailable FormatterResult
 cmd    = [binary, "format"] + (["--check"] if check_only else []) + target_dirs
 result = execute_command(cmd, cwd=project_dir, timeout_seconds=...)
 timed_out / execution_error -> early return, no version banner   (as the other runners)
@@ -118,7 +124,24 @@ channel depending on mode, so both are read and the result deduplicated.
 `files_changed` and `unparsable_files` hold **project-relative paths with forward
 slashes** — the single normalization shared with `run_ruff_imports` (see
 `step_5.md`). Ruff prints native separators on Windows, so every parsed path goes through
-one helper: `os.path.relpath(path, project_dir)` followed by `.replace(os.sep, "/")`.
+one helper in `formatter/common.py`:
+
+```python
+def relative_path(path: str, project_dir: str) -> str:
+    """Project-relative path with forward slashes; already-relative paths pass through."""
+    if os.path.isabs(path):
+        path = os.path.relpath(path, project_dir)
+    return path.replace(os.sep, "/")
+```
+
+**The `os.path.isabs` guard is load-bearing.** Ruff runs with `cwd=project_dir` and
+prints paths relative to it, and `parse_ruff_json_output` has already applied
+`os.path.relpath` to `filename` (`step_5.md`). Calling `os.path.relpath` on a path that
+is *already* relative re-anchors it against the **process's** cwd, not `project_dir`, so
+`"src/bad.py"` becomes something like `"../../../repo/src/bad.py"` whenever the test
+process's cwd differs from the tmp project — which it always does. Relativize only when
+the path is absolute; otherwise just normalize the separators.
+
 Assert against `"src/bad.py"`, never a bare `"bad.py"`.
 
 ## DATA
@@ -152,7 +175,10 @@ except the last:
    in stdout, and a `--check` run that writes nothing to stderr. Assert `success is False`
    **and** `"src/bad.py" in unparsable_files`. This is the case a marker parser that
    discarded the path would report as failed-but-with-nothing-named.
-9. A path reported with native separators normalizes to `"src/bad.py"`.
+9. `relative_path`: a native-separator relative path (`"src\\bad.py"`) normalizes to
+   `"src/bad.py"` **unchanged in depth** — run the test from a cwd that is not
+   `project_dir` so a missing `os.path.isabs` guard shows up as a `"../"` prefix. An
+   absolute path under `project_dir` normalizes to `"src/bad.py"` too.
 10. Missing ruff binary → `success=False`, no subprocess.
 11. Timed out and execution-error paths → `success=False`, no version banner.
 12. **One integration test, no mock:** a `tmp_path` project with one badly formatted file
@@ -193,7 +219,11 @@ correct — step 6 wires it.
 > exit 2 means a parse error is present and the remaining files were still formatted.
 >
 > Every path in `files_changed` and `unparsable_files` is **project-relative with forward
-> slashes** — the same normalization `run_ruff_imports` uses in step 5.
+> slashes**, via one `relative_path(path, project_dir)` helper in `formatter/common.py`
+> that `run_ruff_imports` reuses in step 5. It must relativize **only when the path is
+> absolute** (`os.path.isabs`): ruff runs with `cwd=project_dir` and already prints
+> relative paths, so an unconditional `os.path.relpath` re-anchors them against the
+> process's cwd and produces `"../.."` garbage.
 >
 > Write the tests first, including the `invalid-syntax:`-is-not-a-change regression, a
 > `check_only=True` run against an unparsable file asserting `success is False` and
