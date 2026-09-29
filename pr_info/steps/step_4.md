@@ -63,7 +63,7 @@ timed_out / execution_error -> early return, no version banner   (as the other r
 stderr_bad = [path for "error: Failed to parse <path>:<line>:<col>" in result.stderr]
 changed, marker_bad = parse_check_markers(stdout) if check_only else ([], [])
 unparsable = dedup(stderr_bad + marker_bad)      # project-relative, forward slashes
-return FormatterResult(output=version_line("ruff") + combined,
+return FormatterResult(output=version_line("ruff", environment=environment) + combined,
                        success=(return_code == 0), files_changed=changed,
                        unparsable_files=unparsable)
 ```

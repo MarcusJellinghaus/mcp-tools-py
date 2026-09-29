@@ -13,8 +13,6 @@ exact failure the issue exists to prevent.
 - `src/mcp_tools_py/formatter/runner.py`
 - `src/mcp_tools_py/formatter/formatter_tools.py`
 - `src/mcp_tools_py/formatter/__init__.py`
-- `src/mcp_tools_py/utils/project_config.py` — new public `read_pyproject_tool_tables(Path)`;
-  `_read_mcp_tools_section` delegates to it
 - `tests/test_formatter_runner.py`
 - `tests/test_formatter_tools.py`
 
@@ -102,20 +100,18 @@ message alone. Something like:
 
 **One reader, one parameter type.** `resolve_steps` needs three lookups from the same file
 — `[tool.mcp-tools-py] formatter`, `[tool.black]` and `[tool.ruff.format]` — so it must not
-read `pyproject.toml` twice. Add one public helper to `utils/project_config.py`:
+read `pyproject.toml` twice. It reuses the helper **step 5 already added** to
+`utils/project_config.py` for `per_file_ignores_notice`:
 
 ```python
 def read_pyproject_tool_tables(project_root: Path) -> dict[str, object]:
     """The `[tool]` table of `project_root/pyproject.toml`, empty when absent."""
 ```
 
-`resolve_steps(project_root: Path)` calls it once and takes all three answers from the
-returned mapping. **`Path` is the parameter type throughout** — the existing
-`_read_mcp_tools_section(project_dir: str)` takes a `str`, so do not call it from
-`resolve_steps`: rewrite it to delegate to the new helper (converting its own `str`
-argument once) rather than parsing the file a second time. `get_check_timeout`'s use of
-`_read_mcp_tools_section` is unaffected, and `_read_mcp_tools_section` stays private —
-publicising it is no longer needed.
+No new reader in this step. `resolve_steps(project_root: Path)` calls it once and takes
+all three answers from the returned mapping. **`Path` is the parameter type throughout** —
+do not call the private `_read_mcp_tools_section(project_dir: str)` from `resolve_steps`;
+step 5 already rewrote it to delegate to the same helper.
 
 A missing `pyproject.toml` yields an empty mapping and falls through to the "neither
 declared" error, which is the right answer. A malformed one propagates the existing
@@ -270,8 +266,21 @@ Plus:
 **Fixture fix — `test_default_steps_isort_then_black` at line 59 and friends.** Several
 tests in this module call `run_format` without `steps`, against a `tool_context` whose
 `project_dir` is an empty tmp directory. Those now hit the "neither declared" error. Add a
-module-scoped autouse fixture writing a minimal `pyproject.toml` with
-`[tool.mcp-tools-py] formatter = "black"` into `tool_context.project_dir`.
+**function-scoped** autouse fixture writing a minimal `pyproject.toml` with
+`[tool.mcp-tools-py] formatter = "black"` into `tool_context.project_dir`:
+
+```python
+@pytest.fixture(autouse=True)
+def _declare_formatter(tool_context: ToolContext) -> None:
+    (tool_context.project_dir / "pyproject.toml").write_text(
+        '[tool.mcp-tools-py]\nformatter = "black"\n'
+    )
+```
+
+**Function-scoped, not module-scoped.** `tool_context` and the `tmp_path` it is built on
+are function-scoped, so a module-scoped fixture requesting either raises pytest's
+`ScopeMismatch` at setup. The directory is new per test anyway, so there is nothing to
+share.
 
 Do **not** change the shared `tool_context` fixture in `tests/conftest.py` — timeout tests
 elsewhere depend on there being no `pyproject.toml`.
@@ -295,9 +304,9 @@ pylint / pytest / mypy / tach / lint-imports pass. Check `check_file_size` on `r
 >
 > Resolution: `[tool.mcp-tools-py] formatter` wins; otherwise detect `[tool.ruff.format]`
 > versus `[tool.black]`; both present or neither present is an error. Both error messages
-> must name the key and the path to `pyproject.toml`. Read the file **once**, through a new
-> public `read_pyproject_tool_tables(project_root: Path)` in `utils/project_config.py`, and
-> have the existing `_read_mcp_tools_section` delegate to it. `Path` is the parameter type
+> must name the key and the path to `pyproject.toml`. Read the file **once**, through the
+> `read_pyproject_tool_tables(project_root: Path)` helper **step 5 already added** to
+> `utils/project_config.py` — do not add a second reader. `Path` is the parameter type
 > throughout `resolve_steps`.
 >
 > Also fix `_unparsable_block` in `formatter_tools.py`: its
@@ -314,11 +323,12 @@ pylint / pytest / mypy / tach / lint-imports pass. Check `check_file_size` on `r
 > Its first parameter stays `steps`.
 >
 > Write the tests first. Use one parametrized test for the five resolution cases. Add a
-> module-scoped autouse fixture in `tests/test_formatter_tools.py` writing a
+> **function-scoped** autouse fixture in `tests/test_formatter_tools.py` writing a
 > `[tool.mcp-tools-py] formatter = "black"` pyproject.toml into the tool_context's project
 > dir — several tests there call `run_format` with no steps and would otherwise hit the
-> "neither declared" error. Do not change the shared `tool_context` fixture in
-> `tests/conftest.py`.
+> "neither declared" error. It must be function-scoped: `tool_context` and `tmp_path` are
+> function-scoped, and a module-scoped fixture requesting either raises `ScopeMismatch`.
+> Do not change the shared `tool_context` fixture in `tests/conftest.py`.
 >
 > Keep the existing explicit-`["isort", "black"]` tests passing unchanged; that is a stated
 > regression criterion.

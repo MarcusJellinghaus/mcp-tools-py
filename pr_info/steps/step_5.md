@@ -10,7 +10,16 @@ Named `ruff_imports`, not `ruff_check_fix`, which would read like the unrelated
 ## WHERE
 
 **Modify** `src/mcp_tools_py/formatter/ruff_runner.py` (created in step 4)
+**Modify** `src/mcp_tools_py/utils/project_config.py` — new public
+`read_pyproject_tool_tables(project_root: Path)`; the existing private
+`_read_mcp_tools_section` delegates to it
 **Create** `tests/test_ruff_imports_runner.py`
+**Modify** `tests/test_project_config.py` — cover the new reader
+
+The shared `pyproject.toml` reader is introduced **here**, not in step 6, because
+`per_file_ignores_notice` is its first consumer. Step 6's `resolve_steps` is the second.
+Introducing it later would leave `formatter/` hand-rolling a second `tomllib` reader that
+step 6 never consolidates.
 
 ## WHAT
 
@@ -77,7 +86,7 @@ else:           run [binary, "check", "--select", "I", "--fix"] + target_dirs
                 # runs even when `unparsable` is non-empty — ruff skips the
                 # unparsable file and still sorts the rest
                 success = (fix.return_code == 0 and not unparsable)
-output = version_line("ruff") + per_file_ignores_notice(...) + combined
+output = version_line("ruff", environment=environment) + per_file_ignores_notice(...) + combined
 ```
 
 `files_changed` is populated from the **pre-check** run in both modes — that is what makes
@@ -146,11 +155,31 @@ def per_file_ignores_notice(project_dir: str, target_dirs: list[str]) -> str:
     """One line naming target directories where an `I` per-file-ignore applies."""
 ```
 
+### One shared `pyproject.toml` reader — introduced here
+
+`formatter/` must **not** hand-roll a `tomllib` read. Add one public helper to
+`utils/project_config.py` in this step and call it from `per_file_ignores_notice`:
+
+```python
+def read_pyproject_tool_tables(project_root: Path) -> dict[str, object]:
+    """The `[tool]` table of `project_root/pyproject.toml`, empty when absent."""
+```
+
+`per_file_ignores_notice` keeps its `project_dir: str` parameter, matching the runner
+signature, and converts once: `read_pyproject_tool_tables(Path(project_dir))`. **`Path` is
+the helper's parameter type.** Rewrite the existing private
+`_read_mcp_tools_section(project_dir: str)` to delegate to it rather than parsing the file
+a second time; it stays private, and `get_check_timeout`'s use of it is unaffected.
+
+Step 6's `resolve_steps` is the **second** consumer of the same helper and adds no new
+reader. Two consumers, one reader, introduced at the first use.
+
 **Keep the matching literal.** The notice is advisory, not a gate, and implementing glob
 semantics here would be the largest complexity in the issue for the smallest payoff:
 
 ```
-read [tool.ruff.lint.per-file-ignores] (and legacy [tool.ruff.per-file-ignores])
+tables = read_pyproject_tool_tables(Path(project_dir))
+read tables["ruff"]["lint"]["per-file-ignores"] (and legacy tables["ruff"]["per-file-ignores"])
 for each glob key -> take the leading literal segment before the first * ? [
     if its codes contain "ALL" or any code starting with "I":
         if that prefix and a target dir overlap -> collect the target dir
@@ -158,7 +187,10 @@ return "" when nothing collected, else one line naming the directories and the k
 ```
 
 A false negative on an exotic pattern means no notice — the status quo, not a regression.
-A malformed or missing `pyproject.toml` returns `""`; the notice must never fail the step.
+A missing `pyproject.toml` yields an empty mapping and therefore `""`. A malformed one
+raises the reader's existing `ValueError`, which `per_file_ignores_notice` swallows into
+`""` — the notice must never fail the step. (`resolve_steps` in step 6 deliberately lets
+that same `ValueError` propagate; the two consumers differ only in how they treat it.)
 
 ## DATA
 
@@ -199,7 +231,16 @@ All paths are project-relative with forward slashes.
    `[tool.ruff.lint.per-file-ignores]` ignores `I` for a target directory produces the
    notice in `output`. Acceptance criterion.
 9. No `per-file-ignores` at all, and one that ignores a non-`I` code → no notice.
+9b. A **malformed** `pyproject.toml` → no notice and no exception; the step still runs.
 10. Missing ruff binary → `success=False`, no subprocess.
+
+`tests/test_project_config.py`:
+
+11. `read_pyproject_tool_tables`: a project with `[tool.black]` and `[tool.ruff.format]`
+    returns both keys; a missing `pyproject.toml` returns `{}`; a file without a `[tool]`
+    table returns `{}`; a malformed file raises `ValueError`.
+12. The existing `_read_mcp_tools_section` / `get_check_timeout` tests still pass
+    unchanged — that is the regression on the delegation.
 
 ## DONE WHEN
 
@@ -250,6 +291,12 @@ specifically: it is what catches an accidental `from mcp_tools_py.code_checker_r
 > `[tool.ruff.lint.per-file-ignores]` covers a target directory. Do not override the
 > project's ruff config. Keep the matching literal — leading literal path segment, no glob
 > engine — and never let it fail the step.
+>
+> Read `pyproject.toml` through a **new public**
+> `read_pyproject_tool_tables(project_root: Path)` in `src/mcp_tools_py/utils/project_config.py`,
+> and rewrite the existing private `_read_mcp_tools_section` to delegate to it. Do not
+> hand-roll a `tomllib` read inside `formatter/`. Step 6's `resolve_steps` reuses this same
+> helper and adds no second reader.
 >
 > Write the tests first, including the real unsorted-imports end-to-end test and the
 > `per-file-ignores` fixture.
