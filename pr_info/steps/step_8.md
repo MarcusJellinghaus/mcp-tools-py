@@ -89,17 +89,23 @@ short "Formatter selection" section covering:
 - the migration note: **a migrating repo adds `[tool.ruff.format]` even if empty** — that
   empty table is the signal, and detection is deliberately unchanged from it
 
-*Open question for Marcus: confirm a new subsection there is the right home.*
+This document is already the documented home for `[tool.mcp-tools-py]` as a whole — the
+`docs/README.md` entry describes it as covering the section, not only timeouts — so the
+new key belongs here rather than in a new file.
 
 ## Release note
 
 **The first `run_format_code` after this upgrade will reformat** if the tool-env formatter
 version differs from what the project env had. This is a real, user-visible effect of the
-env move and needs recording somewhere durable. The repo has no `CHANGELOG`.
+env move.
 
-*Open question for Marcus: where does this go?* Put it in the PR description at minimum,
-and mention that each step now reports its formatter version so any future drift is
-visible rather than mysterious.
+**Create `docs/upgrade-notes.md`** holding that note, and add one line linking it from
+`docs/README.md` under Configuration. Repeat the note in the PR description. The repo has
+no `CHANGELOG`, and a user-visible warning needs a home that outlives a PR body; later
+notes append to the same file.
+
+Mention in the note that each step now reports its formatter version, so any future drift
+is visible rather than mysterious.
 
 ## Regenerated graph
 
@@ -166,8 +172,8 @@ blocks a PR carrying one.
 > each hit against the do-not-change table.
 >
 > Put the release note — the first `run_format_code` after upgrade may reformat, because
-> the formatter now comes from the tool env — in the PR description, and flag to Marcus
-> that it may want a more durable home.
+> the formatter now comes from the tool env — in a new `docs/upgrade-notes.md`, link it
+> from `docs/README.md` under Configuration, and repeat it in the PR description.
 >
 > Delete `.scratch/` if any earlier step left one.
 >

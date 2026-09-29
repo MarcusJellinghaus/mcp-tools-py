@@ -10,7 +10,8 @@ Result: the codebase is shorter after this issue than before it.
 
 ## WHERE
 
-**Create** `src/mcp_tools_py/formatter/common.py`
+**Modify** `src/mcp_tools_py/formatter/common.py` — step 2 created it with
+`formatter_binary`; this step adds the output helpers and version reporting alongside
 **Create** `tests/test_formatter_common.py`
 **Modify** `src/mcp_tools_py/formatter/black_runner.py`, `isort_runner.py`,
 `tests/test_black_runner.py`, `tests/test_isort_runner.py`
@@ -129,7 +130,8 @@ pylint / pytest / mypy / tach / lint-imports pass. `common.py` must not import f
 
 > Read `pr_info/steps/summary.md`, then implement `pr_info/steps/step_3.md`.
 >
-> Create `src/mcp_tools_py/formatter/common.py` holding `truncate_output` and
+> Extend `src/mcp_tools_py/formatter/common.py` — created in step 2 with
+> `formatter_binary` — with `truncate_output` and
 > `combine_output` — moved verbatim from the duplicated private copies in
 > `black_runner.py` and `isort_runner.py` — plus `formatter_version(distribution)` and
 > `version_line(tool, distribution=None)`.

@@ -71,18 +71,35 @@ runner directly with `sys.executable`.
 
 ### 6. Parse error, ruff repo, write mode
 
-Source tree with one good file and one syntax-error file.
+Source tree with one good file — badly formatted **and** with unsorted imports — and one
+syntax-error file.
+
+A syntax error is visible to **both** ruff steps, and `ruff_imports` runs first and fails,
+so `run_format_code` breaks before `ruff_format`. That makes "only the format problem"
+unreachable through the default step list. Two tests, therefore:
+
+**6a — through `run_format_code`, default steps.** `ruff_imports` is the step that
+reports:
+
+```
+assert list(results) == ["ruff_imports"]          # the run stops here
+assert results["ruff_imports"].success is False
+assert "bad.py" in results["ruff_imports"].unparsable_files
+assert the good file's imports were sorted on disk   # the others still get processed
+```
+
+**6b — `ruff_format` directly, `steps=["ruff_format"]`.** The only way to reach
+`ruff_format` with a syntax-error file present:
 
 ```
 assert results["ruff_format"].success is False
 assert "bad.py" in results["ruff_format"].unparsable_files
-assert good file was reformatted on disk        # the others still get formatted
+assert the good file was reformatted on disk
 ```
 
-And the same for `ruff_imports` via its JSON syntax-error diagnostics. Note the runner
-stops after the first failing step in write mode, so assert these in two separate tests —
-one with only the import problem, one with only the format problem — or assert on
-`ruff_imports` first since it runs first.
+Both prove the same acceptance criterion — a parse error yields `success=False` and a
+populated `unparsable_files` while the remaining files are still processed. Neither step
+suppresses its work because one file is unparsable; see `step_5.md` for why.
 
 ### 7. `steps=[]` at both entry points
 
@@ -139,7 +156,9 @@ issue has a test naming it.
 >
 > Also cover: a black repo still resolving to isort+black; explicit `["isort", "black"]` on
 > a ruff repo; a bogus `python_executable` not changing which binary runs; parse errors
-> leaving the other files formatted; `steps=[]` raising at the runner and returning an
+> leaving the other files formatted — `ruff_imports` through the default step list, and
+> `ruff_format` via an explicit `steps=["ruff_format"]`, because `ruff_imports` fails
+> first on the same file and stops the run; `steps=[]` raising at the runner and returning an
 > error string at the MCP layer; both-declared and neither-declared errors naming the key
 > and the file; a version line on every step; and the MCP layer resolving to the same steps
 > as the runner layer.

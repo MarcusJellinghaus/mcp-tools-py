@@ -9,8 +9,13 @@ Its failure mode is an availability regression, so it lands alone and is verifie
 
 ## WHERE
 
+**Create**
+- `src/mcp_tools_py/formatter/common.py` — `formatter_binary` only; step 3 extends it
+
 **Modify**
 - `src/mcp_tools_py/utils/environment_info.py`
+- `src/mcp_tools_py/utils/python_environment.py` — the `tool_environment()` accessor
+- `src/mcp_tools_py/utils/tool_context.py` — `tool_environment` `default_factory`
 - `src/mcp_tools_py/formatter/black_runner.py`
 - `src/mcp_tools_py/formatter/isort_runner.py`
 - `src/mcp_tools_py/formatter/runner.py`
@@ -69,20 +74,43 @@ Do not remove the parameter. Removing it is later cleanup, not this issue.
 
 ### 3. Resolving the binary — one shared helper
 
-Add to `formatter/runner.py` (the runners import it from there, or from `common.py` once
-step 3 creates it — either is fine, pick one and keep it):
+**Create `src/mcp_tools_py/formatter/common.py` in this step** and put the helper there.
+It must **not** go in `formatter/runner.py`: `runner.py` imports `run_black` and
+`run_isort` from the two runner modules, so having those modules import back from
+`runner.py` is a circular import that fails at import time. Step 3 extends the same
+`common.py` with the output helpers; this step creates it with `formatter_binary` alone.
 
 ```python
 def formatter_binary(name: str) -> str | None:
     """Locate `name`'s console script in mcp-tools-py's own environment."""
 ```
 
-Implementation is two lines: `PythonEnvironment.resolve().binary(name)`, returned as
-`str` or `None`. `PythonEnvironment.resolve()` with no arguments is `sys.executable`'s
-environment — exactly what `ToolContext.tool_environment` defaults to.
+**Resolve through the same seam the MCP availability check uses.** Add a single cached
+accessor in `src/mcp_tools_py/utils/python_environment.py`:
 
-`formatter/runner.py` has no `ToolContext`, which is why it resolves this itself. That is
-also what makes "ignore `python_executable`" truthful rather than cosmetic.
+```python
+def tool_environment() -> PythonEnvironment:
+    """The environment mcp-tools-py itself runs in, holding its console scripts."""
+```
+
+- `ToolContext.tool_environment`'s `default_factory` changes from
+  `PythonEnvironment.resolve` to this accessor.
+- `formatter_binary` calls the same accessor: `tool_environment().binary(name)`, returned
+  as `str` or `None`.
+
+`formatter/common.py` must **not** call `PythonEnvironment.resolve()` directly. Doing so
+gives the runner layer a second, unpatchable answer to "which binary", so
+`is_tool_available("black")` at the MCP layer could say available while the runner invokes
+a different binary — and a test that patches `tool_environment.binary` would not cover the
+code that actually runs. One accessor means the availability check and the invoked binary
+cannot diverge, and one patch point covers both.
+
+Layering stays downward: `formatter` → `utils`, and `utils.tool_context` →
+`utils.python_environment` as it already does.
+
+`formatter/runner.py` has no `ToolContext`, which is why the runner layer reaches the
+environment through this accessor rather than through a context object. That is also what
+makes "ignore `python_executable`" truthful rather than cosmetic.
 
 When the binary is absent, return the existing `execution_error`-shaped `FormatterResult`:
 `output=f"{tool} is not available: no console script found in {bin_dir}"`,
@@ -158,8 +186,15 @@ them in one commit.
 > Set `"black": None` and `"isort": None` in `TOOL_MODULES` in
 > `src/mcp_tools_py/utils/environment_info.py`, and change `black_runner.py` and
 > `isort_runner.py` to invoke the console script from mcp-tools-py's own environment
-> (`PythonEnvironment.resolve().binary(name)`) instead of
-> `[python_executable, "-m", tool]`.
+> instead of `[python_executable, "-m", tool]`.
+>
+> Put the `formatter_binary` helper in a **new** `src/mcp_tools_py/formatter/common.py` —
+> not in `runner.py`, which already imports both runner modules and would make the import
+> circular. Step 3 extends the same file. `formatter_binary` must resolve through a new
+> cached `tool_environment()` accessor in `src/mcp_tools_py/utils/python_environment.py`,
+> and `ToolContext.tool_environment`'s `default_factory` must become that same accessor,
+> so the MCP availability check and the binary the runner actually invokes cannot diverge.
+> Do not call `PythonEnvironment.resolve()` from `formatter/`.
 >
 > Keep `python_executable` as the first parameter of both runners. It is accepted and
 > ignored — deprecated — and the docstring must say so. mcp_coder still calls these

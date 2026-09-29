@@ -71,6 +71,8 @@ unparsable = sorted({m.filename for m in messages if not m.code})
 changed    = sorted({m.filename for m in messages if m.fixable})
 if check_only:  success = (not changed and not unparsable)
 else:           run [binary, "check", "--select", "I", "--fix"] + target_dirs
+                # runs even when `unparsable` is non-empty — ruff skips the
+                # unparsable file and still sorts the rest
                 success = (fix.return_code == 0 and not unparsable)
 output = version_line("ruff") + per_file_ignores_notice(...) + combined
 ```
@@ -78,9 +80,21 @@ output = version_line("ruff") + per_file_ignores_notice(...) + combined
 `files_changed` is populated from the **pre-check** run in both modes — that is what makes
 it correct in write mode, where the fix run's JSON would report nothing.
 
-A `parse_error` from `parse_ruff_json_output` (malformed JSON, not a syntax error in the
-source) is an infrastructure failure: return `success=False` with the parser's message in
-`output` and do not run the fix.
+### A syntax error does not suppress the fix run
+
+A file with a syntax error yields `success=False` and a populated `unparsable_files`, and
+**the fix run still executes**, so the other files are sorted on disk. This is the issue's
+acceptance criterion — *"a parse error in one file yields `success=False` and a populated
+`unparsable_files`, **with the other files still formatted**"* — and it matches
+`ruff_format`, where ruff formats the remaining files and exits 2.
+
+Skipping the fix would leave the rest of the tree unsorted, which is the silent drift this
+issue exists to eliminate.
+
+A `parse_error` from `parse_ruff_json_output` is different: that is **malformed JSON from
+ruff itself**, not a syntax error in the source, so nothing about the tree is known. That
+is an infrastructure failure — return `success=False` with the parser's message in
+`output` and do **not** run the fix. This is the only case where the fix run is skipped.
 
 ## The `per-file-ignores` notice
 
@@ -134,8 +148,14 @@ A malformed or missing `pyproject.toml` returns `""`; the notice must never fail
    This is the acceptance criterion, and a mock cannot prove the two-invocation design is
    what makes it work.
 6. A syntax-error diagnostic → `unparsable_files` populated, `success is False`, and the
-   fix run is **not** executed.
-7. Malformed JSON from ruff → `success=False`, parser message in `output`, no fix run.
+   fix run **is still executed**. Assert both invocations happened. Add a real,
+   unmocked `tmp_path` sibling: one file with a syntax error and one with unsorted
+   imports, write mode — the good file is sorted on disk, `unparsable_files` names the
+   bad one, `success is False`. This is the acceptance criterion *"with the other files
+   still formatted"*.
+7. Malformed JSON from ruff → `success=False`, parser message in `output`, and **no fix
+   run**. This is the only case that suppresses the fix: ruff's own output was
+   unreadable, so nothing about the tree is known.
 8. **`per-file-ignores` fixture:** a `tmp_path` project whose
    `[tool.ruff.lint.per-file-ignores]` ignores `I` for a target directory produces the
    notice in `output`. Acceptance criterion.
@@ -167,6 +187,11 @@ specifically: it is what catches an accidental `from mcp_tools_py.code_checker_r
 > exits 1 for both a parse error and an ordinary violation and writes nothing to stderr.
 > **Probe the real diagnostic shape in `.scratch/` first** and write the predicate against
 > what you observe; delete `.scratch/` when done.
+>
+> A syntax error sets `success=False` and populates `unparsable_files` but **does not**
+> suppress the fix run — ruff skips that file and still sorts the rest, which the issue
+> requires ("with the other files still formatted"). The only case that skips the fix is
+> malformed JSON from ruff itself, where nothing about the tree is known.
 >
 > Import `parse_ruff_json_output` from `mcp_tools_py.utils.ruff_parsing`. Do **not** import
 > anything from `code_checker_ruff` — tach forbids it, they are the same layer.

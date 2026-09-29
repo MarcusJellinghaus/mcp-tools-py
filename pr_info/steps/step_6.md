@@ -13,6 +13,7 @@ exact failure the issue exists to prevent.
 - `src/mcp_tools_py/formatter/runner.py`
 - `src/mcp_tools_py/formatter/formatter_tools.py`
 - `src/mcp_tools_py/formatter/__init__.py`
+- `src/mcp_tools_py/utils/project_config.py` — publicise `_read_mcp_tools_section`
 - `tests/test_formatter_runner.py`
 - `tests/test_formatter_tools.py`
 
@@ -40,7 +41,9 @@ _STEP_RUNNERS: dict[str, Callable[..., FormatterResult]] = {
 }
 
 # A step is not a tool name. Both ruff steps map to tool `ruff`.
-_STEP_TOOLS: dict[str, str] = {
+# Typed `ToolName`, not `str`: `ToolContext.resolve_timeout(tool: ToolName)` takes a
+# `Literal`, so a `str` here fails the strict-mypy gate at the call site.
+_STEP_TOOLS: dict[str, ToolName] = {
     "isort": "isort",
     "black": "black",
     "ruff_imports": "ruff",
@@ -48,7 +51,7 @@ _STEP_TOOLS: dict[str, str] = {
 }
 
 
-def step_tool(step: str) -> str:
+def step_tool(step: str) -> ToolName:
     """Tool a step invokes — for availability, timeouts and line-length checks."""
 
 
@@ -148,15 +151,22 @@ for step in resolved_steps:
         return f"Error: {self.context.unavailable_message(tool)}"
 
 warnings = check_line_length_conflicts(
-    str(self.context.project_dir), [step_tool(s) for s in resolved_steps]
+    str(self.context.project_dir), sorted({step_tool(s) for s in resolved_steps})
 )
 
 timeouts = {step: self.context.resolve_timeout(step_tool(step)) for step in resolved_steps}
 ```
 
 That timeout dict literal — currently hardcoded to isort and black regardless of the
-requested steps — is the thing that changes. `ToolContext.resolve_timeout` is generic and
-needs no change; `ToolName` in `utils/project_config.py` already includes `ruff`.
+requested steps — is the thing that changes. `ToolContext.resolve_timeout` needs no
+behavioural change, and `ToolName` in `utils/project_config.py` already includes `ruff` —
+but it is typed `resolve_timeout(tool: ToolName)`, a `Literal`, so `step_tool` must return
+`ToolName` rather than `str` or the strict-mypy gate fails here. `runner.py` imports
+`ToolName` from `utils/project_config.py`, which it already depends on for
+`DEFAULT_CHECK_TIMEOUT`.
+
+`check_line_length_conflicts` is deduplicated because both ruff steps map to the same
+tool; passing `["ruff", "ruff"]` would risk a doubled warning.
 
 Note `timeouts` stays keyed by **step**, because `runner.py` looks it up by step.
 
@@ -236,7 +246,8 @@ pylint / pytest / mypy / tach / lint-imports pass. Check `check_file_size` on `r
 > Read `pr_info/steps/summary.md`, then implement `pr_info/steps/step_6.md`.
 >
 > In `src/mcp_tools_py/formatter/runner.py` add `resolve_steps(project_root)`, private
-> `_BLACK_STEPS` / `_RUFF_STEPS`, a `_STEP_TOOLS` mapping with a `step_tool()` accessor,
+> `_BLACK_STEPS` / `_RUFF_STEPS`, a `_STEP_TOOLS` mapping with a `step_tool()` accessor —
+> both typed `ToolName`, not `str`, because `resolve_timeout` takes that `Literal` —
 > and the two ruff entries in `_VALID_STEPS` and `_STEP_RUNNERS`. Make `validate_steps`
 > reject an empty list. **Delete `DEFAULT_STEPS`** — it has no consumer outside the two
 > defaulting sites you are replacing, so no deprecation shim.

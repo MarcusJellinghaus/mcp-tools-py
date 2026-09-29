@@ -104,9 +104,11 @@ acceptance criterion:
   module holds exactly one symbol; mirroring the split preserves structure that existed
   only by convention. Both source modules are deleted.
 - **Versions read via `importlib.metadata.version()`**, not a `--version` subprocess per
-  step. All four formatters now resolve from `tool_environment`, which is
-  `PythonEnvironment.resolve()` with no arguments — `sys.executable`'s environment, the
-  process mcp-tools-py runs in, not configurable from the CLI. So the metadata lookup
+  step. All four formatters now resolve from `tool_environment()` — the single cached
+  accessor in `utils/python_environment.py` that `ToolContext.tool_environment` also
+  defaults to, so the availability check and the invoked binary cannot diverge. It is
+  `sys.executable`'s environment, the process mcp-tools-py runs in, not configurable from
+  the CLI. So the metadata lookup
   names the exact distribution whose console script is about to be invoked. This removes
   four subprocesses per run, four timeout interactions, and a degradation path.
   *Deviation from the issue text, which specifies `--version` subprocesses. The
@@ -114,7 +116,9 @@ acceptance criterion:
   identically. Revert path if `tool_environment` ever becomes CLI-configurable: swap
   `formatter_version()` for a `--version` subprocess inside the step's timeout budget —
   one function, one call site per runner.*
-- **Shared runner boilerplate** in `formatter/common.py`. `black_runner.py` and
+- **Shared runner boilerplate** in `formatter/common.py`, created in step 2 for
+  `formatter_binary` and extended in step 3. It cannot live in `runner.py`, which already
+  imports both runner modules — that would be a circular import. `black_runner.py` and
   `isort_runner.py` each carry an identical `_truncate_output` and an identical
   timed-out / execution-error / combine-stdout-and-stderr preamble; two more runners
   would make four copies. Two small functions, no base class.
@@ -147,13 +151,14 @@ code cannot discriminate — hence the JSON route.
 | Path | Purpose |
 |---|---|
 | `src/mcp_tools_py/utils/ruff_parsing.py` | `RuffMessage` + `parse_ruff_json_output`, moved down a layer |
-| `src/mcp_tools_py/formatter/common.py` | `truncate_output`, `command_output`, `formatter_version` |
+| `src/mcp_tools_py/formatter/common.py` | `formatter_binary` (step 2); `truncate_output`, `combine_output`, `formatter_version`, `version_line` (step 3) |
 | `src/mcp_tools_py/formatter/ruff_runner.py` | `run_ruff_format`, `run_ruff_imports` |
 | `tests/test_formatter_common.py` | Step 3 |
 | `tests/test_ruff_format_runner.py` | Step 4 |
 | `tests/test_ruff_imports_runner.py` | Step 5 |
 | `tests/test_formatter_resolution.py` | Step 6 |
 | `tests/test_formatter_integration.py` | Step 7 |
+| `docs/upgrade-notes.md` | Step 8 — the reformat-on-first-run release note |
 
 ## Files deleted
 
@@ -170,7 +175,9 @@ code cannot discriminate — hence the JSON route.
 - `src/mcp_tools_py/code_checker_ruff/reporting.py` — `RuffMessage` import (5 annotation uses)
 - `src/mcp_tools_py/code_checker_ruff/runners.py` — `parse_ruff_json_output` import; calls at lines 81, 132, 162
 - `src/mcp_tools_py/utils/environment_info.py` — `TOOL_MODULES`; `_failed` docstring count
-- `src/mcp_tools_py/utils/tool_context.py` — module docstring, class docstring, `is_tool_available`, `unavailable_message`
+- `src/mcp_tools_py/utils/python_environment.py` — cached `tool_environment()` accessor, the single seam both the availability check and `formatter_binary` resolve through
+- `src/mcp_tools_py/utils/tool_context.py` — `tool_environment` `default_factory`; module docstring, class docstring, `is_tool_available`, `unavailable_message`
+- `src/mcp_tools_py/utils/project_config.py` — publicises `_read_mcp_tools_section` for `resolve_steps` (step 6)
 - `src/mcp_tools_py/formatter/__init__.py` — exports `resolve_steps`, drops `DEFAULT_STEPS`; module docstring
 - `src/mcp_tools_py/formatter/runner.py` — `resolve_steps`, `_STEP_TOOLS`, `_BLACK_STEPS`/`_RUFF_STEPS`, `validate_steps`, deprecated `python_executable`
 - `src/mcp_tools_py/formatter/formatter_tools.py` — resolution call, step→tool mapping, timeout dict, MCP docstring
@@ -193,7 +200,8 @@ code cannot discriminate — hence the JSON route.
 
 - `README.md` — lines 44, 115, 149, 158, 198, 203, 205, 460
 - `docs/architecture/architecture.md` — lines 11, 19, 58, 69-70, 165, 174, 230, 233
-- `docs/pyproject-configuration.md` — line 45 only (the key list at line 36 needs no edit)
+- `docs/pyproject-configuration.md` — line 45, plus a new "Formatter selection" section (the key list at line 36 needs no edit)
+- `docs/README.md` — one line linking `upgrade-notes.md` under Configuration
 - `docs/architecture/dependencies/pydeps_graph.dot` and `.svg` — regenerated
 
 **Unchanged on purpose**
@@ -237,10 +245,15 @@ mcp__mcp-tools-py__run_lint_imports_check
 All must pass. One commit per step. No `.scratch/` directory left behind — CI blocks any
 PR carrying one.
 
-## Open questions for Marcus
+## Decisions taken during planning
 
-1. **Where does the release note go?** The reformat-on-first-run risk needs recording and
-   the repo has no `CHANGELOG`.
-2. **`[tool.mcp-tools-py] formatter` is the first non-timeout key in that section.**
-   `docs/pyproject-configuration.md` currently reads as a timeout-key list end to end.
-   Step 8 assumes a new "Formatter selection" subsection is acceptable.
+1. **The release note goes in a new `docs/upgrade-notes.md`**, linked from
+   `docs/README.md` under Configuration, and is repeated in the PR description. The repo
+   has no `CHANGELOG`, and a user-visible "your first `run_format_code` after upgrading
+   may reformat" warning needs a durable home that is not a PR body. One short file, one
+   index line; later notes append to it. Step 8 owns both edits.
+2. **`docs/pyproject-configuration.md` gains a "Formatter selection" section.**
+   `[tool.mcp-tools-py] formatter` is the first non-timeout key in that section, but the
+   document is already the documented home for `[tool.mcp-tools-py]` as a whole — its
+   `docs/README.md` entry describes it as covering the section, not only timeouts — so
+   the key belongs there rather than in a new file. Step 8 owns it.
