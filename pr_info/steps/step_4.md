@@ -175,10 +175,13 @@ except the last:
    in stdout, and a `--check` run that writes nothing to stderr. Assert `success is False`
    **and** `"src/bad.py" in unparsable_files`. This is the case a marker parser that
    discarded the path would report as failed-but-with-nothing-named.
-9. `relative_path`: a native-separator relative path (`"src\\bad.py"`) normalizes to
-   `"src/bad.py"` **unchanged in depth** — run the test from a cwd that is not
-   `project_dir` so a missing `os.path.isabs` guard shows up as a `"../"` prefix. An
-   absolute path under `project_dir` normalizes to `"src/bad.py"` too.
+9. `relative_path`: a native-separator relative path, built with
+   `os.path.join("src", "bad.py")` (never a hard-coded `"src\\bad.py"` — CI runs on Linux,
+   where `os.sep` is `/` and a backslash is a legal filename character, not a separator),
+   normalizes to `"src/bad.py"` **unchanged in depth** — run the test from a cwd that is
+   not `project_dir` so a missing `os.path.isabs` guard shows up as a `"../"` prefix. An
+   absolute path under `project_dir`, built with `os.path.join(project_dir, "src",
+   "bad.py")`, normalizes to `"src/bad.py"` too.
 10. Missing ruff binary → `success=False`, no subprocess.
 11. Timed out and execution-error paths → `success=False`, no version banner.
 12. **One integration test, no mock:** a `tmp_path` project with one badly formatted file
