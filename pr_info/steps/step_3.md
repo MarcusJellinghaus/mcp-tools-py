@@ -99,6 +99,20 @@ The version line goes **inside** the truncation input, so a 200-line cap still y
 banner. The timed-out and execution-error early returns keep their current bare messages
 — a version banner on "black timed out" is noise.
 
+### This changes `FormatterResult.output` for `black` and `isort`
+
+The banner is a deliberate, user-visible change to the `output` **text** of the two
+existing steps: `output` now begins with `black <version>` rather than with black's own
+first line. `success`, `files_changed` and `unparsable_files` are untouched, and
+`files_changed` is still parsed from the formatter's own output, not from the banner-prefixed
+string.
+
+The "existing explicit `["isort", "black"]` behaviour unchanged — regression criterion" at
+`step_6.md:215` and `step_7.md:59` therefore means **which steps run, in which order, with
+which results** — it does **not** cover `output` content. Any existing test asserting
+`output` equality for black or isort is updated here, in this step, to expect the banner;
+that is not a weakening of the regression criterion.
+
 ## TESTS
 
 `tests/test_formatter_common.py` — **write first**:

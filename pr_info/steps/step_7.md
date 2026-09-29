@@ -60,7 +60,9 @@ steps are `["isort", "black"]` and the files are actually sorted and formatted o
 
 The repos that have not migrated keep working, and an explicit list overrides detection
 entirely. Acceptance criterion: *existing explicit `["isort", "black"]` behaviour
-unchanged*.
+unchanged* — meaning the steps that run and their `success`, `files_changed` and
+`unparsable_files`. `output` **text** is exempt: step 3 prepends a version banner to it
+deliberately.
 
 ### 5. `python_executable` is inert
 
@@ -84,7 +86,7 @@ reports:
 ```
 assert list(results) == ["ruff_imports"]          # the run stops here
 assert results["ruff_imports"].success is False
-assert "bad.py" in results["ruff_imports"].unparsable_files
+assert "src/bad.py" in results["ruff_imports"].unparsable_files
 assert the good file's imports were sorted on disk   # the others still get processed
 ```
 
@@ -93,13 +95,21 @@ assert the good file's imports were sorted on disk   # the others still get proc
 
 ```
 assert results["ruff_format"].success is False
-assert "bad.py" in results["ruff_format"].unparsable_files
+assert "src/bad.py" in results["ruff_format"].unparsable_files
 assert the good file was reformatted on disk
 ```
 
 Both prove the same acceptance criterion — a parse error yields `success=False` and a
 populated `unparsable_files` while the remaining files are still processed. Neither step
 suppresses its work because one file is unparsable; see `step_5.md` for why.
+
+**Paths are project-relative with forward slashes** in `files_changed` and
+`unparsable_files`, per `step_5.md`. Assert the full relative path, never a bare
+`"bad.py"` — a bare basename is not a member of either list.
+
+**6c — `check_only=True` on the same tree.** `steps=["ruff_format"]`, `check_only=True`:
+`success is False` **and** `"src/bad.py" in unparsable_files`. Check mode must name the
+file it could not read, not merely fail.
 
 ### 7. `steps=[]` at both entry points
 

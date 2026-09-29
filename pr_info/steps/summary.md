@@ -116,8 +116,12 @@ acceptance criterion:
   identically. Revert path if `tool_environment` ever becomes CLI-configurable: swap
   `formatter_version()` for a `--version` subprocess inside the step's timeout budget —
   one function, one call site per runner.*
+  The banner **does** change `FormatterResult.output` text for `black` and `isort`. The
+  "existing explicit `["isort", "black"]` behaviour unchanged" criterion covers the steps
+  that run and their `success`, `files_changed` and `unparsable_files`, not `output`
+  content.
 - **Shared runner boilerplate** in `formatter/common.py`, created in step 2 for
-  `formatter_binary` and extended in step 3. It cannot live in `runner.py`, which already
+  `formatter_binary` and extended in steps 3 and 4. It cannot live in `runner.py`, which already
   imports both runner modules — that would be a circular import. `black_runner.py` and
   `isort_runner.py` each carry an identical `_truncate_output` and an identical
   timed-out / execution-error / combine-stdout-and-stderr preamble; two more runners
@@ -134,13 +138,19 @@ acceptance criterion:
 | command | `ruff format [--check] <dirs>` | `ruff check --select I [--fix] <dirs>` |
 | write mode | one invocation | **two** — JSON pre-check, then `--fix` |
 | `files_changed` | empty in write mode; parsed in `--check` only | from the pre-check `fixable` messages |
-| parse errors | exit 2 + `error: Failed to parse` on stderr | JSON syntax-error diagnostics |
+| parse errors | exit 2 + `error: Failed to parse` on stderr, plus the `invalid-syntax:` marker paths in `--check` mode | JSON syntax-error diagnostics |
+
+Both runners report `files_changed` and `unparsable_files` as **project-relative paths with
+forward slashes**, via one `relative_path` helper in `formatter/common.py`.
+`ruff_imports` check-mode `success` is keyed on *any* `I` diagnostic, not only the fixable
+subset, so an unfixable unsorted import still fails the check.
 
 `ruff format` does **not** sort imports, so `ruff_imports` is load-bearing, not
 belt-and-braces. `ruff format` write mode prints only `N files reformatted` and never
 names files. A `--check` parser must key on the **marker line**
 (`unformatted:` / `invalid-syntax:`), never on `-->`, or unparsable files are silently
-recorded as "would be reformatted". `ruff check --select I --fix` exits 1 for both a
+recorded as "would be reformatted". The `invalid-syntax:` path is **recorded in
+`unparsable_files`**, not discarded, or `--check` mode fails while naming nothing. `ruff check --select I --fix` exits 1 for both a
 parse error and an ordinary unfixed violation and writes nothing to stderr, so its exit
 code cannot discriminate — hence the JSON route.
 
@@ -151,7 +161,7 @@ code cannot discriminate — hence the JSON route.
 | Path | Purpose |
 |---|---|
 | `src/mcp_tools_py/utils/ruff_parsing.py` | `RuffMessage` + `parse_ruff_json_output`, moved down a layer |
-| `src/mcp_tools_py/formatter/common.py` | `formatter_binary` (step 2); `truncate_output`, `combine_output`, `formatter_version`, `version_line` (step 3) |
+| `src/mcp_tools_py/formatter/common.py` | `formatter_binary` (step 2); `truncate_output`, `combine_output`, `formatter_version`, `version_line` (step 3); `relative_path` (step 4) |
 | `src/mcp_tools_py/formatter/ruff_runner.py` | `run_ruff_format`, `run_ruff_imports` |
 | `tests/test_formatter_common.py` | Step 3 |
 | `tests/test_ruff_format_runner.py` | Step 4 |
@@ -177,10 +187,10 @@ code cannot discriminate — hence the JSON route.
 - `src/mcp_tools_py/utils/environment_info.py` — `TOOL_MODULES`; `_failed` docstring count
 - `src/mcp_tools_py/utils/python_environment.py` — cached `tool_environment()` accessor, the single seam both the availability check and `formatter_binary` resolve through
 - `src/mcp_tools_py/utils/tool_context.py` — `tool_environment` `default_factory`; module docstring, class docstring, `is_tool_available`, `unavailable_message`
-- `src/mcp_tools_py/utils/project_config.py` — publicises `_read_mcp_tools_section` for `resolve_steps` (step 6)
+- `src/mcp_tools_py/utils/project_config.py` — new public `read_pyproject_tool_tables(Path)`, the single `pyproject.toml` reader `resolve_steps` and `_read_mcp_tools_section` share (step 6)
 - `src/mcp_tools_py/formatter/__init__.py` — exports `resolve_steps`, drops `DEFAULT_STEPS`; module docstring
 - `src/mcp_tools_py/formatter/runner.py` — `resolve_steps`, `_STEP_TOOLS`, `_BLACK_STEPS`/`_RUFF_STEPS`, `validate_steps`, deprecated `python_executable`
-- `src/mcp_tools_py/formatter/formatter_tools.py` — resolution call, step→tool mapping, timeout dict, MCP docstring
+- `src/mcp_tools_py/formatter/formatter_tools.py` — resolution call, step→tool mapping, timeout dict, MCP docstring, `_unparsable_block` wording (the isort-only "Windows, piped stdout" explanation is wrong for a ruff syntax error)
 - `src/mcp_tools_py/formatter/black_runner.py` — tool-env console script; deprecated param; shared helpers
 - `src/mcp_tools_py/formatter/isort_runner.py` — same
 - `src/mcp_tools_py/server.py` — docstrings at lines 39, 101; count at line 73

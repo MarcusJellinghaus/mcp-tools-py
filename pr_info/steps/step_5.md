@@ -67,9 +67,10 @@ json_cmd = [binary, "check", "--select", "I", "--output-format", "json"] + targe
 pre = execute_command(json_cmd, cwd=project_dir, timeout_seconds=...)
 timed_out / execution_error -> early return, no version banner
 messages, parse_error = parse_ruff_json_output(pre.stdout, project_dir)
-unparsable = sorted({m.filename for m in messages if not m.code})
-changed    = sorted({m.filename for m in messages if m.fixable})
-if check_only:  success = (not changed and not unparsable)
+unparsable = sorted({norm(m.filename) for m in messages if not m.code})
+violations = sorted({norm(m.filename) for m in messages if m.code})   # any I diagnostic
+changed    = sorted({norm(m.filename) for m in messages if m.fixable})
+if check_only:  success = (not violations and not unparsable)
 else:           run [binary, "check", "--select", "I", "--fix"] + target_dirs
                 # runs even when `unparsable` is non-empty — ruff skips the
                 # unparsable file and still sorts the rest
@@ -79,6 +80,24 @@ output = version_line("ruff") + per_file_ignores_notice(...) + combined
 
 `files_changed` is populated from the **pre-check** run in both modes — that is what makes
 it correct in write mode, where the fix run's JSON would report nothing.
+
+### One path normalization, shared with `run_ruff_format`
+
+`parse_ruff_json_output` already relativises `filename` with `os.path.relpath`, which on
+Windows yields `src\bad.py`. **Both lists in both ruff runners hold project-relative paths
+with forward slashes**, so the `norm()` above is
+`os.path.relpath(path, project_dir).replace(os.sep, "/")`. One helper in
+`formatter/common.py`, used by `run_ruff_format` (`step_4.md`) and `run_ruff_imports`
+alike. Every assertion names the full relative path — `"src/bad.py"`, never a bare
+`"bad.py"`.
+
+### Check mode fails on *any* `I` diagnostic, not only fixable ones
+
+`changed` is the `fixable` subset, because that is what the fix run will actually rewrite.
+`success` in check mode is keyed on `violations` — every diagnostic carrying a rule code —
+so an unsorted-import violation ruff declines to autofix still reports `success=False`
+rather than a clean check. Keying `success` on `changed` would report success while the
+imports are unsorted, which is the silent drift this issue exists to eliminate.
 
 ### A syntax error does not suppress the fix run
 
@@ -129,10 +148,12 @@ A malformed or missing `pyproject.toml` returns `""`; the notice must never fail
 ## DATA
 
 - `output` — version banner, then the notice line when non-empty, then combined output
-- `success` — check mode: nothing to fix and nothing unparsable. write mode: the fix run
-  exited 0 and nothing was unparsable
+- `success` — check mode: no `I` diagnostic at all and nothing unparsable. write mode: the
+  fix run exited 0 and nothing was unparsable
 - `files_changed` — fixable filenames from the pre-check run, deduplicated and sorted
 - `unparsable_files` — filenames of syntax-error diagnostics
+
+All paths are project-relative with forward slashes.
 
 ## TESTS
 
@@ -142,7 +163,10 @@ A malformed or missing `pyproject.toml` returns `""`; the notice must never fail
    `[ruff, "check", "--select", "I", "--output-format", "json", "src"]`.
 2. Write mode: **two** invocations, the second carrying `--fix` and no `--output-format`.
 3. Bogus `python_executable` does not change argv.
-4. `files_changed` comes from the pre-check messages with `fixable` true, deduplicated.
+4. `files_changed` comes from the pre-check messages with `fixable` true, deduplicated, as
+   project-relative forward-slash paths (`["src/a.py"]`, not `src\a.py` and not `a.py`).
+4b. **Check mode fails on an unfixable `I` diagnostic:** a pre-check message with a rule
+   code and `fix` absent → `files_changed` empty, `success is False`.
 5. **Real end-to-end, no mock:** a `tmp_path` project with a file that genuinely has
    unsorted imports, write mode. The file is sorted on disk and `files_changed` names it.
    This is the acceptance criterion, and a mock cannot prove the two-invocation design is
@@ -150,9 +174,9 @@ A malformed or missing `pyproject.toml` returns `""`; the notice must never fail
 6. A syntax-error diagnostic → `unparsable_files` populated, `success is False`, and the
    fix run **is still executed**. Assert both invocations happened. Add a real,
    unmocked `tmp_path` sibling: one file with a syntax error and one with unsorted
-   imports, write mode — the good file is sorted on disk, `unparsable_files` names the
-   bad one, `success is False`. This is the acceptance criterion *"with the other files
-   still formatted"*.
+   imports, write mode — the good file is sorted on disk,
+   `unparsable_files == ["src/bad.py"]`, `success is False`. This is the acceptance
+   criterion *"with the other files still formatted"*.
 7. Malformed JSON from ruff → `success=False`, parser message in `output`, and **no fix
    run**. This is the only case that suppresses the fix: ruff's own output was
    unreadable, so nothing about the tree is known.
@@ -192,6 +216,15 @@ specifically: it is what catches an accidental `from mcp_tools_py.code_checker_r
 > suppress the fix run — ruff skips that file and still sorts the rest, which the issue
 > requires ("with the other files still formatted"). The only case that skips the fix is
 > malformed JSON from ruff itself, where nothing about the tree is known.
+>
+> Check-mode `success` is keyed on **every** `I` diagnostic, not only the fixable ones, so
+> an unsorted import ruff declines to autofix still reports `success=False`.
+> `files_changed` stays the fixable subset.
+>
+> Normalize every path in `files_changed` and `unparsable_files` to **project-relative with
+> forward slashes** — `parse_ruff_json_output` returns `os.path.relpath` output, which is
+> backslash-separated on Windows. Put the one-line helper in `formatter/common.py`;
+> `run_ruff_format` (step 4) uses the same one.
 >
 > Import `parse_ruff_json_output` from `mcp_tools_py.utils.ruff_parsing`. Do **not** import
 > anything from `code_checker_ruff` — tach forbids it, they are the same layer.

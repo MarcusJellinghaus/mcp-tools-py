@@ -13,7 +13,8 @@ exact failure the issue exists to prevent.
 - `src/mcp_tools_py/formatter/runner.py`
 - `src/mcp_tools_py/formatter/formatter_tools.py`
 - `src/mcp_tools_py/formatter/__init__.py`
-- `src/mcp_tools_py/utils/project_config.py` — publicise `_read_mcp_tools_section`
+- `src/mcp_tools_py/utils/project_config.py` — new public `read_pyproject_tool_tables(Path)`;
+  `_read_mcp_tools_section` delegates to it
 - `tests/test_formatter_runner.py`
 - `tests/test_formatter_tools.py`
 
@@ -99,9 +100,26 @@ message alone. Something like:
 > No formatter declared: `<root>/pyproject.toml` has neither `[tool.black]` nor
 > `[tool.ruff.format]`. Set `[tool.mcp-tools-py] formatter = "black"` or `"ruff"`.
 
-Reuse `_read_mcp_tools_section` from `utils/project_config.py` for the first lookup —
-export it under a public name rather than reaching for the private one. A missing
-`pyproject.toml` falls through to the "neither declared" error, which is the right answer.
+**One reader, one parameter type.** `resolve_steps` needs three lookups from the same file
+— `[tool.mcp-tools-py] formatter`, `[tool.black]` and `[tool.ruff.format]` — so it must not
+read `pyproject.toml` twice. Add one public helper to `utils/project_config.py`:
+
+```python
+def read_pyproject_tool_tables(project_root: Path) -> dict[str, object]:
+    """The `[tool]` table of `project_root/pyproject.toml`, empty when absent."""
+```
+
+`resolve_steps(project_root: Path)` calls it once and takes all three answers from the
+returned mapping. **`Path` is the parameter type throughout** — the existing
+`_read_mcp_tools_section(project_dir: str)` takes a `str`, so do not call it from
+`resolve_steps`: rewrite it to delegate to the new helper (converting its own `str`
+argument once) rather than parsing the file a second time. `get_check_timeout`'s use of
+`_read_mcp_tools_section` is unaffected, and `_read_mcp_tools_section` stays private —
+publicising it is no longer needed.
+
+A missing `pyproject.toml` yields an empty mapping and falls through to the "neither
+declared" error, which is the right answer. A malformed one propagates the existing
+`ValueError`, which both entry points already handle.
 
 **Rollout is safe:** mcp_coder, mcp-workspace, mcp-config and mcp-coder-utils all have
 `[tool.black]`, so every repo in the fleet resolves to black and none is broken by the new
@@ -165,10 +183,30 @@ but it is typed `resolve_timeout(tool: ToolName)`, a `Literal`, so `step_tool` m
 `ToolName` from `utils/project_config.py`, which it already depends on for
 `DEFAULT_CHECK_TIMEOUT`.
 
-`check_line_length_conflicts` is deduplicated because both ruff steps map to the same
-tool; passing `["ruff", "ruff"]` would risk a doubled warning.
+`check_line_length_conflicts` takes a deduplicated list because both ruff steps map to the
+same tool. It only tests membership (`project_config.py:200`), so duplicates are harmless
+today — dedup is for a readable argument, not to prevent a doubled warning.
 
 Note `timeouts` stays keyed by **step**, because `runner.py` looks it up by step.
+
+### `_unparsable_block`'s explanation is isort-specific and must change
+
+`formatter_tools.py:116-121` renders every step's `unparsable_files` with a hardcoded
+three-line preamble ending in `"Known limitation (Windows, piped stdout)."`. That
+explanation is true only of isort, which exits 0 and skips files it could not read on a
+piped stdout. For the ruff steps a populated `unparsable_files` means a **genuine syntax
+error in the source**, so the current wording tells the caller the opposite of what
+happened.
+
+Replace the third line with wording that covers both causes, and keep the first two lines
+(the count and "a clean result here does NOT mean CI will pass"), which stay true for
+every step:
+
+> `The file could not be parsed, or the formatter could not read it (isort on Windows with piped stdout).`
+
+Test: a `FormatterResult` with a populated `unparsable_files` on a **ruff** step renders a
+block that does not claim a Windows piped-stdout limitation as the cause. Existing
+isort-path assertions on this text are updated to the new wording, not duplicated.
 
 ### `formatter/__init__.py`
 
@@ -214,6 +252,9 @@ Plus:
 6. `steps=None` calls `resolve_steps`; an explicit list does not.
 7. `["isort", "black"]` passed explicitly behaves exactly as before. **Regression
    criterion** — keep the existing tests in this module and add nothing that weakens them.
+   "As before" covers which steps run, in which order, with which `success`,
+   `files_changed` and `unparsable_files`; it does **not** cover `output` text, which step 3
+   deliberately changed by prepending the version banner.
 8. A bogus `python_executable` does not change which binary runs, end to end through
    `run_format_code`.
 
@@ -254,7 +295,14 @@ pylint / pytest / mypy / tach / lint-imports pass. Check `check_file_size` on `r
 >
 > Resolution: `[tool.mcp-tools-py] formatter` wins; otherwise detect `[tool.ruff.format]`
 > versus `[tool.black]`; both present or neither present is an error. Both error messages
-> must name the key and the path to `pyproject.toml`.
+> must name the key and the path to `pyproject.toml`. Read the file **once**, through a new
+> public `read_pyproject_tool_tables(project_root: Path)` in `utils/project_config.py`, and
+> have the existing `_read_mcp_tools_section` delegate to it. `Path` is the parameter type
+> throughout `resolve_steps`.
+>
+> Also fix `_unparsable_block` in `formatter_tools.py`: its
+> `"Known limitation (Windows, piped stdout)"` line is isort-specific and would now be
+> printed for genuine ruff syntax errors. Reword it to cover both causes.
 >
 > Wire both defaulting sites — `runner.py::run_format_code` and the MCP-registered
 > `formatter_tools.py::run_format_code` — to call `resolve_steps` when `steps is None`, so
