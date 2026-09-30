@@ -154,3 +154,13 @@ over both. Step 4's check mode therefore passes `--output-format json` and keys
 "key on the marker line" warning concerned text parsing and is satisfied by structured
 output. `_is_syntax_error` and `_render_diagnostics` are defined once in `ruff_runner.py`
 in step 4 and reused by step 5, and step 5's write-mode `output` uses `combine_output`.
+
+## Breaking changes in the release note; docstrings move to step 6 (supervisor request)
+
+- **`docs/upgrade-notes.md` lists step 6's breaking changes**, each with a remedy: no
+  `steps` errors without `[tool.black]` or `[tool.ruff.format]` (add `[tool.black]`, even
+  empty, or set `[tool.mcp-tools-py] formatter = "black"`); `steps=[]` is an error;
+  `DEFAULT_STEPS` is no longer exported (use `resolve_steps(project_root)`).
+- **The MCP tool docstring in `formatter_tools.py` and `runner.py`'s module and `steps`
+  docstrings are rewritten in step 6**, where the default changes, not in step 8. Step 8's
+  grep criterion accepts those lines as rewritten in step 6.

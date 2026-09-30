@@ -241,6 +241,20 @@ Test: a `FormatterResult` with a populated `unparsable_files` on a **ruff** step
 block containing that line and not `"Known limitation"`. No existing test asserts the old
 line.
 
+### Docstrings that describe the default
+
+These change with the behaviour, so they are rewritten here, not in step 8:
+
+- `formatter_tools.py:43-50` — the **user-visible MCP tool docstring**, which an agent
+  reads before calling the tool. "Run code formatters (black, isort) on the project",
+  `Defaults to ["isort", "black"]` and `Valid values: "isort", "black"` become: the four
+  valid step names (`isort`, `black`, `ruff_imports`, `ruff_format`), and a default resolved
+  from the project's configuration — `[tool.mcp-tools-py] formatter`, else
+  `[tool.ruff.format]` versus `[tool.black]`; both or neither is an error; `[]` is an error.
+- `runner.py` — the module docstring's "sequences formatter runners (isort, black)" (lines
+  3-4), alongside the fail-fast wording above, and the `steps` argument docstring's
+  `Defaults to ["isort", "black"]`, which now says `None` calls `resolve_steps`.
+
 ### `formatter/__init__.py`
 
 Export `resolve_steps`. Drop `DEFAULT_STEPS`. The step lists stay private.
@@ -400,7 +414,10 @@ pylint / pytest / mypy / tach / lint-imports / ruff / vulture pass. Check
 > `{"isort": ..., "black": ...}` literal is what changes.
 >
 > **The MCP-registered `run_format_code` must not gain a `python_executable` parameter.**
-> Its first parameter stays `steps`.
+> Its first parameter stays `steps`. Rewrite its user-visible docstring: list the four
+> valid step names and say the default is resolved from the project's configuration, with
+> both-or-neither and `[]` as errors. Update `runner.py`'s module docstring
+> ("(isort, black)") and its `steps` docstring (`Defaults to ["isort", "black"]`) likewise.
 >
 > Change the write-mode loop to `if not result.success and not check_only and not
 > result.unparsable_files: break` — a failed step that reported unparsable files does not

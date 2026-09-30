@@ -63,14 +63,9 @@ black and isort move to the second list:
 
 Formatter naming:
 
-- `src/mcp_tools_py/formatter/formatter_tools.py:43-50` — the **user-visible MCP tool
-  docstring**. "Run code formatters (black, isort) on the project" and
-  `Valid values: "isort", "black"`. This is what an agent reads before calling the tool,
-  so it must describe all four steps and say the default is resolved from the project's
-  configuration.
-- `src/mcp_tools_py/formatter/runner.py` — module docstring lines 3-4 ("sequences formatter
-  runners (isort, black)") and the `steps` argument docstring ("Defaults to
-  `["isort", "black"]`")
+- Already rewritten in step 6, no edit here: the MCP tool docstring in
+  `formatter/formatter_tools.py:43-50`, and `formatter/runner.py`'s module docstring and
+  `steps` docstring. Step 6 changes the default, so it owns their wording.
 - `src/mcp_tools_py/formatter/__init__.py:1` — "Formatter package for code formatting
   tools (black, isort)"
 - `README.md:460` — "`run_format_code` | Runs isort then black"
@@ -147,6 +142,15 @@ Also add two short points:
   `README.md:152` already advises for the tool-env tools. Otherwise agent formatting and
   CI disagree on every commit.
 
+List the breaking changes from step 6, each with its remedy:
+
+- `run_format_code` with no `steps` now errors when `pyproject.toml` has neither
+  `[tool.black]` nor `[tool.ruff.format]` — common for repos using black with defaults.
+  Add `[tool.black]` (even empty) or set `[tool.mcp-tools-py] formatter = "black"`.
+- `steps=[]` is now an error. Omit `steps` for the default, or name the steps.
+- `DEFAULT_STEPS` is no longer exported from `mcp_tools_py.formatter`. Use
+  `resolve_steps(project_root)`.
+
 ## Regenerated graph
 
 `docs/architecture/dependencies/pydeps_graph.dot` and `.svg` carry
@@ -175,7 +179,8 @@ case-sensitive `those five` misses. The third pattern is the pre-move tool-env
 enumeration; after the sweep it must have **no** hits outside `pr_info/`.
 
 Re-read every hit outside `pr_info/`. Each must be either a line in the "do not change"
-table above or a line written or rewritten in this step. Line numbers are as of planning;
+table above or a line written or rewritten in this step or in step 6 (the
+`formatter_tools.py` and `runner.py` docstrings). Line numbers are as of planning;
 earlier steps shift some (`tests/test_formatter_tools.py` is edited in steps 2 and 6), so
 match table rows by their quoted text. Verified at planning time: the three patterns hit
 only lines listed in this file — the table or the edit lists — so any other hit was added
@@ -184,7 +189,8 @@ by an earlier step and must be classified before committing.
 ## DONE WHEN
 
 pylint / pytest / mypy / tach / lint-imports / ruff / vulture pass, every grep hit outside
-`pr_info/` is a listed do-not-change line or a line written or rewritten in this step, and
+`pr_info/` is a listed do-not-change line or a line written or rewritten in this step or
+step 6, and
 `check_file_size` is clean.
 
 Finally: `delete_directory(".scratch", recursive=True)` if any earlier step left one. CI
@@ -206,8 +212,8 @@ blocks a PR carrying one.
 > workflow list and keeps black; and `architecture.md:173`, the probe bullet sitting next
 > to an edited line. Do not touch `tach.toml`.
 >
-> Update `formatter_tools.py`'s MCP tool docstring — it is user-visible to agents and must
-> describe all four steps and say the default comes from the project's configuration.
+> `formatter_tools.py`'s MCP tool docstring and `runner.py`'s docstrings were already
+> rewritten in step 6; do not edit them here.
 >
 > In `docs/pyproject-configuration.md`, update the `run_format_code` timeout row (3 ×
 > `ruff-timeout` on a ruff repo, since `ruff_imports` is two invocations) and add a
@@ -223,14 +229,16 @@ blocks a PR carrying one.
 > `formatter` key, and name `ruff_runner.py` and `common.py` in the `formatter/` bullet.
 >
 > Before committing, grep for stragglers with the three case-insensitive patterns in the
-> step file. Every hit outside `pr_info/` must be a do-not-change line or a line you
-> wrote or rewrote. `README.md:198` and `:205` take both a count and an enumeration edit.
+> step file. Every hit outside `pr_info/` must be a do-not-change line or a line you or
+> step 6 wrote or rewrote. `README.md:198` and `:205` take both a count and an enumeration edit.
 >
 > Put the release note — the first `run_format_code` after upgrade may reformat, because
 > the formatter now comes from the tool env — in a new `docs/upgrade-notes.md`, with the
 > two short points from the step file (console scripts found only next to the tool-env
-> interpreter; keep CI's black/isort pins compatible), link it from `docs/README.md`
-> under Configuration, and repeat it in the PR description.
+> interpreter; keep CI's black/isort pins compatible) and step 6's three breaking changes
+> with their remedies (no-`steps` error without `[tool.black]` or `[tool.ruff.format]`;
+> `steps=[]` rejected; `DEFAULT_STEPS` removed in favour of `resolve_steps`), link it
+> from `docs/README.md` under Configuration, and repeat it in the PR description.
 >
 > Delete `.scratch/` if any earlier step left one.
 >

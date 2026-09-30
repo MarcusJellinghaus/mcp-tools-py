@@ -163,3 +163,22 @@ Supervised plan review (`/plan_review_supervisor`). Continues from `plan_review_
 **User decisions**: none
 **Changes**: step_4, step_5, summary.md, Decisions.md. Probe (ruff 0.16.9): JSON check output gives `code == "unformatted"` / `"invalid-syntax"` with one entry per affected file, parsed correctly by `parse_ruff_json_output`; concise config/env breaks the text markers; an explicit `--output-format` flag wins over config/env. Check mode now uses JSON; `_is_syntax_error` and `_render_diagnostics` are defined once in `ruff_runner.py` and shared with step 5; `_ARROW_PATH` and the marker parser are removed; write-mode `_FAILED_TO_PARSE` kept.
 **Status**: committed
+
+## Round 10 — 2026-09-30
+**Triage rules changed (user direction)**: from this round, ignore line numbers, counts, wording and cross-reference drift unless it would mislead the implementer; a round with no high/medium findings counts as done; low findings are logged, not actioned.
+**Findings**:
+- step_8 — medium — release note misses step 6's breaking changes (no-declaration error, `steps=[]` error, `DEFAULT_STEPS` removed)
+- step_6 — medium — user-visible MCP tool docstring stays wrong until step 8
+- summary — low — CI's `pycycle` not in per-step checks
+- step_2 — low — `formatter_binary`'s `environment=None` default unused
+- Design — `--no-deps` installs don't enforce the ruff floor; mcp_coder pins `ruff>=0.9.0`
+- Design — optionally split step 3
+**Decisions**:
+- Release note: accept
+- Docstring to step 6: accept
+- pycycle, `formatter_binary` default: skip (low, logged for the implementer)
+- `--no-deps` floor: out of scope — belongs to the mcp_coder#1173 follow-up (raise mcp_coder's ruff floor when it selects the ruff steps); told the user
+- Split step 3: skip (bundling is justified in the plan)
+**User decisions**: none
+**Changes**: step_6, step_8, summary.md, Decisions.md.
+**Status**: committed
