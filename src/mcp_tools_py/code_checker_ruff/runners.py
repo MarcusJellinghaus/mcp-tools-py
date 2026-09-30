@@ -26,19 +26,32 @@ _EXTRA_ARGS_HINT = " An argument in extra_args probably changed the output shape
 
 
 def _rejected_flag(extra_args: list[str] | None, flags: tuple[str, ...]) -> str | None:
-    """First token in extra_args that exactly equals one of flags, else None."""
+    """First token in extra_args that exactly equals one of flags, else None.
+
+    Returns:
+        The first matching rejected flag, or None.
+    """
     return next((arg for arg in extra_args or [] if arg in flags), None)
 
 
 def _rejection_message(flag: str) -> str:
-    """Error returned instead of running ruff with a rejected flag."""
+    """Error returned instead of running ruff with a rejected flag.
+
+    Returns:
+        The error message for the rejected flag.
+    """
     if flag == "--statistics":
         return _STATISTICS_ERROR
     return _FIX_IN_CHECK_ERROR.format(flag=flag)
 
 
 def _with_hint(parse_error: str, extra_args: list[str] | None) -> str:
-    """Append the extra_args hint to a parse error when extra_args were passed."""
+    """Append the extra_args hint to a parse error when extra_args were passed.
+
+    Returns:
+        The parse error, with the extra_args hint appended when extra_args
+        were passed.
+    """
     return parse_error + _EXTRA_ARGS_HINT if extra_args else parse_error
 
 
