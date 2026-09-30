@@ -182,3 +182,15 @@ Supervised plan review (`/plan_review_supervisor`). Continues from `plan_review_
 **User decisions**: none
 **Changes**: step_6, step_8, summary.md, Decisions.md.
 **Status**: committed
+
+## Round 11 — 2026-09-30
+Reviewer prompt tightened: only wrong behaviour, tests that can't pass, unsatisfiable checks, missing requirements, contradictions about what to build.
+**Findings**:
+- step_5 — medium — `ruff_imports` JSON run lacks `--no-fix`; with `[tool.ruff] fix = true` check mode rewrites files and write mode's pre-check returns empty `files_changed`
+**Decisions**:
+- `--no-fix`: accept, after a probe confirmed it (with `fix = true`, the JSON run sorted the file and reported nothing, exit 0; with `--no-fix` the file was untouched and `I001` reported, exit 1). Step 4's `format --check` is unaffected (confirmed).
+- summary.md's asymmetry table still shows the command without `--no-fix`: skipped — step 5 is authoritative (drift rule)
+- Out of scope: `run_ruff_fix_impl` has the same gap
+**User decisions**: none
+**Changes**: step_5 (argv, algorithm, prompt, tests 1/1b/2), Decisions.md.
+**Status**: committed

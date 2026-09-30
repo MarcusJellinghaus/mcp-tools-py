@@ -47,8 +47,13 @@ applied. Mirror it.
 
 | mode | invocations |
 |---|---|
-| write | `ruff check --select I --output-format json <dirs>`, then `ruff check --select I --fix <dirs>` |
-| check | `ruff check --select I --output-format json <dirs>` |
+| write | `ruff check --select I --no-fix --output-format json <dirs>`, then `ruff check --select I --fix <dirs>` |
+| check | `ruff check --select I --no-fix --output-format json <dirs>` |
+
+**`--no-fix` on the JSON run is required.** Verified against the installed ruff: with
+`[tool.ruff] fix = true` in the project, the JSON run without `--no-fix` sorts the file on
+disk and its JSON omits the `I001` diagnostic — check mode would write and report success.
+With `--no-fix` the file is untouched and `I001` is listed.
 
 Do not import from `code_checker_ruff` — tach forbids it (same layer). The shared piece is
 `parse_ruff_json_output`, which step 1 moved to `utils/ruff_parsing.py`.
@@ -84,7 +89,7 @@ the one `null` repeat in test 6.
 ```
 env    = environment or PythonEnvironment.resolve()   # once, as in step 2
 binary = formatter_binary("ruff", env);  if None -> unavailable FormatterResult naming env.bin_dir
-json_cmd = [binary, "check", "--select", "I", "--output-format", "json"] + target_dirs
+json_cmd = [binary, "check", "--select", "I", "--no-fix", "--output-format", "json"] + target_dirs
 started = time.monotonic()
 pre = execute_command(json_cmd, cwd=project_dir, timeout_seconds=...)
 timed_out / execution_error -> early return, no version banner
@@ -296,8 +301,11 @@ and 8 if it runs ruff) restore the real function with
 `monkeypatch.setattr(ruff_runner, "formatter_binary", common.formatter_binary)`.
 
 1. Check mode: exactly one invocation, argv is
-   `[ruff, "check", "--select", "I", "--output-format", "json", "src"]`.
-2. Write mode: **two** invocations, the second carrying `--fix` and no `--output-format`.
+   `[ruff, "check", "--select", "I", "--no-fix", "--output-format", "json", "src"]`.
+1b. **`--no-fix` on the JSON run:** in both check mode and write mode, the first
+   invocation's argv contains `--no-fix` (mocked; overrides a project's `fix = true`).
+2. Write mode: **two** invocations, the second carrying `--fix` and neither `--no-fix` nor
+   `--output-format`.
 3. Bogus `python_executable` does not change argv.
 4. `files_changed` comes from the pre-check messages with `fixable` true, deduplicated, as
    project-relative forward-slash paths (`["src/a.py"]`, not `src\a.py` and not `a.py`).
@@ -368,7 +376,7 @@ specifically: it is what catches an accidental `from mcp_tools_py.code_checker_r
 > Add `run_ruff_imports` to `src/mcp_tools_py/formatter/ruff_runner.py`, matching the
 > other runners' signature.
 >
-> Write mode is **two** invocations: a `ruff check --select I --output-format json` pre-check
+> Write mode is **two** invocations: a `ruff check --select I --no-fix --output-format json` pre-check
 > that collects the fixable filenames, then `ruff check --select I --fix`. The fix run's
 > JSON lists only remaining unfixed diagnostics, so `files_changed` must come from the
 > pre-check. Check mode is the JSON run alone.

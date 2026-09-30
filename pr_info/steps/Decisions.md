@@ -164,3 +164,7 @@ in step 4 and reused by step 5, and step 5's write-mode `output` uses `combine_o
 - **The MCP tool docstring in `formatter_tools.py` and `runner.py`'s module and `steps`
   docstrings are rewritten in step 6**, where the default changes, not in step 8. Step 8's
   grep criterion accepts those lines as rewritten in step 6.
+
+## `ruff_imports` JSON run passes `--no-fix` (supervisor request, based on a probe)
+
+Probe: with `[tool.ruff] fix = true`, `ruff check --select I --output-format json` sorted the file on disk and omitted `I001`; with `--no-fix` the file was untouched and `I001` listed. `ruff format --check` did not modify the file under the same config.
