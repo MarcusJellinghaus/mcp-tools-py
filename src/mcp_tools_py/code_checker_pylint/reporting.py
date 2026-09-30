@@ -67,14 +67,22 @@ def _group_and_sort_issues(messages: list[PylintMessage]) -> list[IssueGroup]:
 
 
 def _dir_split(group: IssueGroup, project_dir: str) -> str:
-    """Format the group's count split by top-level directory."""
+    """Format the group's count split by top-level directory.
+
+    Returns:
+        The directory split, e.g. ``(src: 11, tests: 2)``.
+    """
     return format_dir_split(
         normalize_path(msg.path, project_dir) for msg in group.messages
     )
 
 
 def _summary_line(group: IssueGroup, project_dir: str) -> str:
-    """Format one rule line: id, symbol, count and directory split."""
+    """Format one rule line.
+
+    Returns:
+        The line with message id, symbol, count and directory split.
+    """
     return (
         f"- {group.message_id} {group.symbol}: "
         f"{plural(len(group.messages), 'occurrence')} "

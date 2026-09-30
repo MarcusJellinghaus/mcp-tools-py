@@ -16,8 +16,10 @@ def plural(count: int, word: str) -> str:
 def _top_level_dir(path: str) -> str:
     """Map a project-relative path to its top-level directory.
 
-    Returns ``(root)`` for files directly in the project root and ``(outside)``
-    for absolute paths, ``..`` paths and pylint's ``Command line`` pseudo-path.
+    Returns:
+        The top-level directory name, ``(root)`` for files directly in the
+        project root, or ``(outside)`` for absolute paths, ``..`` paths and
+        pylint's ``Command line`` pseudo-path.
     """
     if path == "Command line":
         return _OUTSIDE
@@ -35,9 +37,11 @@ def _top_level_dir(path: str) -> str:
 
 
 def format_dir_split(paths: Iterable[str]) -> str:
-    """Format per-top-level-directory counts, e.g. ``(src: 11, tests: 2)``.
+    """Format per-top-level-directory counts.
 
-    Ordered by count descending, ties alphabetical.
+    Returns:
+        The counts in parentheses, e.g. ``(src: 11, tests: 2)``, ordered by
+        count descending, ties alphabetical.
     """
     counts = Counter(_top_level_dir(path) for path in paths)
     items = sorted(counts.items(), key=lambda kv: (-kv[1], kv[0]))
@@ -45,5 +49,9 @@ def format_dir_split(paths: Iterable[str]) -> str:
 
 
 def format_total_line(tool: str, issues: int, rules: int) -> str:
-    """Format the report's total line, e.g. ``ruff found 3 issues across 2 rules``."""
+    """Format the report's total line.
+
+    Returns:
+        The line, e.g. ``ruff found 3 issues across 2 rules``.
+    """
     return f"{tool} found {plural(issues, 'issue')} across {plural(rules, 'rule')}"

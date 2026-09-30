@@ -15,7 +15,11 @@ MAX_LOCATIONS_PER_CODE = 5
 
 
 def _format_message(msg: MypyMessage) -> list[str]:
-    """Format one message as a location line followed by its indented hint lines."""
+    """Format one mypy message.
+
+    Returns:
+        The location line followed by the message's indented hint lines.
+    """
     lines = [f"- {msg.file}:{msg.line}:{msg.column} - {msg.message}"]
     if msg.hint:
         lines.extend(f"    {hint_line}" for hint_line in msg.hint.splitlines())
