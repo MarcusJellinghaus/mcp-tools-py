@@ -13,7 +13,8 @@ exact failure the issue exists to prevent.
 - `src/mcp_tools_py/formatter/runner.py`
 - `src/mcp_tools_py/formatter/formatter_tools.py`
 - `src/mcp_tools_py/formatter/__init__.py`
-- `tests/test_formatter_runner.py`
+- `tests/test_formatter_runner.py` — new tests, plus `steps=["isort", "black"]` passed
+  explicitly in the six existing tests that omit `steps` (see TESTS)
 - `tests/test_formatter_tools.py`
 
 **Create** `tests/test_formatter_resolution.py`
@@ -247,12 +248,21 @@ Plus:
 5. `steps=[]` raises `ValueError` — not a fallback to the defaults, not a zero-step run.
 6. `steps=None` calls `resolve_steps`; an explicit list does not.
 7. `["isort", "black"]` passed explicitly behaves exactly as before. **Regression
-   criterion** — keep the existing tests in this module and add nothing that weakens them.
+   criterion** — keep the existing tests' assertions and add nothing that weakens them.
    "As before" covers which steps run, in which order, with which `success`,
    `files_changed` and `unparsable_files`; it does **not** cover `output` text, which step 3
    deliberately changed by prepending the version banner.
 8. A bogus `python_executable` does not change which binary runs, end to end through
    `run_format_code`.
+
+**Six existing tests in this module must pass `steps` explicitly.**
+`test_runs_isort_then_black`, `test_stops_on_failure`, `test_continues_on_failure`,
+`test_passes_check_only_to_runners`, `test_each_step_receives_its_own_timeout` and
+`test_missing_timeouts_use_default` call `run_format_code(_PYTHON, _PROJECT, _DIRS, ...)`
+with no `steps`. `_PROJECT` is `Path("/fake/project")`, which has no `pyproject.toml`, so
+`steps=None` now raises the "neither declared" error. Add `steps=["isort", "black"]` to
+each call — the only edit; their assertions stay unchanged. Defaulting itself is covered
+by test 6 and `tests/test_formatter_resolution.py`.
 
 `tests/test_formatter_tools.py`:
 
@@ -330,8 +340,13 @@ pylint / pytest / mypy / tach / lint-imports pass. Check `check_file_size` on `r
 > function-scoped, and a module-scoped fixture requesting either raises `ScopeMismatch`.
 > Do not change the shared `tool_context` fixture in `tests/conftest.py`.
 >
-> Keep the existing explicit-`["isort", "black"]` tests passing unchanged; that is a stated
-> regression criterion.
+> In `tests/test_formatter_runner.py`, the six existing tests that call `run_format_code`
+> without `steps` (`test_runs_isort_then_black`, `test_stops_on_failure`,
+> `test_continues_on_failure`, `test_passes_check_only_to_runners`,
+> `test_each_step_receives_its_own_timeout`, `test_missing_timeouts_use_default`) would hit
+> the "neither declared" error — `_PROJECT` has no `pyproject.toml`. Pass
+> `steps=["isort", "black"]` explicitly in each and leave their assertions unchanged; that
+> is the stated regression criterion.
 >
 > Run `run_format_code`, `run_pylint_check`, `run_pytest_check` with
 > `extra_args=["-n", "auto"]`, `run_mypy_check`, `run_tach_check` and

@@ -58,12 +58,14 @@ done — CI blocks a PR carrying one.
 ```
 binary = formatter_binary("ruff", environment);  if None -> unavailable FormatterResult
 cmd    = [binary, "format"] + (["--check"] if check_only else []) + target_dirs
+started = time.monotonic()
 result = execute_command(cmd, cwd=project_dir, timeout_seconds=...)
 timed_out / execution_error -> early return, no version banner   (as the other runners)
+remaining = int(timeout_seconds - (time.monotonic() - started))
 stderr_bad = [path for "error: Failed to parse <path>:<line>:<col>" in result.stderr]
 changed, marker_bad = parse_check_markers(stdout) if check_only else ([], [])
 unparsable = dedup(stderr_bad + marker_bad)      # project-relative, forward slashes
-return FormatterResult(output=version_line("ruff", environment=environment) + combined,
+return FormatterResult(output=version_line("ruff", binary, remaining) + combined,
                        success=(return_code == 0), files_changed=changed,
                        unparsable_files=unparsable)
 ```
@@ -158,7 +160,8 @@ Paths in both lists are project-relative with forward slashes.
 ## TESTS
 
 **Write first**, all against a mocked `execute_command` using recorded real output,
-except the last:
+except the last. As in step 3's runner tests, an autouse fixture patches
+`ruff_runner.version_line` so the mocked tests spawn no `--version` subprocess:
 
 1. Write mode argv is `[ruff, "format", "src"]` — no `--check`.
 2. `check_only=True` adds `--check`.
@@ -183,7 +186,8 @@ except the last:
    absolute path under `project_dir`, built with `os.path.join(project_dir, "src",
    "bad.py")`, normalizes to `"src/bad.py"` too.
 10. Missing ruff binary → `success=False`, no subprocess.
-11. Timed out and execution-error paths → `success=False`, no version banner.
+11. Timed out and execution-error paths → `success=False`, no version banner, and
+    `version_line` not called.
 12. **One integration test, no mock:** a `tmp_path` project with one badly formatted file
     and one syntax-error file, run in write mode. The good file is reformatted on disk,
     `unparsable_files == ["src/bad.py"]`, `success is False`. This is the acceptance

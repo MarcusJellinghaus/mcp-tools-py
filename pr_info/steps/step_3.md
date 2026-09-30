@@ -30,21 +30,11 @@ def combine_output(result: CommandResult) -> str:
     """Join a command's stdout and stderr into one block."""
 
 
-def formatter_version(
-    distribution: str,
-    environment: PythonEnvironment | None = None,
-) -> str:
-    """Version of `distribution` in the environment the binary comes from.
-
-    Returns the installed version, or "unknown" when it cannot be determined.
-    """
+def formatter_version(binary: str, timeout_seconds: int) -> str:
+    """Version reported by `binary --version`, or "unknown" when it cannot be determined."""
 
 
-def version_line(
-    tool: str,
-    distribution: str | None = None,
-    environment: PythonEnvironment | None = None,
-) -> str:
+def version_line(tool: str, binary: str, timeout_seconds: int) -> str:
     """One-line version banner to prepend to a FormatterResult.output."""
 ```
 
@@ -52,58 +42,57 @@ def version_line(
 leading underscore is dropped — they are now package-internal shared helpers, not
 module-private ones.
 
-### Why `importlib.metadata`, not `--version`
+### Version from `<binary> --version`, as the issue specifies
 
-The version must describe the binary that was actually invoked. Step 2 made the
-environment a **caller-supplied, injectable** parameter — `formatter_binary(name,
-environment)`, with the MCP layer passing `self.context.tool_environment` and
-`tests/conftest.py:78` injecting a tmp script directory — so `formatter_version` takes the
-**same** `environment` its caller passed to `formatter_binary`. Reading
-`importlib.metadata.version()` unconditionally would report the running process's
-distribution no matter which environment the binary came from, which is the divergence
-step 2 exists to prevent.
+The version must describe the binary that was actually invoked, so `formatter_version`
+runs `[binary, "--version"]` on the **same path** `formatter_binary(name, environment)`
+returned to the runner. That makes the injected environment govern the banner for free —
+no metadata lookup, no environment parameter.
 
-When `environment` is `None`, or when its interpreter is the running one, the running
-process **is** the environment the console script comes from, so
-`importlib.metadata.version(distribution)` names the exact distribution. That is the
-production path: `tool_environment` is `sys.executable`'s environment and is not
-configurable from the CLI. Any other environment is answered from the existing cached
-`get_environment_info(interpreter).distributions` probe in `utils/environment_info.py`,
-keyed by lowercased distribution name — no new subprocess per step, because that probe is
-one-shot and `lru_cache`d per interpreter.
+**It never fails the step.** A timed-out run, an `execution_error`, a non-zero exit, or
+output with no recognisable version number all return `"unknown"`.
 
-This deviates from the issue text, which specifies one `--version` subprocess per step
-inside that step's timeout budget. The acceptance criterion — *each step's `output` names
-the formatter version it ran* — is met identically, with four fewer subprocesses, no
-timeout interaction, and a one-line degradation path.
+**Timeout budget.** The version call runs inside the step's own budget: after the step's
+last formatter invocation, with whatever that invocation's `timeout_seconds` left unused.
+Under one second left → skip the call and report `"unknown"`. A step's worst-case wall
+time is therefore unchanged, and the timeout docs in step 8 need no version term.
 
-**Put a comment at `formatter_version` recording the revert path:** if the metadata route
-ever stops matching the invoked binary, swap the body for a `--version` subprocess — one
-function, and the call sites do not move.
+**Probe the output first.** Before writing the parser, run `black --version`,
+`isort --version` and `ruff --version` from the tool env via a `.scratch/` probe and record
+the real stdout. Expected shapes differ — black prints `black, <v> (compiled: …)` plus a
+Python line, ruff prints `ruff <v>`, isort prints an ASCII banner with `VERSION <v>` — so
+the parser takes the **first** dotted version number (`\d+(\.\d+)+`) in stdout. Confirm
+that the first match is the formatter's own version for all three, not a Python version.
+Delete `.scratch/` when done.
 
 ## ALGORITHM
 
 ```
-formatter_version(dist, environment=None):
-    if environment is None or environment.interpreter == Path(sys.executable):
-        try:    return importlib.metadata.version(dist)
-        except PackageNotFoundError: return "unknown"
-    info = get_environment_info(str(environment.interpreter))
-    return info.distributions.get(dist.lower(), "unknown")   # "unknown" on probe error
+formatter_version(binary, timeout_seconds):
+    if timeout_seconds < 1: return "unknown"
+    result = execute_command([binary, "--version"], timeout_seconds=timeout_seconds)
+    if result.timed_out or result.execution_error or result.return_code != 0:
+        return "unknown"
+    match = first r"\d+(\.\d+)+" in result.stdout
+    return match or "unknown"
 
-version_line(tool, dist=None, environment=None):
-    return f"{tool} {formatter_version(dist or tool, environment)}"
+version_line(tool, binary, timeout_seconds):
+    return f"{tool} {formatter_version(binary, timeout_seconds)}"
 ```
 
-Each runner passes the `environment` it received, so the banner and the binary always come
-from one place:
+Each runner records `started = time.monotonic()` before its final formatter invocation and
+passes the remainder, so the banner and the binary always come from one place:
 
 ```python
-output = f"{version_line('black', environment=environment)}\n{combine_output(result)}"
+remaining = int(timeout_seconds - (time.monotonic() - started))
+output = f"{version_line('black', binary, remaining)}\n{combine_output(result)}"
 ```
 
-`distribution` defaults to `tool` and differs only where the names diverge. black, isort
-and ruff all match, so the parameter exists for honesty, not for a current caller.
+`formatter_version` calls `execute_command` through `common.py`'s **own** import, never
+through the runner module's. The existing runner tests read `mock_exec.call_args` — the
+**last** call — for argv and `timeout_seconds` (`tests/test_black_runner.py:40,51,161,170`,
+`tests/test_isort_runner.py:55,66,191,200`), so a version call routed through the runner's
+patched `execute_command` would replace the call they inspect.
 
 ## DATA
 
@@ -120,16 +109,17 @@ black 24.8.0
 In each runner, after the successful-command branch:
 
 ```python
-output = f"{version_line('black', environment=environment)}\n{combine_output(result)}"
+remaining = int(timeout_seconds - (time.monotonic() - started))
+output = f"{version_line('black', binary, remaining)}\n{combine_output(result)}"
 return FormatterResult(output=truncate_output(output), ...)
 ```
 
-`environment` is the runner's own keyword-only parameter from step 2 — the same value it
-passed to `formatter_binary`, so the banner names the environment the binary came from.
+`binary` is the path `formatter_binary("black", environment)` returned in step 2's code —
+the one just invoked — so the banner names the binary that ran.
 
 The version line goes **inside** the truncation input, so a 200-line cap still yields a
 banner. The timed-out and execution-error early returns keep their current bare messages
-— a version banner on "black timed out" is noise.
+and **run no version subprocess** — a version banner on "black timed out" is noise.
 
 ### This changes `FormatterResult.output` for `black` and `isort`
 
@@ -140,7 +130,7 @@ first line. `success`, `files_changed` and `unparsable_files` are untouched, and
 string.
 
 The "existing explicit `["isort", "black"]` behaviour unchanged — regression criterion" at
-`step_6.md:215` and `step_7.md:59` therefore means **which steps run, in which order, with
+`step_6.md` (test 7) and `step_7.md` (test 4) therefore means **which steps run, in which order, with
 which results** — it does **not** cover `output` content. Any existing test asserting
 `output` equality for black or isort is updated here, in this step, to expect the banner;
 that is not a weakening of the regression criterion.
@@ -152,24 +142,28 @@ that is not a weakening of the regression criterion.
 1. `truncate_output` under the cap returns the input unchanged.
 2. Over the cap: 200 lines plus a `... (truncated, N more lines)` marker.
 3. `combine_output` joins both streams; each of stdout-only, stderr-only and neither.
-4. `formatter_version("black")` returns something non-empty and not `"unknown"` — black
-   is a declared dependency, so it is installed in the test environment.
-5. `formatter_version("definitely-not-a-distribution")` returns `"unknown"`. Assert the
-   degradation, not an exception.
-5b. **The environment governs the answer.** `formatter_version("black", environment=env)`
-   for an `env` whose interpreter is *not* `sys.executable` goes through the probe, not
-   through `importlib.metadata`: patch `get_environment_info` to report a distinct
-   `distributions` mapping and assert that version comes back. A probe error, or a
-   distribution the probe does not list, degrades to `"unknown"`.
-5c. An `environment` whose interpreter *is* `sys.executable` gives the same answer as
-   `environment=None`.
+4. **Unmocked:** `formatter_version(<tool-env black binary>, 30)` returns a dotted version,
+   not `"unknown"` — black is a declared dependency, so its console script exists.
+5. Parsing, against mocked `common.execute_command` fed the **recorded** real stdout of
+   `black --version`, `isort --version` and `ruff --version`: each yields the formatter's
+   own version, never the Python version.
+5b. **Degradation, never an exception:** timed out, `execution_error`, non-zero exit, and
+   stdout with no version number each return `"unknown"`.
+5c. The subprocess argv is `[binary, "--version"]` with the given `timeout_seconds`, and
+   `timeout_seconds < 1` returns `"unknown"` without running anything.
 
 `tests/test_black_runner.py` / `tests/test_isort_runner.py`:
 
-6. A successful run's `output` first line names the tool and a version. With an injected
-   `environment`, the banner reports **that** environment's version — the same environment
-   the invoked binary came from, per step 2's threaded parameter.
-7. The timed-out and execution-error paths carry **no** version banner.
+Add an autouse fixture patching `<runner module>.version_line` to a fixed
+`"<tool> 0.0.0"`, so no existing test spawns a version subprocess against its patched
+binary path. Tests 6 and 7 assert on that mock's calls; the real subprocess is covered by
+tests 4-5c above.
+
+6. A successful run's `output` first line is the banner, and `version_line` received the
+   **same binary path** the formatter command used (argv[0]) and a timeout no larger than
+   the step's `timeout_seconds`.
+7. The timed-out and execution-error paths carry **no** version banner and call
+   `version_line` zero times.
 
 Existing truncation tests in the two runner test modules can point at the shared helper
 or stay as-is; do not rewrite what already passes.
@@ -189,26 +183,26 @@ pylint / pytest / mypy / tach / lint-imports pass. `common.py` must not import f
 > `formatter_binary` — with `truncate_output` and
 > `combine_output` — moved verbatim from the duplicated private copies in
 > `black_runner.py` and `isort_runner.py` — plus
-> `formatter_version(distribution, environment=None)` and
-> `version_line(tool, distribution=None, environment=None)`.
+> `formatter_version(binary, timeout_seconds)` and
+> `version_line(tool, binary, timeout_seconds)`.
 >
-> `formatter_version` takes the **same** `environment` its caller passed to
-> `formatter_binary`, so the banner describes the binary that actually ran. When
-> `environment` is `None` or names the running interpreter, use
-> `importlib.metadata.version` and return `"unknown"` on `PackageNotFoundError`;
-> otherwise read the version from the cached
-> `get_environment_info(interpreter).distributions` probe, degrading to `"unknown"`. Do
-> not read `importlib.metadata` unconditionally — the environment is injectable
-> (`tests/conftest.py:78`), so that would report the running process's version for a
-> binary that came from somewhere else. Add a comment recording the
-> `--version`-subprocess revert path.
+> `formatter_version` runs `[binary, "--version"]` — the **same** path the runner got from
+> `formatter_binary` and just invoked — through `common.py`'s own `execute_command`
+> import, and returns the first dotted version number in stdout. Timeout, execution
+> error, non-zero exit or no match → `"unknown"`; it never fails the step. **Probe the real
+> `--version` output of black, isort and ruff in `.scratch/` first** and write the parser
+> against it; delete `.scratch/` when done.
 >
 > Wire both existing runners to the shared helpers and have each prepend a version line
-> to `output`, inside the truncation input, passing their own `environment` through. The
-> timed-out and execution-error early returns get no banner.
+> to `output`, inside the truncation input. The version call gets what is left of the
+> step's `timeout_seconds` after the formatter invocation (measured with
+> `time.monotonic()`); under one second left means `"unknown"`. The timed-out and
+> execution-error early returns get no banner and run no version subprocess.
 >
-> Write the tests first, including the `"unknown"` degradation case and the case where an
-> injected environment governs the reported version.
+> Write the tests first, including the `"unknown"` degradation cases, parsing of recorded
+> real output, and an autouse fixture in the runner test modules that patches
+> `version_line` so existing `mock_exec.call_args` assertions still see the formatter
+> call.
 >
 > Run `run_format_code`, `run_pylint_check`, `run_pytest_check` with
 > `extra_args=["-n", "auto"]`, `run_mypy_check`, `run_tach_check` and

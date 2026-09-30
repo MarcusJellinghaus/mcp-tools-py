@@ -75,6 +75,7 @@ Expected shape: a syntax-error diagnostic carries no rule code, so
 ```
 binary = formatter_binary("ruff", environment);  if None -> unavailable FormatterResult
 json_cmd = [binary, "check", "--select", "I", "--output-format", "json"] + target_dirs
+started = time.monotonic()
 pre = execute_command(json_cmd, cwd=project_dir, timeout_seconds=...)
 timed_out / execution_error -> early return, no version banner
 messages, parse_error = parse_ruff_json_output(pre.stdout, project_dir)
@@ -82,12 +83,20 @@ unparsable = sorted({norm(m.filename) for m in messages if not m.code})
 violations = sorted({norm(m.filename) for m in messages if m.code})   # any I diagnostic
 changed    = sorted({norm(m.filename) for m in messages if m.fixable})
 if check_only:  success = (not violations and not unparsable)
-else:           run [binary, "check", "--select", "I", "--fix"] + target_dirs
+else:           started = time.monotonic()
+                fix = execute_command([binary, "check", "--select", "I", "--fix"] + target_dirs, ...)
+                timed_out / execution_error -> early return, no version banner
                 # runs even when `unparsable` is non-empty — ruff skips the
                 # unparsable file and still sorts the rest
                 success = (fix.return_code == 0 and not unparsable)
-output = version_line("ruff", environment=environment) + per_file_ignores_notice(...) + combined
+remaining = int(timeout_seconds - (time.monotonic() - started))   # budget of the last invocation
+output = version_line("ruff", binary, remaining) + per_file_ignores_notice(...) + combined
 ```
+
+The `--fix` run gets the **same** timed-out / execution-error early return as the
+pre-check: `success=False`, the bare `ruff timed out …` / `ruff failed to run: …` message,
+no version banner and no version subprocess. `files_changed` is `[]` on that return — the
+fix may not have been applied, so the pre-check's fixable list is not a claim it can make.
 
 `files_changed` is populated from the **pre-check** run in both modes — that is what makes
 it correct in write mode, where the fix run's JSON would report nothing.
@@ -204,7 +213,8 @@ All paths are project-relative with forward slashes.
 
 ## TESTS
 
-**Write first.**
+**Write first.** The mocked tests share step 4's autouse fixture patching
+`ruff_runner.version_line`.
 
 1. Check mode: exactly one invocation, argv is
    `[ruff, "check", "--select", "I", "--output-format", "json", "src"]`.
@@ -233,6 +243,9 @@ All paths are project-relative with forward slashes.
 9. No `per-file-ignores` at all, and one that ignores a non-`I` code → no notice.
 9b. A **malformed** `pyproject.toml` → no notice and no exception; the step still runs.
 10. Missing ruff binary → `success=False`, no subprocess.
+10b. Write mode, pre-check succeeds, **`--fix` run times out** (and, separately, returns an
+    `execution_error`) → `success=False`, the bare timeout / failure message, no version
+    banner, `version_line` not called.
 
 `tests/test_project_config.py`:
 
@@ -272,6 +285,11 @@ specifically: it is what catches an accidental `from mcp_tools_py.code_checker_r
 > suppress the fix run — ruff skips that file and still sorts the rest, which the issue
 > requires ("with the other files still formatted"). The only case that skips the fix is
 > malformed JSON from ruff itself, where nothing about the tree is known.
+>
+> Both invocations get the same timed-out / execution-error early return — no version
+> banner, no version subprocess. The version banner otherwise comes from
+> `version_line("ruff", binary, remaining)` with what is left of the last invocation's
+> budget.
 >
 > Check-mode `success` is keyed on **every** `I` diagnostic, not only the fixable ones, so
 > an unsorted import ruff declines to autofix still reports `success=False`.

@@ -125,13 +125,18 @@ Real `tmp_path` repos, `steps=None`. Assert the message names the key and the fi
 
 Every step's `output` first line names the formatter and a version, on both the ruff and
 the black repo. Acceptance criterion: *each step's `output` names the formatter version it
-ran*. Assert the tool name and that the version is not `"unknown"`, not an exact version
-string.
+ran*. Assert the tool name and that the version is not `"unknown"` — proving the real
+`<binary> --version` call succeeded within the step's budget — not an exact version string.
 
 ### 10. MCP layer agrees with the runner layer
 
-Capture the registered `run_format_code` as `tests/test_formatter_tools.py` does, point a
-`ToolContext` at the ruff repo, call it with no `steps`, and assert the output has
+Capture the registered `run_format_code` as `tests/test_formatter_tools.py` does. Build a
+`ToolContext` directly with `project_dir` set to the tmp ruff repo and the **real default
+tool environment** — `environment=PythonEnvironment.resolve()` for the required field, and
+leave `tool_environment` unset so its `default_factory` supplies it.
+Do **not** use the conftest `tool_context` fixture: its tool env is a dummy script
+directory of empty stubs, so no real formatter would run. Call it with no `steps`, and
+assert the output has
 `## ruff_imports` and `## ruff_format` sections and no `## black`. One defaulting rule,
 two entry points.
 
@@ -171,7 +176,9 @@ issue has a test naming it.
 > first on the same file and stops the run; `steps=[]` raising at the runner and returning an
 > error string at the MCP layer; both-declared and neither-declared errors naming the key
 > and the file; a version line on every step; and the MCP layer resolving to the same steps
-> as the runner layer.
+> as the runner layer — for that one, build a `ToolContext` with the real default tool
+> environment and `project_dir` at the tmp ruff repo, not the conftest `tool_context`
+> fixture, whose tool env holds empty stub scripts.
 >
 > This is a test-only commit. If a test fails, fix the source — but land the fix in this
 > commit rather than amending an earlier step.

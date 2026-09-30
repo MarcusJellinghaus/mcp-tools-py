@@ -14,8 +14,6 @@ Its failure mode is an availability regression, so it lands alone and is verifie
 
 **Modify**
 - `src/mcp_tools_py/utils/environment_info.py`
-- `src/mcp_tools_py/utils/python_environment.py` — the `tool_environment()` accessor
-- `src/mcp_tools_py/utils/tool_context.py` — `tool_environment` `default_factory`
 - `src/mcp_tools_py/formatter/black_runner.py`
 - `src/mcp_tools_py/formatter/isort_runner.py`
 - `src/mcp_tools_py/formatter/runner.py`
@@ -100,26 +98,24 @@ the environment through instead:
   `environment: PythonEnvironment | None = None`.
 - `runner.py::run_format_code` gains the same trailing keyword-only parameter and passes
   it to each runner. Adding it last and keyword-only keeps mcp_coder's existing
-  positional `run_black(sys.executable, ...)` call working.
+  positional `run_black(sys.executable, ...)` call working. **Its own
+  `python_executable` docstring is marked deprecated too** — accepted and ignored, exactly
+  as on `run_black` / `run_isort`; the issue names all three functions.
 - `formatter_tools.py` passes `environment=self.context.tool_environment`, so the MCP
   layer's availability check and the invoked binary are the *same* environment object.
 
 `None` means "mcp-tools-py's own environment", which is what a direct runner caller such
-as mcp_coder gets. Add one cached accessor in
-`src/mcp_tools_py/utils/python_environment.py` to supply it:
+as mcp_coder gets. `formatter_binary` answers it with `PythonEnvironment.resolve()` — the
+same call `ToolContext.tool_environment`'s existing `default_factory` makes, so an
+un-injected context and a direct runner caller agree by construction. **No new accessor
+and no cache:** `resolve()` reads `sys.executable` on every call, and
+`tests/test_tool_availability/_helpers.py::_patched_tool_env` fakes a tool env by patching
+`sys.executable`, while `server.py:54` builds `ToolContext` without `tool_environment`. A
+cached default would pin the real env per xdist worker and break
+`tests/test_server_params.py:795` / `:819` depending on test order. `default_factory` and
+`_patched_tool_env`'s docstring stay as they are.
 
-```python
-def tool_environment() -> PythonEnvironment:
-    """The environment mcp-tools-py itself runs in, holding its console scripts."""
-```
-
-`ToolContext.tool_environment`'s `default_factory` changes from
-`PythonEnvironment.resolve` to this accessor, so an un-injected context and a direct
-runner caller agree by construction. `formatter/common.py` must **not** call
-`PythonEnvironment.resolve()` directly — the accessor is the only default.
-
-Layering stays downward: `formatter` → `utils`, and `utils.tool_context` →
-`utils.python_environment` as it already does.
+Layering stays downward: `formatter` → `utils`.
 
 `formatter/runner.py` has no `ToolContext`, which is why the environment arrives as a
 plain `PythonEnvironment` argument rather than as a context object. That is also what
@@ -182,7 +178,7 @@ docstring already documents as the intended mechanism.
 
 5. **The injected environment governs the binary.** Call `run_black` with an
    `environment` pointing at a tmp script directory and assert argv[0] is that
-   directory's script, not the one `tool_environment()` would return. This is what the
+   directory's script, not the one `PythonEnvironment.resolve()` would return. This is what the
    threaded parameter buys: without it the `tool_context` fixture at
    `tests/conftest.py:78` would advertise one environment and the runner would invoke
    another.
@@ -221,13 +217,13 @@ them in one commit.
 > `environment=self.context.tool_environment` — `ToolContext.tool_environment` is
 > injectable (`tests/conftest.py:78` supplies a tmp script directory), so reading a
 > module-level accessor inside the runner would invoke a different binary from the one
-> `is_tool_available` was answered against. `None` falls back to a new cached
-> `tool_environment()` accessor in `src/mcp_tools_py/utils/python_environment.py`, which
-> also becomes `ToolContext.tool_environment`'s `default_factory`. Do not call
-> `PythonEnvironment.resolve()` from `formatter/`.
+> `is_tool_available` was answered against. `None` falls back to
+> `PythonEnvironment.resolve()`, uncached — do not add an accessor or a cache; existing
+> tests fake the tool env by patching `sys.executable`.
 >
 > Keep `python_executable` as the first parameter of both runners. It is accepted and
-> ignored — deprecated — and the docstring must say so. mcp_coder still calls these
+> ignored — deprecated — and the docstring must say so. Mark `runner.py::run_format_code`'s
+> own `python_executable` docstring deprecated the same way. mcp_coder still calls these
 > directly with `sys.executable`; removing the parameter would break it.
 >
 > Write the tests first, including one that passes a bogus `python_executable` and asserts

@@ -103,27 +103,13 @@ acceptance criterion:
 - **One `utils/ruff_parsing.py`**, not a `models.py` + `parsers.py` pair. Each source
   module holds exactly one symbol; mirroring the split preserves structure that existed
   only by convention. Both source modules are deleted.
-- **Versions read from the environment the binary came from**, not from a `--version`
-  subprocess per step. The environment is threaded from the caller — `formatter_binary(name,
-  environment)`, with the MCP layer passing `self.context.tool_environment`, which is
-  injectable and is what `tests/conftest.py:78` replaces. `None` falls back to the cached
-  `tool_environment()` accessor in `utils/python_environment.py`, which is also
-  `ToolContext.tool_environment`'s `default_factory`. `formatter_version(distribution,
-  environment)` takes that **same** environment: `None` or the running interpreter is
-  answered by `importlib.metadata.version()`, since the running process then *is* that
-  environment; any other environment is answered from the cached
-  `get_environment_info(interpreter).distributions` probe. So the banner always names the
-  distribution whose console script was invoked, even under an injected environment. This
-  removes four subprocesses per run and four timeout interactions.
-  *Deviation from the issue text, which specifies `--version` subprocesses. The
-  acceptance criterion ("Each step's `output` names the formatter version it ran") is met
-  identically. Revert path if the lookup ever stops matching the invoked binary: swap
-  `formatter_version()` for a `--version` subprocess inside the step's timeout budget —
-  one function, one call site per runner.*
-  The banner **does** change `FormatterResult.output` text for `black` and `isort`. The
-  "existing explicit `["isort", "black"]` behaviour unchanged" criterion covers the steps
-  that run and their `success`, `files_changed` and `unparsable_files`, not `output`
-  content.
+- **The environment is threaded from the caller, with no new accessor.**
+  `formatter_binary(name, environment)` resolves the console script; the MCP layer passes
+  `self.context.tool_environment`, which is injectable and is what `tests/conftest.py:78`
+  replaces. `None` falls back to `PythonEnvironment.resolve()` — the same call
+  `ToolContext.tool_environment`'s existing `default_factory` makes. It is **uncached** and
+  reads `sys.executable` on each call, which `tests/test_tool_availability/_helpers.py`
+  (`_patched_tool_env`) relies on.
 - **Shared runner boilerplate** in `formatter/common.py`, created in step 2 for
   `formatter_binary` and extended in steps 3 and 4. It cannot live in `runner.py`, which already
   imports both runner modules — that would be a circular import. `black_runner.py` and
@@ -134,6 +120,20 @@ acceptance criterion:
   implementing glob semantics would be the largest complexity in the issue for the
   smallest payoff. A leading-literal-segment prefix match satisfies the acceptance
   criterion, and a false negative just means no notice — the status quo.
+
+### Version reporting follows the issue text
+
+Each step reports its version by running `<binary> --version` on the **same resolved
+binary** the step invoked, inside that step's own timeout budget (`formatter_version` in
+`formatter/common.py`, step 3). A timeout, execution error or unparsable output yields
+`"unknown"` and never fails the step. The version subprocess runs only after the formatter
+actually ran (any exit code) — the timed-out and execution-error early returns carry no banner —
+and never extends a step's worst-case wall time.
+
+The banner **does** change `FormatterResult.output` text for `black` and `isort`. The
+"existing explicit `["isort", "black"]` behaviour unchanged" criterion covers the steps
+that run and their `success`, `files_changed` and `unparsable_files`, not `output`
+content.
 
 ### Behaviour that is deliberately asymmetric between the two ruff steps
 
@@ -168,7 +168,7 @@ code cannot discriminate — hence the JSON route.
 | Path | Purpose |
 |---|---|
 | `src/mcp_tools_py/utils/ruff_parsing.py` | `RuffMessage` + `parse_ruff_json_output`, moved down a layer |
-| `src/mcp_tools_py/formatter/common.py` | `formatter_binary` (step 2); `truncate_output`, `combine_output`, `formatter_version`, `version_line` (step 3); `relative_path` (step 4) |
+| `src/mcp_tools_py/formatter/common.py` | `formatter_binary` (step 2); `truncate_output`, `combine_output`, `formatter_version` (a `<binary> --version` subprocess), `version_line` (step 3); `relative_path` (step 4) |
 | `src/mcp_tools_py/formatter/ruff_runner.py` | `run_ruff_format`, `run_ruff_imports` |
 | `tests/test_formatter_common.py` | Step 3 |
 | `tests/test_ruff_format_runner.py` | Step 4 |
@@ -192,11 +192,10 @@ code cannot discriminate — hence the JSON route.
 - `src/mcp_tools_py/code_checker_ruff/reporting.py` — `RuffMessage` import (5 annotation uses)
 - `src/mcp_tools_py/code_checker_ruff/runners.py` — `parse_ruff_json_output` import; calls at lines 81, 132, 162
 - `src/mcp_tools_py/utils/environment_info.py` — `TOOL_MODULES`; `_failed` docstring count
-- `src/mcp_tools_py/utils/python_environment.py` — cached `tool_environment()` accessor, the default when no environment is passed in
-- `src/mcp_tools_py/utils/tool_context.py` — `tool_environment` `default_factory`; module docstring, class docstring, `is_tool_available`, `unavailable_message`
+- `src/mcp_tools_py/utils/tool_context.py` — module docstring, class docstring, `is_tool_available`, `unavailable_message` (step 8); the `tool_environment` `default_factory` stays `PythonEnvironment.resolve`
 - `src/mcp_tools_py/utils/project_config.py` — new public `read_pyproject_tool_tables(Path)`, the single `pyproject.toml` reader `per_file_ignores_notice`, `resolve_steps` and `_read_mcp_tools_section` share. Added in **step 5**, its first consumer; step 6 reuses it and adds no second reader
 - `src/mcp_tools_py/formatter/__init__.py` — exports `resolve_steps`, drops `DEFAULT_STEPS`; module docstring
-- `src/mcp_tools_py/formatter/runner.py` — `resolve_steps`, `_STEP_TOOLS`, `_BLACK_STEPS`/`_RUFF_STEPS`, `validate_steps`, deprecated `python_executable`, keyword-only `environment` passed through to the runners
+- `src/mcp_tools_py/formatter/runner.py` — `resolve_steps`, `_STEP_TOOLS`, `_BLACK_STEPS`/`_RUFF_STEPS`, `validate_steps`, `run_format_code`'s `python_executable` docstring marked deprecated (step 2), keyword-only `environment` passed through to the runners
 - `src/mcp_tools_py/formatter/formatter_tools.py` — `environment=self.context.tool_environment`, resolution call, step→tool mapping, timeout dict, MCP docstring, `_unparsable_block` wording (the isort-only "Windows, piped stdout" explanation is wrong for a ruff syntax error)
 - `src/mcp_tools_py/formatter/black_runner.py` — tool-env console script; deprecated param; shared helpers
 - `src/mcp_tools_py/formatter/isort_runner.py` — same
@@ -209,7 +208,7 @@ code cannot discriminate — hence the JSON route.
 - `tests/test_code_checker_ruff/test_reporting.py` — `RuffMessage` import
 - `tests/test_black_runner.py`, `tests/test_isort_runner.py` — command shape, version line
 - `tests/test_project_config.py` — `read_pyproject_tool_tables` (step 5)
-- `tests/test_formatter_runner.py` — `resolve_steps`, empty-list rejection, ignored `python_executable`
+- `tests/test_formatter_runner.py` — `resolve_steps`, empty-list rejection, ignored `python_executable`; six existing tests that omit `steps` pass `steps=["isort", "black"]` explicitly (step 6)
 - `tests/test_formatter_tools.py` — formatter declaration fixture; black-unavailable via `tool_environment.binary`
 - `tests/test_server_params.py` — docstring count at line 798
 - `tests/test_tool_context.py` — follows `CONSOLE_SCRIPT_TOOLS`; verify
