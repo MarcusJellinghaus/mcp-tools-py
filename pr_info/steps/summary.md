@@ -25,7 +25,9 @@
   | bandit | `test_id`, `filename`, `line_number` | `line_number` |
 
   Ruff `code: null` (older ruff syntax errors, used by the formatter) is normalised
-  to `"invalid-syntax"` instead of being rejected.
+  to `"invalid-syntax"` instead of being rejected. This intentionally deviates
+  from the issue's "`code` required and non-null" rule; it keeps
+  `tests/test_ruff_imports_runner.py::test_syntax_error_still_runs_fix` passing.
 - **Bandit.** Missing or non-list `results` is an error. `cwe_id` stays `int`
   (`0` = no id); the report omits the CWE line when `cwe_id` is `0`.
 - **Ruff command building.** `_build_ruff_command` appends, after `extra_args` and

@@ -31,7 +31,9 @@ def parse_bandit_json_output(raw_output: str, project_dir: str
   `results = data.get("results")`; if not a list, return
   `"bandit output has no 'results' list (keys: ...)"` as the parse error.
 - Replace the "skip non-dict" branch with `_invalid_reason`.
-- CWE: `cwe_id = issue_cwe.get("id") or 0` (handles missing and `null`).
+- CWE: keep the `isinstance(issue_cwe, dict)` guard;
+  `cwe_id = (issue_cwe.get("id") or 0) if isinstance(issue_cwe, dict) else 0`
+  (handles missing, `null` and non-dict `issue_cwe`).
 - Reporting: emit `f"CWE-{first.cwe_id}: {first.cwe_link}"` only when
   `first.cwe_id` is truthy.
 

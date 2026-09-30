@@ -39,8 +39,9 @@ def _build_ruff_command(...)  # signature unchanged; trailing overrides added
   `execute_command`.
 - `run_ruff_fix_impl`: same, with `("--statistics",)` only. `--fix`,
   `--unsafe-fixes` etc. stay accepted.
-- `ruff_check_tool.py` docstring, `extra_args` line: add
-  "`--fix`, `--fix-only` and `--statistics` are rejected."
+- `ruff_check_tool.py` docstrings, `extra_args` line: for `run_ruff_check` add
+  "`--fix`, `--fix-only` and `--statistics` are rejected."; for `run_ruff_fix`
+  add "`--statistics` is rejected."
 
 ## ALGORITHM
 
