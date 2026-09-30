@@ -45,9 +45,9 @@ See [step_3.md](./steps/step_3.md)
 ### Step 4: Coverage run plumbing
 See [step_4.md](./steps/step_4.md)
 
-- [ ] Implementation: tests + new `code_checker_pytest/coverage.py` with `coverage_args`, `read_coverage_report`, `read_fail_under`
-- [ ] Quality checks: pylint, pytest, mypy — fix all issues
-- [ ] Commit message prepared
+- [x] Implementation: tests + new `code_checker_pytest/coverage.py` with `coverage_args`, `read_coverage_report`, `read_fail_under`
+- [x] Quality checks: pylint, pytest, mypy — fix all issues
+- [x] Commit message prepared
 
 ### Step 5: Selection echo
 See [step_5.md](./steps/step_5.md)
