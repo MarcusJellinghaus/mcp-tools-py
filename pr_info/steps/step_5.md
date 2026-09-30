@@ -51,3 +51,6 @@ File errors (files not scanned):
 - `max_issues=0`: one line per test id with `test_name` and split, no `file:line` paths.
 - Detail header contains `test_name` and split; singular wording for one issue.
 - Update existing header/summary assertions.
+- `tests/test_code_checker_bandit/test_reporting.py:167`: the ordering check uses
+  `result.index("bandit found")`, which now matches the total line before "File errors". Look up the
+  detail header (e.g. `"bandit found 1 issue with"`) instead.

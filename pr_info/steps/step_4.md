@@ -66,3 +66,6 @@ Use max_issues>=1 to see details for one or more issue types.
 - `Command line` path counts as `(outside)`.
 - Rewrite `test_max_issues_zero_stats_only` (old `2 issue types` / `7 total occurrences` header) and
   summary-line assertions for the new format.
+- Update the direct calls to `get_prompt_for_known_pylint_code` / `get_prompt_for_unknown_pylint_code`
+  in `tests/test_code_checker_pylint/test_reporting.py` (around lines 175, 208, 233, 279) to pass the
+  new required `header` argument.
