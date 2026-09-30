@@ -86,3 +86,14 @@ requires the notice to name the covered directories.
 - **`utils/ruff_parsing.py` gets a module docstring** — ruff's `D` rules apply to `src/`.
 - **Rejected:** skipping the `--fix` pass when the pre-check finds nothing fixable — an
   optimisation; the two-invocation design follows the issue.
+
+## Plan review 5
+
+- **Launch-mode change recorded, not acted on.** Moving black/isort from `python -m` to
+  the console script changes how mcp-coder-utils launches them (file-redirected Python
+  isolation versus piped output with `PYTHONUTF8=1`). A Windows probe found identical
+  results in both modes, so step 2 documents it and adds no code.
+- **`_unparsable_block` uses neutral wording**, `"The formatter could not parse these
+  files."`. The probe reproduced isort's skip without piped stdout, so no cause is asserted.
+- **Step 4's ` --> ` header parser uses `(.+?):\d+:\d+`**, the same anchor as the stderr
+  regex, so absolute Windows paths survive. Test 7c covers it.

@@ -187,24 +187,23 @@ today — dedup is for a readable argument, not to prevent a doubled warning.
 
 Note `timeouts` stays keyed by **step**, because `runner.py` looks it up by step.
 
-### `_unparsable_block`'s explanation is isort-specific and must change
+### `_unparsable_block`'s explanation must change
 
 `formatter_tools.py:116-121` renders every step's `unparsable_files` with a hardcoded
-three-line preamble ending in `"Known limitation (Windows, piped stdout)."`. That
-explanation is true only of isort, which exits 0 and skips files it could not read on a
-piped stdout. For the ruff steps a populated `unparsable_files` means a **genuine syntax
-error in the source**, so the current wording tells the caller the opposite of what
-happened.
+three-line preamble ending in `"Known limitation (Windows, piped stdout)."`. For the ruff
+steps a populated `unparsable_files` means a **genuine syntax error in the source**, so
+that line names the wrong cause. It does not hold for isort either: the step 2 probe
+reproduced isort's `--check-only` skip on Windows with stdout redirected to a file as well
+as piped, with and without `PYTHONUTF8=1`.
 
-Replace the third line with wording that covers both causes, and keep the first two lines
-(the count and "a clean result here does NOT mean CI will pass"), which stay true for
-every step:
+Replace the third line with a neutral one, true for all four steps, and keep the first two
+lines (the count and "a clean result here does NOT mean CI will pass"):
 
-> `The file could not be parsed, or the formatter could not read it (isort on Windows with piped stdout).`
+> `The formatter could not parse these files.`
 
 Test: a `FormatterResult` with a populated `unparsable_files` on a **ruff** step renders a
-block that does not claim a Windows piped-stdout limitation as the cause. Existing
-isort-path assertions on this text are updated to the new wording, not duplicated.
+block containing that line and not `"Known limitation"`. No existing test asserts the old
+line.
 
 ### `formatter/__init__.py`
 
@@ -337,8 +336,9 @@ pylint / pytest / mypy / tach / lint-imports / ruff / vulture pass. Check
 > throughout `resolve_steps`.
 >
 > Also fix `_unparsable_block` in `formatter_tools.py`: its
-> `"Known limitation (Windows, piped stdout)"` line is isort-specific and would now be
-> printed for genuine ruff syntax errors. Reword it to cover both causes.
+> `"Known limitation (Windows, piped stdout)"` line would now be printed for genuine ruff
+> syntax errors, and its cause is unconfirmed even for isort. Replace it with
+> `"The formatter could not parse these files."`.
 >
 > Wire both defaulting sites — `runner.py::run_format_code` and the MCP-registered
 > `formatter_tools.py::run_format_code` — to call `resolve_steps` when `steps is None`, so

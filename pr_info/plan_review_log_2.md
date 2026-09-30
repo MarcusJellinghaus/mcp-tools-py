@@ -105,3 +105,17 @@ Supervised plan review (`/plan_review_supervisor`). Continues from `plan_review_
 **User decisions**: none
 **Changes**: step_1, step_5, step_6, step_8, summary.md, Decisions.md.
 **Status**: committed
+
+## Round 6 — 2026-09-30
+**Findings**:
+- step_2 — medium — env move also changes launch mode: a bare console script is not treated as a Python command by the subprocess runner (piped stdout, `PYTHONUTF8=1`), which touches isort's "Windows, piped stdout" limitation
+- step_4 — low — check-mode ` --> ` parser splits at the first `:`, breaking absolute Windows paths
+- Design — keep or drop "(isort on Windows with piped stdout)" wording in `_unparsable_block`
+**Decisions**:
+- Launch mode: accept, verified by probe before editing
+- ` --> ` parser: accept — same anchor as the stderr regex
+- Wording question: resolved by fact rather than asked — the probe shows it
+**User decisions**: none
+**Changes**: step_2, step_4, step_6, summary.md, Decisions.md. Probe (Windows; `python -m`, `python -m` without `PYTHONUTF8`, console script): identical behaviour in every mode, so no regression. isort `--check-only` skips a non-ASCII file with a `'charmap' codec` warning in *all* modes, so the old "piped stdout" cause was wrong; isort never flags syntax errors. `_unparsable_block` now reads "The formatter could not parse these files."; `_ARROW_PATH` regex plus test 7c.
+**Pre-existing, out of scope**: isort `--check-only` on Windows silently skips non-ASCII files (`charmap`), independent of this issue.
+**Status**: committed

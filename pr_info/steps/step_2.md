@@ -163,6 +163,32 @@ The only change to each runner is the first two lines of command construction. E
 downstream — truncation, changed-file parsing, isort's unparsable-file handling — stays
 byte-identical.
 
+### Launch mode changes with the command
+
+mcp-coder-utils' `execute_command` treats a command as Python only when argv[0] is named
+`python`/`python3` (with or without `.exe`) or equals `sys.executable`
+(`is_python_command`). `[python, "-m", "black"]` qualified: its output went to temp files
+and it ran under `get_python_isolation_env()` (`PYTHONIOENCODING=utf-8`,
+`PYTHONNOUSERSITE=1`; `PYTHONUTF8` only if inherited). A console-script path does not
+qualify: it runs with piped stdout/stderr under `get_utf8_env()` (`PYTHONIOENCODING=utf-8`,
+`PYTHONUTF8=1`, plus `LC_ALL=C.UTF-8` on non-Windows). Both decode output as UTF-8 with
+`errors="replace"`.
+
+Probed on Windows before planning: black and isort from this venv, on a tree holding a
+file with non-ASCII text and unsorted imports and a file with a syntax error, launched as
+`python -m` with `PYTHONUTF8=1`, as `python -m` without it, and as the console script. All
+three gave the same exit codes, messages and on-disk results (black's message order varies
+between runs in every mode):
+
+- isort `--check-only` warns `Unable to parse file ... 'charmap' codec can't encode` for
+  the non-ASCII file and does not check it; write mode sorts it and keeps its non-ASCII
+  text. isort does not detect the syntax error: it reports that file as unsorted, or
+  sorts it.
+- black exits 123 with `cannot format ... Cannot parse` for the syntax-error file, and
+  formats the non-ASCII file with its text intact.
+
+So the launch-mode change needs no code or test of its own.
+
 ## DATA
 
 `FormatterResult` unchanged.

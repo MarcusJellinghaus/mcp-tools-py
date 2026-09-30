@@ -127,9 +127,13 @@ parse_check_markers(stdout) -> (changed, unparsable):
     for each line:
         if line starts with "unformatted:"      -> arm as changed
         elif line starts with "invalid-syntax:" -> arm as unparsable
-        elif armed and line.lstrip() starts with "-->":
-                take the path before the first ":", append to the armed list, disarm
+        elif armed and (m := _ARROW_PATH.match(line)):
+                append m.group(1) to the armed list, disarm
 ```
+
+`_ARROW_PATH = re.compile(r"\s*-->\s*(.+?):\d+:\d+")` is module-level and uses the same
+`(.+?):\d+:\d+` anchor as `_FAILED_TO_PARSE`, so an absolute Windows path in a header
+(` --> C:\repo\src\bad.py:1:7`) is not cut at its drive-letter colon.
 
 In `--check` mode `unparsable_files` is the union of the `invalid-syntax:` paths and any
 `error: Failed to parse` paths on stderr — ruff may report a parse error through either
@@ -199,6 +203,10 @@ common.formatter_binary)`.
    returns `[r"C:\repo\src\bad.py"]`. Test the pattern directly, not the runner's
    normalized result — `relative_path` on a Windows path is platform-dependent and CI runs
    on Linux.
+7c. The check-mode marker parser keeps a drive-letter path whole: feed
+   `"unformatted: File would be reformatted\n --> C:\\repo\\src\\ugly.py:1:6\n"` to
+   `parse_check_markers` and assert `changed == [r"C:\repo\src\ugly.py"]`. Same reason as
+   7b: test the parser's raw output, not the normalized runner result.
 8. **`check_only=True` against an unparsable file** — exit 2, an `invalid-syntax:` marker
    in stdout, and a `--check` run that writes nothing to stderr. Assert `success is False`
    **and** `"src/bad.py" in unparsable_files`. This is the case a marker parser that
@@ -245,7 +253,9 @@ correct — step 6 wires it.
 > on `-->`. Keying on `-->` silently records unparsable files as "would be reformatted".
 > `unformatted:` paths go to `files_changed`; `invalid-syntax:` paths go to
 > `unparsable_files` — **record them, do not discard them**, or `--check` mode returns
-> `success=False` with nothing named. `files_changed` stays empty in write mode, because
+> `success=False` with nothing named. Take the path from the ` --> ` header with a
+> module-level `_ARROW_PATH = re.compile(r"\s*-->\s*(.+?):\d+:\d+")`, the same anchor as
+> `_FAILED_TO_PARSE`, never by splitting at the first `:`. `files_changed` stays empty in write mode, because
 > `ruff format` never names the files it changed there. Also parse `unparsable_files` from
 > `error: Failed to parse <path>:<l>:<c>` on stderr with a module-level
 > `_FAILED_TO_PARSE = re.compile(r"error: Failed to parse (.+?):\d+:\d+")` — so a

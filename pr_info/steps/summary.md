@@ -43,6 +43,12 @@ from setting two dict values to `None`.
 > ⚠️ "five **registrars**" in `docs/architecture/architecture.md` lines 163 and 252 and
 > in `tests/test_registrars.py` is an unrelated count and must not be touched.
 
+**Launch mode changes too.** mcp-coder-utils runs `[python, "-m", tool]` as a Python
+command (output to temp files, `PYTHONNOUSERSITE=1`, `PYTHONUTF8` only if inherited) and a bare
+console script as a plain command (piped output, `PYTHONUTF8=1`, `LC_ALL=C.UTF-8` on
+non-Windows). A Windows probe of both launches on non-ASCII and syntax-error files found
+identical exit codes, messages and results for black and isort. Details in `step_2.md`.
+
 **Release risk:** the first `run_format_code` after upgrade reformats if the tool-env
 formatter version differs from what the project env had. This needs a release note, and
 is why each step reports the version it ran.
@@ -207,7 +213,7 @@ code cannot discriminate — hence the JSON route.
 - `src/mcp_tools_py/utils/project_config.py` — new public `read_pyproject_tool_tables(Path)`, the single `pyproject.toml` reader `per_file_ignores_notice`, `resolve_steps` and `_read_mcp_tools_section` share. Added in **step 5**, its first consumer; step 6 reuses it and adds no second reader
 - `src/mcp_tools_py/formatter/__init__.py` — exports `resolve_steps`, drops `DEFAULT_STEPS`; module docstring
 - `src/mcp_tools_py/formatter/runner.py` — `resolve_steps`, `_STEP_TOOLS`, `_BLACK_STEPS`/`_RUFF_STEPS`, `validate_steps`, `run_format_code`'s `python_executable` docstring marked deprecated (step 2), keyword-only `environment` passed through to the runners
-- `src/mcp_tools_py/formatter/formatter_tools.py` — `environment=self.context.tool_environment`, resolution call, step→tool mapping, timeout dict, MCP docstring, `_unparsable_block` wording (the isort-only "Windows, piped stdout" explanation is wrong for a ruff syntax error)
+- `src/mcp_tools_py/formatter/formatter_tools.py` — `environment=self.context.tool_environment`, resolution call, step→tool mapping, timeout dict, MCP docstring, `_unparsable_block` wording (the "Known limitation (Windows, piped stdout)" line becomes a neutral "could not parse" line: wrong for a ruff syntax error, and the probe found the isort skip independent of piped stdout)
 - `src/mcp_tools_py/formatter/black_runner.py` — tool-env console script; deprecated param; shared helpers
 - `src/mcp_tools_py/formatter/isort_runner.py` — same
 - `src/mcp_tools_py/server.py` — docstrings at lines 39, 101; count at line 73
