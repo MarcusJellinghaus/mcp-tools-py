@@ -31,9 +31,9 @@ See [step_1.md](./steps/step_1.md)
 ### Step 2: Ruff command overrides and flag pre-check
 See [step_2.md](./steps/step_2.md)
 
-- [ ] Implementation: tests (unit + integration) + `--no-fix`/`--no-fix-only` overrides, rejected flags, extra_args hint, tool docstrings
-- [ ] Quality checks: pylint, pytest, mypy — fix all issues
-- [ ] Commit message prepared
+- [x] Implementation: tests (unit + integration) + `--no-fix`/`--no-fix-only` overrides, rejected flags, extra_args hint, tool docstrings
+- [x] Quality checks: pylint, pytest, mypy — fix all issues
+- [x] Commit message prepared
 
 ### Step 3: Strict pylint parser
 See [step_3.md](./steps/step_3.md)
