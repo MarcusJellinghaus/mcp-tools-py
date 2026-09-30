@@ -182,26 +182,118 @@ class TestParseRuffJsonOutput:
         assert messages[1].fixable is False
 
     def test_parse_missing_optional_fields(self) -> None:
-        """Test parsing item with minimal fields — defaults applied."""
-        project_dir = "/project"
+        """Test that an item without location and filename is an error."""
         json_data = [{"code": "X001", "message": "test"}]
-        raw_output = json.dumps(json_data)
 
-        messages, error = parse_ruff_json_output(raw_output, project_dir)
+        messages, error = parse_ruff_json_output(json.dumps(json_data), "/project")
+
+        assert messages == []
+        assert error is not None
+        assert "without locations" in error
+
+    def test_statistics_output_is_error(self) -> None:
+        """Test that ruff --statistics JSON is rejected, not turned into violations."""
+        json_data = [
+            {
+                "code": "D100",
+                "name": "undocumented-public-module",
+                "count": 3,
+                "fixable": False,
+                "fixable_count": 0,
+            }
+        ]
+
+        messages, error = parse_ruff_json_output(json.dumps(json_data), "/project")
+
+        assert messages == []
+        assert error is not None
+        assert "without locations" in error
+        assert "code, name, count, fixable, fixable_count" in error
+        assert "extra_args" not in error
+
+    def test_non_dict_entry_is_error(self) -> None:
+        """Test that a non-object entry fails the whole parse."""
+        raw_output = json.dumps([_make_ruff_item(), 42])
+
+        messages, error = parse_ruff_json_output(raw_output, "/project")
+
+        assert messages == []
+        assert error is not None
+        assert "entries that are not objects" in error
+        assert "int" in error
+
+    def test_missing_location_row_is_error(self) -> None:
+        """Test that an entry without location.row is an error."""
+        item = _make_ruff_item()
+        item["location"] = {"column": 0}
+
+        messages, error = parse_ruff_json_output(json.dumps([item]), "/project")
+
+        assert messages == []
+        assert error is not None
+        assert "without locations" in error
+
+    def test_non_int_column_is_error(self) -> None:
+        """Test that a non-int location.column (including bool) is an error."""
+        for column in ("3", True, None):
+            item = _make_ruff_item()
+            item["location"] = {"row": 1, "column": column}
+
+            messages, error = parse_ruff_json_output(json.dumps([item]), "/project")
+
+            assert messages == []
+            assert error is not None
+            assert "without locations" in error
+
+    def test_missing_message_is_error(self) -> None:
+        """Test that an entry without message is an error."""
+        item = _make_ruff_item()
+        del item["message"]
+
+        messages, error = parse_ruff_json_output(json.dumps([item]), "/project")
+
+        assert messages == []
+        assert error is not None
+        assert "without code, message or filename" in error
+
+    def test_missing_filename_is_error(self) -> None:
+        """Test that an entry with null filename is an error."""
+        item = _make_ruff_item()
+        item["filename"] = None
+
+        messages, error = parse_ruff_json_output(json.dumps([item]), "/project")
+
+        assert messages == []
+        assert error is not None
+        assert "without code, message or filename" in error
+
+    def test_invalid_syntax_entry_with_nulls_parses(self) -> None:
+        """Test that null optional fields (as in invalid-syntax entries) are accepted."""
+        item = _make_ruff_item(code="invalid-syntax")
+        item["url"] = None
+        item["noqa_row"] = None
+        item["fix"] = None
+        item["cell"] = None
+
+        messages, error = parse_ruff_json_output(json.dumps([item]), "/project")
 
         assert error is None
         assert len(messages) == 1
-        msg = messages[0]
-        assert msg.code == "X001"
-        assert msg.message == "test"
-        assert msg.filename == ""
-        assert msg.line == -1
-        assert msg.column == -1
-        assert msg.end_line == -1
-        assert msg.end_column == -1
-        assert msg.url == ""
-        assert msg.fixable is False
-        assert msg.noqa_row == -1
+        assert messages[0].code == "invalid-syntax"
+        assert messages[0].url == ""
+        assert messages[0].noqa_row == -1
+        assert messages[0].fixable is False
+
+    def test_null_code_normalised(self) -> None:
+        """Test that code: null is normalised to invalid-syntax."""
+        item = _make_ruff_item()
+        item["code"] = None
+
+        messages, error = parse_ruff_json_output(json.dumps([item]), "/project")
+
+        assert error is None
+        assert len(messages) == 1
+        assert messages[0].code == "invalid-syntax"
 
     def test_parse_very_long_output(self) -> None:
         """Test parsing very long invalid output (error message truncation)."""
