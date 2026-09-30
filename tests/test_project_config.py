@@ -15,6 +15,7 @@ from mcp_tools_py.utils.project_config import (
     get_pytest_addopts,
     get_target_directories,
     read_pyproject_tool_tables,
+    resolve_coverage_source,
     resolve_target_directories,
     validate_timeout,
 )
@@ -584,3 +585,84 @@ class TestGetPytestAddopts:
 
         with pytest.raises(ValueError, match="Invalid pyproject.toml"):
             get_pytest_addopts(path)
+
+
+def _write_layout(path: str, where: str, testpaths: str, dirs: list[str]) -> None:
+    """Write a pyproject.toml with *where* / *testpaths* and create *dirs*."""
+    _write_pyproject(
+        path,
+        f"""\
+        [tool.setuptools.packages.find]
+        where = {where}
+
+        [tool.pytest.ini_options]
+        testpaths = {testpaths}
+        """,
+    )
+    for d in dirs:
+        os.makedirs(os.path.join(path, d), exist_ok=True)
+
+
+class TestResolveCoverageSource:
+    """Tests for the resolve_coverage_source function."""
+
+    def test_src_layout_returns_src(self, tmp_path: object) -> None:
+        """A src layout with a separate tests dir yields the source dir."""
+        path = str(tmp_path)
+        _write_layout(path, '["src"]', '["tests"]', ["src", "tests"])
+        assert resolve_coverage_source(path, None) == ["src"]
+
+    def test_flat_layout_containing_tests_is_error(self, tmp_path: object) -> None:
+        """A source dir that contains a testpath is dropped, giving an error."""
+        path = str(tmp_path)
+        _write_layout(path, '["."]', '["tests"]', ["tests"])
+        result = resolve_coverage_source(path, None)
+        assert isinstance(result, str)
+        assert result.startswith("Error resolving coverage source:")
+        assert "coverage_source" in result
+
+    def test_source_equal_to_testpath_dropped(self, tmp_path: object) -> None:
+        """A source dir equal to a testpath is dropped too."""
+        path = str(tmp_path)
+        _write_layout(path, '["src", "tests"]', '["tests"]', ["src", "tests"])
+        assert resolve_coverage_source(path, None) == ["src"]
+
+    def test_nonexistent_source_dir_dropped(self, tmp_path: object) -> None:
+        """Source dirs missing on disk are skipped."""
+        path = str(tmp_path)
+        _write_layout(path, '["src", "lib"]', '["tests"]', ["src", "tests"])
+        assert resolve_coverage_source(path, None) == ["src"]
+
+    def test_all_dropped_is_error(self, tmp_path: object) -> None:
+        """No surviving source dir yields an error string."""
+        path = str(tmp_path)
+        _write_layout(path, '["src"]', '["tests"]', ["tests"])
+        result = resolve_coverage_source(path, None)
+        assert isinstance(result, str)
+        assert "coverage_source" in result
+
+    def test_explicit_returned_unchanged(self, tmp_path: object) -> None:
+        """An explicit list is returned as-is without reading pyproject.toml."""
+        path = str(tmp_path)
+        with open(os.path.join(path, "pyproject.toml"), "w", encoding="utf-8") as f:
+            f.write("invalid toml {{{{")
+        assert resolve_coverage_source(path, ["pkg"]) == ["pkg"]
+
+    def test_malformed_pyproject_is_error(self, tmp_path: object) -> None:
+        """Invalid TOML yields an error string, not an exception."""
+        path = str(tmp_path)
+        with open(os.path.join(path, "pyproject.toml"), "w", encoding="utf-8") as f:
+            f.write("invalid toml {{{{")
+        result = resolve_coverage_source(path, None)
+        assert isinstance(result, str)
+        assert result.startswith("Error resolving coverage source:")
+
+    def test_fallback_warnings_logged(
+        self, tmp_path: object, caplog: pytest.LogCaptureFixture
+    ) -> None:
+        """Missing sections fall back to src/tests and log warnings."""
+        path = str(tmp_path)
+        os.makedirs(os.path.join(path, "src"))
+        with caplog.at_level(logging.WARNING):
+            assert resolve_coverage_source(path, None) == ["src"]
+        assert "defaulting to ['src']" in caplog.text

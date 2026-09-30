@@ -31,9 +31,9 @@ See [step_1.md](./steps/step_1.md)
 ### Step 2: Source-only lookup for `coverage_source`
 See [step_2.md](./steps/step_2.md)
 
-- [ ] Implementation: tests + `_read_source_dirs`, `_read_test_dirs`, `resolve_coverage_source` in `utils/project_config.py`
-- [ ] Quality checks: pylint, pytest, mypy — fix all issues
-- [ ] Commit message prepared
+- [x] Implementation: tests + `_read_source_dirs`, `_read_test_dirs`, `resolve_coverage_source` in `utils/project_config.py`
+- [x] Quality checks: pylint, pytest, mypy — fix all issues
+- [x] Commit message prepared
 
 ### Step 3: `SanitizedArgs.path_args`
 See [step_3.md](./steps/step_3.md)
