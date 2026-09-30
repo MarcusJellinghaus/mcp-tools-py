@@ -119,3 +119,20 @@ Supervised plan review (`/plan_review_supervisor`). Continues from `plan_review_
 **Changes**: step_2, step_4, step_6, summary.md, Decisions.md. Probe (Windows; `python -m`, `python -m` without `PYTHONUTF8`, console script): identical behaviour in every mode, so no regression. isort `--check-only` skips a non-ASCII file with a `'charmap' codec` warning in *all* modes, so the old "piped stdout" cause was wrong; isort never flags syntax errors. `_unparsable_block` now reads "The formatter could not parse these files."; `_ARROW_PATH` regex plus test 7c.
 **Pre-existing, out of scope**: isort `--check-only` on Windows silently skips non-ASCII files (`charmap`), independent of this issue.
 **Status**: committed
+
+## Round 7 — 2026-09-30
+**Findings**:
+- step_8 — medium — done-when grep criterion unachievable: correct lines in neither list (`CONTRIBUTING.md:252`, `.claude/CLAUDE.md:3`, `project_config.py:162`, `test_formatter_tools.py:269`)
+- step_7 — medium — churn-test pseudocode: `dict_keys == list` is always False; keyword before positional arguments is a syntax error
+- step_2 — low — missing-binary message needs `bin_dir` when `environment is None`
+- step_5 — low — prefix/target "overlap" undefined; `startswith` gives false notices
+- step_3 — low — intro promises helpers the step doesn't specify
+- Design — in write mode a syntax error in `ruff_imports` stops the run, so `ruff_format` never formats the other files (black repos keep going)
+**Decisions**:
+- All five defects: accept
+- Fail-fast: ask user
+**User decisions**:
+- Q3: B — keep going when the only failure is unparsable files
+- isort non-ASCII `--check-only` skip: do not open an issue
+**Changes**: step_2–step_5, step_6, step_7, step_8, summary.md, Decisions.md. Step 8 do-not-change table completed from an actual grep run (README 198/205 also got enumeration edits); churn test fixed; runner resolves `env` once; per-file-ignores compared by path component (test 9c); step 3 intro reworded. The engineer first implemented B with a new `FormatterResult.only_unparsable` field and per-runner rules. The supervisor replaced that with the simpler loop rule `if not success and not unparsable_files: break`: no new field (the issue avoids mcp_coder-visible `FormatterResult` changes), and steps are independent and idempotent. Early returns now guarantee empty `unparsable_files` (a gap in `ruff_imports` fix-run returns was closed). Named regression exception: black now runs after isort reports unparsable files.
+**Status**: committed

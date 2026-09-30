@@ -187,6 +187,42 @@ today — dedup is for a readable argument, not to prevent a doubled warning.
 
 Note `timeouts` stays keyed by **step**, because `runner.py` looks it up by step.
 
+### Continue past unparsable-file failures (user decision)
+
+Today the loop breaks on the first failing step in write mode
+(`if not result.success and not check_only: break`). With the ruff steps, a syntax error
+fails `ruff_imports` first, so `ruff_format` never formats the remaining files. New rule:
+**in write mode, a failed step that reported any unparsable files does not stop the
+run.** A failure without unparsable files stops it as today. Check mode already runs
+every step and is unchanged. The loop becomes:
+
+```python
+if not result.success and not check_only and not result.unparsable_files:
+    break
+```
+
+No new `FormatterResult` field and no per-runner flag: the rule reads what every runner
+already reports, and `FormatterResult` stays unchanged for mcp_coder, as the issue's
+Decisions table already chose for version reporting. Continuing past a step that also
+failed for another reason is harmless — the formatter steps are independent and
+idempotent, and that step's own `success=False` is still reported.
+
+Failures that say nothing about the tree still stop the run, because none of them
+populates `unparsable_files`: the timed-out, execution-error and missing-binary returns
+of all four runners (step 2 for isort and black; steps 4 and 5 for ruff), `ruff_format`'s
+config-error exit 2 (step 4), and `ruff_imports`' exit 2 from either run and malformed
+JSON (step 5 — explicitly `[]` even when the pre-check found syntax errors). black never
+populates `unparsable_files`; its syntax error is exit 123, which stops the run as today.
+
+Update `runner.py`'s module docstring ("with fail-fast behaviour") to say the run stops
+at the first failing step unless that step reported unparsable files.
+
+**MCP layer: no change.** `_format_results` prints `Formatting stopped due to errors in
+<step>` only when `len(results) < len(steps)`, naming the last failed step. A continued
+step never ends the run, so when the run does stop, the last failed step is the one that
+stopped it; when it runs to completion no stop line is printed. Every step's
+`unparsable_files` block is still rendered.
+
 ### `_unparsable_block`'s explanation must change
 
 `formatter_tools.py:116-121` renders every step's `unparsable_files` with a hardcoded
@@ -258,9 +294,22 @@ Plus:
    criterion** — keep the existing tests' assertions and add nothing that weakens them.
    "As before" covers which steps run, in which order, with which `success`,
    `files_changed` and `unparsable_files`; it does **not** cover `output` text, which step 3
-   deliberately changed by prepending the version banner.
+   deliberately changed by prepending the version banner. One deliberate exception: an
+   isort step that exits 0 but reports unparsable files no longer stops the run, so black
+   now runs after it (see "Continue past unparsable-file failures").
 8. A bogus `python_executable` does not change which binary runs, end to end through
    `run_format_code`.
+8a. **Continue past a step that reported unparsable files.**
+   `steps=["ruff_imports", "ruff_format"]`, write mode; the fake `ruff_imports` returns
+   `success=False`, `unparsable_files=["src/bad.py"]`. Assert `ruff_format` was called and
+   `list(result) == ["ruff_imports", "ruff_format"]`, with
+   `result["ruff_imports"].success is False`.
+8b. **Stop on a failure without unparsable files.** Same, but `unparsable_files=[]` →
+   `ruff_format` not called, `list(result) == ["ruff_imports"]`.
+
+The existing `test_stops_on_failure` and `test_continues_on_failure` stay unchanged and
+still hold: their `_make_result` fakes leave `unparsable_files` empty, so the first still
+stops after isort, and the second runs in check mode, which the rule does not touch.
 
 **Six existing tests in this module must pass `steps` explicitly.**
 `test_runs_isort_then_black`, `test_stops_on_failure`, `test_continues_on_failure`,
@@ -279,6 +328,10 @@ by test 6 and `tests/test_formatter_resolution.py`.
 11. The existing `{"isort": 120, "black": 120}` assertion still holds.
 12. Availability for a ruff step is checked against tool `ruff`, and its error message
     names `ruff`.
+13. `_format_results` with both ruff steps present, each failed with `src/bad.py` in
+    `unparsable_files`, `check_only=False` → both `## ` sections, both unparsable blocks,
+    and no `Formatting stopped` line. The existing
+    `test_normal_mode_stops_on_first_failure` stays unchanged.
 
 **Fixture fix — `test_default_steps_isort_then_black` at line 59 and friends.** Several
 tests in this module call `run_format` without `steps`, against a `tool_context` whose
@@ -348,6 +401,12 @@ pylint / pytest / mypy / tach / lint-imports / ruff / vulture pass. Check
 >
 > **The MCP-registered `run_format_code` must not gain a `python_executable` parameter.**
 > Its first parameter stays `steps`.
+>
+> Change the write-mode loop to `if not result.success and not check_only and not
+> result.unparsable_files: break` — a failed step that reported unparsable files does not
+> stop the run; any other failure still does, and check mode is unchanged. Do not add a
+> `FormatterResult` field or touch the runners for this. `_format_results` needs no
+> change.
 >
 > Write the tests first. Use one parametrized test for the five resolution cases. Add a
 > **function-scoped** autouse fixture in `tests/test_formatter_tools.py` writing a

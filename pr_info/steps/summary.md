@@ -95,6 +95,21 @@ Both defaulting sites are `steps or DEFAULT_STEPS` today, so `[]` silently means
 defaults". Switching to a `steps is None` check would turn it into a silent zero-step
 run. `validate_steps` therefore rejects an empty list at both entry points.
 
+### Unparsable-file failures do not stop the run (user decision)
+
+In write mode `run_format_code` stops at the first failing step. It now continues past a
+failed step that reported any `unparsable_files`, so `ruff_format` still formats the
+remaining files after `ruff_imports` hits a syntax error. A failure without unparsable
+files stops the run as before; check mode already runs every step. The loop condition
+becomes `not result.success and not check_only and not result.unparsable_files` (step 6).
+
+No new `FormatterResult` field and no runner changes. Continuing past a step that also
+failed for another reason is harmless: the steps are independent and idempotent, and that
+step still reports `success=False`. Timeouts, execution errors, missing binaries, ruff
+exit 2 and malformed JSON never populate `unparsable_files` (steps 2, 4, 5), so they still
+stop the run. For black repos this means black now runs after an isort that exited 0 but
+skipped a file. `_format_results` needs no change.
+
 ### Simplifications applied
 
 These reduce complexity relative to a literal reading of the issue, without changing any
@@ -119,12 +134,14 @@ acceptance criterion:
 - **Shared runner boilerplate** in `formatter/common.py`, created in step 2 for
   `formatter_binary` and extended in steps 3 and 4. It cannot live in `runner.py`, which already
   imports both runner modules — that would be a circular import. `black_runner.py` and
-  `isort_runner.py` each carry an identical `_truncate_output` and an identical
-  timed-out / execution-error / combine-stdout-and-stderr preamble; two more runners
-  would make four copies. Two small functions, no base class.
+  `isort_runner.py` each carry an identical `_truncate_output` and the same inline
+  stdout/stderr joining; two more runners would make four copies. Step 3 extracts them as
+  `truncate_output` and `combine_output`; the timed-out / execution-error early returns
+  stay in each runner. Two small functions, no base class.
 - **`per-file-ignores` matching stays literal.** The notice is advisory, not a gate;
   implementing glob semantics would be the largest complexity in the issue for the
-  smallest payoff. A leading-literal-segment prefix match satisfies the acceptance
+  smallest payoff. A leading-literal-segment prefix, compared with each target dir by
+  path component (so `tests2/**` does not match `tests`), satisfies the acceptance
   criterion, and a false negative just means no notice — the status quo. A key with no
   leading literal segment (`"*.py"`) is skipped, and `extend-per-file-ignores` is not
   read — both such false negatives. Codes match `"ALL"` or `^I\d*$` only, so `INP001`,
@@ -142,7 +159,8 @@ and never extends a step's worst-case wall time.
 The banner **does** change `FormatterResult.output` text for `black` and `isort`. The
 "existing explicit `["isort", "black"]` behaviour unchanged" criterion covers the steps
 that run and their `success`, `files_changed` and `unparsable_files`, not `output`
-content.
+content — with the one exception above: black now runs after an isort step that exited 0
+but reported unparsable files.
 
 ### Behaviour that is deliberately asymmetric between the two ruff steps
 
@@ -212,7 +230,7 @@ code cannot discriminate — hence the JSON route.
 - `src/mcp_tools_py/utils/tool_context.py` — module docstring, class docstring, `is_tool_available`, `unavailable_message` (step 8); the `tool_environment` `default_factory` stays `PythonEnvironment.resolve`
 - `src/mcp_tools_py/utils/project_config.py` — new public `read_pyproject_tool_tables(Path)`, the single `pyproject.toml` reader `per_file_ignores_notice`, `resolve_steps` and `_read_mcp_tools_section` share. Added in **step 5**, its first consumer; step 6 reuses it and adds no second reader
 - `src/mcp_tools_py/formatter/__init__.py` — exports `resolve_steps`, drops `DEFAULT_STEPS`; module docstring
-- `src/mcp_tools_py/formatter/runner.py` — `resolve_steps`, `_STEP_TOOLS`, `_BLACK_STEPS`/`_RUFF_STEPS`, `validate_steps`, `run_format_code`'s `python_executable` docstring marked deprecated (step 2), keyword-only `environment` passed through to the runners
+- `src/mcp_tools_py/formatter/runner.py` — write-mode loop continues past a failed step that reported unparsable files (step 6), `resolve_steps`, `_STEP_TOOLS`, `_BLACK_STEPS`/`_RUFF_STEPS`, `validate_steps`, `run_format_code`'s `python_executable` docstring marked deprecated (step 2), keyword-only `environment` passed through to the runners
 - `src/mcp_tools_py/formatter/formatter_tools.py` — `environment=self.context.tool_environment`, resolution call, step→tool mapping, timeout dict, MCP docstring, `_unparsable_block` wording (the "Known limitation (Windows, piped stdout)" line becomes a neutral "could not parse" line: wrong for a ruff syntax error, and the probe found the isort skip independent of piped stdout)
 - `src/mcp_tools_py/formatter/black_runner.py` — tool-env console script; deprecated param; shared helpers
 - `src/mcp_tools_py/formatter/isort_runner.py` — same
@@ -230,7 +248,7 @@ code cannot discriminate — hence the JSON route.
   `_fixed_formatter_binary` fixture (step 2); version line, and the truncation test's
   marker becomes `"51 more lines"` (step 3)
 - `tests/test_project_config.py` — `read_pyproject_tool_tables` (step 5)
-- `tests/test_formatter_runner.py` — `resolve_steps`, empty-list rejection, ignored `python_executable`; six existing tests that omit `steps` pass `steps=["isort", "black"]` explicitly (step 6)
+- `tests/test_formatter_runner.py` — `resolve_steps`, empty-list rejection, ignored `python_executable`, continue past a failed step with unparsable files and stop on one without; six existing tests that omit `steps` pass `steps=["isort", "black"]` explicitly (step 6)
 - `tests/test_formatter_tools.py` — formatter declaration fixture; black-unavailable by deleting the black stub from the fixture's script directory
 - `tests/test_server_params.py` — docstring count at line 798
 - `tests/test_tool_context.py` — follows `CONSOLE_SCRIPT_TOOLS`; verify
@@ -269,7 +287,7 @@ surfaces before any new-feature code is in the tree.
 | 3 | `formatter/common.py`: shared output helpers + version reporting |
 | 4 | `run_ruff_format` |
 | 5 | `run_ruff_imports`, plus the shared `read_pyproject_tool_tables` reader |
-| 6 | `resolve_steps`, step→tool mapping, both entry points wired |
+| 6 | `resolve_steps`, step→tool mapping, both entry points wired, continue past failures that reported unparsable files |
 | 7 | End-to-end acceptance tests |
 | 8 | Documentation sweep + regenerated dependency graph |
 

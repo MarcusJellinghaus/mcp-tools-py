@@ -80,7 +80,8 @@ Every mocked syntax-error diagnostic in the tests uses `"code": "invalid-syntax"
 ## ALGORITHM
 
 ```
-binary = formatter_binary("ruff", environment);  if None -> unavailable FormatterResult
+env    = environment or PythonEnvironment.resolve()   # once, as in step 2
+binary = formatter_binary("ruff", env);  if None -> unavailable FormatterResult naming env.bin_dir
 json_cmd = [binary, "check", "--select", "I", "--output-format", "json"] + target_dirs
 started = time.monotonic()
 pre = execute_command(json_cmd, cwd=project_dir, timeout_seconds=...)
@@ -96,7 +97,8 @@ if check_only:  success = (not violations and not unparsable)
 else:           started = time.monotonic()
                 fix = execute_command([binary, "check", "--select", "I", "--fix"] + target_dirs, ...)
                 timed_out / execution_error -> early return, no version banner
-                if fix.return_code == 2:  success=False, combined = fix.stderr, files_changed=[]
+                if fix.return_code == 2:  success=False, combined = fix.stderr, files_changed=[],
+                                          unparsable_files=[]   # even if the pre-check found some
                 # runs even when `unparsable` is non-empty — ruff skips the
                 # unparsable file and still sorts the rest
                 success = (fix.return_code == 0 and not unparsable)
@@ -236,6 +238,12 @@ for each glob key -> take the leading literal segment before the first * ? [
 return "" when nothing collected, else one line naming the directories and the key
 ```
 
+**Overlap is by path component, not by string.** Normalise both the prefix and the target
+dir — backslashes to `/`, trailing `/` stripped — then split each on `/`. They overlap when
+either component list is a leading run of the other: `src/sub/**` overlaps target `src`,
+and `src/**` overlaps target `src/sub`. A string `startswith` would wrongly match
+`tests2/**` against target `tests`; component comparison does not.
+
 **Match codes exactly, not by prefix.** A bare "starts with `I`" also matches unrelated
 rule families — `INP001`, `ICN`, `ISC`, `INT` — and would emit a false notice. Only
 `"ALL"`, `"I"`, or `I` followed by digits names the isort rules.
@@ -267,9 +275,13 @@ that same `ValueError` propagate; the two consumers differ only in how they trea
   unparsable
 - `files_changed` — fixable filenames from the pre-check run, deduplicated and sorted;
   `[]` on exit 2 from either run
-- `unparsable_files` — filenames of syntax-error diagnostics
+- `unparsable_files` — filenames of syntax-error diagnostics; `[]` on exit 2 from either
+  run, on malformed JSON, and on every early return (missing binary, timed out, execution
+  error), including those after the pre-check already found syntax errors
 
-All paths are project-relative with forward slashes.
+All paths are project-relative with forward slashes. Step 6's write-mode loop relies on
+the empty `unparsable_files` above: only a step that reported unparsable files continues
+the run, so a ruff error or an early return must still stop it.
 
 ## TESTS
 
@@ -305,10 +317,10 @@ and 8 if it runs ruff) restore the real function with
 7b. **Exit 2, check mode:** pre-check returns exit 2, empty stdout, `stderr` naming an
    invalid `[tool.ruff]` option → `success is False` (not `True` from the empty parse),
    the stderr text in `output`, `files_changed == []`, exactly one invocation.
-7c. **Exit 2, write mode:** pre-check exits 0 with one fixable message, the `--fix` run
-   exits 2 with stderr → `success is False`, the fix run's stderr in `output`,
-   `files_changed == []`. Separately, a pre-check exit 2 in write mode → exactly one
-   invocation (no fix run).
+7c. **Exit 2, write mode:** pre-check exits 1 with one fixable message and one
+   syntax-error diagnostic, the `--fix` run exits 2 with stderr → `success is False`, the
+   fix run's stderr in `output`, `files_changed == []`, `unparsable_files == []`.
+   Separately, a pre-check exit 2 in write mode → exactly one invocation (no fix run).
 7d. **`combined` source:** check mode with two diagnostics → `output` contains one
    readable line per diagnostic naming `src/a.py` and the rule code, and does not contain
    the raw JSON (no `"filename"` key); still exactly one invocation. Write mode → `output` contains
@@ -322,10 +334,13 @@ and 8 if it runs ruff) restore the real function with
 9a. Keys with no leading literal segment — `"*.py" = ["I001"]` and
    `"**/test_*.py" = ["I"]` — → no notice (documented false negative), no exception.
 9b. A **malformed** `pyproject.toml` → no notice and no exception; the step still runs.
+9c. **Component overlap, not string prefix:** `"tests2/**" = ["I"]` with target dir
+   `tests` → no notice. `"src/sub/**" = ["I"]` with target `src` → notice.
 10. Missing ruff binary → `success=False`, no subprocess.
-10b. Write mode, pre-check succeeds, **`--fix` run times out** (and, separately, returns an
-    `execution_error`) → `success=False`, the bare timeout / failure message, no version
-    banner, `version_line` not called.
+10b. Write mode, pre-check reports a syntax-error diagnostic, **`--fix` run times out**
+    (and, separately, returns an `execution_error`) → `success=False`,
+    `unparsable_files == []`, the bare timeout / failure message, no version banner,
+    `version_line` not called.
 
 `tests/test_project_config.py`:
 
@@ -370,7 +385,10 @@ specifically: it is what catches an accidental `from mcp_tools_py.code_checker_r
 > Check the exit code after **each** invocation, mirroring `run_ruff_fix_impl`
 > (`code_checker_ruff/runners.py:129`, `:159`): exit 2 (e.g. an invalid `[tool.ruff]`
 > config, empty stdout) means `success=False` with ruff's stderr in `output` and
-> `files_changed=[]` — otherwise the empty parse would report a clean check.
+> `files_changed=[]` — otherwise the empty parse would report a clean check. That return,
+> malformed JSON and every early return also carry `unparsable_files=[]`, even when the
+> pre-check found syntax errors: step 6's loop continues past any step that reports
+> unparsable files, and these failures must stop it.
 >
 > In write mode, `output` carries the `--fix` run's text output. In check mode, render a
 > short readable per-file list from the already-parsed messages — never the raw JSON, and
@@ -398,8 +416,9 @@ specifically: it is what catches an accidental `from mcp_tools_py.code_checker_r
 > Add a `per_file_ignores_notice` that reports, in `output`, when an `I` entry in
 > `[tool.ruff.lint.per-file-ignores]` covers a target directory. Do not override the
 > project's ruff config. Keep the matching literal — leading literal path segment, no glob
-> engine — and never let it fail the step. Match codes `"ALL"` or `^I\d*$` only — a bare
-> `I` prefix would also catch `INP001`, `ICN`, `ISC`, `INT`. A key with no leading literal
+> engine — and never let it fail the step. Compare the prefix and each target dir by path
+> component, not string `startswith` (`tests2/**` must not match `tests`). Match codes
+> `"ALL"` or `^I\d*$` only — a bare `I` prefix would also catch `INP001`, `ICN`, `ISC`, `INT`. A key with no leading literal
 > segment (`"*.py"`, `"**/test_*.py"`) is skipped, and `extend-per-file-ignores` is not
 > read: both are documented false negatives.
 >

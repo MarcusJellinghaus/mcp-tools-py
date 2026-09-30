@@ -1,10 +1,10 @@
 # Step 3 — `formatter/common.py`: shared output helpers and version reporting
 
 `black_runner.py` and `isort_runner.py` each carry an identical 10-line
-`_truncate_output` and an identical timed-out / execution-error /
-combine-stdout-and-stderr preamble. Steps 4 and 5 add two more runners, which would make
-four copies. This step extracts them once, and adds version reporting while the two
-existing runners are open.
+`_truncate_output` function and the same inline code joining stdout and stderr. Steps 4
+and 5 add two more runners, which would make four copies. This step extracts both into
+`truncate_output` and `combine_output`, and adds version reporting while the two existing
+runners are open. The timed-out and execution-error early returns stay in each runner.
 
 Result: the codebase is shorter after this issue than before it.
 
@@ -38,14 +38,15 @@ def version_line(tool: str, binary: str, timeout_seconds: int) -> str:
     """One-line version banner to prepend to a FormatterResult.output."""
 ```
 
-`truncate_output` and `combine_output` are the existing bodies, moved verbatim. The
-leading underscore is dropped — they are now package-internal shared helpers, not
-module-private ones.
+`truncate_output` is the existing `_truncate_output` body, moved verbatim with the leading
+underscore dropped — it is now a package-internal shared helper, not a module-private one.
+`combine_output` is extracted from the inline `output_parts` code in both runners, with
+the same result: stdout and stderr joined by a newline, empty streams skipped.
 
 ### Version from `<binary> --version`, as the issue specifies
 
 The version must describe the binary that was actually invoked, so `formatter_version`
-runs `[binary, "--version"]` on the **same path** `formatter_binary(name, environment)`
+runs `[binary, "--version"]` on the **same path** `formatter_binary(name, env)`
 returned to the runner. That makes the injected environment govern the banner for free —
 no metadata lookup, no environment parameter.
 
@@ -114,7 +115,7 @@ output = f"{version_line('black', binary, remaining)}\n{combine_output(result)}"
 return FormatterResult(output=truncate_output(output), ...)
 ```
 
-`binary` is the path `formatter_binary("black", environment)` returned in step 2's code —
+`binary` is the path `formatter_binary("black", env)` returned in step 2's code —
 the one just invoked — so the banner names the binary that ran.
 
 The version line goes **inside** the truncation input, so a 200-line cap still yields a
@@ -195,9 +196,9 @@ import from `runner.py` or `formatter_tools.py` — it sits below both.
 > Read `pr_info/steps/summary.md`, then implement `pr_info/steps/step_3.md`.
 >
 > Extend `src/mcp_tools_py/formatter/common.py` — created in step 2 with
-> `formatter_binary` — with `truncate_output` and
-> `combine_output` — moved verbatim from the duplicated private copies in
-> `black_runner.py` and `isort_runner.py` — plus
+> `formatter_binary` — with `truncate_output` (the duplicated private `_truncate_output`,
+> moved verbatim) and `combine_output` (extracted from the inline stdout/stderr joining in
+> `black_runner.py` and `isort_runner.py`), plus
 > `formatter_version(binary, timeout_seconds)` and
 > `version_line(tool, binary, timeout_seconds)`.
 >

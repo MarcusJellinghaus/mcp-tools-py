@@ -18,6 +18,10 @@ Plus traps that must **not** change.
 | `docs/pyproject-configuration.md:36` | `ruff-timeout` is already listed; `black-timeout` and `isort-timeout` both stay valid |
 | `tach.toml` | No new edge, in either direction |
 | `README.md:44` | Verified, no edit. The issue lists it, but it is the target-directory auto-detect list and names only `run_format_code`, not black or isort |
+| `CONTRIBUTING.md:252` | "`format_all.bat` … (runs ruff, black, isort)" describes dev tooling, not the env split. The script it names does not exist in `tools/`; that is pre-existing and out of scope |
+| `.claude/CLAUDE.md:3` | The repo's tool list — black and isort remain supported |
+| `src/mcp_tools_py/utils/project_config.py:162` | `check_line_length_conflicts` docstring: "black, isort, and ruff" line-length settings, still accurate |
+| `tests/test_formatter_tools.py:269` | "Both black and isort budgets" — the black-repo timeout test, which step 6 (test 11) keeps unchanged |
 
 ## Count edits — five → seven console-script, five → three `python -m`
 
@@ -25,8 +29,11 @@ Plus traps that must **not** change.
   docstring, `unavailable_message` docstring
 - `src/mcp_tools_py/utils/environment_info.py::_failed` — "all five module tools"
 - `src/mcp_tools_py/server.py:73` — "The five `python -m` tools are left to the lazy probe"
-- `README.md:198` — "if those five are not installed" → three
-- `README.md:205` — "restart the MCP server after installing one of those five" → three
+- `README.md:198` — "if those five are not installed" → three. **Also an enumeration
+  edit:** the same line's "reports pytest, pylint, mypy, black and isort as missing"
+- `README.md:205` — "restart the MCP server after installing one of those five" → three.
+  **Also an enumeration edit:** "pytest, pylint, mypy, black and isort are answered by a
+  probe"
 - `README.md:152` — "Those five therefore run at the tool env's versions" → seven. **This
   "five" counts the tool-env tools**, the opposite side from lines 198 and 205
 - `docs/architecture/architecture.md:174` — "used by the five console-script tools" →
@@ -47,6 +54,7 @@ black and isort move to the second list:
 - `src/mcp_tools_py/main.py:74` — the `--python-executable` CLI help text, "ruff, bandit,
   vulture, tach and lint-imports come from mcp-tools-py's own environment"
 - `README.md:115`, `:149`, `:158`, `:203`
+- `README.md:198`, `:205` — as above, both kinds of edit on one line
 - `README.md:150` — the tool env "supplies ruff, bandit, vulture, tach and lint-imports"
 - `README.md:204` — "(or bandit/vulture/tach/lint-imports)" gains black and isort
 - `docs/architecture/architecture.md:230`, `:233` — the project-env / tool-env split
@@ -60,7 +68,7 @@ Formatter naming:
   `Valid values: "isort", "black"`. This is what an agent reads before calling the tool,
   so it must describe all four steps and say the default is resolved from the project's
   configuration.
-- `src/mcp_tools_py/formatter/runner.py` — module docstring line 3 ("sequences formatter
+- `src/mcp_tools_py/formatter/runner.py` — module docstring lines 3-4 ("sequences formatter
   runners (isort, black)") and the `steps` argument docstring ("Defaults to
   `["isort", "black"]`")
 - `src/mcp_tools_py/formatter/__init__.py:1` — "Formatter package for code formatting
@@ -154,12 +162,16 @@ case-sensitive `those five` misses. The third pattern is the pre-move tool-env
 enumeration; after the sweep it must have **no** hits outside `pr_info/`.
 
 Re-read every hit outside `pr_info/`. Each must be either a line in the "do not change"
-table above or a line already rewritten in this step.
+table above or a line written or rewritten in this step. Line numbers are as of planning;
+earlier steps shift some (`tests/test_formatter_tools.py` is edited in steps 2 and 6), so
+match table rows by their quoted text. Verified at planning time: the three patterns hit
+only lines listed in this file — the table or the edit lists — so any other hit was added
+by an earlier step and must be classified before committing.
 
 ## DONE WHEN
 
 pylint / pytest / mypy / tach / lint-imports / ruff / vulture pass, every grep hit outside
-`pr_info/` is a listed do-not-change line or a line rewritten in this step, and
+`pr_info/` is a listed do-not-change line or a line written or rewritten in this step, and
 `check_file_size` is clean.
 
 Finally: `delete_directory(".scratch", recursive=True)` if any earlier step left one. CI
@@ -199,7 +211,7 @@ blocks a PR carrying one.
 >
 > Before committing, grep for stragglers with the three case-insensitive patterns in the
 > step file. Every hit outside `pr_info/` must be a do-not-change line or a line you
-> already rewrote.
+> wrote or rewrote. `README.md:198` and `:205` take both a count and an enumeration edit.
 >
 > Put the release note — the first `run_format_code` after upgrade may reformat, because
 > the formatter now comes from the tool env — in a new `docs/upgrade-notes.md`, link it

@@ -97,3 +97,36 @@ requires the notice to name the covered directories.
   files."`. The probe reproduced isort's skip without piped stdout, so no cause is asserted.
 - **Step 4's ` --> ` header parser uses `(.+?):\d+:\d+`**, the same anchor as the stderr
   regex, so absolute Windows paths survive. Test 7c covers it.
+
+## Plan review 6
+
+- **Step 8 do-not-change table covers every current grep hit.** Added `CONTRIBUTING.md:252`,
+  `.claude/CLAUDE.md:3`, `utils/project_config.py:162` and `tests/test_formatter_tools.py:269`,
+  all correct as written. `README.md:198` and `:205` take an enumeration edit as well as the
+  count edit.
+- **Churn-test pseudocode** uses positional arguments and `list(results) == [...]`.
+- **Runners resolve the environment once:** `env = environment or PythonEnvironment.resolve()`,
+  used for both the binary lookup and the missing-binary message's `env.bin_dir`.
+- **`per-file-ignores` overlap compares path components**, not string prefixes; step 5 adds
+  a `tests2/**` versus `tests` no-notice test.
+- **Step 3 wording:** `truncate_output` moves verbatim; `combine_output` is extracted from
+  inline code; the timed-out / execution-error early returns are not extracted.
+
+## Continue past unparsable-file failures (user decision, simplified by supervisor)
+
+The user chose "keep going when the only failure is unparsable files", so `ruff_format`
+still formats the remaining files after `ruff_imports` hits a syntax error. The
+supervisor simplified the implementation to "keep going when the failed step reported
+unparsable files": the write-mode loop breaks on
+`not result.success and not result.unparsable_files` (step 6); check mode is unchanged.
+This avoids a new `FormatterResult` field (the issue's Decisions table already avoids
+mcp_coder-visible `FormatterResult` changes) and per-runner flag logic. Continuing past a
+step that also failed for another reason is harmless: the steps are independent and
+idempotent, and that step still reports `success=False`. Timeouts, execution errors,
+missing binaries, ruff exit 2 and malformed JSON never populate `unparsable_files`, so
+they still stop the run; step 5 now states `unparsable_files=[]` explicitly on its
+fix-run exit 2 and early returns. Behaviour change for black repos: black now runs after
+an isort step that exited 0 but reported unparsable files. Step 7
+test 6a now expects both ruff steps in the result, both `success=False` with
+`src/bad.py` in `unparsable_files`, and the good file sorted and reformatted; the separate
+`steps=["ruff_format"]` write-mode test is dropped as redundant.

@@ -38,9 +38,9 @@ def _project(tmp_path: Path, pyproject: str, files: dict[str, str]) -> Path:
 ```
 write already-ruff-formatted, already-sorted source
 snapshot file bytes
-run_format_code(python_executable=sys.executable, project_root, ["src"], steps=None)
+results = run_format_code(sys.executable, project_root, ["src"], steps=None)
 assert bytes unchanged          # no diff
-assert results.keys() == ["ruff_imports", "ruff_format"]
+assert list(results) == ["ruff_imports", "ruff_format"]
 assert all(r.success for r in results.values())
 ```
 
@@ -81,32 +81,25 @@ runner directly with `sys.executable`.
 Source tree with one good file — badly formatted **and** with unsorted imports — and one
 syntax-error file.
 
-A syntax error is visible to **both** ruff steps, and `ruff_imports` runs first and fails,
-so `run_format_code` breaks before `ruff_format`. That makes "only the format problem"
-unreachable through the default step list. Two tests, therefore:
+A syntax error is visible to **both** ruff steps. `ruff_imports` runs first and fails,
+but it reported an unparsable file, so the run continues to `ruff_format` (step 6,
+"Continue past unparsable-file failures").
 
-**6a — through `run_format_code`, default steps.** `ruff_imports` is the step that
-reports:
-
-```
-assert list(results) == ["ruff_imports"]          # the run stops here
-assert results["ruff_imports"].success is False
-assert "src/bad.py" in results["ruff_imports"].unparsable_files
-assert the good file's imports were sorted on disk   # the others still get processed
-```
-
-**6b — `ruff_format` directly, `steps=["ruff_format"]`.** The only way to reach
-`ruff_format` with a syntax-error file present:
+**6a — through `run_format_code`, default steps.**
 
 ```
-assert results["ruff_format"].success is False
-assert "src/bad.py" in results["ruff_format"].unparsable_files
-assert the good file was reformatted on disk
+assert list(results) == ["ruff_imports", "ruff_format"]   # the run did not stop
+for step in ("ruff_imports", "ruff_format"):
+    assert results[step].success is False
+    assert "src/bad.py" in results[step].unparsable_files
+assert the good file's imports were sorted on disk
+assert the good file was reformatted on disk      # ruff_format ran on the rest
 ```
 
-Both prove the same acceptance criterion — a parse error yields `success=False` and a
-populated `unparsable_files` while the remaining files are still processed. Neither step
-suppresses its work because one file is unparsable; see `step_5.md` for why.
+This proves the acceptance criterion — a parse error yields `success=False` and a
+populated `unparsable_files` while the remaining files are still processed — for both
+steps in one run. Neither step suppresses its work because one file is unparsable; see
+`step_5.md` for why.
 
 **Paths are project-relative with forward slashes** in `files_changed` and
 `unparsable_files`, per `step_5.md`. Assert the full relative path, never a bare
@@ -178,9 +171,10 @@ issue has a test naming it.
 >
 > Also cover: a black repo still resolving to isort+black; explicit `["isort", "black"]` on
 > a ruff repo; a bogus `python_executable` not changing which binary runs; parse errors
-> leaving the other files formatted — `ruff_imports` through the default step list, and
-> `ruff_format` via an explicit `steps=["ruff_format"]`, because `ruff_imports` fails
-> first on the same file and stops the run; `steps=[]` raising at the runner and returning an
+> leaving the other files formatted — through the default step list, where
+> `ruff_imports` fails on the unparsable file only and the run continues, so
+> `ruff_format` still formats the rest and both steps report the file in
+> `unparsable_files` with `success=False`; `steps=[]` raising at the runner and returning an
 > error string at the MCP layer; both-declared and neither-declared errors naming the key
 > and the file; a version line on every step; and the MCP layer resolving to the same steps
 > as the runner layer — for that one, build a `ToolContext` with the real default tool

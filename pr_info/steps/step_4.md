@@ -36,8 +36,8 @@ for a caller — nothing has ever passed it. The bare `python_executable` entry 
 to `vulture_whitelist.py` already covers it; no new entry.
 
 Command: `[ruff_binary, "format"] + (["--check"] if check_only else []) + target_dirs`,
-with `ruff_binary` from the same `formatter_binary("ruff", environment)` helper step 2
-introduced.
+with `ruff_binary` from the same `formatter_binary("ruff", env)` helper step 2
+introduced, `env` resolved once as step 2 specifies.
 
 ## FIRST: confirm the output format
 
@@ -59,7 +59,8 @@ done — CI blocks a PR carrying one.
 ## ALGORITHM
 
 ```
-binary = formatter_binary("ruff", environment);  if None -> unavailable FormatterResult
+env    = environment or PythonEnvironment.resolve()   # once, as in step 2
+binary = formatter_binary("ruff", env);  if None -> unavailable FormatterResult naming env.bin_dir
 cmd    = [binary, "format"] + (["--check"] if check_only else []) + target_dirs
 started = time.monotonic()
 result = execute_command(cmd, cwd=project_dir, timeout_seconds=...)
@@ -175,6 +176,11 @@ Paths in both lists are project-relative with forward slashes.
 - `unparsable_files` — `invalid-syntax:` marker paths from stdout plus
   `error: Failed to parse` paths from stderr, deduplicated
 
+Every early return — missing binary, timed out, execution error — leaves
+`unparsable_files` empty, and so does exit 2 from a config error (no
+`error: Failed to parse` on stderr). Step 6's write-mode loop relies on this: only a step
+that reported unparsable files continues the run.
+
 ## TESTS
 
 **Write first**, all against a mocked `execute_command` using recorded real output,
@@ -207,6 +213,8 @@ common.formatter_binary)`.
    `"unformatted: File would be reformatted\n --> C:\\repo\\src\\ugly.py:1:6\n"` to
    `parse_check_markers` and assert `changed == [r"C:\repo\src\ugly.py"]`. Same reason as
    7b: test the parser's raw output, not the normalized runner result.
+7d. Exit 2 with empty stdout and a config error on stderr (no `Failed to parse`) →
+   `success is False`, `unparsable_files == []`.
 8. **`check_only=True` against an unparsable file** — exit 2, an `invalid-syntax:` marker
    in stdout, and a `--check` run that writes nothing to stderr. Assert `success is False`
    **and** `"src/bad.py" in unparsable_files`. This is the case a marker parser that
@@ -218,9 +226,9 @@ common.formatter_binary)`.
    not `project_dir` so a missing `os.path.isabs` guard shows up as a `"../"` prefix. An
    absolute path under `project_dir`, built with `os.path.join(project_dir, "src",
    "bad.py")`, normalizes to `"src/bad.py"` too.
-10. Missing ruff binary → `success=False`, no subprocess.
-11. Timed out and execution-error paths → `success=False`, no version banner, and
-    `version_line` not called.
+10. Missing ruff binary → `success=False`, `unparsable_files == []`, no subprocess.
+11. Timed out and execution-error paths → `success=False`, `unparsable_files == []`, no
+    version banner, and `version_line` not called.
 12. **One integration test, no mock:** a `tmp_path` project with one badly formatted file
     and one syntax-error file, run in write mode. The good file is reformatted on disk,
     `unparsable_files == ["src/bad.py"]`, `success is False`. This is the acceptance

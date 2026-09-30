@@ -136,8 +136,14 @@ plain `PythonEnvironment` argument rather than as a context object. That is also
 makes "ignore `python_executable`" truthful rather than cosmetic: the selecting argument
 is `environment`, not the interpreter path.
 
+**Each runner resolves the environment once**, at the top:
+`env = environment or PythonEnvironment.resolve()`. It passes `env` to
+`formatter_binary(name, env)` and uses `env.bin_dir` in the missing-binary message, so the
+lookup and the message always name the same directory. `formatter_binary` returns only
+`str | None` and cannot supply that directory itself.
+
 When the binary is absent, return the existing `execution_error`-shaped `FormatterResult`:
-`output=f"{tool} is not available: no console script found in {bin_dir}"`,
+`output=f"{tool} is not available: no console script found in {env.bin_dir}"`,
 `success=False`, `files_changed=[]`. The MCP layer checks availability upfront anyway;
 this is the direct-caller path.
 
@@ -152,14 +158,16 @@ runners invoke.
 ## ALGORITHM
 
 ```
-binary = formatter_binary("black", environment)   # caller's env, not python_executable
-if binary is None: return unavailable FormatterResult
+env    = environment or PythonEnvironment.resolve()   # once; caller's env, not python_executable
+binary = formatter_binary("black", env)
+if binary is None: return unavailable FormatterResult naming env.bin_dir
 command = [binary] + (["--check"] if check_only else []) + target_dirs
 result  = execute_command(command, cwd=project_dir, timeout_seconds=...)
 ... existing timed_out / execution_error / parse handling, unchanged ...
 ```
 
-The only change to each runner is the first two lines of command construction. Everything
+The only change to each runner is the environment and binary lookup and the command
+construction above. Everything
 downstream — truncation, changed-file parsing, isort's unparsable-file handling — stays
 byte-identical.
 
