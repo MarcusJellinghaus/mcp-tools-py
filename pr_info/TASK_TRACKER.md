@@ -21,6 +21,56 @@ This tracks **Feature Implementation** consisting of multiple **Tasks**.
 
 ## Tasks
 
-<!-- Tasks populated from pr_info/steps/ by prepare_task_tracker -->
+### Step 1: Read-only `addopts` accessor
+See [step_1.md](./steps/step_1.md)
+
+- [ ] Implementation: tests + `_load_pyproject` and `get_pytest_addopts` in `utils/project_config.py`
+- [ ] Quality checks: pylint, pytest, mypy — fix all issues
+- [ ] Commit message prepared
+
+### Step 2: Source-only lookup for `coverage_source`
+See [step_2.md](./steps/step_2.md)
+
+- [ ] Implementation: tests + `_read_source_dirs`, `_read_test_dirs`, `resolve_coverage_source` in `utils/project_config.py`
+- [ ] Quality checks: pylint, pytest, mypy — fix all issues
+- [ ] Commit message prepared
+
+### Step 3: `SanitizedArgs.path_args`
+See [step_3.md](./steps/step_3.md)
+
+- [ ] Implementation: tests + `path_args` field in `models.py`, populated by `sanitize_extra_args`
+- [ ] Quality checks: pylint, pytest, mypy — fix all issues
+- [ ] Commit message prepared
+
+### Step 4: Coverage run plumbing
+See [step_4.md](./steps/step_4.md)
+
+- [ ] Implementation: tests + new `code_checker_pytest/coverage.py` with `coverage_args`, `read_coverage_report`, `read_fail_under`
+- [ ] Quality checks: pylint, pytest, mypy — fix all issues
+- [ ] Commit message prepared
+
+### Step 5: Selection echo
+See [step_5.md](./steps/step_5.md)
+
+- [ ] Implementation: tests + `selection_line` and `_option_value` in `coverage.py`
+- [ ] Quality checks: pylint, pytest, mypy — fix all issues
+- [ ] Commit message prepared
+
+### Step 6: Coverage digest formatter
+See [step_6.md](./steps/step_6.md)
+
+- [ ] Implementation: tests + `format_coverage_digest` and `_ranges` in `coverage.py`
+- [ ] Quality checks: pylint, pytest, mypy — fix all issues
+- [ ] Commit message prepared
+
+### Step 7: Wire coverage into `run_pytest_check`
+See [step_7.md](./steps/step_7.md)
+
+- [ ] Implementation: handler + integration tests, `pytest_tool.py` parameters, `pyproject.toml` dev dependency, README and architecture docs
+- [ ] Quality checks: pylint, pytest (incl. integration), mypy, lint-imports — fix all issues
+- [ ] Commit message prepared
 
 ## Pull Request
+
+- [ ] PR review: review the full branch diff against `main`
+- [ ] PR summary prepared
