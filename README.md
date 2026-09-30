@@ -65,8 +65,13 @@ by passing an explicit list:
 | `extra_args` | list | None | Optional list of additional pytest arguments; use `-v`/`-vv`/`-vvv` to control verbosity |
 | `env_vars` | dictionary | None | Optional environment variables for the subprocess |
 | `timeout_seconds` | integer | None (resolved from config, else 300) | Maximum seconds to wait for the test run. Positive integers only |
+| `coverage` | boolean | False | Measure coverage with pytest-cov and append a coverage digest to the reply |
+| `coverage_source` | list | None (auto-detected) | Directories to measure. Auto-detected from `[tool.setuptools.packages.find] where`, excluding test paths |
+| `max_modules` | integer | 10 | How many modules the coverage digest details in each list |
 
 **Note:** Parallel test execution is enabled by default using pytest-xdist (`-n auto`).
+
+**Coverage:** `coverage=True` needs `pytest-cov` installed in the project's environment. The digest gives the total, the modules with the most missing statements and their per-function line ranges, the modules with nothing covered, and the test selection the numbers come from. The project's `fail_under` is reported but not applied, so pass/fail reflects the tests only. To exclude code, use coverage's own `[tool.coverage.run] omit` or `# pragma: no cover`.
 
 ### Mypy Parameters
 

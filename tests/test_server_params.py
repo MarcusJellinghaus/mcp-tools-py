@@ -5,13 +5,15 @@ Tests for the server functionality with updated parameter exposure.
 import inspect
 import logging
 from pathlib import Path
-from typing import Any, Dict, Tuple
+from typing import Any, Dict, Iterator, Tuple
 from unittest.mock import MagicMock, patch
 
 import pytest
 
 from mcp_tools_py.code_checker_pytest.utils import SHOW_OUTPUT_NOTE
+from mcp_tools_py.utils.environment_info import EnvironmentInfo
 from mcp_tools_py.utils.tool_context import CONSOLE_SCRIPT_TOOLS
+from tests.conftest import make_environment_info
 from tests.test_tool_availability._helpers import _dummy_python, _patched_tool_env
 
 
@@ -813,6 +815,202 @@ class TestPytestTimeoutArgument:
 
         assert "timeout_seconds" in result
         mock_check_pytest.assert_not_called()
+
+
+_PYTEST_TOOL = "mcp_tools_py.checker_tools.pytest_tool"
+
+_COVERAGE_DATA: Dict[str, Any] = {
+    "totals": {"percent_covered": 50.0, "num_statements": 4, "missing_lines": 2},
+    "files": {
+        "src/pkg/mod.py": {
+            "summary": {
+                "covered_lines": 2,
+                "num_statements": 4,
+                "missing_lines": 2,
+                "percent_covered": 50.0,
+            },
+            "missing_lines": [5, 6],
+            "functions": {"untested": {"missing_lines": [5, 6]}},
+        }
+    },
+}
+
+
+def _pytest_results(failed: int = 0) -> Dict[str, Any]:
+    return {
+        "success": True,
+        "summary": {"passed": 1, "failed": failed, "error": 0, "collected": 1},
+        "test_results": None,
+    }
+
+
+class TestPytestCoverage:
+    """Tests for the run_pytest_check coverage parameters."""
+
+    @pytest.fixture
+    def run_pytest_check(
+        self, tmp_path: Path, all_modules_importable: Any
+    ) -> Iterator[Any]:
+        """run_pytest_check over tmp_path, with pytest-cov reported installed."""
+        with patch("mcp.server.fastmcp.FastMCP") as mock_fastmcp:
+            mock_tool = MagicMock()
+            mock_fastmcp.return_value.tool.return_value = mock_tool
+
+            from mcp_tools_py.server import ToolServer
+
+            with patch.object(
+                ToolServer, "_warn_missing_console_scripts", return_value=None
+            ):
+                ToolServer(project_dir=tmp_path)
+
+        info = make_environment_info(distributions={"pytest-cov": "7.1.0"})
+        with (
+            patch(f"{_PYTEST_TOOL}.get_environment_info", return_value=info),
+            patch(f"{_PYTEST_TOOL}.read_fail_under", return_value=0.0),
+        ):
+            yield _get_tool(mock_tool, "run_pytest_check")
+
+    def test_missing_pytest_cov_is_refused(
+        self, run_pytest_check: Any, all_modules_importable: Any
+    ) -> None:
+        """Without pytest-cov in the target env, pytest is never run."""
+        with (
+            patch(
+                f"{_PYTEST_TOOL}.get_environment_info",
+                return_value=make_environment_info(),
+            ),
+            patch(f"{_PYTEST_TOOL}.check_code_with_pytest") as mock_check,
+        ):
+            result = run_pytest_check(coverage=True, coverage_source=["src"])
+
+        assert "pytest-cov is not available" in result
+        mock_check.assert_not_called()
+
+    def test_failed_probe_lets_the_run_proceed(self, run_pytest_check: Any) -> None:
+        """A probe that could not be trusted does not refuse the run."""
+        broken = EnvironmentInfo(
+            version="", sys_path=(), distributions={}, importable={}, error="boom"
+        )
+        with (
+            patch(f"{_PYTEST_TOOL}.get_environment_info", return_value=broken),
+            patch(f"{_PYTEST_TOOL}.check_code_with_pytest") as mock_check,
+            patch(f"{_PYTEST_TOOL}.read_coverage_report", return_value=None),
+        ):
+            mock_check.return_value = _pytest_results()
+            run_pytest_check(coverage=True, coverage_source=["src"])
+
+        mock_check.assert_called_once()
+
+    def test_coverage_flags_and_env_reach_the_runner(
+        self, run_pytest_check: Any
+    ) -> None:
+        """Each source gets --cov, --cov-fail-under=0 comes last, env is merged."""
+        with (
+            patch(f"{_PYTEST_TOOL}.check_code_with_pytest") as mock_check,
+            patch(f"{_PYTEST_TOOL}.read_coverage_report", return_value=None),
+        ):
+            mock_check.return_value = _pytest_results()
+            run_pytest_check(
+                extra_args=["--cov-fail-under=90"],
+                env_vars={"TEST_ENV": "value"},
+                coverage=True,
+                coverage_source=["a", "b"],
+            )
+
+        kwargs = mock_check.call_args[1]
+        assert "--cov=a" in kwargs["extra_args"]
+        assert "--cov=b" in kwargs["extra_args"]
+        assert kwargs["extra_args"][-1] == "--cov-fail-under=0"
+        assert kwargs["env_vars"]["TEST_ENV"] == "value"
+        assert "COVERAGE_FILE" in kwargs["env_vars"]
+
+    def test_temp_dir_is_removed(self, run_pytest_check: Any) -> None:
+        """The coverage temp dir is gone after the call."""
+        with (
+            patch(f"{_PYTEST_TOOL}.check_code_with_pytest") as mock_check,
+            patch(f"{_PYTEST_TOOL}.read_coverage_report", return_value=None),
+        ):
+            mock_check.return_value = _pytest_results()
+            run_pytest_check(coverage=True, coverage_source=["src"])
+
+        data_file = Path(mock_check.call_args[1]["env_vars"]["COVERAGE_FILE"])
+        assert not data_file.parent.exists()
+
+    def test_max_modules_is_forwarded(self, run_pytest_check: Any) -> None:
+        """max_modules reaches format_coverage_digest."""
+        with (
+            patch(f"{_PYTEST_TOOL}.check_code_with_pytest") as mock_check,
+            patch(f"{_PYTEST_TOOL}.read_coverage_report", return_value=_COVERAGE_DATA),
+            patch(
+                f"{_PYTEST_TOOL}.format_coverage_digest", return_value="DIGEST"
+            ) as mock_digest,
+        ):
+            mock_check.return_value = _pytest_results()
+            run_pytest_check(coverage=True, coverage_source=["src"], max_modules=3)
+
+        assert mock_digest.call_args[1]["max_modules"] == 3
+
+    def test_source_dir_containing_tests_is_refused(
+        self, run_pytest_check: Any, tmp_path: Path
+    ) -> None:
+        """where = ["."] resolves to nothing, and the error names coverage_source."""
+        (tmp_path / "tests").mkdir()
+        (tmp_path / "pyproject.toml").write_text(
+            '[tool.setuptools.packages.find]\nwhere = ["."]\n\n'
+            '[tool.pytest.ini_options]\ntestpaths = ["tests"]\n'
+        )
+        with patch(f"{_PYTEST_TOOL}.check_code_with_pytest") as mock_check:
+            result = run_pytest_check(coverage=True)
+
+        assert "coverage_source" in result
+        mock_check.assert_not_called()
+
+    def test_digest_is_appended_to_the_reply(self, run_pytest_check: Any) -> None:
+        """The normal reply comes first, then the digest."""
+        with (
+            patch(f"{_PYTEST_TOOL}.check_code_with_pytest") as mock_check,
+            patch(f"{_PYTEST_TOOL}.read_coverage_report", return_value=_COVERAGE_DATA),
+        ):
+            mock_check.return_value = _pytest_results()
+            result = run_pytest_check(coverage=True, coverage_source=["src"])
+
+        assert "selection: full suite" in result
+        assert result.index("passed") < result.index("50.0%")
+        assert "untested" in result
+        assert "Warning: tests failed" not in result
+
+    def test_failed_run_carries_the_warning(self, run_pytest_check: Any) -> None:
+        """A run with failures says the numbers come from it."""
+        with (
+            patch(f"{_PYTEST_TOOL}.check_code_with_pytest") as mock_check,
+            patch(f"{_PYTEST_TOOL}.read_coverage_report", return_value=_COVERAGE_DATA),
+        ):
+            mock_check.return_value = _pytest_results(failed=1)
+            result = run_pytest_check(coverage=True, coverage_source=["src"])
+
+        assert "Warning: tests failed" in result
+
+    def test_unsuccessful_run_carries_the_warning(self, run_pytest_check: Any) -> None:
+        """A run that failed with no summary still carries the warning."""
+        with (
+            patch(f"{_PYTEST_TOOL}.check_code_with_pytest") as mock_check,
+            patch(f"{_PYTEST_TOOL}.read_coverage_report", return_value=_COVERAGE_DATA),
+        ):
+            mock_check.return_value = {"success": False, "error": "boom"}
+            result = run_pytest_check(coverage=True, coverage_source=["src"])
+
+        assert "Warning: tests failed" in result
+
+    def test_missing_report_is_stated(self, run_pytest_check: Any) -> None:
+        """No coverage JSON gives a one-line note instead of a digest."""
+        with (
+            patch(f"{_PYTEST_TOOL}.check_code_with_pytest") as mock_check,
+            patch(f"{_PYTEST_TOOL}.read_coverage_report", return_value=None),
+        ):
+            mock_check.return_value = _pytest_results()
+            result = run_pytest_check(coverage=True, coverage_source=["src"])
+
+        assert result.endswith("Coverage report was not produced.")
 
 
 class TestStartupConsoleScriptWarnings:

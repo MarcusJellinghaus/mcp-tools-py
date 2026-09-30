@@ -64,17 +64,30 @@ def get_target_directories(project_dir: str) -> TargetDirs:
         ValueError: If none of the resolved directories exist on disk.
     """
     warnings: list[str] = []
-    pyproject_path = os.path.join(project_dir, "pyproject.toml")
+    toml_data = _load_pyproject(project_dir)
+    src_dirs = _read_source_dirs(toml_data, warnings)
+    test_dirs = _read_test_dirs(toml_data, warnings)
 
-    toml_data: dict[str, object] = {}
-    if os.path.isfile(pyproject_path):
-        with open(pyproject_path, "rb") as f:
-            try:
-                toml_data = tomllib.load(f)
-            except tomllib.TOMLDecodeError as exc:
-                raise ValueError(f"Invalid pyproject.toml: {exc}") from exc
+    # --- filter to existing dirs ---
+    combined = src_dirs + test_dirs
+    existing = [d for d in combined if os.path.isdir(os.path.join(project_dir, d))]
 
-    # --- source dirs ---
+    if not existing:
+        raise ValueError(f"No target directories found: {combined}")
+
+    return TargetDirs(directories=existing, warnings=warnings)
+
+
+def _read_source_dirs(toml_data: dict[str, object], warnings: list[str]) -> list[str]:
+    """Read ``[tool.setuptools.packages.find] where``, defaulting to ``["src"]``.
+
+    Args:
+        toml_data: Parsed pyproject.toml data.
+        warnings: List to append a fallback warning to.
+
+    Returns:
+        The configured source directories, or ``["src"]``.
+    """
     src_dirs: list[str] | None = None
     try:
         tool = toml_data["tool"]
@@ -97,8 +110,19 @@ def get_target_directories(project_dir: str) -> TargetDirs:
             "Warning: [tool.setuptools.packages.find] where not found "
             "in pyproject.toml, defaulting to ['src']"
         )
+    return src_dirs
 
-    # --- test dirs ---
+
+def _read_test_dirs(toml_data: dict[str, object], warnings: list[str]) -> list[str]:
+    """Read ``[tool.pytest.ini_options] testpaths``, defaulting to ``["tests"]``.
+
+    Args:
+        toml_data: Parsed pyproject.toml data.
+        warnings: List to append a fallback warning to.
+
+    Returns:
+        The configured test directories, or ``["tests"]``.
+    """
     test_dirs: list[str] | None = None
     try:
         tool = toml_data["tool"]
@@ -119,15 +143,7 @@ def get_target_directories(project_dir: str) -> TargetDirs:
             "Warning: [tool.pytest.ini_options] testpaths not found "
             "in pyproject.toml, defaulting to ['tests']"
         )
-
-    # --- filter to existing dirs ---
-    combined = src_dirs + test_dirs
-    existing = [d for d in combined if os.path.isdir(os.path.join(project_dir, d))]
-
-    if not existing:
-        raise ValueError(f"No target directories found: {combined}")
-
-    return TargetDirs(directories=existing, warnings=warnings)
+    return test_dirs
 
 
 def resolve_target_directories(
@@ -152,6 +168,50 @@ def resolve_target_directories(
         return result.directories
     except ValueError as exc:
         return f"Error resolving target directories: {exc}"
+
+
+def resolve_coverage_source(
+    project_dir: str, coverage_source: list[str] | None
+) -> list[str] | str:
+    """Resolve the directories to measure coverage for.
+
+    Args:
+        project_dir: Path to project root.
+        coverage_source: Explicit directories, or None to auto-detect.
+
+    Returns:
+        *coverage_source* as-is when given; otherwise the source directories
+        from pyproject.toml that exist on disk and contain no test path.  An
+        error message string naming ``coverage_source`` when none remain.
+    """
+    if coverage_source is not None:
+        return coverage_source
+    try:
+        toml_data = _load_pyproject(project_dir)
+    except ValueError as exc:
+        return f"Error resolving coverage source: {exc}"
+
+    warnings: list[str] = []
+    src_dirs = _read_source_dirs(toml_data, warnings)
+    test_dirs = _read_test_dirs(toml_data, warnings)
+    for warning in warnings:
+        logger.warning(warning)
+
+    root = Path(project_dir)
+    test_paths = [(root / t).resolve() for t in test_dirs]
+    keep = [
+        s
+        for s in src_dirs
+        if (root / s).is_dir()
+        and not any(t.is_relative_to((root / s).resolve()) for t in test_paths)
+    ]
+    if keep:
+        return keep
+    return (
+        "Error resolving coverage source: no source directory outside the test "
+        f"paths (source: {src_dirs}, tests: {test_dirs}). "
+        "Pass coverage_source explicitly."
+    )
 
 
 def check_line_length_conflicts(
@@ -312,3 +372,56 @@ def get_check_timeout(
         return validate_timeout(cli_timeout, "--check-timeout")
 
     return DEFAULT_PYTEST_TIMEOUT if tool == "pytest" else DEFAULT_CHECK_TIMEOUT
+
+
+def _load_pyproject(project_dir: str) -> dict[str, object]:
+    """Load pyproject.toml from *project_dir*.
+
+    Args:
+        project_dir: Path to project root containing pyproject.toml.
+
+    Returns:
+        The parsed TOML data, or an empty dict when the file is missing.
+
+    Raises:
+        ValueError: If pyproject.toml is not valid TOML.
+    """
+    pyproject_path = os.path.join(project_dir, "pyproject.toml")
+    if not os.path.isfile(pyproject_path):
+        return {}
+
+    with open(pyproject_path, "rb") as f:
+        try:
+            return tomllib.load(f)
+        except tomllib.TOMLDecodeError as exc:
+            raise ValueError(f"Invalid pyproject.toml: {exc}") from exc
+
+
+def get_pytest_addopts(project_dir: str) -> str | None:
+    """Return ``[tool.pytest.ini_options] addopts`` from pyproject.toml, or None.
+
+    The value is exposed as-is; flags are not interpreted.  A list value is
+    joined with spaces.
+
+    Args:
+        project_dir: Path to project root containing pyproject.toml.
+
+    Returns:
+        The addopts string, or None when the file, section or key is missing.
+        A ``ValueError`` from :func:`_load_pyproject` propagates when
+        pyproject.toml is not valid TOML.
+    """
+    section: object = _load_pyproject(project_dir)
+    for key in ("tool", "pytest", "ini_options"):
+        if not isinstance(section, dict):
+            return None
+        section = section.get(key)
+    if not isinstance(section, dict):
+        return None
+
+    value = section.get("addopts")
+    if isinstance(value, str):
+        return value
+    if isinstance(value, list):
+        return " ".join(str(v) for v in value)
+    return None

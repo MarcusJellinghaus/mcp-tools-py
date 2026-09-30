@@ -283,3 +283,40 @@ class TestSanitizeExtraArgsPathDetection:
             assert result.cleaned_args == ["-n", "auto", "tests/test_file.py"]
             assert not any("not found" in n for n in result.notes)
             assert not any("'auto'" in n for n in result.notes)
+
+
+class TestSanitizeExtraArgsPathArgs:
+    """Tests for the path_args list in sanitize_extra_args."""
+
+    def test_no_extra_args_path_args_empty(self) -> None:
+        """No extra_args gives an empty path_args list."""
+        assert sanitize_extra_args(None, None).path_args == []
+
+    def test_shape_match_path_listed(self) -> None:
+        """An existing path that looks like a path is listed."""
+        with tempfile.TemporaryDirectory() as tmpdir:
+            os.makedirs(os.path.join(tmpdir, "tests"))
+            with open(os.path.join(tmpdir, "tests", "test_x.py"), "w") as f:
+                f.write("")
+            result = sanitize_extra_args(
+                ["-x", "tests/test_x.py::test_a"], None, project_dir=tmpdir
+            )
+            assert result.path_args == ["tests/test_x.py::test_a"]
+
+    def test_bare_directory_listed(self) -> None:
+        """An existing bare directory name is listed."""
+        with tempfile.TemporaryDirectory() as tmpdir:
+            os.makedirs(os.path.join(tmpdir, "subdir"))
+            result = sanitize_extra_args(["subdir"], None, project_dir=tmpdir)
+            assert result.path_args == ["subdir"]
+
+    def test_missing_and_absolute_paths_not_listed(self) -> None:
+        """Missing and absolute paths are not listed."""
+        with tempfile.TemporaryDirectory() as tmpdir:
+            abs_path = os.path.join(tmpdir, "test_example.py")
+            with open(abs_path, "w") as f:
+                f.write("")
+            result = sanitize_extra_args(
+                ["no_such_file.py", abs_path], None, project_dir=tmpdir
+            )
+            assert result.path_args == []

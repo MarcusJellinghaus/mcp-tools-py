@@ -46,7 +46,8 @@ def sanitize_extra_args(
             ``has_path_args`` is set to ``True``.
 
     Returns:
-        SanitizedArgs with cleaned_args, extracted verbosity, and notes.
+        SanitizedArgs with cleaned_args, extracted verbosity, notes, and
+        the detected path_args.
     """
     if not extra_args:
         return SanitizedArgs(cleaned_args=[], verbosity=2, notes=[])
@@ -108,6 +109,7 @@ def sanitize_extra_args(
     # If shape matches, run existence check; missing → "not found" note.
     # If shape doesn't match, fall back to existence check; missing → silent passthrough.
     has_path_args = False
+    path_args: List[str] = []
     if project_dir:
         for arg in cleaned:
             if arg.startswith("-"):
@@ -123,6 +125,7 @@ def sanitize_extra_args(
             if looks_like_path:
                 if exists:
                     has_path_args = True
+                    path_args.append(arg)
                     notes.append(
                         f"Path argument '{arg}' detected; "
                         f"default test folder not appended."
@@ -131,6 +134,7 @@ def sanitize_extra_args(
                     notes.append(f"Path '{arg}' not found relative to project_dir.")
             elif exists:
                 has_path_args = True
+                path_args.append(arg)
                 notes.append(
                     f"Path argument '{arg}' detected; "
                     f"default test folder not appended."
@@ -142,6 +146,7 @@ def sanitize_extra_args(
         notes=notes,
         has_path_args=has_path_args,
         show_output=show_output,
+        path_args=path_args,
     )
 
 
