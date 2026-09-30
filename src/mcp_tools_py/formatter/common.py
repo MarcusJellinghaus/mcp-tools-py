@@ -1,5 +1,6 @@
 """Helpers shared by the formatter runners."""
 
+import os
 import re
 
 from mcp_tools_py.utils.python_environment import PythonEnvironment
@@ -49,6 +50,20 @@ def combine_output(result: CommandResult) -> str:
         The non-empty streams joined by a newline, or ``""`` when both are empty.
     """
     return "\n".join(part for part in (result.stdout, result.stderr) if part)
+
+
+def relative_path(path: str, project_dir: str) -> str:
+    """Project-relative path with forward slashes; already-relative paths pass through.
+
+    Only an absolute path is relativized: `os.path.relpath` on a relative path
+    would re-anchor it against the process's cwd, not `project_dir`.
+
+    Returns:
+        `path` relative to `project_dir` if absolute, with ``/`` separators.
+    """
+    if os.path.isabs(path):
+        path = os.path.relpath(path, project_dir)
+    return path.replace(os.sep, "/")
 
 
 def formatter_version(binary: str, timeout_seconds: int) -> str:

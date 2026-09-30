@@ -1,6 +1,8 @@
 """Tests for the helpers shared by the formatter runners."""
 
+import os
 import re
+from pathlib import Path
 from unittest.mock import MagicMock, patch
 
 import pytest
@@ -10,6 +12,7 @@ from mcp_tools_py.formatter.common import (
     combine_output,
     formatter_binary,
     formatter_version,
+    relative_path,
     truncate_output,
     version_line,
 )
@@ -135,3 +138,26 @@ def test_version_line(mock_exec: MagicMock) -> None:
     mock_exec.return_value = make_command_result(stdout=_RUFF_VERSION_STDOUT)
 
     assert version_line("ruff", "/tool-env/bin/ruff", 30) == "ruff 0.16.9"
+
+
+@pytest.fixture
+def _elsewhere(tmp_path: Path, monkeypatch: pytest.MonkeyPatch) -> Path:
+    """A project dir that is not the cwd, so a missing isabs guard adds '../'."""
+    project_dir = tmp_path / "project"
+    project_dir.mkdir()
+    cwd = tmp_path / "elsewhere" / "deeper"
+    cwd.mkdir(parents=True)
+    monkeypatch.chdir(cwd)
+    return project_dir
+
+
+def test_relative_path_relative_input_unchanged_in_depth(_elsewhere: Path) -> None:
+    assert relative_path(os.path.join("src", "bad.py"), str(_elsewhere)) == (
+        "src/bad.py"
+    )
+
+
+def test_relative_path_absolute_input(_elsewhere: Path) -> None:
+    path = os.path.join(str(_elsewhere), "src", "bad.py")
+
+    assert relative_path(path, str(_elsewhere)) == "src/bad.py"
