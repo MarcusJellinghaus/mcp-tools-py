@@ -6,7 +6,10 @@ import tempfile
 import pytest
 
 from mcp_tools_py.code_checker_pytest.models import SanitizedArgs
-from mcp_tools_py.code_checker_pytest.utils import sanitize_extra_args
+from mcp_tools_py.code_checker_pytest.utils import (
+    SHOW_OUTPUT_NOTE,
+    sanitize_extra_args,
+)
 
 
 class TestSanitizeExtraArgs:
@@ -46,33 +49,51 @@ class TestSanitizeExtraArgs:
         assert result.cleaned_args == ["-x", "--tb=short"]
         assert result.verbosity == 3
 
-    def test_lone_s_flag_passes_through(self) -> None:
-        """-s flag passes through when xdist is not active."""
-        result = sanitize_extra_args(["-s", "-x"], None)
-        assert result.cleaned_args == ["-s", "-x"]
-        assert result.verbosity == 2
-        assert result.notes == []
+    @pytest.mark.parametrize(
+        "args,expected_cleaned,expected_verbosity",
+        [
+            (["-s"], [], 2),
+            (["--capture=no"], [], 2),
+            (["--capture", "no"], [], 2),
+            (["-xvs"], ["-x"], 1),
+            (["-qs"], ["-q"], 2),
+            (["-vv", "-xvs"], ["-x"], 1),
+            (["-s", "-n", "auto"], ["-n", "auto"], 2),
+            (["-s", "-n", "0"], ["-n", "0"], 2),
+            (["-s", "--capture=no"], [], 2),
+        ],
+    )
+    def test_s_spellings_set_show_output(
+        self, args: list[str], expected_cleaned: list[str], expected_verbosity: int
+    ) -> None:
+        """-s and its other spellings are removed and set show_output."""
+        result = sanitize_extra_args(args, None)
+        assert result.cleaned_args == expected_cleaned
+        assert result.verbosity == expected_verbosity
+        assert result.show_output is True
+        assert result.notes.count(SHOW_OUTPUT_NOTE) == 1
 
-    def test_s_stripped_when_xdist_active(self) -> None:
-        """-s is stripped when -n VALUE (VALUE != "0") is also present."""
-        result = sanitize_extra_args(["-s", "-n", "auto"], None)
-        assert result.cleaned_args == ["-n", "auto"]
-        assert result.verbosity == 2
-        assert len(result.notes) == 1
-        assert "xdist" in result.notes[0]
-
-    def test_s_preserved_with_n_zero(self) -> None:
-        """-s is preserved when -n 0 is used (xdist disabled)."""
-        result = sanitize_extra_args(["-s", "-n", "0"], None)
-        assert result.cleaned_args == ["-s", "-n", "0"]
-        assert result.verbosity == 2
-        assert result.notes == []
-
-    def test_numprocesses_long_form_does_not_trigger_strip(self) -> None:
-        """--numprocesses long form does not trigger -s strip (documented limitation)."""
-        result = sanitize_extra_args(["-s", "--numprocesses", "auto"], None)
-        assert result.cleaned_args == ["-s", "--numprocesses", "auto"]
-        assert result.verbosity == 2
+    @pytest.mark.parametrize(
+        "args",
+        [
+            ["-vrs"],
+            ["-rfEs"],
+            ["-ktest_s"],
+            ["-kfoo"],
+            ["-xktest_pass"],
+            ["-oxfail_strict=true"],
+            ["-p", "no:cacheprovider"],
+            ["-n", "2"],
+            ["--capture=sys"],
+            ["--capture", "tee-sys"],
+            ["--capture=fd"],
+        ],
+    )
+    def test_non_switch_args_pass_through(self, args: list[str]) -> None:
+        """Args that are not pure switch groups or capture=no pass through."""
+        result = sanitize_extra_args(args, None)
+        assert result.cleaned_args == args
+        assert result.show_output is False
         assert result.notes == []
 
     def test_m_flag_removed_when_markers_provided(self) -> None:
@@ -120,10 +141,12 @@ class TestSanitizeExtraArgs:
         result = sanitize_extra_args(
             ["-s", "-vvv", "-m", "slow", "tests", "-x"], ["unit"]
         )
-        assert result.cleaned_args == ["-s", "-x"]
+        assert result.cleaned_args == ["-x"]
         assert result.verbosity == 3
-        assert len(result.notes) == 1
+        assert result.show_output is True
+        assert len(result.notes) == 2
         assert "-m flag" in result.notes[0]
+        assert result.notes[1] == SHOW_OUTPUT_NOTE
 
 
 class TestSanitizeExtraArgsPathDetection:

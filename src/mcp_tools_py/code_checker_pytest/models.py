@@ -179,3 +179,4 @@ class SanitizedArgs:
     verbosity: int
     notes: List[str]
     has_path_args: bool = False
+    show_output: bool = False
