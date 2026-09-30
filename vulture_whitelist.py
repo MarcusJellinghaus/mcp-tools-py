@@ -20,6 +20,7 @@ _.main  # Entry point function
 _.pytest_configure
 _.pytest_collection_modifyitems
 _.pytest_runtest_setup
+pytestmark  # Module-level marks, read by pytest not by name
 
 # Configuration and data model fields that may appear unused
 _.project_dir
