@@ -16,6 +16,7 @@ exact failure the issue exists to prevent.
 - `tests/test_formatter_runner.py` — new tests, plus `steps=["isort", "black"]` passed
   explicitly in the six existing tests that omit `steps` (see TESTS)
 - `tests/test_formatter_tools.py`
+- `vulture_whitelist.py` — `_declare_formatter`
 
 **Create** `tests/test_formatter_resolution.py`
 
@@ -149,9 +150,9 @@ except ValueError as exc:
 ```
 
 The MCP layer needs the resolved list *before* calling the runner — for the availability
-loop, the timeout dict, `check_line_length_conflicts` and result section ordering. The
-runner resolves again when `steps is None`; that is a cheap TOML read and keeps a direct
-runner caller honest.
+loop, the timeout dict, `check_line_length_conflicts` and result section ordering. It
+always passes that resolved list to the runner, so the runner's own `resolve_steps` call
+serves direct callers only.
 
 **The MCP-registered `run_format_code` must not gain a `python_executable` parameter.**
 Its first parameter stays `steps`. The deprecated parameter exists only on the runner
@@ -295,9 +296,18 @@ share.
 Do **not** change the shared `tool_context` fixture in `tests/conftest.py` — timeout tests
 elsewhere depend on there being no `pyproject.toml`.
 
+`_declare_formatter` is invoked by pytest, never by name, so vulture reports it as an
+unused function (60% confidence). Add the bare name to `vulture_whitelist.py` next to
+step 3's `_fixed_version_line` entry:
+
+```python
+_declare_formatter  # Autouse fixture in tests/test_formatter_tools.py
+```
+
 ## DONE WHEN
 
-pylint / pytest / mypy / tach / lint-imports pass. Check `check_file_size` on `runner.py`.
+pylint / pytest / mypy / tach / lint-imports / ruff / vulture pass. Check
+`check_file_size` on `runner.py`.
 
 ---
 
@@ -338,7 +348,8 @@ pylint / pytest / mypy / tach / lint-imports pass. Check `check_file_size` on `r
 > dir — several tests there call `run_format` with no steps and would otherwise hit the
 > "neither declared" error. It must be function-scoped: `tool_context` and `tmp_path` are
 > function-scoped, and a module-scoped fixture requesting either raises `ScopeMismatch`.
-> Do not change the shared `tool_context` fixture in `tests/conftest.py`.
+> Do not change the shared `tool_context` fixture in `tests/conftest.py`. Add
+> `_declare_formatter` as a bare name to `vulture_whitelist.py`.
 >
 > In `tests/test_formatter_runner.py`, the six existing tests that call `run_format_code`
 > without `steps` (`test_runs_isort_then_black`, `test_stops_on_failure`,
@@ -349,5 +360,6 @@ pylint / pytest / mypy / tach / lint-imports pass. Check `check_file_size` on `r
 > is the stated regression criterion.
 >
 > Run `run_format_code`, `run_pylint_check`, `run_pytest_check` with
-> `extra_args=["-n", "auto"]`, `run_mypy_check`, `run_tach_check` and
-> `run_lint_imports_check`. All must pass. Then make exactly one commit.
+> `extra_args=["-n", "auto"]`, `run_mypy_check`, `run_tach_check`,
+> `run_lint_imports_check`, `run_ruff_check` and `run_vulture_check`. All must pass. Then
+> make exactly one commit.

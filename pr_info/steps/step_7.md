@@ -152,7 +152,7 @@ because the churn test is the one that must not be skipped.
 
 ## DONE WHEN
 
-pylint / pytest / mypy / tach / lint-imports pass, and every acceptance criterion in the
+pylint / pytest / mypy / tach / lint-imports / ruff / vulture pass, and every acceptance criterion in the
 issue has a test naming it.
 
 ---
@@ -184,5 +184,6 @@ issue has a test naming it.
 > commit rather than amending an earlier step.
 >
 > Run `run_format_code`, `run_pylint_check`, `run_pytest_check` with
-> `extra_args=["-n", "auto"]`, `run_mypy_check`, `run_tach_check` and
-> `run_lint_imports_check`. All must pass. Then make exactly one commit.
+> `extra_args=["-n", "auto"]`, `run_mypy_check`, `run_tach_check`,
+> `run_lint_imports_check`, `run_ruff_check` and `run_vulture_check`. All must pass. Then
+> make exactly one commit.

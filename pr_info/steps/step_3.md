@@ -14,7 +14,7 @@ Result: the codebase is shorter after this issue than before it.
 `formatter_binary`; this step adds the output helpers and version reporting alongside
 **Create** `tests/test_formatter_common.py`
 **Modify** `src/mcp_tools_py/formatter/black_runner.py`, `isort_runner.py`,
-`tests/test_black_runner.py`, `tests/test_isort_runner.py`
+`tests/test_black_runner.py`, `tests/test_isort_runner.py`, `vulture_whitelist.py`
 
 ## WHAT
 
@@ -154,10 +154,10 @@ that is not a weakening of the regression criterion.
 
 `tests/test_black_runner.py` / `tests/test_isort_runner.py`:
 
-Add an autouse fixture patching `<runner module>.version_line` to a fixed
-`"<tool> 0.0.0"`, so no existing test spawns a version subprocess against its patched
-binary path. Tests 6 and 7 assert on that mock's calls; the real subprocess is covered by
-tests 4-5c above.
+Add an autouse fixture named `_fixed_version_line` patching `<runner module>.version_line`
+to a fixed `"<tool> 0.0.0"`, so no existing test spawns a version subprocess against its
+patched binary path. Tests 6 and 7 assert on that mock's calls; the real subprocess is
+covered by tests 4-5c above.
 
 6. A successful run's `output` first line is the banner, and `version_line` received the
    **same binary path** the formatter command used (argv[0]) and a timeout no larger than
@@ -165,13 +165,28 @@ tests 4-5c above.
 7. The timed-out and execution-error paths carry **no** version banner and call
    `version_line` zero times.
 
-Existing truncation tests in the two runner test modules can point at the shared helper
-or stay as-is; do not rewrite what already passes.
+**Two existing truncation tests break and must be updated:**
+`tests/test_black_runner.py::test_run_black_truncates_output` and
+`tests/test_isort_runner.py::test_run_isort_truncates_output`. Each feeds 250 lines of
+stdout and asserts `"50 more lines"`. The banner goes inside the truncation input, and the
+`_fixed_version_line` patch returns a **non-empty** one-line banner, so the input is 251
+lines: `len(lines) == 201` still holds, but the marker reads `"51 more lines"`. Change that
+one assertion to `"51 more lines"` in both tests; nothing else in them changes.
+
+`_fixed_version_line` is invoked by pytest, never by name, so vulture reports it as an
+unused function (60% confidence). Add the bare name to `vulture_whitelist.py` under the
+existing autouse-fixture entries, following `_clear_environment_info_cache`:
+
+```python
+_fixed_version_line  # Autouse fixture in the formatter runner test modules
+```
+
+Steps 4 and 5 reuse the same fixture name, so this one entry covers them.
 
 ## DONE WHEN
 
-pylint / pytest / mypy / tach / lint-imports pass. `common.py` must not import from
-`runner.py` or `formatter_tools.py` — it sits below both.
+pylint / pytest / mypy / tach / lint-imports / ruff / vulture pass. `common.py` must not
+import from `runner.py` or `formatter_tools.py` — it sits below both.
 
 ---
 
@@ -200,10 +215,13 @@ pylint / pytest / mypy / tach / lint-imports pass. `common.py` must not import f
 > execution-error early returns get no banner and run no version subprocess.
 >
 > Write the tests first, including the `"unknown"` degradation cases, parsing of recorded
-> real output, and an autouse fixture in the runner test modules that patches
-> `version_line` so existing `mock_exec.call_args` assertions still see the formatter
-> call.
+> real output, and an autouse fixture `_fixed_version_line` in the runner test modules that
+> patches `version_line` so existing `mock_exec.call_args` assertions still see the
+> formatter call. Whitelist `_fixed_version_line` in `vulture_whitelist.py`. Update the
+> two existing truncation tests from `"50 more lines"` to `"51 more lines"` — the banner
+> adds one line to the truncation input.
 >
 > Run `run_format_code`, `run_pylint_check`, `run_pytest_check` with
-> `extra_args=["-n", "auto"]`, `run_mypy_check`, `run_tach_check` and
-> `run_lint_imports_check`. All must pass. Then make exactly one commit.
+> `extra_args=["-n", "auto"]`, `run_mypy_check`, `run_tach_check`,
+> `run_lint_imports_check`, `run_ruff_check` and `run_vulture_check`. All must pass. Then
+> make exactly one commit.

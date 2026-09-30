@@ -21,6 +21,7 @@ Its failure mode is an availability regression, so it lands alone and is verifie
 - `tests/test_black_runner.py`
 - `tests/test_isort_runner.py`
 - `tests/test_formatter_tools.py`
+- `vulture_whitelist.py`
 
 ## WHAT
 
@@ -74,6 +75,19 @@ the reroute (mcp_coder#1173) has **not** landed. Ignoring the argument closes th
 before and after.
 
 Do not remove the parameter. Removing it is later cleanup, not this issue.
+
+**Keeping vulture clean.** `run_black` and `run_isort` never read `python_executable`, so
+vulture reports it as an unused variable at 100% confidence — above CI's
+`--min-confidence 60`. `runner.py::run_format_code` still forwards it positionally to the
+runners, so it is used there and not reported. Add one bare-name entry to
+`vulture_whitelist.py`, next to the other bare names:
+
+```python
+python_executable  # Deprecated runner parameter, accepted and ignored until mcp_coder#1173
+```
+
+A bare name covers every function with that parameter, so `run_ruff_format` and
+`run_ruff_imports` (steps 4 and 5) need no further entry.
 
 ### 3. Resolving the binary — one shared helper
 
@@ -171,10 +185,18 @@ byte-identical.
 rewritten**. It currently patches the probe via `make_environment_info(black=False)`.
 Once black is a console-script tool, `is_tool_available("black")` is answered from the
 filesystem and never consults the probe, so that patch becomes a no-op and the test
-silently passes for the wrong reason. Replace it with a patch of
-`tool_context.tool_environment.binary` returning `None` for `"black"` — or delete the
-black binary from the `tool_context` fixture's script directory, which the fixture
-docstring already documents as the intended mechanism.
+silently passes for the wrong reason. Rewrite it to **delete the black stub from the
+`tool_context` fixture's script directory** — the mechanism the fixture docstring
+documents, and the one `tests/test_checker_tools.py:21` already uses:
+
+```python
+binary = tool_context.tool_environment.binary("black")
+assert binary is not None
+binary.unlink()
+```
+
+Do not patch `tool_environment.binary` on the instance: `PythonEnvironment` is
+`@dataclass(frozen=True)`, so `patch.object` on it raises `FrozenInstanceError`.
 
 5. **The injected environment governs the binary.** Call `run_black` with an
    `environment` pointing at a tmp script directory and assert argv[0] is that
@@ -189,7 +211,7 @@ fixed in step 6.
 
 ## DONE WHEN
 
-pylint / pytest / mypy / tach / lint-imports pass. Watch specifically for failures in
+pylint / pytest / mypy / tach / lint-imports / ruff / vulture pass. Watch specifically for failures in
 `test_tool_context.py` and `test_server_params.py`: those parametrize over
 `CONSOLE_SCRIPT_TOOLS` and are the signal that the derived sets moved correctly.
 
@@ -228,12 +250,19 @@ them in one commit.
 >
 > Write the tests first, including one that passes a bogus `python_executable` and asserts
 > the same binary still runs. Rewrite `test_tool_unavailable_returns_error` in
-> `tests/test_formatter_tools.py` to patch `tool_environment.binary` rather than the
-> probe — patching the probe is now a no-op and the test would pass for the wrong reason.
+> `tests/test_formatter_tools.py` to delete the black stub from the `tool_context`
+> fixture's script directory (`tool_context.tool_environment.binary("black").unlink()`)
+> rather than patching the probe — patching the probe is now a no-op and the test would
+> pass for the wrong reason. Do not patch `binary` on the instance: `PythonEnvironment` is
+> a frozen dataclass.
+>
+> Add `python_executable` as a bare name to `vulture_whitelist.py` — the runners never
+> read it, and vulture reports that at 100% confidence.
 >
 > Do not update any documentation counts; step 8 does that. Do not add ruff steps or
 > resolution logic.
 >
 > Run `run_format_code`, `run_pylint_check`, `run_pytest_check` with
-> `extra_args=["-n", "auto"]`, `run_mypy_check`, `run_tach_check` and
-> `run_lint_imports_check`. All must pass. Then make exactly one commit.
+> `extra_args=["-n", "auto"]`, `run_mypy_check`, `run_tach_check`,
+> `run_lint_imports_check`, `run_ruff_check` and `run_vulture_check`. All must pass. Then
+> make exactly one commit.

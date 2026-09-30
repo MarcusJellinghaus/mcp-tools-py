@@ -120,7 +120,8 @@ re-export cannot creep back in.
 
 ## DONE WHEN
 
-`run_tach_check` and `run_lint_imports_check` pass, plus pylint / pytest / mypy. Run
+`run_tach_check` and `run_lint_imports_check` pass, plus pylint / pytest / mypy / ruff /
+vulture. Run
 these **before** moving to step 2 — this step is independently verifiable and its failure
 mode is a layering error, not a test failure.
 
@@ -140,5 +141,6 @@ mode is a layering error, not a test failure.
 > rewrite either symbol's body.
 >
 > Run `run_format_code`, `run_pylint_check`, `run_pytest_check` with
-> `extra_args=["-n", "auto"]`, `run_mypy_check`, `run_tach_check` and
-> `run_lint_imports_check`. All must pass. Then make exactly one commit.
+> `extra_args=["-n", "auto"]`, `run_mypy_check`, `run_tach_check`,
+> `run_lint_imports_check`, `run_ruff_check` and `run_vulture_check`. All must pass. Then
+> make exactly one commit.

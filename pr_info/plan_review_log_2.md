@@ -46,3 +46,22 @@ Supervised plan review (`/plan_review_supervisor`). Continues from `plan_review_
 - ruff floor: A — raise to `ruff>=0.16.8` now
 **Changes**: step_1, step_4, step_5, summary.md, Decisions.md, pyproject.toml. Exit-2 handling plus tests 7b/7c; output source plus test 7d; step 1 move checks; empty-prefix skip plus test 9a; `:46`. Floor raised. Probe on ruff 0.16.9: syntax errors carry `code: "invalid-syntax"`, not null — step 5's predicate became `not m.code or m.code == "invalid-syntax"` (would otherwise have misclassified broken files and failed step 7 test 6a). Exit codes and `--check` markers confirmed.
 **Status**: committed
+
+## Round 3 — 2026-09-30
+**Findings**:
+- step_3 — medium — `test_run_black_truncates_output` / `test_run_isort_truncates_output` break (banner makes it "51 more lines"); plan says leave existing tests alone
+- summary/all steps — medium — CI runs `ruff check` and `vulture`; plan never does. Unused `python_executable` and new autouse fixtures would fail vulture
+- step_2 — medium — instance `patch.object` on frozen `PythonEnvironment` raises `FrozenInstanceError`
+- step_8 — low — README :150, :152, :204 missing from the sweep; grep is case-sensitive
+- step_6 — low — inaccurate "runner resolves again" sentence
+- Design — low — drop per-file-ignores prefix matching and report any `I` entry
+**Decisions**:
+- Truncation tests: accept
+- ruff/vulture in done criteria plus whitelist plan: accept
+- Frozen dataclass: accept — delete the stub file instead
+- README lines: accept
+- step_6 sentence: accept
+- Drop prefix matching: skip — the issue's Decisions table requires reporting the *covered directories*; "any `I` entry" would not name them
+**User decisions**: none
+**Changes**: summary.md, Decisions.md, step_1–step_8. Truncation tests updated to "51 more lines"; `run_ruff_check`/`run_vulture_check` added to every DONE WHEN; whitelist entries `python_executable` (step 2), `_fixed_version_line` (step 3), `_declare_formatter` (step 6), verified by vulture probe; `test_tool_unavailable_returns_error` deletes the black stub; README :150/:152/:204 and `main.py:74` added to step 8, with case-insensitive greps; step_6 sentence replaced. Engineer flagged that step 8's "deliberate survivors" wording looked confusing; supervisor left it, since the "five registrars" hits are meant to survive.
+**Status**: committed

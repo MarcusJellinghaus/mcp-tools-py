@@ -36,6 +36,7 @@ def run_ruff_imports(
 ```
 
 Same signature as the other three, including the trailing keyword-only `environment`.
+The unread `python_executable` is covered by step 2's bare vulture whitelist entry.
 
 ## Why this is two invocations in write mode
 
@@ -262,8 +263,9 @@ All paths are project-relative with forward slashes.
 
 ## TESTS
 
-**Write first.** The mocked tests share step 4's autouse fixture patching
-`ruff_runner.version_line`.
+**Write first.** The mocked tests use the same autouse fixture as step 4, patching
+`ruff_runner.version_line`, under the same name `_fixed_version_line` — step 3's
+`vulture_whitelist.py` entry covers it.
 
 1. Check mode: exactly one invocation, argv is
    `[ruff, "check", "--select", "I", "--output-format", "json", "src"]`.
@@ -319,7 +321,7 @@ All paths are project-relative with forward slashes.
 
 ## DONE WHEN
 
-pylint / pytest / mypy / tach / lint-imports pass. `run_tach_check` matters here
+pylint / pytest / mypy / tach / lint-imports / ruff / vulture pass. `run_tach_check` matters here
 specifically: it is what catches an accidental `from mcp_tools_py.code_checker_ruff import ...`.
 
 `ruff_imports` is still unreachable from `run_format_code`. Step 6 wires it.
@@ -390,11 +392,13 @@ specifically: it is what catches an accidental `from mcp_tools_py.code_checker_r
 > helper and adds no second reader.
 >
 > Write the tests first, including the real unsorted-imports end-to-end test and the
-> `per-file-ignores` fixture.
+> `per-file-ignores` fixture. Name the autouse `version_line` patch fixture
+> `_fixed_version_line`, as in steps 3 and 4.
 >
 > Do not wire the step into `_STEP_RUNNERS`, `_VALID_STEPS` or `resolve_steps` — step 6
 > does that.
 >
 > Run `run_format_code`, `run_pylint_check`, `run_pytest_check` with
-> `extra_args=["-n", "auto"]`, `run_mypy_check`, `run_tach_check` and
-> `run_lint_imports_check`. All must pass. Then make exactly one commit.
+> `extra_args=["-n", "auto"]`, `run_mypy_check`, `run_tach_check`,
+> `run_lint_imports_check`, `run_ruff_check` and `run_vulture_check`. All must pass. Then
+> make exactly one commit.

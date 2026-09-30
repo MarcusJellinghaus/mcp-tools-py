@@ -26,6 +26,8 @@ Plus three traps that must **not** change.
 - `src/mcp_tools_py/server.py:73` — "The five `python -m` tools are left to the lazy probe"
 - `README.md:198` — "if those five are not installed" → three
 - `README.md:205` — "restart the MCP server after installing one of those five" → three
+- `README.md:152` — "Those five therefore run at the tool env's versions" → seven. **This
+  "five" counts the tool-env tools**, the opposite side from lines 198 and 205
 - `docs/architecture/architecture.md:174` — "used by the five console-script tools" →
   seven. **This line takes a count edit *and* an enumeration edit.**
 - `tests/test_server_params.py:798` — docstring "Each of the five names is warned about
@@ -41,7 +43,11 @@ black and isort move to the second list:
   `tool_environment` attribute descriptions
 - `src/mcp_tools_py/server.py:39` and `:101` — the `python_executable` parameter docstrings
   on `ToolServer.__init__` and `create_server`
+- `src/mcp_tools_py/main.py:74` — the `--python-executable` CLI help text, "ruff, bandit,
+  vulture, tach and lint-imports come from mcp-tools-py's own environment"
 - `README.md:115`, `:149`, `:158`, `:203`
+- `README.md:150` — the tool env "supplies ruff, bandit, vulture, tach and lint-imports"
+- `README.md:204` — "(or bandit/vulture/tach/lint-imports)" gains black and isort
 - `docs/architecture/architecture.md:230`, `:233` — the project-env / tool-env split
   explanation, which is precisely what this env move changes
 - `docs/architecture/architecture.md:174` — as above, both kinds of edit on one line
@@ -125,16 +131,21 @@ else is documentation.
 Before committing, grep for stragglers:
 
 ```
-search_files(pattern="black and isort|isort, black|isort then black|black, isort")
-search_files(pattern="five console-script|five `python -m`|those five|five names")
+search_files(pattern="(?i)black and isort|isort, black|isort then black|black, isort")
+search_files(pattern="(?i)five console-script|five `python -m`|those five|five names")
+search_files(pattern="(?i)ruff, bandit, vulture, tach and lint-imports|bandit/vulture/tach/lint-imports")
 ```
+
+The `(?i)` flag matters: `README.md:152` starts a sentence with "Those five", which a
+case-sensitive `those five` misses. The third pattern is the pre-move tool-env
+enumeration; after the sweep it must have **no** hits outside `pr_info/`.
 
 Re-read every hit against the "do not change" table above. Two of the "five" hits are
 supposed to survive.
 
 ## DONE WHEN
 
-pylint / pytest / mypy / tach / lint-imports pass, the greps return only the three
+pylint / pytest / mypy / tach / lint-imports / ruff / vulture pass, the greps return only the three
 deliberate survivors, and `check_file_size` is clean.
 
 Finally: `delete_directory(".scratch", recursive=True)` if any earlier step left one. CI
@@ -168,8 +179,8 @@ blocks a PR carrying one.
 > `tools/pydeps_graph.*` — read the script and `dependencies/readme.md` first, justify the
 > Bash call in chat, and do not hand-edit the output.
 >
-> Before committing, grep for stragglers with the two patterns in the step file and check
-> each hit against the do-not-change table.
+> Before committing, grep for stragglers with the three case-insensitive patterns in the
+> step file and check each hit against the do-not-change table.
 >
 > Put the release note — the first `run_format_code` after upgrade may reformat, because
 > the formatter now comes from the tool env — in a new `docs/upgrade-notes.md`, link it
@@ -178,5 +189,6 @@ blocks a PR carrying one.
 > Delete `.scratch/` if any earlier step left one.
 >
 > Run `run_format_code`, `run_pylint_check`, `run_pytest_check` with
-> `extra_args=["-n", "auto"]`, `run_mypy_check`, `run_tach_check` and
-> `run_lint_imports_check`. All must pass. Then make exactly one commit.
+> `extra_args=["-n", "auto"]`, `run_mypy_check`, `run_tach_check`,
+> `run_lint_imports_check`, `run_ruff_check` and `run_vulture_check`. All must pass. Then
+> make exactly one commit.

@@ -209,22 +209,26 @@ code cannot discriminate — hence the JSON route.
 - `src/mcp_tools_py/formatter/black_runner.py` — tool-env console script; deprecated param; shared helpers
 - `src/mcp_tools_py/formatter/isort_runner.py` — same
 - `src/mcp_tools_py/server.py` — docstrings at lines 39, 101; count at line 73
+- `src/mcp_tools_py/main.py` — `--python-executable` help text at line 74 (step 8)
+- `vulture_whitelist.py` — bare names `python_executable` (step 2), `_fixed_version_line`
+  (step 3), `_declare_formatter` (step 6)
 
 **Tests**
 
 - `tests/conftest.py` — no edit expected; `CONSOLE_SCRIPT_TOOLS` is derived
 - `tests/test_code_checker_ruff/test_parsers.py` — import only (11 call sites), file stays put
 - `tests/test_code_checker_ruff/test_reporting.py` — `RuffMessage` import
-- `tests/test_black_runner.py`, `tests/test_isort_runner.py` — command shape, version line
+- `tests/test_black_runner.py`, `tests/test_isort_runner.py` — command shape, version line;
+  the truncation test's marker becomes `"51 more lines"` (step 3)
 - `tests/test_project_config.py` — `read_pyproject_tool_tables` (step 5)
 - `tests/test_formatter_runner.py` — `resolve_steps`, empty-list rejection, ignored `python_executable`; six existing tests that omit `steps` pass `steps=["isort", "black"]` explicitly (step 6)
-- `tests/test_formatter_tools.py` — formatter declaration fixture; black-unavailable via `tool_environment.binary`
+- `tests/test_formatter_tools.py` — formatter declaration fixture; black-unavailable by deleting the black stub from the fixture's script directory
 - `tests/test_server_params.py` — docstring count at line 798
 - `tests/test_tool_context.py` — follows `CONSOLE_SCRIPT_TOOLS`; verify
 
 **Docs**
 
-- `README.md` — lines 44, 115, 149, 158, 198, 203, 205, 460
+- `README.md` — lines 44, 115, 149, 150, 152, 158, 198, 203, 204, 205, 460
 - `docs/architecture/architecture.md` — lines 11, 19, 58, 69-70, 165, 174, 230, 233
 - `docs/pyproject-configuration.md` — line 45, plus a new "Formatter selection" section (the key list at line 36 needs no edit)
 - `docs/README.md` — one line linking `upgrade-notes.md` under Configuration
@@ -266,9 +270,12 @@ mcp__mcp-tools-py__run_pytest_check   extra_args=["-n", "auto"]
 mcp__mcp-tools-py__run_mypy_check
 mcp__mcp-tools-py__run_tach_check
 mcp__mcp-tools-py__run_lint_imports_check
+mcp__mcp-tools-py__run_ruff_check
+mcp__mcp-tools-py__run_vulture_check
 ```
 
-All must pass. One commit per step. No `.scratch/` directory left behind — CI blocks any
+All must pass. The last two mirror CI's `ruff check src tests` and
+`vulture src tests vulture_whitelist.py --min-confidence 60`. One commit per step. No `.scratch/` directory left behind — CI blocks any
 PR carrying one.
 
 ## Decisions taken during planning

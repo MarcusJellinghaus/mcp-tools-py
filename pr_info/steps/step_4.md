@@ -32,7 +32,8 @@ def run_ruff_format(
 Signature matches `run_black` / `run_isort` exactly, so `_STEP_RUNNERS` can call all four
 uniformly — including the trailing keyword-only `environment` step 2 introduced.
 `python_executable` is accepted and ignored here too, for signature uniformity rather than
-for a caller — nothing has ever passed it.
+for a caller — nothing has ever passed it. The bare `python_executable` entry step 2 added
+to `vulture_whitelist.py` already covers it; no new entry.
 
 Command: `[ruff_binary, "format"] + (["--check"] if check_only else []) + target_dirs`,
 with `ruff_binary` from the same `formatter_binary("ruff", environment)` helper step 2
@@ -167,8 +168,10 @@ Paths in both lists are project-relative with forward slashes.
 ## TESTS
 
 **Write first**, all against a mocked `execute_command` using recorded real output,
-except the last. As in step 3's runner tests, an autouse fixture patches
-`ruff_runner.version_line` so the mocked tests spawn no `--version` subprocess:
+except the last. As in step 3's runner tests, an autouse fixture named
+`_fixed_version_line` patches `ruff_runner.version_line` so the mocked tests spawn no
+`--version` subprocess. Keep that exact name: step 3's `vulture_whitelist.py` entry covers
+it, so no new entry is needed.
 
 1. Write mode argv is `[ruff, "format", "src"]` — no `--check`.
 2. `check_only=True` adds `--check`.
@@ -203,7 +206,7 @@ except the last. As in step 3's runner tests, an autouse fixture patches
 
 ## DONE WHEN
 
-pylint / pytest / mypy / tach / lint-imports pass. `formatter/ruff_runner.py` imports from
+pylint / pytest / mypy / tach / lint-imports / ruff / vulture pass. `formatter/ruff_runner.py` imports from
 `formatter/common.py` and `utils/` only.
 
 `ruff_format` is still unreachable from `run_format_code` at the end of this step. That is
@@ -243,9 +246,13 @@ correct — step 6 wires it.
 > `check_only=True` run against an unparsable file asserting `success is False` and
 > `"src/bad.py" in unparsable_files`, and one real end-to-end test on a `tmp_path` project.
 >
+> Name the autouse `version_line` patch fixture `_fixed_version_line`, as in step 3, so the
+> existing vulture whitelist entry covers it.
+>
 > Do not wire the step into `_STEP_RUNNERS`, `_VALID_STEPS` or `resolve_steps` — step 6
 > does that.
 >
 > Run `run_format_code`, `run_pylint_check`, `run_pytest_check` with
-> `extra_args=["-n", "auto"]`, `run_mypy_check`, `run_tach_check` and
-> `run_lint_imports_check`. All must pass. Then make exactly one commit.
+> `extra_args=["-n", "auto"]`, `run_mypy_check`, `run_tach_check`,
+> `run_lint_imports_check`, `run_ruff_check` and `run_vulture_check`. All must pass. Then
+> make exactly one commit.
