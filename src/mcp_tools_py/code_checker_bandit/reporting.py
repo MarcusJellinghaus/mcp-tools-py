@@ -8,6 +8,11 @@ from collections import defaultdict
 from typing import NamedTuple
 
 from mcp_tools_py.code_checker_bandit.models import BanditMessage
+from mcp_tools_py.utils.report_counts import (
+    format_dir_split,
+    format_total_line,
+    plural,
+)
 
 MAX_LOCATIONS_PER_ISSUE: int = 50
 
@@ -60,7 +65,12 @@ def format_bandit_report(
     Returns:
         Formatted report string, or None if there are no issues and no errors.
     """
-    sections: list[str] = []
+    groups = group_and_sort_issues(messages)
+
+    if not groups and not errors:
+        return None
+
+    sections: list[str] = [format_total_line("bandit", len(messages), len(groups))]
 
     if errors:
         error_lines: list[str] = ["File errors (files not scanned):"]
@@ -68,22 +78,18 @@ def format_bandit_report(
             error_lines.append(f"- {error}")
         sections.append("\n".join(error_lines))
 
-    groups = group_and_sort_issues(messages)
-
-    if not groups and not errors:
-        return None
-
     max_issues = max(0, max_issues)
 
     # Detailed sections for top N issue types
     for group in groups[:max_issues]:
         first = group.messages[0]
         count = len(group.messages)
+        split = format_dir_split(msg.filename for msg in group.messages)
 
         lines: list[str] = []
         lines.append(
-            f"bandit found {count} issues with {group.test_id} "
-            f"({first.test_name}) "
+            f"bandit found {plural(count, 'issue')} with {group.test_id} "
+            f"{first.test_name} {split} "
             f"[severity: {first.issue_severity}, confidence: {first.issue_confidence}]"
         )
         lines.append(f"CWE-{first.cwe_id}: {first.cwe_link}")
@@ -105,9 +111,11 @@ def format_bandit_report(
     if remaining:
         summary_lines: list[str] = []
         for group in remaining:
+            first = group.messages[0]
+            split = format_dir_split(msg.filename for msg in group.messages)
             summary_lines.append(
-                f"- {group.test_id} ({group.messages[0].issue_severity}): "
-                f"{len(group.messages)} occurrences"
+                f"- {group.test_id} {first.test_name} ({first.issue_severity}): "
+                f"{plural(len(group.messages), 'occurrence')} {split}"
             )
         sections.append("\n".join(summary_lines))
 

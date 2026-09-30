@@ -34,6 +34,7 @@ def register(mcp: "FastMCPProtocol", checker_tools: "CheckerTools") -> None:
             extra_args: Additional bandit CLI flags.
             max_issues: Number of issue types to show in detail (default: 1).
                 Remaining issues shown as summary counts.
+                0 = counts only: one line per rule with count and directory split, no file paths.
 
         Returns:
             Formatted bandit report, or an error message string.
