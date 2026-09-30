@@ -30,7 +30,7 @@ Module-level constants in `utils.py`:
 _SWITCH_LETTERS = set("xvsql")
 SHOW_OUTPUT_NOTE = (
     "Note: -s was not passed to pytest. It was turned into the captured-output "
-    "display: output printed by passing tests is shown below."
+    "display, which shows output printed by passing tests."
 )
 ```
 

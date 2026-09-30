@@ -56,10 +56,10 @@ for test in (report.tests or []) where test.outcome not in FAILED_OUTCOMES:
     if not blocks: continue
     if not output.add(f"Test ID: {test.nodeid} - outcome {test.outcome}\n"): break
     for label, text in blocks: if not output.add(f"  {label}:\n```\n{text}\n```\n"): break both loops
-return header + output.get_result() if any test was added, else NO_CAPTURED_OUTPUT_NOTE
+return output.get_result() if any test was added, else NO_CAPTURED_OUTPUT_NOTE
 ```
 
-The header is `"Captured output of passing tests:\n"`, added to `output` before the first test. Guard the header and the early exit with a simple flag.
+The header is `"Captured output of passing tests:\n"`, added to `output` once, before the first printing test, and not prepended again on return. Guard the header and the early exit with a simple flag.
 
 ## DATA
 
@@ -91,6 +91,8 @@ The header is `"Captured output of passing tests:\n"`, added to `output` before 
 `test_integration_show_output.py` (`@pytest.mark.integration`; follow `test_integration_env.py`):
 
 8. `parametrize` over `["-n", "0"]` and `["-n", "2"]`:
-   - Write a temp project with a passing test that prints `HELLO_PROBE`.
+   - Write a temp project with:
+     - a fixture that prints `SETUP_PROBE` before `yield` and `TEARDOWN_PROBE` after it
+     - a passing test that uses the fixture, prints `HELLO_PROBE` and writes `STDERR_PROBE` to `sys.stderr`
    - Call `run_tests(..., extra_args=<n args>)`.
-   - Check that `create_prompt_for_passing_output(report)` contains `HELLO_PROBE`.
+   - Check that `create_prompt_for_passing_output(report)` contains `SETUP_PROBE`, `HELLO_PROBE`, `TEARDOWN_PROBE` and `STDERR_PROBE`.
