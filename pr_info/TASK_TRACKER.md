@@ -21,6 +21,21 @@ This tracks **Feature Implementation** consisting of multiple **Tasks**.
 
 ## Tasks
 
-<!-- Tasks populated from pr_info/steps/ by prepare_task_tracker -->
+### Step 1: Remove `-s` in `sanitize_extra_args` and record `show_output`
+See [step_1.md](./steps/step_1.md)
+
+- [ ] Implementation: tests in `test_extra_args.py`, then `SanitizedArgs.show_output` and `sanitize_extra_args` changes
+- [ ] Quality checks: pylint, pytest, mypy — fix all issues
+- [ ] Commit message prepared
+
+### Step 2: Show captured output of passing tests
+See [step_2.md](./steps/step_2.md)
+
+- [ ] Implementation: tests (reporting, checker_tools, server_params, integration), then `create_prompt_for_passing_output`, `show_output` wiring and docstrings
+- [ ] Quality checks: pylint, pytest, mypy — fix all issues
+- [ ] Commit message prepared
 
 ## Pull Request
+
+- [ ] PR review: review the full branch diff against `main`
+- [ ] PR summary prepared
