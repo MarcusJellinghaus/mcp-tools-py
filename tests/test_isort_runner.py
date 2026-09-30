@@ -38,6 +38,14 @@ def _fixed_formatter_binary(monkeypatch: pytest.MonkeyPatch) -> None:
     )
 
 
+@pytest.fixture(autouse=True)
+def _fixed_version_line(monkeypatch: pytest.MonkeyPatch) -> MagicMock:
+    """Pin the version banner so no test spawns a `--version` subprocess."""
+    mock = MagicMock(return_value="isort 0.0.0")
+    monkeypatch.setattr(isort_runner, "version_line", mock)
+    return mock
+
+
 def _make_result(
     return_code: int = 0,
     stdout: str = "",
@@ -106,7 +114,7 @@ def test_run_isort_truncates_output(mock_exec: MagicMock) -> None:
     lines = result.output.splitlines()
     assert len(lines) == 201  # 200 lines + truncation notice
     assert "truncated" in lines[-1]
-    assert "50 more lines" in lines[-1]
+    assert "51 more lines" in lines[-1]
 
 
 @patch("mcp_tools_py.formatter.isort_runner.execute_command")
@@ -265,3 +273,41 @@ def test_run_isort_uses_injected_environment(
     expected = environment.binary("isort")
     assert expected is not None
     assert mock_exec.call_args[0][0][0] == str(expected)
+
+
+@patch("mcp_tools_py.formatter.isort_runner.execute_command")
+def test_run_isort_output_starts_with_version_banner(
+    mock_exec: MagicMock, _fixed_version_line: MagicMock
+) -> None:
+    mock_exec.return_value = _make_result(stdout="Fixing src/foo.py")
+
+    result = run_isort("/usr/bin/python", ["src"], "/project", False, 45)
+
+    assert result.output.splitlines()[0] == "isort 0.0.0"
+    assert result.files_changed == ["src/foo.py"]
+    tool, binary, timeout = _fixed_version_line.call_args[0]
+    assert tool == "isort"
+    assert binary == mock_exec.call_args[0][0][0]
+    assert timeout <= 45
+
+
+@pytest.mark.parametrize(
+    "command_result",
+    [
+        make_command_result(timed_out=True, execution_error="timed out"),
+        make_command_result(execution_error="FileNotFoundError: isort"),
+    ],
+    ids=["timed_out", "execution_error"],
+)
+@patch("mcp_tools_py.formatter.isort_runner.execute_command")
+def test_run_isort_failure_paths_have_no_banner(
+    mock_exec: MagicMock,
+    _fixed_version_line: MagicMock,
+    command_result: CommandResult,
+) -> None:
+    mock_exec.return_value = command_result
+
+    result = run_isort("/usr/bin/python", ["src"], "/project")
+
+    _fixed_version_line.assert_not_called()
+    assert "isort 0.0.0" not in result.output

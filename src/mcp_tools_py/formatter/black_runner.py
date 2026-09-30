@@ -3,28 +3,18 @@
 Invokes black as a subprocess and returns a FormatterResult.
 """
 
-from mcp_tools_py.formatter.common import formatter_binary
+import time
+
+from mcp_tools_py.formatter.common import (
+    combine_output,
+    formatter_binary,
+    truncate_output,
+    version_line,
+)
 from mcp_tools_py.formatter.models import FormatterResult
 from mcp_tools_py.utils.project_config import DEFAULT_CHECK_TIMEOUT
 from mcp_tools_py.utils.python_environment import PythonEnvironment
 from mcp_tools_py.utils.subprocess_runner import execute_command
-
-_MAX_LINES = 200
-
-
-def _truncate_output(text: str) -> str:
-    """Truncate output to a maximum number of lines.
-
-    Returns:
-        Original text, or text capped at `_MAX_LINES` with a marker.
-    """
-    lines = text.splitlines()
-    if len(lines) <= _MAX_LINES:
-        return text
-    truncated = lines[:_MAX_LINES]
-    remaining = len(lines) - _MAX_LINES
-    truncated.append(f"... (truncated, {remaining} more lines)")
-    return "\n".join(truncated)
 
 
 def _parse_black_changed_files(output: str) -> list[str]:
@@ -84,6 +74,7 @@ def run_black(
         command.append("--check")
     command.extend(target_dirs)
 
+    started = time.monotonic()
     result = execute_command(command, cwd=project_dir, timeout_seconds=timeout_seconds)
 
     if result.timed_out:
@@ -100,15 +91,12 @@ def run_black(
             files_changed=[],
         )
 
-    output_parts: list[str] = []
-    if result.stdout:
-        output_parts.append(result.stdout)
-    if result.stderr:
-        output_parts.append(result.stderr)
-    output = "\n".join(output_parts) if output_parts else ""
+    output = combine_output(result)
+    remaining = int(timeout_seconds - (time.monotonic() - started))
+    banner = version_line("black", binary, remaining)
 
     return FormatterResult(
-        output=_truncate_output(output),
+        output=truncate_output(f"{banner}\n{output}"),
         success=result.return_code == 0,
         files_changed=_parse_black_changed_files(output),
     )
