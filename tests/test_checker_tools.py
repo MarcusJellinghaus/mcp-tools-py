@@ -409,6 +409,44 @@ def test_mypy_passes_default_timeout(tool_context: ToolContext) -> None:
     assert mock_prompt.call_args[1]["timeout_seconds"] == 120
 
 
+def test_mypy_passes_max_issues(tool_context: ToolContext) -> None:
+    """An explicit max_issues reaches get_mypy_prompt."""
+    run_mypy = _capture_tool(tool_context, "run_mypy_check")
+
+    with (
+        patch(
+            "mcp_tools_py.checker_tools.mypy_tool.resolve_target_directories",
+            return_value=["src"],
+        ),
+        patch(
+            "mcp_tools_py.checker_tools.mypy_tool.get_mypy_prompt",
+            return_value=None,
+        ) as mock_prompt,
+    ):
+        run_mypy(max_issues=2)
+
+    assert mock_prompt.call_args[1]["max_issues"] == 2
+
+
+def test_mypy_max_issues_defaults_to_none(tool_context: ToolContext) -> None:
+    """Without max_issues, None reaches get_mypy_prompt."""
+    run_mypy = _capture_tool(tool_context, "run_mypy_check")
+
+    with (
+        patch(
+            "mcp_tools_py.checker_tools.mypy_tool.resolve_target_directories",
+            return_value=["src"],
+        ),
+        patch(
+            "mcp_tools_py.checker_tools.mypy_tool.get_mypy_prompt",
+            return_value=None,
+        ) as mock_prompt,
+    ):
+        run_mypy()
+
+    assert mock_prompt.call_args[1]["max_issues"] is None
+
+
 def test_mypy_invalid_timeout_returns_message(tool_context: ToolContext) -> None:
     """An invalid timeout_seconds comes back as text, and mypy is never run."""
     run_mypy = _capture_tool(tool_context, "run_mypy_check")

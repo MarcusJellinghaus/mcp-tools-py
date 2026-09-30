@@ -177,6 +177,7 @@ registrar modules: `code_checker_ruff` backs two of them, `ruff_check_tool.py` a
 - **`utils/file_utils.py`** — thin re-export shim over `mcp_coder_utils.fs`: `read_file()` with encoding fallback
 - **`utils/project_config.py`** — target-directory auto-detection from `pyproject.toml`, the source-only coverage lookup, the pytest `addopts` accessor, plus subprocess timeout resolution from `[tool.mcp-tools-py]` (per-tool key, shared key, CLI value, built-in default). `read_pyproject_tool_tables` is the single reader of `pyproject.toml`'s `[tool]` tables, shared by timeout resolution, formatter resolution (the `[tool.mcp-tools-py] formatter` key) and the `ruff_imports` per-file-ignores notice
 - **`utils/ruff_parsing.py`** — `RuffMessage` and `parse_ruff_json_output`, shared by `code_checker_ruff` and `formatter/ruff_runner.py`
+- **`utils/report_counts.py`** — shared per-rule report helpers (directory split, total line, plural) for the ruff, pylint, bandit and mypy reports
 - **`log_utils.py`** — thin re-export shim over `mcp_coder_utils.log_utils`: `setup_logging()` (console/JSON file), `@log_function_call` decorator
 
 ---
