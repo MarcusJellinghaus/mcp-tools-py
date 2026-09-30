@@ -75,6 +75,22 @@ def test_unrecognised_formatter_value_raises(tmp_path: Path) -> None:
     assert '"ruff"' in message
 
 
+@pytest.mark.parametrize(
+    "value",
+    ['["ruff"]', '{ name = "ruff" }'],
+    ids=["array", "table"],
+)
+def test_non_string_formatter_value_raises(tmp_path: Path, value: str) -> None:
+    path = _write_pyproject(tmp_path, f"[tool.mcp-tools-py]\nformatter = {value}\n")
+
+    with pytest.raises(ValueError) as excinfo:
+        resolve_steps(tmp_path)
+
+    message = str(excinfo.value)
+    assert "[tool.mcp-tools-py] formatter" in message
+    assert str(path) in message
+
+
 def test_missing_pyproject_is_neither_error(tmp_path: Path) -> None:
     with pytest.raises(ValueError, match="No formatter declared") as excinfo:
         resolve_steps(tmp_path)

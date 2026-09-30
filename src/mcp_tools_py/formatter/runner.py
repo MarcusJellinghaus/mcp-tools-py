@@ -76,7 +76,7 @@ def resolve_steps(project_root: Path) -> list[str]:
     section = tools.get("mcp-tools-py")
     if isinstance(section, dict) and "formatter" in section:
         formatter = section["formatter"]
-        if formatter in _FORMATTER_STEPS:
+        if isinstance(formatter, str) and formatter in _FORMATTER_STEPS:
             return list(_FORMATTER_STEPS[formatter])
         raise ValueError(
             f"Invalid [tool.mcp-tools-py] formatter = {formatter!r} in "
