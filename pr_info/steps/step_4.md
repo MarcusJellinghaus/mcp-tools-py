@@ -41,7 +41,9 @@ introduced.
 ## FIRST: confirm the output format
 
 **Before writing the parser, probe the installed ruff.** The formats below were verified
-against ruff 0.16.8 and are version-sensitive.
+against ruff 0.16.8 and re-probed against 0.16.9, and are version-sensitive — older ruff
+printed `Would reformat: <path>` instead of the marker lines. `pyproject.toml` therefore
+already requires `ruff>=0.16.8` (user decision, applied with the plan).
 
 ```
 save_file(".scratch/fmt/pyproject.toml", ...)      # minimal project
@@ -94,11 +96,16 @@ an answer would be worse than an empty list.
 header and an inline diff:
 
 ```
+invalid-syntax: Expected a parameter or the end of the parameter list
+ --> src\bad.py:1:7
 unformatted: File would be reformatted
- --> src/ugly.py:1:1
-invalid-syntax: ...
- --> src/bad.py:1:7
+ --> src\ugly.py:1:6
 ```
+
+(Observed on ruff 0.16.9, Windows: native separators, each header followed by a code
+snippet or diff. In `--check` mode the syntax error goes to stdout only — exit 2, stderr
+empty. In write mode it goes to stderr only, as
+`error: Failed to parse src\bad.py:1:7: <message>`; take the path before `:<line>`.)
 
 **Key on the marker line, never on `-->`.** Keying on `-->` records an unparsable file as
 "would be reformatted", which is exactly the silent-drift class this issue exists to

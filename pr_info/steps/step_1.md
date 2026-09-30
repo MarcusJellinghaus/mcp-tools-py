@@ -76,13 +76,20 @@ move_symbol(
 
 Then by hand:
 
-1. Delete the two now-empty source modules (`delete_this_file`). Confirm with
-   `list_symbols` that nothing else remains in them before deleting.
-2. `code_checker_ruff/__init__.py` — **remove** both symbols from the imports **and**
+1. Check `utils/ruff_parsing.py`. `parse_ruff_json_output` uses the module-level
+   `logger` and the `json` and `os` imports from `parsers.py`, so the new module must
+   define `logger = logging.getLogger(__name__)` and import `json`, `logging` and `os`.
+   It must not import from itself (e.g. a rewritten `from .models import RuffMessage`
+   pointing back at `ruff_parsing`). Add whatever `move_symbol` did not carry over.
+2. Delete the two emptied source modules (`delete_this_file`). Confirm with
+   `list_symbols` that neither still holds `RuffMessage` or `parse_ruff_json_output`.
+   A leftover `logger` (and its imports) in `parsers.py` is expected — it goes with the
+   file.
+3. `code_checker_ruff/__init__.py` — **remove** both symbols from the imports **and**
    from `__all__`. They are not re-exported. Callers import from
    `mcp_tools_py.utils.ruff_parsing`, so there is one home rather than a home plus a
    re-export.
-3. Verify with `find_references` that `code_checker_ruff/runners.py` line 81, 132 and 162
+4. Verify with `find_references` that `code_checker_ruff/runners.py` line 81, 132 and 162
    call sites resolve, and that `reporting.py`'s 5 annotation uses type-check.
 
 Do not touch `tach.toml` or `.importlinter`.

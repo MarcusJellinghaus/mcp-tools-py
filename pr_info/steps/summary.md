@@ -119,7 +119,8 @@ acceptance criterion:
 - **`per-file-ignores` matching stays literal.** The notice is advisory, not a gate;
   implementing glob semantics would be the largest complexity in the issue for the
   smallest payoff. A leading-literal-segment prefix match satisfies the acceptance
-  criterion, and a false negative just means no notice — the status quo.
+  criterion, and a false negative just means no notice — the status quo. A key with no
+  leading literal segment (`"*.py"`) is skipped as such a false negative.
 
 ### Version reporting follows the issue text
 
@@ -142,7 +143,9 @@ content.
 | command | `ruff format [--check] <dirs>` | `ruff check --select I [--fix] <dirs>` |
 | write mode | one invocation | **two** — JSON pre-check, then `--fix` |
 | `files_changed` | empty in write mode; parsed in `--check` only | from the pre-check `fixable` messages |
-| parse errors | exit 2 + `error: Failed to parse` on stderr, plus the `invalid-syntax:` marker paths in `--check` mode | JSON syntax-error diagnostics |
+| parse errors | exit 2 + `error: Failed to parse` on stderr, plus the `invalid-syntax:` marker paths in `--check` mode | JSON diagnostics with `code == "invalid-syntax"`; the pre-check still exits 1, not 2 |
+| exit 2 | a source parse error; the other files are still formatted | ruff itself failed (e.g. invalid `[tool.ruff]` config): `success=False`, stderr in `output`, no fix run after a pre-check exit 2 |
+| `output` body | ruff's stdout and stderr | write mode: the `--fix` run's text output; check mode: a per-diagnostic list rendered from the parsed pre-check JSON |
 
 Both runners report `files_changed` and `unparsable_files` as **project-relative paths with
 forward slashes**, via one `relative_path` helper in `formatter/common.py` that
@@ -185,6 +188,12 @@ code cannot discriminate — hence the JSON route.
 | `src/mcp_tools_py/code_checker_ruff/parsers.py` | Sole symbol `parse_ruff_json_output` moved likewise |
 
 ## Files modified
+
+**Packaging**
+
+- `pyproject.toml` — `ruff>=0.9.0` raised to `ruff>=0.16.8`, the oldest version whose
+  `ruff format --check` markers and syntax-error JSON the step 4/5 parsers read. Already
+  applied alongside the plan, so no step owns it
 
 **Source**
 

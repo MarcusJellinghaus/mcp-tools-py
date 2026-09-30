@@ -24,3 +24,25 @@ Supervised plan review (`/plan_review_supervisor`). Continues from `plan_review_
 - ruff floor: on hold
 **Changes**: summary.md, step_2–step_7 updated; new `Decisions.md`. Version via `--version` (`formatter_version(binary, timeout_seconds)` in step 3); accessor dropped, `None` falls back to uncached `PythonEnvironment.resolve()`; six runner tests pass `steps=["isort", "black"]`; Test 10 builds its own `ToolContext`; step 5 `--fix` early return plus test 10b; deprecation docstring stated in step 2.
 **Status**: committed
+
+## Round 2 — 2026-09-30
+**Findings**:
+- step_5 — high — `run_ruff_imports` ignores pre-check exit 2 (e.g. invalid config); empty stdout → check mode reports `success=True`
+- pyproject.toml — medium — ruff floor `>=0.9.0` vs formats verified on 0.16.8 (repeat of round 1, raised independently)
+- step_5 — medium — unspecified which invocation `output` comes from; check mode would dump raw JSON
+- step_1 — low — `move_symbol` leaves `logger`/imports to reconcile; "nothing else remains" check would fail
+- step_5 — low (design) — per-file-ignores key with empty literal prefix (`*.py`) undefined
+- step_5 — low — wrong line reference (`:45` → `:46`)
+- Engineer-raised during fix: unverified assumption that a syntax error doesn't make `ruff check` exit 2
+**Decisions**:
+- Exit 2: accept (silent false success)
+- Output source: accept — write mode uses `--fix` text; check mode renders parsed messages
+- step_1 move note: accept
+- Empty prefix: supervisor decision — skip as documented false negative, consistent with the summary's literal-matching rule
+- Line ref: accept
+- ruff floor: repeat of round 1 (on hold) — re-asked the user, since an independent reviewer re-raised it with new evidence (`Would reformat:` format in older ruff)
+- Unverified assumption: resolve now with a scratch probe rather than defer to implementation
+**User decisions**:
+- ruff floor: A — raise to `ruff>=0.16.8` now
+**Changes**: step_1, step_4, step_5, summary.md, Decisions.md, pyproject.toml. Exit-2 handling plus tests 7b/7c; output source plus test 7d; step 1 move checks; empty-prefix skip plus test 9a; `:46`. Floor raised. Probe on ruff 0.16.9: syntax errors carry `code: "invalid-syntax"`, not null — step 5's predicate became `not m.code or m.code == "invalid-syntax"` (would otherwise have misclassified broken files and failed step 7 test 6a). Exit codes and `--check` markers confirmed.
+**Status**: committed

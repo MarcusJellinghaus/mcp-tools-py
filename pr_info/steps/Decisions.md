@@ -9,3 +9,24 @@ never fails the step. This replaces the earlier package-metadata lookup
 (`importlib.metadata` / `get_environment_info(...).distributions`) and its "deviation from
 the issue text" note. Environment threading stays, because `formatter_binary(name,
 environment)` still needs it to resolve the binary.
+
+## `per-file-ignores` keys with no leading literal segment are skipped (plan review 2, round 1)
+
+When a glob key has no leading literal segment (`"*.py"`, `"**/test_*.py"`), the prefix is
+empty and `per_file_ignores_notice` skips the key: no notice. This is a documented false
+negative, consistent with "a false negative just means no notice".
+
+## Ruff floor raised to 0.16.8 (user decision)
+
+`pyproject.toml` requires `ruff>=0.16.8` instead of `>=0.9.0`. The step 4 and step 5
+parsers depend on output verified against 0.16.8: the `ruff format --check` markers
+`unformatted:` / `invalid-syntax:` (older ruff printed `Would reformat: <path>`) and the
+syntax-error JSON diagnostic.
+
+## Syntax-error diagnostic predicate follows the probe (user-requested probe)
+
+Probed against the installed ruff 0.16.9: the syntax-error JSON diagnostic has
+`code == "invalid-syntax"`, not `null`, and a syntax error makes the `ruff check --select I`
+pre-check and `--fix` run exit 1, not 2. Step 5 therefore uses
+`not m.code or m.code == "invalid-syntax"` as its one syntax-error predicate, and the
+"stop and report if exit 2" probe instruction becomes a stated, verified fact.

@@ -53,7 +53,7 @@ Do not import from `code_checker_ruff` — tach forbids it (same layer). The sha
 `parse_ruff_json_output`, which step 1 moved to `utils/ruff_parsing.py`.
 
 **Timeout:** both invocations get the full `timeout_seconds`, so write mode consumes
-2 × `ruff-timeout` — exactly as `docs/pyproject-configuration.md:45` already records for
+2 × `ruff-timeout` — exactly as `docs/pyproject-configuration.md:46` already records for
 `run_ruff_fix`. Step 8 documents it.
 
 ## Why parse errors come from JSON, not the exit code
@@ -62,13 +62,19 @@ Do not import from `code_checker_ruff` — tach forbids it (same layer). The sha
 violations, and writes nothing to stderr. The exit code cannot discriminate. So syntax
 errors are detected from `--output-format json` syntax-error diagnostics instead.
 
-**Probe this before writing the detection.** In `.scratch/`, run
-`ruff check --select I --output-format json` over a file with a syntax error and record
-the diagnostic's shape — in particular whether `code` is `null` and how `message` reads.
-Write the predicate against what you observe. Delete `.scratch/` when done.
+**Verified shape (probed against ruff 0.16.9):** a syntax-error diagnostic carries
+`code == "invalid-syntax"` — **not** `null` — with no `fix`, and ruff may emit several
+for one file (`def f(:` yields two). The filename comes from `filename`. The
+discriminator is therefore a single helper:
 
-Expected shape: a syntax-error diagnostic carries no rule code, so
-`not message.code` is the discriminator, with the filename taken from `filename`.
+```python
+def _is_syntax_error(m: RuffMessage) -> bool:
+    return not m.code or m.code == "invalid-syntax"
+```
+
+The `not m.code` arm is defensive: an earlier note recorded a `null` code, which 0.16.9
+does not produce, and a code-less diagnostic cannot be an import-sorting violation.
+Every mocked syntax-error diagnostic in the tests uses `"code": "invalid-syntax"`.
 
 ## ALGORITHM
 
@@ -78,20 +84,51 @@ json_cmd = [binary, "check", "--select", "I", "--output-format", "json"] + targe
 started = time.monotonic()
 pre = execute_command(json_cmd, cwd=project_dir, timeout_seconds=...)
 timed_out / execution_error -> early return, no version banner
+if pre.return_code == 2:  success=False, combined = pre.stderr, files_changed=[], no fix run
 messages, parse_error = parse_ruff_json_output(pre.stdout, project_dir)
-unparsable = sorted({norm(m.filename) for m in messages if not m.code})
-violations = sorted({norm(m.filename) for m in messages if m.code})   # any I diagnostic
+parse_error -> success=False, output = parse_error, no fix run
+unparsable = sorted({norm(m.filename) for m in messages if _is_syntax_error(m)})
+violations = sorted({norm(m.filename) for m in messages if not _is_syntax_error(m)})   # any I diagnostic
 changed    = sorted({norm(m.filename) for m in messages if m.fixable})
 if check_only:  success = (not violations and not unparsable)
+                combined = one line per diagnostic, "<norm(filename)>: <code or 'invalid-syntax'> <message>"
 else:           started = time.monotonic()
                 fix = execute_command([binary, "check", "--select", "I", "--fix"] + target_dirs, ...)
                 timed_out / execution_error -> early return, no version banner
+                if fix.return_code == 2:  success=False, combined = fix.stderr, files_changed=[]
                 # runs even when `unparsable` is non-empty — ruff skips the
                 # unparsable file and still sorts the rest
                 success = (fix.return_code == 0 and not unparsable)
+                combined = fix.stdout + fix.stderr     # ruff's default text output
 remaining = int(timeout_seconds - (time.monotonic() - started))   # budget of the last invocation
 output = version_line("ruff", binary, remaining) + per_file_ignores_notice(...) + combined
 ```
+
+### Exit code 2 is a ruff error, not a result
+
+Ruff exits 2 when it cannot run at all — an invalid `[tool.ruff]` config, an unknown
+option. stdout is then empty, so `parse_ruff_json_output` returns `([], None)` and, left
+unchecked, check mode would report `success=True` over a tree nobody looked at. Mirror
+`run_ruff_fix_impl` (`code_checker_ruff/runners.py:129` and `:159`): after each
+invocation, exit 2 means `success=False` with ruff's `stderr` as `combined`. After the
+pre-check, the fix run is skipped. `files_changed` is `[]` in both cases. The version
+banner and notice are still prepended — ruff ran, it rejected its input.
+
+Exit 2 from the pre-check is checked before parsing. A source syntax error does **not**
+produce exit 2 under `ruff check` — verified against ruff 0.16.9: over a tree with one
+syntax-error file and one unsorted file, the JSON pre-check exits **1** (stderr empty) and
+`--fix` exits **1**, sorts the good file, and prints `Found 3 errors (1 fixed, 2
+remaining).` So this does not conflict with "a syntax error does not suppress the fix run"
+below.
+
+### Where `combined` comes from
+
+- **Write mode:** the `--fix` run's text output (stdout, then stderr) — ruff's own
+  summary of what remains.
+- **Check mode:** the only invocation is the JSON pre-check, whose stdout is a raw JSON
+  array and not fit for `output`. Render a short readable list from the already-parsed
+  `messages` instead — one line per diagnostic, file path normalised as below. **No
+  second invocation.** Empty when there are no diagnostics.
 
 The `--fix` run gets the **same** timed-out / execution-error early return as the
 pre-check: `success=False`, the bare `ruff timed out …` / `ruff failed to run: …` message,
@@ -127,7 +164,8 @@ Every assertion names the full relative path — `"src/bad.py"`, never a bare `"
 ### Check mode fails on *any* `I` diagnostic, not only fixable ones
 
 `changed` is the `fixable` subset, because that is what the fix run will actually rewrite.
-`success` in check mode is keyed on `violations` — every diagnostic carrying a rule code —
+`success` in check mode is keyed on `violations` — every diagnostic that is not a syntax
+error —
 so an unsorted-import violation ruff declines to autofix still reports `success=False`
 rather than a clean check. Keying `success` on `changed` would report success while the
 imports are unsorted, which is the silent drift this issue exists to eliminate.
@@ -146,7 +184,8 @@ issue exists to eliminate.
 A `parse_error` from `parse_ruff_json_output` is different: that is **malformed JSON from
 ruff itself**, not a syntax error in the source, so nothing about the tree is known. That
 is an infrastructure failure — return `success=False` with the parser's message in
-`output` and do **not** run the fix. This is the only case where the fix run is skipped.
+`output` and do **not** run the fix. The fix run is skipped only here and on a pre-check
+exit 2 (above) — both mean ruff's own output says nothing about the tree.
 
 ## The `per-file-ignores` notice
 
@@ -190,12 +229,17 @@ semantics here would be the largest complexity in the issue for the smallest pay
 tables = read_pyproject_tool_tables(Path(project_dir))
 read tables["ruff"]["lint"]["per-file-ignores"] (and legacy tables["ruff"]["per-file-ignores"])
 for each glob key -> take the leading literal segment before the first * ? [
+    if that prefix is empty ("*.py", "**/test_*.py") -> skip the key
     if its codes contain "ALL" or any code starting with "I":
         if that prefix and a target dir overlap -> collect the target dir
 return "" when nothing collected, else one line naming the directories and the key
 ```
 
 A false negative on an exotic pattern means no notice — the status quo, not a regression.
+A key with **no** leading literal segment (`"*.py"`, `"**/test_*.py"`) is skipped for
+that reason: an empty prefix would overlap every target directory, and deciding whether
+it really matches would need the glob engine this notice avoids. It is a documented
+false negative, not a bug.
 A missing `pyproject.toml` yields an empty mapping and therefore `""`. A malformed one
 raises the reader's existing `ValueError`, which `per_file_ignores_notice` swallows into
 `""` — the notice must never fail the step. (`resolve_steps` in step 6 deliberately lets
@@ -203,10 +247,15 @@ that same `ValueError` propagate; the two consumers differ only in how they trea
 
 ## DATA
 
-- `output` — version banner, then the notice line when non-empty, then combined output
-- `success` — check mode: no `I` diagnostic at all and nothing unparsable. write mode: the
-  fix run exited 0 and nothing was unparsable
-- `files_changed` — fixable filenames from the pre-check run, deduplicated and sorted
+- `output` — version banner, then the notice line when non-empty, then `combined`: the
+  `--fix` run's text output in write mode, a per-diagnostic list rendered from the parsed
+  pre-check messages in check mode. On exit 2 from either run, ruff's stderr in place of
+  `combined`
+- `success` — `False` on exit 2 from either run. Otherwise, check mode: no `I` diagnostic
+  at all and nothing unparsable. write mode: the fix run exited 0 and nothing was
+  unparsable
+- `files_changed` — fixable filenames from the pre-check run, deduplicated and sorted;
+  `[]` on exit 2 from either run
 - `unparsable_files` — filenames of syntax-error diagnostics
 
 All paths are project-relative with forward slashes.
@@ -228,19 +277,32 @@ All paths are project-relative with forward slashes.
    unsorted imports, write mode. The file is sorted on disk and `files_changed` names it.
    This is the acceptance criterion, and a mock cannot prove the two-invocation design is
    what makes it work.
-6. A syntax-error diagnostic → `unparsable_files` populated, `success is False`, and the
-   fix run **is still executed**. Assert both invocations happened. Add a real,
-   unmocked `tmp_path` sibling: one file with a syntax error and one with unsorted
-   imports, write mode — the good file is sorted on disk,
+6. A syntax-error diagnostic (`"code": "invalid-syntax"`, no `fix`) → `unparsable_files`
+   populated, the file **not** in `files_changed`, `success is False`, and the fix run
+   **is still executed**. Repeat with `"code": null` → same result. Assert both
+   invocations happened. Add a real, unmocked `tmp_path` sibling: one file with a
+   syntax error and one with unsorted imports, write mode — the good file is sorted on disk,
    `unparsable_files == ["src/bad.py"]`, `success is False`. This is the acceptance
    criterion *"with the other files still formatted"*.
 7. Malformed JSON from ruff → `success=False`, parser message in `output`, and **no fix
-   run**. This is the only case that suppresses the fix: ruff's own output was
-   unreadable, so nothing about the tree is known.
+   run**: ruff's own output was unreadable, so nothing about the tree is known.
+7b. **Exit 2, check mode:** pre-check returns exit 2, empty stdout, `stderr` naming an
+   invalid `[tool.ruff]` option → `success is False` (not `True` from the empty parse),
+   the stderr text in `output`, `files_changed == []`, exactly one invocation.
+7c. **Exit 2, write mode:** pre-check exits 0 with one fixable message, the `--fix` run
+   exits 2 with stderr → `success is False`, the fix run's stderr in `output`,
+   `files_changed == []`. Separately, a pre-check exit 2 in write mode → exactly one
+   invocation (no fix run).
+7d. **`combined` source:** check mode with two diagnostics → `output` contains one
+   readable line per diagnostic naming `src/a.py` and the rule code, and does not contain
+   the raw JSON (no `"filename"` key); still exactly one invocation. Write mode → `output` contains
+   the mocked `--fix` run's stdout text.
 8. **`per-file-ignores` fixture:** a `tmp_path` project whose
    `[tool.ruff.lint.per-file-ignores]` ignores `I` for a target directory produces the
    notice in `output`. Acceptance criterion.
 9. No `per-file-ignores` at all, and one that ignores a non-`I` code → no notice.
+9a. Keys with no leading literal segment — `"*.py" = ["I001"]` and
+   `"**/test_*.py" = ["I"]` — → no notice (documented false negative), no exception.
 9b. A **malformed** `pyproject.toml` → no notice and no exception; the step still runs.
 10. Missing ruff binary → `success=False`, no subprocess.
 10b. Write mode, pre-check succeeds, **`--fix` run times out** (and, separately, returns an
@@ -278,13 +340,23 @@ specifically: it is what catches an accidental `from mcp_tools_py.code_checker_r
 >
 > Detect parse errors from the JSON syntax-error diagnostics, not the exit code — `--fix`
 > exits 1 for both a parse error and an ordinary violation and writes nothing to stderr.
-> **Probe the real diagnostic shape in `.scratch/` first** and write the predicate against
-> what you observe; delete `.scratch/` when done.
+> On ruff 0.16.9 a syntax-error diagnostic has `code == "invalid-syntax"`, **not** `null`;
+> use one `_is_syntax_error(m)` predicate (`not m.code or m.code == "invalid-syntax"`)
+> for both `unparsable` and its complement `violations`.
 >
 > A syntax error sets `success=False` and populates `unparsable_files` but **does not**
 > suppress the fix run — ruff skips that file and still sorts the rest, which the issue
-> requires ("with the other files still formatted"). The only case that skips the fix is
-> malformed JSON from ruff itself, where nothing about the tree is known.
+> requires ("with the other files still formatted"). The fix is skipped only on malformed
+> JSON from ruff itself or a pre-check exit 2, where nothing about the tree is known.
+>
+> Check the exit code after **each** invocation, mirroring `run_ruff_fix_impl`
+> (`code_checker_ruff/runners.py:129`, `:159`): exit 2 (e.g. an invalid `[tool.ruff]`
+> config, empty stdout) means `success=False` with ruff's stderr in `output` and
+> `files_changed=[]` — otherwise the empty parse would report a clean check.
+>
+> In write mode, `output` carries the `--fix` run's text output. In check mode, render a
+> short readable per-file list from the already-parsed messages — never the raw JSON, and
+> no second invocation.
 >
 > Both invocations get the same timed-out / execution-error early return — no version
 > banner, no version subprocess. The version banner otherwise comes from
@@ -308,7 +380,8 @@ specifically: it is what catches an accidental `from mcp_tools_py.code_checker_r
 > Add a `per_file_ignores_notice` that reports, in `output`, when an `I` entry in
 > `[tool.ruff.lint.per-file-ignores]` covers a target directory. Do not override the
 > project's ruff config. Keep the matching literal — leading literal path segment, no glob
-> engine — and never let it fail the step.
+> engine — and never let it fail the step. A key with no leading literal segment
+> (`"*.py"`, `"**/test_*.py"`) is skipped: a documented false negative.
 >
 > Read `pyproject.toml` through a **new public**
 > `read_pyproject_tool_tables(project_root: Path)` in `src/mcp_tools_py/utils/project_config.py`,
