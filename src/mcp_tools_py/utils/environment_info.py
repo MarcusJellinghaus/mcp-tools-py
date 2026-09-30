@@ -189,7 +189,7 @@ def _failed(reason: str) -> EnvironmentInfo:
     """Build the fail-open result used when the probe cannot be trusted.
 
     Every probed module reads as importable, so a failed probe lets the call
-    proceed and surface the real error instead of making all five module
+    proceed and surface the real error instead of making all three module
     tools vanish at once.
 
     Args:

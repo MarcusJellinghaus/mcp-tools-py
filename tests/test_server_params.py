@@ -821,7 +821,7 @@ class TestStartupConsoleScriptWarnings:
     def test_warning_matches_handler_message(
         self, tmp_path: Path, caplog: pytest.LogCaptureFixture
     ) -> None:
-        """Each of the five names is warned about with the handler's message."""
+        """Each of the seven names is warned about with the handler's message."""
         from mcp_tools_py.server import ToolServer
 
         with (

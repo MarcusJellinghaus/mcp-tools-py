@@ -15,7 +15,8 @@ Complete documentation for MCP Tools Py.
 
 ### Configuration
 
-- **[Project Configuration](pyproject-configuration.md)** — How pylint and mypy read `pyproject.toml`, `[tool.mcp-tools-py]` subprocess timeouts, migration from the old defaults, per-call overrides
+- **[Project Configuration](pyproject-configuration.md)** — How pylint and mypy read `pyproject.toml`, `[tool.mcp-tools-py]` subprocess timeouts and formatter selection, migration from the old defaults, per-call overrides
+- **[Upgrade Notes](upgrade-notes.md)** — Behaviour changes to check when upgrading
 
 ### Setup & Configuration (Planned)
 
