@@ -24,9 +24,9 @@ This tracks **Feature Implementation** consisting of multiple **Tasks**.
 ### Step 1: Read-only `addopts` accessor
 See [step_1.md](./steps/step_1.md)
 
-- [ ] Implementation: tests + `_load_pyproject` and `get_pytest_addopts` in `utils/project_config.py`
-- [ ] Quality checks: pylint, pytest, mypy — fix all issues
-- [ ] Commit message prepared
+- [x] Implementation: tests + `_load_pyproject` and `get_pytest_addopts` in `utils/project_config.py`
+- [x] Quality checks: pylint, pytest, mypy — fix all issues
+- [x] Commit message prepared
 
 ### Step 2: Source-only lookup for `coverage_source`
 See [step_2.md](./steps/step_2.md)

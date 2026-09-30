@@ -312,3 +312,57 @@ def get_check_timeout(
         return validate_timeout(cli_timeout, "--check-timeout")
 
     return DEFAULT_PYTEST_TIMEOUT if tool == "pytest" else DEFAULT_CHECK_TIMEOUT
+
+
+def _load_pyproject(project_dir: str) -> dict[str, object]:
+    """Load pyproject.toml from *project_dir*.
+
+    Args:
+        project_dir: Path to project root containing pyproject.toml.
+
+    Returns:
+        The parsed TOML data, or an empty dict when the file is missing.
+
+    Raises:
+        ValueError: If pyproject.toml is not valid TOML.
+    """
+    pyproject_path = os.path.join(project_dir, "pyproject.toml")
+    if not os.path.isfile(pyproject_path):
+        return {}
+
+    with open(pyproject_path, "rb") as f:
+        try:
+            return tomllib.load(f)
+        except tomllib.TOMLDecodeError as exc:
+            raise ValueError(f"Invalid pyproject.toml: {exc}") from exc
+
+
+def get_pytest_addopts(project_dir: str) -> str | None:
+    """Return ``[tool.pytest.ini_options] addopts`` from pyproject.toml, or None.
+
+    The value is exposed as-is; flags are not interpreted.  A list value is
+    joined with spaces.
+
+    Args:
+        project_dir: Path to project root containing pyproject.toml.
+
+    Returns:
+        The addopts string, or None when the file, section or key is missing.
+
+    Raises:
+        ValueError: If pyproject.toml is not valid TOML.
+    """
+    section: object = _load_pyproject(project_dir)
+    for key in ("tool", "pytest", "ini_options"):
+        if not isinstance(section, dict):
+            return None
+        section = section.get(key)
+    if not isinstance(section, dict):
+        return None
+
+    value = section.get("addopts")
+    if isinstance(value, str):
+        return value
+    if isinstance(value, list):
+        return " ".join(str(v) for v in value)
+    return None

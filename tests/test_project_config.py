@@ -12,6 +12,7 @@ from mcp_tools_py.utils.project_config import (
     DEFAULT_PYTEST_TIMEOUT,
     check_line_length_conflicts,
     get_check_timeout,
+    get_pytest_addopts,
     get_target_directories,
     read_pyproject_tool_tables,
     resolve_target_directories,
@@ -518,3 +519,68 @@ class TestReadPyprojectToolTables:
 
         with pytest.raises(ValueError, match="Invalid pyproject.toml"):
             read_pyproject_tool_tables(tmp_path)
+
+
+class TestGetPytestAddopts:
+    """Tests for the get_pytest_addopts function."""
+
+    def test_string_returned_verbatim(self, tmp_path: object) -> None:
+        """A string addopts is returned unchanged."""
+        path = str(tmp_path)
+        _write_pyproject(
+            path,
+            """\
+            [tool.pytest.ini_options]
+            addopts = "-n auto -m 'not slow'"
+            """,
+        )
+        assert get_pytest_addopts(path) == "-n auto -m 'not slow'"
+
+    def test_list_joined_with_spaces(self, tmp_path: object) -> None:
+        """A list addopts is joined with single spaces."""
+        path = str(tmp_path)
+        _write_pyproject(
+            path,
+            """\
+            [tool.pytest.ini_options]
+            addopts = ["-n", "auto", "--cov"]
+            """,
+        )
+        assert get_pytest_addopts(path) == "-n auto --cov"
+
+    def test_no_pyproject_returns_none(self, tmp_path: object) -> None:
+        """A missing pyproject.toml yields None."""
+        assert get_pytest_addopts(str(tmp_path)) is None
+
+    def test_no_section_returns_none(self, tmp_path: object) -> None:
+        """A pyproject.toml without [tool.pytest.ini_options] yields None."""
+        path = str(tmp_path)
+        _write_pyproject(
+            path,
+            """\
+            [tool.black]
+            line-length = 88
+            """,
+        )
+        assert get_pytest_addopts(path) is None
+
+    def test_no_key_returns_none(self, tmp_path: object) -> None:
+        """An ini_options table without addopts yields None."""
+        path = str(tmp_path)
+        _write_pyproject(
+            path,
+            """\
+            [tool.pytest.ini_options]
+            testpaths = ["tests"]
+            """,
+        )
+        assert get_pytest_addopts(path) is None
+
+    def test_malformed_pyproject_raises(self, tmp_path: object) -> None:
+        """Invalid TOML raises ValueError, not TOMLDecodeError."""
+        path = str(tmp_path)
+        with open(os.path.join(path, "pyproject.toml"), "w", encoding="utf-8") as f:
+            f.write("invalid toml {{{{")
+
+        with pytest.raises(ValueError, match="Invalid pyproject.toml"):
+            get_pytest_addopts(path)
