@@ -37,7 +37,8 @@ CI runs `ruff check src tests` and `vulture src tests vulture_whitelist.py
 --min-confidence 60`, so every step's checks include `run_ruff_check` and
 `run_vulture_check`. Names vulture cannot see being used go into `vulture_whitelist.py` as
 bare names, following the existing autouse-fixture entries: `python_executable` (step 2),
-`_fixed_version_line` (step 3, reused by steps 4 and 5) and `_declare_formatter` (step 6).
+`_fixed_formatter_binary` (step 2, reused by steps 4 and 5), `_fixed_version_line` (step 3,
+reused by steps 4 and 5) and `_declare_formatter` (step 6).
 
 ## `test_tool_unavailable_returns_error` deletes the black stub (plan review 2)
 
@@ -49,3 +50,23 @@ script directory, as the fixture docstring documents.
 
 Dropping the prefix matching was proposed and rejected: the issue's Decisions table
 requires the notice to name the covered directories.
+
+## Plan review 3
+
+- **Runner tests pin binary lookup.** The existing black/isort runner tests mock
+  `execute_command` only; after step 2 they would resolve the binary through
+  `PythonEnvironment.resolve()` on the real `sys.executable`. An autouse
+  `_fixed_formatter_binary` fixture patches `<runner module>.formatter_binary` in the
+  black, isort and both ruff runner test modules; unmocked tests restore the real function.
+- **Step 8 grep criterion.** No survivor count. Every remaining hit outside `pr_info/` is a
+  listed do-not-change line or a line rewritten in step 8.
+- **Step 8 covers the stale `architecture.md` module bullets:** a new
+  `utils/ruff_parsing.py` bullet, the `utils/project_config.py` bullet, and the
+  `formatter/` bullet. Line 173 still does not change.
+- **`ruff format` stderr path regex** is `error: Failed to parse (.+?):\d+:\d+`, so a
+  drive-letter colon does not cut an absolute Windows path.
+- **Churn test uses stdlib-only imports**, so first-party / third-party classification in a
+  tmp project cannot produce a spurious diff.
+- **No `ImportError` test for the old `code_checker_ruff` import path.** It tests a
+  decision, not behaviour; the deleted modules enforce it.
+- **Rejected:** returning copies from `resolve_steps` — speculative.

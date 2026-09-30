@@ -76,6 +76,19 @@ Formatter naming:
 - `docs/architecture/architecture.md:165` — the `formatter/` bullet naming
   `black_runner.py` and `isort_runner.py`; add `ruff_runner.py` and `common.py`
 
+## New and changed modules in `architecture.md`
+
+The `utils/` bullet list (`docs/architecture/architecture.md:171-178`) describes each
+module; two entries go stale:
+
+- **Add** a `utils/ruff_parsing.py` bullet — `RuffMessage` and `parse_ruff_json_output`,
+  shared by `code_checker_ruff` and `formatter/ruff_runner.py` (step 1).
+- `architecture.md:178` — the `utils/project_config.py` bullet also covers
+  `read_pyproject_tool_tables` (the shared `[tool]` table reader, step 5) and the
+  `[tool.mcp-tools-py] formatter` key.
+
+Line 173 (the `probe.py` bullet) stays as it is — see the do-not-change table.
+
 ## Timeout documentation
 
 `docs/pyproject-configuration.md:45` — the `run_format_code` row. Worst case is no longer
@@ -140,13 +153,14 @@ The `(?i)` flag matters: `README.md:152` starts a sentence with "Those five", wh
 case-sensitive `those five` misses. The third pattern is the pre-move tool-env
 enumeration; after the sweep it must have **no** hits outside `pr_info/`.
 
-Re-read every hit against the "do not change" table above. Two of the "five" hits are
-supposed to survive.
+Re-read every hit outside `pr_info/`. Each must be either a line in the "do not change"
+table above or a line already rewritten in this step.
 
 ## DONE WHEN
 
-pylint / pytest / mypy / tach / lint-imports / ruff / vulture pass, the greps return only the three
-deliberate survivors, and `check_file_size` is clean.
+pylint / pytest / mypy / tach / lint-imports / ruff / vulture pass, every grep hit outside
+`pr_info/` is a listed do-not-change line or a line rewritten in this step, and
+`check_file_size` is clean.
 
 Finally: `delete_directory(".scratch", recursive=True)` if any earlier step left one. CI
 blocks a PR carrying one.
@@ -179,8 +193,13 @@ blocks a PR carrying one.
 > `tools/pydeps_graph.*` — read the script and `dependencies/readme.md` first, justify the
 > Bash call in chat, and do not hand-edit the output.
 >
+> In `architecture.md`, also add a `utils/ruff_parsing.py` bullet to the `utils/` list,
+> extend the `utils/project_config.py` bullet to cover `read_pyproject_tool_tables` and the
+> `formatter` key, and name `ruff_runner.py` and `common.py` in the `formatter/` bullet.
+>
 > Before committing, grep for stragglers with the three case-insensitive patterns in the
-> step file and check each hit against the do-not-change table.
+> step file. Every hit outside `pr_info/` must be a do-not-change line or a line you
+> already rewrote.
 >
 > Put the release note — the first `run_format_code` after upgrade may reformat, because
 > the formatter now comes from the tool env — in a new `docs/upgrade-notes.md`, link it

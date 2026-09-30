@@ -65,7 +65,7 @@ started = time.monotonic()
 result = execute_command(cmd, cwd=project_dir, timeout_seconds=...)
 timed_out / execution_error -> early return, no version banner   (as the other runners)
 remaining = int(timeout_seconds - (time.monotonic() - started))
-stderr_bad = [path for "error: Failed to parse <path>:<line>:<col>" in result.stderr]
+stderr_bad = _FAILED_TO_PARSE.findall(result.stderr)   # see "Extract the stderr path" below
 changed, marker_bad = parse_check_markers(stdout) if check_only else ([], [])
 unparsable = dedup(stderr_bad + marker_bad)      # project-relative, forward slashes
 return FormatterResult(output=version_line("ruff", binary, remaining) + combined,
@@ -106,7 +106,13 @@ unformatted: File would be reformatted
 (Observed on ruff 0.16.9, Windows: native separators, each header followed by a code
 snippet or diff. In `--check` mode the syntax error goes to stdout only — exit 2, stderr
 empty. In write mode it goes to stderr only, as
-`error: Failed to parse src\bad.py:1:7: <message>`; take the path before `:<line>`.)
+`error: Failed to parse src\bad.py:1:7: <message>`.)
+
+Extract the stderr path with a module-level
+`_FAILED_TO_PARSE = re.compile(r"error: Failed to parse (.+?):\d+:\d+")`. Anchoring on the
+`:<line>:<col>` pair, rather than splitting at the first `:`, keeps an absolute Windows
+path such as `C:\repo\src\bad.py` intact — its drive-letter colon is not followed by
+digits and a second colon.
 
 **Key on the marker line, never on `-->`.** Keying on `-->` records an unparsable file as
 "would be reformatted", which is exactly the silent-drift class this issue exists to
@@ -168,10 +174,14 @@ Paths in both lists are project-relative with forward slashes.
 ## TESTS
 
 **Write first**, all against a mocked `execute_command` using recorded real output,
-except the last. As in step 3's runner tests, an autouse fixture named
+except the last. As in steps 2 and 3's runner tests, two autouse fixtures:
+`_fixed_formatter_binary` patches `ruff_runner.formatter_binary` to a fixed path, and
 `_fixed_version_line` patches `ruff_runner.version_line` so the mocked tests spawn no
-`--version` subprocess. Keep that exact name: step 3's `vulture_whitelist.py` entry covers
-it, so no new entry is needed.
+`--version` subprocess. Keep those exact names: the `vulture_whitelist.py` entries from
+steps 2 and 3 cover them, so no new entry is needed. Test 10 overrides
+`_fixed_formatter_binary` to return `None`; the unmocked test 12 restores the real
+function with `monkeypatch.setattr(ruff_runner, "formatter_binary",
+common.formatter_binary)`.
 
 1. Write mode argv is `[ruff, "format", "src"]` — no `--check`.
 2. `check_only=True` adds `--check`.
@@ -184,6 +194,11 @@ it, so no new entry is needed.
    `files_changed == ["src/ugly.py"]` **and** `unparsable_files == ["src/bad.py"]`.
 7. Exit 2 with `error: Failed to parse src/bad.py:1:7` on stderr →
    `unparsable_files == ["src/bad.py"]` and `success is False`.
+7b. `_FAILED_TO_PARSE` keeps a drive-letter path whole:
+   `_FAILED_TO_PARSE.findall(r"error: Failed to parse C:\repo\src\bad.py:1:7: msg")`
+   returns `[r"C:\repo\src\bad.py"]`. Test the pattern directly, not the runner's
+   normalized result — `relative_path` on a Windows path is platform-dependent and CI runs
+   on Linux.
 8. **`check_only=True` against an unparsable file** — exit 2, an `invalid-syntax:` marker
    in stdout, and a `--check` run that writes nothing to stderr. Assert `success is False`
    **and** `"src/bad.py" in unparsable_files`. This is the case a marker parser that
@@ -232,7 +247,9 @@ correct — step 6 wires it.
 > `unparsable_files` — **record them, do not discard them**, or `--check` mode returns
 > `success=False` with nothing named. `files_changed` stays empty in write mode, because
 > `ruff format` never names the files it changed there. Also parse `unparsable_files` from
-> `error: Failed to parse <path>:<l>:<c>` on stderr and deduplicate against the markers;
+> `error: Failed to parse <path>:<l>:<c>` on stderr with a module-level
+> `_FAILED_TO_PARSE = re.compile(r"error: Failed to parse (.+?):\d+:\d+")` — so a
+> drive-letter colon does not cut the path — and deduplicate against the markers;
 > exit 2 means a parse error is present and the remaining files were still formatted.
 >
 > Every path in `files_changed` and `unparsable_files` is **project-relative with forward
@@ -246,8 +263,9 @@ correct — step 6 wires it.
 > `check_only=True` run against an unparsable file asserting `success is False` and
 > `"src/bad.py" in unparsable_files`, and one real end-to-end test on a `tmp_path` project.
 >
-> Name the autouse `version_line` patch fixture `_fixed_version_line`, as in step 3, so the
-> existing vulture whitelist entry covers it.
+> Name the autouse patch fixtures `_fixed_formatter_binary` and `_fixed_version_line`, as
+> in steps 2 and 3, so the existing vulture whitelist entries cover them. The unmocked
+> end-to-end test restores the real `formatter_binary`.
 >
 > Do not wire the step into `_STEP_RUNNERS`, `_VALID_STEPS` or `resolve_steps` — step 6
 > does that.

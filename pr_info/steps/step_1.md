@@ -113,10 +113,8 @@ No new behaviour, so no new test. The existing suites are the regression:
 - `tests/test_shim_reexports.py` and `tests/test_packaging.py` — check these pass; they
   assert things about module structure
 
-Add one assertion to `tests/test_code_checker_ruff/test_parsers.py`: importing
-`RuffMessage` or `parse_ruff_json_output` from `mcp_tools_py.code_checker_ruff` raises
-`ImportError`. That pins the "one home, no re-export" decision so a later convenience
-re-export cannot creep back in.
+No test asserts the old import path fails: the deleted modules and the trimmed `__all__`
+are the enforcement.
 
 ## DONE WHEN
 
@@ -134,8 +132,7 @@ mode is a layering error, not a test failure.
 > Move `RuffMessage` and `parse_ruff_json_output` into a single new
 > `src/mcp_tools_py/utils/ruff_parsing.py`, delete the two emptied source modules, and
 > drop both symbols from `code_checker_ruff/__init__.py`'s imports and `__all__` — no
-> re-export. Use the `move_symbol` MCP tool so importers are rewritten for you. Add one
-> test asserting the old import path now raises `ImportError`.
+> re-export. Use the `move_symbol` MCP tool so importers are rewritten for you.
 >
 > Do not add a `tach.toml` edge. Do not move the test files. This is a pure move: do not
 > rewrite either symbol's body.

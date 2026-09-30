@@ -263,9 +263,13 @@ All paths are project-relative with forward slashes.
 
 ## TESTS
 
-**Write first.** The mocked tests use the same autouse fixture as step 4, patching
-`ruff_runner.version_line`, under the same name `_fixed_version_line` — step 3's
-`vulture_whitelist.py` entry covers it.
+**Write first.** The mocked tests use the same two autouse fixtures as step 4, under the
+same names: `_fixed_formatter_binary` patching `ruff_runner.formatter_binary` to a fixed
+path, and `_fixed_version_line` patching `ruff_runner.version_line` — the
+`vulture_whitelist.py` entries from steps 2 and 3 cover them. Test 10 overrides
+`_fixed_formatter_binary` to return `None`; the unmocked tests (5, the real sibling in 6,
+and 8 if it runs ruff) restore the real function with
+`monkeypatch.setattr(ruff_runner, "formatter_binary", common.formatter_binary)`.
 
 1. Check mode: exactly one invocation, argv is
    `[ruff, "check", "--select", "I", "--output-format", "json", "src"]`.
@@ -392,8 +396,9 @@ specifically: it is what catches an accidental `from mcp_tools_py.code_checker_r
 > helper and adds no second reader.
 >
 > Write the tests first, including the real unsorted-imports end-to-end test and the
-> `per-file-ignores` fixture. Name the autouse `version_line` patch fixture
-> `_fixed_version_line`, as in steps 3 and 4.
+> `per-file-ignores` fixture. Name the autouse patch fixtures `_fixed_formatter_binary`
+> and `_fixed_version_line`, as in steps 2–4; the unmocked tests restore the real
+> `formatter_binary`.
 >
 > Do not wire the step into `_STEP_RUNNERS`, `_VALID_STEPS` or `resolve_steps` — step 6
 > does that.

@@ -155,8 +155,8 @@ that is not a weakening of the regression criterion.
 `tests/test_black_runner.py` / `tests/test_isort_runner.py`:
 
 Add an autouse fixture named `_fixed_version_line` patching `<runner module>.version_line`
-to a fixed `"<tool> 0.0.0"`, so no existing test spawns a version subprocess against its
-patched binary path. Tests 6 and 7 assert on that mock's calls; the real subprocess is
+to a fixed `"<tool> 0.0.0"`, so no existing test spawns a version subprocess against the
+fixed path step 2's `_fixed_formatter_binary` fixture supplies. Tests 6 and 7 assert on that mock's calls; the real subprocess is
 covered by tests 4-5c above.
 
 6. A successful run's `output` first line is the banner, and `version_line` received the
@@ -175,7 +175,7 @@ one assertion to `"51 more lines"` in both tests; nothing else in them changes.
 
 `_fixed_version_line` is invoked by pytest, never by name, so vulture reports it as an
 unused function (60% confidence). Add the bare name to `vulture_whitelist.py` under the
-existing autouse-fixture entries, following `_clear_environment_info_cache`:
+existing autouse-fixture entries, next to step 2's `_fixed_formatter_binary`:
 
 ```python
 _fixed_version_line  # Autouse fixture in the formatter runner test modules

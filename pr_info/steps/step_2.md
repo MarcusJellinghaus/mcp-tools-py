@@ -173,13 +173,33 @@ byte-identical.
 
 `tests/test_black_runner.py` / `tests/test_isort_runner.py`:
 
-1. The command's argv[0] is the tool-env console script and `"-m"` does **not** appear.
-   Patch `formatter_binary` to return a known path.
+Add an autouse fixture named `_fixed_formatter_binary` patching
+`<runner module>.formatter_binary` to return a fixed path (e.g. `"/tool-env/bin/black"`).
+The existing tests mock `execute_command` but not binary lookup; without the fixture they
+would resolve through `PythonEnvironment.resolve()` on the real `sys.executable` and, on an
+interpreter with no black/isort script beside it, return "not available" before any
+subprocess runs. Same pattern as step 3's `_fixed_version_line`. Tests that need a
+different answer override it: test 3 patches it to return `None`; test 5 restores the real
+function with `monkeypatch.setattr(<runner module>, "formatter_binary",
+common.formatter_binary)`.
+
+1. The command's argv[0] is the fixture's path and `"-m"` does **not** appear.
 2. **Passing a bogus `python_executable` does not change which binary runs** — call with
    `"/nonexistent/python"` and assert the same argv. This is an acceptance criterion.
 3. Missing binary → `success=False` and a message naming the tool, with no subprocess run.
-4. Existing parse / truncation / timeout tests unchanged — they are the regression that
-   the move touched nothing else.
+4. Existing parse / truncation / timeout tests otherwise unchanged — they are the
+   regression that the move touched nothing else. The autouse fixture is what keeps them
+   independent of the interpreter running the suite.
+
+`_fixed_formatter_binary` is invoked by pytest, never by name, so vulture reports it as an
+unused function. Add the bare name to `vulture_whitelist.py` next to the other
+autouse-fixture entries:
+
+```python
+_fixed_formatter_binary  # Autouse fixture in the formatter runner test modules
+```
+
+Steps 4 and 5 reuse the same fixture name, so this one entry covers them.
 
 `tests/test_formatter_tools.py:288` (`test_tool_unavailable_returns_error`) **must be
 rewritten**. It currently patches the probe via `make_environment_info(black=False)`.
@@ -256,8 +276,14 @@ them in one commit.
 > pass for the wrong reason. Do not patch `binary` on the instance: `PythonEnvironment` is
 > a frozen dataclass.
 >
-> Add `python_executable` as a bare name to `vulture_whitelist.py` — the runners never
-> read it, and vulture reports that at 100% confidence.
+> Add an autouse fixture `_fixed_formatter_binary` to `tests/test_black_runner.py` and
+> `tests/test_isort_runner.py` that patches the runner module's `formatter_binary` to a
+> fixed path, so the existing mocked tests do not depend on black/isort scripts sitting
+> next to the interpreter running the suite.
+>
+> Add `python_executable` and `_fixed_formatter_binary` as bare names to
+> `vulture_whitelist.py` — the runners never read the former, and pytest alone invokes the
+> latter.
 >
 > Do not update any documentation counts; step 8 does that. Do not add ruff steps or
 > resolution logic.

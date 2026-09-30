@@ -65,3 +65,24 @@ Supervised plan review (`/plan_review_supervisor`). Continues from `plan_review_
 **User decisions**: none
 **Changes**: summary.md, Decisions.md, step_1–step_8. Truncation tests updated to "51 more lines"; `run_ruff_check`/`run_vulture_check` added to every DONE WHEN; whitelist entries `python_executable` (step 2), `_fixed_version_line` (step 3), `_declare_formatter` (step 6), verified by vulture probe; `test_tool_unavailable_returns_error` deletes the black stub; README :150/:152/:204 and `main.py:74` added to step 8, with case-insensitive greps; step_6 sentence replaced. Engineer flagged that step 8's "deliberate survivors" wording looked confusing; supervisor left it, since the "five registrars" hits are meant to survive.
 **Status**: committed
+
+## Round 4 — 2026-09-30
+**Findings**:
+- step_2 — medium — existing black/isort runner tests don't mock binary lookup; they fail on an interpreter without the scripts
+- step_8 — low — contradictory "survivors" counts in the grep expectations (**repeat of round 3**, an engineer's note)
+- step_8 — low — architecture.md `utils/` list, `project_config.py` bullet, `formatter/` bullet not updated
+- step_4 — low — "path before `:<line>`" breaks on drive-letter paths; name the regex
+- step_6 — low — `resolve_steps` returns module-level lists; a caller could mutate them
+- step_7 — low — churn test fixture should use stdlib-only imports
+- step_1 — low (optional) — `ImportError` test guards a decision, not behaviour
+**Decisions**:
+- Binary lookup fixture: accept
+- Survivor counts: accept — repeat. In round 3 the supervisor dismissed it, reasoning that the "five registrars" lines were the survivors. An independent reviewer showed the grep can't match those lines, so the round-3 reason was wrong.
+- architecture.md lines: accept
+- Regex: accept
+- Copies from `resolve_steps`: skip — speculative (only matters if a caller mutates the result)
+- Stdlib-only fixture: accept
+- `ImportError` test: accept dropping — tests a decision, not behaviour
+**User decisions**: none
+**Changes**: step_1, step_2, step_3, step_4, step_5, step_7, step_8, summary.md, Decisions.md. `_fixed_formatter_binary` autouse fixture (whitelisted; steps 4/5 aligned, with real-lookup overrides where needed); step 8 grep criterion rewritten; architecture.md utils/formatter bullets added; `_FAILED_TO_PARSE` regex plus test 7b (probed); churn fixture stdlib-only; step 1 `ImportError` test dropped.
+**Status**: committed

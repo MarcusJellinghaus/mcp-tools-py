@@ -46,6 +46,11 @@ assert all(r.success for r in results.values())
 
 Byte comparison, not a string comparison — trailing newlines matter.
 
+**The source uses stdlib-only imports** (e.g. `import os` / `import sys`). Whether a
+module in a `tmp_path` project counts as first-party or third-party depends on ruff's
+detection, not on the formatter; a stdlib-only fixture cannot produce a spurious sort diff
+from that classification.
+
 ### 2. Sibling: the explicit key
 
 Same repo, plus `[tool.mcp-tools-py] formatter = "ruff"`. Same assertions. Proves the key
@@ -167,7 +172,9 @@ issue has a test naming it.
 > The central test is the churn test: a repo carrying `[tool.ruff.format]`, **no**
 > `[tool.black]` and **no** explicit `[tool.mcp-tools-py] formatter` key, with
 > already-formatted source, must produce **no diff** when `run_format_code` is called with
-> no `steps`. Compare bytes. Add a sibling that sets the explicit key.
+> no `steps`. Compare bytes. Use stdlib-only imports in that source, so first-party /
+> third-party classification cannot produce a spurious diff. Add a sibling that sets the
+> explicit key.
 >
 > Also cover: a black repo still resolving to isort+black; explicit `["isort", "black"]` on
 > a ruff repo; a bogus `python_executable` not changing which binary runs; parse errors
