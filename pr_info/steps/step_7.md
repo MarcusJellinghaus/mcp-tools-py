@@ -17,7 +17,9 @@
 - `docs/architecture/architecture.md` — `code_checker_pytest` and
   `utils/project_config.py` bullets
 - `tests/test_server_params.py` — handler tests
-- Create `tests/test_code_checker_pytest/test_coverage_integration.py`
+- Create `tests/test_checker_tools/__init__.py` and
+  `tests/test_checker_tools/test_pytest_tool.py` (mirrors
+  `checker_tools/pytest_tool.py`) for the integration test
 
 ## WHAT
 
@@ -81,14 +83,17 @@ finally: rmtree(tmp) unless keep_temp_files
 - probe `error` set → run proceeds
 - coverage on: `--cov-fail-under=0` is the last element of `extra_args` passed;
   `COVERAGE_FILE` in `env_vars` alongside the caller's vars
+- explicit `coverage_source=["a", "b"]` → `--cov=a` and `--cov=b` in `extra_args`
+- `max_modules=3` is forwarded to `format_coverage_digest` (patched)
 - `where=["."]` project → error string naming `coverage_source`
 - digest appended after the normal reply; failure run contains the warning line
 - missing JSON → "Coverage report was not produced."
 
-`test_coverage_integration.py` (`@pytest.mark.integration`, `sys.executable`,
-skip if `pytest_cov` not importable): tmp project with `src/pkg/mod.py`
-(one tested and one untested function) and `pyproject.toml` with
-`[tool.coverage.report] fail_under = 99`:
+`tests/test_checker_tools/test_pytest_tool.py` (`@pytest.mark.integration`,
+`sys.executable`, skip if `pytest_cov` not importable): tmp project with
+`src/pkg/mod.py` (one tested and one untested function), a `pyproject.toml`
+without coverage config, and a `.coveragerc` with `[report] fail_under = 99`
+(proves a non-pyproject config home is read with the project as `cwd`):
 - reply contains the total line, `selection: full suite`, the untested
   function name with its range, and the "not applied" `fail_under` line
 - run does not report failure despite `fail_under = 99`

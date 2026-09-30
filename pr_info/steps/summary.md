@@ -69,7 +69,7 @@ Layering is unchanged: `code_checker_pytest` → `utils`; `checker_tools` →
 | Modify | `tests/test_project_config.py` |
 | Modify | `tests/test_code_checker_pytest/test_extra_args.py` |
 | Create | `tests/test_code_checker_pytest/test_coverage.py` |
-| Create | `tests/test_code_checker_pytest/test_coverage_integration.py` |
+| Create | `tests/test_checker_tools/__init__.py`, `tests/test_checker_tools/test_pytest_tool.py` |
 | Modify | `tests/test_server_params.py` |
 
 ## Steps
