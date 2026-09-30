@@ -160,6 +160,12 @@ class TestSelectionLine:
 
         assert line == "selection: markers 'slow'"
 
+    def test_extra_args_m_wins_over_markers(self) -> None:
+        """extra_args follow the markers -m on the command line, so they win."""
+        line = selection_line(["slow"], ["-m", "fast"], [], None)
+
+        assert line == "selection: markers 'fast'"
+
     def test_k_in_args(self) -> None:
         """-k in the args is reported."""
         assert selection_line(None, ["-k", "install"], [], None) == (
@@ -306,6 +312,13 @@ class TestFormatCoverageDigest:
 
         assert "f1" in digest and "f2" in digest and "f3" in digest
         assert "f4" not in digest
+        assert "    … 1 more functions" in digest
+
+    def test_no_function_marker_under_cap(self) -> None:
+        """No truncation marker when every function is shown."""
+        data = _report({"a.py": _file(10, [1], {"f": [1]})})
+
+        assert "more functions" not in format_coverage_digest(data, _SELECTION)
 
     def test_range_cap(self) -> None:
         """The sixth range is replaced by an ellipsis."""

@@ -109,7 +109,10 @@ def selection_line(
         add = []
 
     parts = []
-    cmd_m = " and ".join(markers) if markers else _option_value(cleaned_args, "-m")
+    # runners.py puts the markers -m before extra_args, so an -m there wins.
+    cmd_m = _option_value(cleaned_args, "-m") or (
+        " and ".join(markers) if markers else None
+    )
     if cmd_m:
         parts.append(f"markers '{cmd_m}'")
     elif add_m := _option_value(add, "-m"):
@@ -220,10 +223,13 @@ def format_coverage_digest(
                 if region.get("missing_lines")
             ),
             key=lambda region: (-len(region[1]), region[0]),
-        )[:MAX_FUNCTIONS_PER_MODULE]
-        width = max((len(name) for name, _ in regions), default=0)
-        for name, region_lines in regions:
+        )
+        shown = regions[:MAX_FUNCTIONS_PER_MODULE]
+        width = max((len(name) for name, _ in shown), default=0)
+        for name, region_lines in shown:
             lines.append(f"    {name.ljust(width)}  {_capped_ranges(region_lines)}")
+        if len(regions) > len(shown):
+            lines.append(f"    … {len(regions) - len(shown)} more functions")
     if degraded:
         lines.append(
             "Per-function detail needs coverage >= 7.6.0; showing file-level ranges."

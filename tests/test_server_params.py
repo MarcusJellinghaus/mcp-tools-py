@@ -990,6 +990,17 @@ class TestPytestCoverage:
 
         assert "Warning: tests failed" in result
 
+    def test_unsuccessful_run_carries_the_warning(self, run_pytest_check: Any) -> None:
+        """A run that failed with no summary still carries the warning."""
+        with (
+            patch(f"{_PYTEST_TOOL}.check_code_with_pytest") as mock_check,
+            patch(f"{_PYTEST_TOOL}.read_coverage_report", return_value=_COVERAGE_DATA),
+        ):
+            mock_check.return_value = {"success": False, "error": "boom"}
+            result = run_pytest_check(coverage=True, coverage_source=["src"])
+
+        assert "Warning: tests failed" in result
+
     def test_missing_report_is_stated(self, run_pytest_check: Any) -> None:
         """No coverage JSON gives a one-line note instead of a digest."""
         with (

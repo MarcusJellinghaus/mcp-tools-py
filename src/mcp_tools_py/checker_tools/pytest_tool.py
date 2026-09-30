@@ -190,7 +190,8 @@ def register(mcp: "FastMCPProtocol", checker_tools: "CheckerTools") -> None:
                         selection,
                         max_modules=max_modules,
                         fail_under=fail_under,
-                        tests_failed=bool(
+                        tests_failed=not test_results.get("success")
+                        or bool(
                             (summary.get("failed") or 0) or (summary.get("error") or 0)
                         ),
                     )
