@@ -17,9 +17,9 @@
 - `docs/architecture/architecture.md` — `code_checker_pytest` and
   `utils/project_config.py` bullets
 - `tests/test_server_params.py` — handler tests
-- Create `tests/test_checker_tools/__init__.py` and
-  `tests/test_checker_tools/test_pytest_tool.py` (mirrors
-  `checker_tools/pytest_tool.py`) for the integration test
+- Create `tests/test_pytest_tool_coverage.py` for the integration test.
+  (Not `tests/test_checker_tools/`: that package would shadow the existing
+  `tests/test_checker_tools.py` and silently drop its tests.)
 
 ## WHAT
 

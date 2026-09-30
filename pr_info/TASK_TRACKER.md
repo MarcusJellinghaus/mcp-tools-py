@@ -66,9 +66,9 @@ See [step_6.md](./steps/step_6.md)
 ### Step 7: Wire coverage into `run_pytest_check`
 See [step_7.md](./steps/step_7.md)
 
-- [ ] Implementation: handler + integration tests, `pytest_tool.py` parameters, `pyproject.toml` dev dependency, README and architecture docs
-- [ ] Quality checks: pylint, pytest (incl. integration), mypy, lint-imports — fix all issues
-- [ ] Commit message prepared
+- [x] Implementation: handler + integration tests, `pytest_tool.py` parameters, `pyproject.toml` dev dependency, README and architecture docs
+- [x] Quality checks: pylint, pytest (incl. integration), mypy, lint-imports — fix all issues
+- [x] Commit message prepared
 
 ## Pull Request
 

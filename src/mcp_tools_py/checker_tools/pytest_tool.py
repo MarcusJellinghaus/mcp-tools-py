@@ -1,11 +1,25 @@
 """Pytest MCP tool registration."""
 
 import logging
+import shutil
+import tempfile
 from typing import TYPE_CHECKING, Dict, List, Optional
 
+from mcp_tools_py.code_checker_pytest.coverage import (
+    coverage_args,
+    format_coverage_digest,
+    read_coverage_report,
+    read_fail_under,
+    selection_line,
+)
 from mcp_tools_py.code_checker_pytest.runners import check_code_with_pytest
 from mcp_tools_py.code_checker_pytest.utils import sanitize_extra_args
 from mcp_tools_py.log_utils import log_function_call
+from mcp_tools_py.utils.environment_info import get_environment_info
+from mcp_tools_py.utils.project_config import (
+    get_pytest_addopts,
+    resolve_coverage_source,
+)
 
 if TYPE_CHECKING:
     from mcp_tools_py.checker_tools import CheckerTools
@@ -25,6 +39,9 @@ def register(mcp: "FastMCPProtocol", checker_tools: "CheckerTools") -> None:
         extra_args: Optional[List[str]] = None,
         env_vars: Optional[Dict[str, str]] = None,
         timeout_seconds: Optional[int] = None,
+        coverage: bool = False,
+        coverage_source: Optional[List[str]] = None,
+        max_modules: int = 10,
     ) -> str:
         """Run pytest on the project code and generate smart prompts for LLMs.
 
@@ -39,6 +56,17 @@ def register(mcp: "FastMCPProtocol", checker_tools: "CheckerTools") -> None:
                 configured limit for this call. Must be a positive integer.
                 Defaults to `[tool.mcp-tools-py]` config, then `--check-timeout`,
                 then 300.
+            coverage: Measure coverage with pytest-cov (must be installed in the
+                project's environment) and append a digest to the reply: total,
+                modules ranked by missing statements with per-function line
+                ranges, modules with nothing covered, and the test selection
+                the numbers come from. The project's `fail_under` is not
+                applied. Exclude code with coverage's own `omit` setting or
+                `# pragma: no cover`.
+            coverage_source: Directories to measure. Defaults to the project's
+                source directories from pyproject.toml, excluding test paths.
+            max_modules: How many modules the coverage digest details in each
+                list (default: 10).
 
         Returns:
             A string containing either pytest results or a prompt for an LLM to interpret
@@ -70,11 +98,27 @@ def register(mcp: "FastMCPProtocol", checker_tools: "CheckerTools") -> None:
 
             # Integration test run
             run_pytest_check(markers=["integration"])
+
+            # Coverage digest for the full suite
+            run_pytest_check(coverage=True)
         """
         if not context.is_tool_available("pytest"):
             return context.unavailable_message("pytest")
 
+        project_dir = str(context.project_dir)
+        interpreter = str(context.environment.interpreter)
+        temp_dir: Optional[str] = None
         try:
+            sources: List[str] = []
+            if coverage:
+                info = get_environment_info(interpreter)
+                if not info.error and "pytest-cov" not in info.distributions:
+                    return context.unavailable_message("pytest-cov")
+                resolved = resolve_coverage_source(project_dir, coverage_source)
+                if isinstance(resolved, str):
+                    return resolved
+                sources = resolved
+
             logger.info(
                 "Starting pytest check",
                 extra={
@@ -87,22 +131,32 @@ def register(mcp: "FastMCPProtocol", checker_tools: "CheckerTools") -> None:
 
             # Sanitize extra_args: deduplicate flags, extract verbosity
             sanitized = sanitize_extra_args(
-                extra_args, markers, project_dir=str(context.project_dir)
+                extra_args, markers, project_dir=project_dir
             )
 
             # Log any deduplication notes
             for note in sanitized.notes:
                 logger.info("extra_args sanitized", extra={"note": note})
 
+            run_args = sanitized.cleaned_args
+            run_env = env_vars
+            fail_under: Optional[float] = None
+            if coverage:
+                temp_dir = tempfile.mkdtemp(prefix="pytest_cov_")
+                cov_args, cov_env = coverage_args(sources, temp_dir)
+                run_args = sanitized.cleaned_args + cov_args
+                run_env = {**(env_vars or {}), **cov_env}
+                fail_under = read_fail_under(interpreter, project_dir)
+
             # Run pytest
             test_results = check_code_with_pytest(
-                project_dir=str(context.project_dir),
+                project_dir=project_dir,
                 test_folder=context.test_folder,
-                python_executable=str(context.environment.interpreter),
+                python_executable=interpreter,
                 markers=markers,
                 verbosity=sanitized.verbosity,
-                extra_args=sanitized.cleaned_args,
-                env_vars=env_vars,
+                extra_args=run_args,
+                env_vars=run_env,
                 venv_bin=str(context.environment.bin_dir),
                 keep_temp_files=context.keep_temp_files,
                 skip_default_test_folder=sanitized.has_path_args,
@@ -119,8 +173,30 @@ def register(mcp: "FastMCPProtocol", checker_tools: "CheckerTools") -> None:
                 notes_text = "\n".join(sanitized.notes)
                 result = f"{notes_text}\n\n{result}"
 
+            summary = test_results.get("summary", {})
+            if temp_dir is not None:
+                data = read_coverage_report(temp_dir)
+                if data is None:
+                    digest = "Coverage report was not produced."
+                else:
+                    selection = selection_line(
+                        markers,
+                        sanitized.cleaned_args,
+                        sanitized.path_args,
+                        get_pytest_addopts(project_dir),
+                    )
+                    digest = format_coverage_digest(
+                        data,
+                        selection,
+                        max_modules=max_modules,
+                        fail_under=fail_under,
+                        tests_failed=bool(
+                            (summary.get("failed") or 0) or (summary.get("error") or 0)
+                        ),
+                    )
+                result = f"{result}\n\n{digest}"
+
             if test_results.get("success"):
-                summary = test_results.get("summary", {})
                 logger.info(
                     "Pytest execution completed",
                     extra={
@@ -147,7 +223,10 @@ def register(mcp: "FastMCPProtocol", checker_tools: "CheckerTools") -> None:
                 extra={
                     "error": str(e),
                     "error_type": type(e).__name__,
-                    "project_dir": str(context.project_dir),
+                    "project_dir": project_dir,
                 },
             )
             return error_msg
+        finally:
+            if temp_dir is not None and not context.keep_temp_files:
+                shutil.rmtree(temp_dir, ignore_errors=True)
