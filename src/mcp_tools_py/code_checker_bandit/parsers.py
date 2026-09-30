@@ -62,7 +62,13 @@ def parse_bandit_json_output(
 
             filename = item.get("filename", "")
             if filename:
-                filename = os.path.relpath(filename, project_dir)
+                # Bandit reports paths relative to its cwd, which is project_dir
+                try:
+                    filename = os.path.relpath(
+                        os.path.join(project_dir, filename), project_dir
+                    )
+                except ValueError:
+                    pass  # other drive: keep the path unchanged
 
             issue_cwe = item.get("issue_cwe") or {}
             cwe_id = issue_cwe.get("id", 0) if isinstance(issue_cwe, dict) else 0
