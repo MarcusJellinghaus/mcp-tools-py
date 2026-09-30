@@ -86,7 +86,8 @@ def format_bandit_report(
             f"({first.test_name}) "
             f"[severity: {first.issue_severity}, confidence: {first.issue_confidence}]"
         )
-        lines.append(f"CWE-{first.cwe_id}: {first.cwe_link}")
+        if first.cwe_id:
+            lines.append(f"CWE-{first.cwe_id}: {first.cwe_link}")
         lines.append(first.issue_text)
         lines.append("Locations:")
 
