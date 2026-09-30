@@ -63,11 +63,13 @@ def test_format_mypy_result_no_issues(checker_tools: CheckerTools) -> None:
 
 
 def test_format_mypy_result_with_issues(checker_tools: CheckerTools) -> None:
-    """Test formatting when mypy finds type issues."""
-    prompt = "src/foo.py:10: error: Incompatible types"
+    """A report already carries its own header and is passed through unchanged."""
+    prompt = (
+        "Mypy found type issues that need attention:\n\n"
+        "mypy found 1 issue across 1 rule"
+    )
     result = checker_tools._format_mypy_result(prompt)
-    assert "Mypy found type issues" in result
-    assert prompt in result
+    assert result == prompt
 
 
 def test_format_mypy_result_failure_keeps_its_own_headline(
