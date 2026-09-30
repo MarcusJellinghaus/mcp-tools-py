@@ -3,10 +3,13 @@
 import json
 import os
 from pathlib import Path
+from typing import Any
 from unittest.mock import patch
 
 from mcp_tools_py.code_checker_pytest.coverage import (
+    _ranges,
     coverage_args,
+    format_coverage_digest,
     read_coverage_report,
     read_fail_under,
     selection_line,
@@ -196,3 +199,227 @@ class TestSelectionLine:
         assert selection_line(None, [], [], "-m 'not integration") == (
             "selection: full suite (no markers, -k or path arguments)"
         )
+
+
+_SELECTION = "selection: full suite (no markers, -k or path arguments)"
+
+
+def _file(
+    stmts: int,
+    missing: list[int],
+    functions: dict[str, list[int]] | None = None,
+) -> dict[str, Any]:
+    """One file entry of the coverage JSON."""
+    covered = stmts - len(missing)
+    entry: dict[str, Any] = {
+        "summary": {
+            "num_statements": stmts,
+            "covered_lines": covered,
+            "missing_lines": len(missing),
+            "percent_covered": 100.0 * covered / stmts if stmts else 100.0,
+        },
+        "missing_lines": missing,
+    }
+    if functions is not None:
+        entry["functions"] = {
+            name: {"missing_lines": lines} for name, lines in functions.items()
+        }
+    return entry
+
+
+def _report(files: dict[str, dict[str, Any]]) -> dict[str, Any]:
+    """A coverage JSON with totals summed from files."""
+    stmts = sum(f["summary"]["num_statements"] for f in files.values())
+    missed = sum(f["summary"]["missing_lines"] for f in files.values())
+    return {
+        "totals": {
+            "num_statements": stmts,
+            "missing_lines": missed,
+            "covered_lines": stmts - missed,
+            "percent_covered": 100.0 * (stmts - missed) / stmts if stmts else 100.0,
+        },
+        "files": files,
+    }
+
+
+class TestRanges:
+    """Test collapsing line numbers into ranges."""
+
+    def test_collapse(self) -> None:
+        """Consecutive runs become a-b, singletons stay single."""
+        assert _ranges([1, 2, 3, 5, 7, 8]) == ["1-3", "5", "7-8"]
+
+    def test_empty(self) -> None:
+        """No lines yield no ranges."""
+        assert not _ranges([])
+
+
+class TestFormatCoverageDigest:
+    """Test the coverage digest appended to the pytest reply."""
+
+    def test_header_and_selection(self) -> None:
+        """The header and the selection line are always the first two lines."""
+        data = _report({"a.py": _file(10, [3], {"f": [3]})})
+
+        lines = format_coverage_digest(data, _SELECTION).splitlines()
+
+        assert lines[0] == "90.0%  10 stmts  1 missed  |  1 modules measured"
+        assert lines[1] == _SELECTION
+
+    def test_ranked_by_absolute_missing(self) -> None:
+        """A big module at 90% ranks above a small one at 50%."""
+        big = list(range(1, 201))
+        small = list(range(1, 16))
+        data = _report(
+            {
+                "small.py": _file(30, small, {"f": small}),
+                "big.py": _file(2000, big, {"g": big}),
+            }
+        )
+
+        digest = format_coverage_digest(data, _SELECTION)
+
+        assert "big.py  200 missing  (90%)" in digest
+        assert "small.py  15 missing  (50%)" in digest
+        assert digest.index("big.py") < digest.index("small.py")
+
+    def test_module_level_region(self) -> None:
+        """The empty-string region is rendered as <module level>."""
+        data = _report({"a.py": _file(10, [1, 2], {"": [1, 2]})})
+
+        digest = format_coverage_digest(data, _SELECTION)
+
+        assert "<module level>  1-2" in digest
+
+    def test_function_cap(self) -> None:
+        """Only the three functions with most missing lines are shown."""
+        functions = {
+            "f1": [1, 3, 5, 7],
+            "f2": [11, 13, 15],
+            "f3": [21, 23],
+            "f4": [31],
+        }
+        missing = sorted(line for lines in functions.values() for line in lines)
+        data = _report({"a.py": _file(50, missing, functions)})
+
+        digest = format_coverage_digest(data, _SELECTION)
+
+        assert "f1" in digest and "f2" in digest and "f3" in digest
+        assert "f4" not in digest
+
+    def test_range_cap(self) -> None:
+        """The sixth range is replaced by an ellipsis."""
+        lines = [1, 3, 5, 7, 9, 11]
+        data = _report({"a.py": _file(20, lines, {"f": lines})})
+
+        digest = format_coverage_digest(data, _SELECTION)
+
+        assert "f  1, 3, 5, 7, 9, …" in digest
+        assert "11" not in digest.split("f  ", 1)[1].splitlines()[0]
+
+    def test_zero_coverage_listed_separately(self) -> None:
+        """Modules with nothing covered are not ranked but listed with counts."""
+        data = _report(
+            {
+                "a.py": _file(10, [1], {"f": [1]}),
+                "probe.py": _file(150, list(range(1, 151)), {"": [1]}),
+            }
+        )
+
+        digest = format_coverage_digest(data, _SELECTION)
+
+        assert "probe.py  150 missing" not in digest
+        assert "1 modules have no covered statements in this selection:" in digest
+        assert "    probe.py (150 missing statements)" in digest
+        for cause in ("untested", "not selected", "never traced"):
+            assert cause not in digest
+
+    def test_max_modules_cut(self) -> None:
+        """Modules beyond max_modules are summarised in a tail line."""
+        files = {
+            f"m{i}.py": _file(10, list(range(1, i + 2)), {"f": list(range(1, i + 2))})
+            for i in range(4)
+        }
+        digest = format_coverage_digest(_report(files), _SELECTION, max_modules=2)
+
+        assert "m3.py" in digest and "m2.py" in digest
+        assert "m1.py" not in digest and "m0.py" not in digest
+        assert "2 further modules have gaps (use max_modules to see more)." in digest
+
+    def test_max_modules_zero(self) -> None:
+        """max_modules=0 leaves only the header and the counts."""
+        data = _report(
+            {
+                "a.py": _file(10, [1], {"f": [1]}),
+                "z.py": _file(5, [1, 2, 3, 4, 5], {"": [1]}),
+            }
+        )
+
+        digest = format_coverage_digest(data, _SELECTION, max_modules=0)
+
+        assert "a.py" not in digest and "z.py" not in digest
+        assert "1 modules have no covered statements in this selection:" in digest
+        assert "… and 1 more" in digest
+        assert "1 further modules have gaps" in digest
+
+    def test_negative_max_modules_clamped(self) -> None:
+        """A negative max_modules behaves like 0."""
+        data = _report({"a.py": _file(10, [1], {"f": [1]})})
+
+        assert format_coverage_digest(
+            data, _SELECTION, max_modules=-3
+        ) == format_coverage_digest(data, _SELECTION, max_modules=0)
+
+    def test_file_level_fallback(self) -> None:
+        """Without functions data, file-level ranges and one note are shown."""
+        data = _report(
+            {
+                "a.py": _file(20, [1, 2, 4]),
+                "b.py": _file(20, [5, 6]),
+            }
+        )
+
+        digest = format_coverage_digest(data, _SELECTION)
+
+        assert "    1-2, 4" in digest
+        assert "    5-6" in digest
+        assert digest.count("coverage >= 7.6.0") == 1
+
+    def test_fail_under_zero(self) -> None:
+        """No threshold configured yields no fail_under line."""
+        data = _report({"a.py": _file(10, [1], {"f": [1]})})
+
+        assert "fail_under" not in format_coverage_digest(data, _SELECTION)
+
+    def test_fail_under_configured(self) -> None:
+        """A configured threshold is named and said not to be applied."""
+        data = _report({"a.py": _file(10, [1], {"f": [1]})})
+
+        digest = format_coverage_digest(data, _SELECTION, fail_under=80.0)
+
+        assert "fail_under=80 is configured; not applied to this run" in digest
+
+    def test_fail_under_unreadable(self) -> None:
+        """An unreadable threshold is reported as such."""
+        data = _report({"a.py": _file(10, [1], {"f": [1]})})
+
+        digest = format_coverage_digest(data, _SELECTION, fail_under=None)
+
+        assert "fail_under: could not be read from the coverage config" in digest
+
+    def test_tests_failed_warning(self) -> None:
+        """A failed run carries a warning line."""
+        data = _report({"a.py": _file(10, [1], {"f": [1]})})
+
+        assert "Warning: tests failed" not in format_coverage_digest(data, _SELECTION)
+        assert "Warning: tests failed" in format_coverage_digest(
+            data, _SELECTION, tests_failed=True
+        )
+
+    def test_fully_covered(self) -> None:
+        """No gaps at all is said explicitly."""
+        data = _report({"a.py": _file(10, [], {"f": []})})
+
+        digest = format_coverage_digest(data, _SELECTION)
+
+        assert "No uncovered statements in the measured modules." in digest

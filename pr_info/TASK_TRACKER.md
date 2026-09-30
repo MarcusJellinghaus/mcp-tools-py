@@ -59,9 +59,9 @@ See [step_5.md](./steps/step_5.md)
 ### Step 6: Coverage digest formatter
 See [step_6.md](./steps/step_6.md)
 
-- [ ] Implementation: tests + `format_coverage_digest` and `_ranges` in `coverage.py`
-- [ ] Quality checks: pylint, pytest, mypy — fix all issues
-- [ ] Commit message prepared
+- [x] Implementation: tests + `format_coverage_digest` and `_ranges` in `coverage.py`
+- [x] Quality checks: pylint, pytest, mypy — fix all issues
+- [x] Commit message prepared
 
 ### Step 7: Wire coverage into `run_pytest_check`
 See [step_7.md](./steps/step_7.md)

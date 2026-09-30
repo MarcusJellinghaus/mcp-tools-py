@@ -19,6 +19,10 @@ COVERAGE_DATA = ".coverage"
 
 _FAIL_UNDER_SCRIPT = "import coverage; print(coverage.Coverage().config.fail_under)"
 
+MAX_FUNCTIONS_PER_MODULE = 3
+MAX_RANGES_PER_FUNCTION = 5
+MODULE_LEVEL = "<module level>"
+
 
 def coverage_args(
     sources: list[str], temp_dir: str
@@ -130,3 +134,132 @@ def _option_value(tokens: list[str], flag: str) -> str | None:
         elif token.startswith(flag):
             value = token[len(flag) :]
     return value
+
+
+def format_coverage_digest(
+    data: dict[str, Any],
+    selection: str,
+    max_modules: int = 10,
+    fail_under: float | None = 0.0,
+    tests_failed: bool = False,
+) -> str:
+    """Render the coverage JSON as the digest appended to the pytest reply.
+
+    Modules with gaps are ranked by absolute missing statements; modules with
+    nothing covered are listed separately, with no cause attributed.
+
+    Args:
+        data: The coverage JSON report.
+        selection: The line from selection_line.
+        max_modules: How many modules to detail in each list.
+        fail_under: The project's threshold; None when it could not be read.
+        tests_failed: Whether the run had test failures.
+
+    Returns:
+        The multi-line digest.
+    """
+    max_modules = max(0, max_modules)
+    totals = data.get("totals", {})
+    files: dict[str, Any] = data.get("files", {})
+
+    lines = [
+        f"{totals.get('percent_covered', 0.0):.1f}%  "
+        f"{totals.get('num_statements', 0)} stmts  "
+        f"{totals.get('missing_lines', 0)} missed  |  "
+        f"{len(files)} modules measured",
+        selection,
+    ]
+    if fail_under is None:
+        lines.append("fail_under: could not be read from the coverage config")
+    elif fail_under > 0:
+        lines.append(
+            f"fail_under={fail_under:g} is configured; not applied to this run"
+        )
+    if tests_failed:
+        lines.append(
+            "Warning: tests failed; these numbers come from a run with failures."
+        )
+
+    zero = []
+    gaps = []
+    for path, entry in files.items():
+        summary = entry.get("summary", {})
+        missing = summary.get("missing_lines", 0)
+        if summary.get("covered_lines", 0) == 0 and summary.get("num_statements", 0):
+            zero.append((path, missing))
+        elif missing > 0:
+            gaps.append((path, missing))
+    gaps.sort(key=lambda gap: (-gap[1], gap[0]))
+
+    if not gaps and not zero:
+        lines += ["", "No uncovered statements in the measured modules."]
+
+    degraded = False
+    if gaps[:max_modules]:
+        lines.append("")
+    for path, missing in gaps[:max_modules]:
+        entry = files[path]
+        percent = entry.get("summary", {}).get("percent_covered", 0.0)
+        lines.append(f"{path}  {missing} missing  ({percent:.0f}%)")
+        if "functions" not in entry:
+            degraded = True
+            lines.append("    " + _capped_ranges(entry.get("missing_lines", [])))
+            continue
+        regions = sorted(
+            (
+                (name or MODULE_LEVEL, region.get("missing_lines", []))
+                for name, region in entry["functions"].items()
+                if region.get("missing_lines")
+            ),
+            key=lambda region: (-len(region[1]), region[0]),
+        )[:MAX_FUNCTIONS_PER_MODULE]
+        width = max((len(name) for name, _ in regions), default=0)
+        for name, region_lines in regions:
+            lines.append(f"    {name.ljust(width)}  {_capped_ranges(region_lines)}")
+    if degraded:
+        lines.append(
+            "Per-function detail needs coverage >= 7.6.0; showing file-level ranges."
+        )
+
+    if zero:
+        lines += [
+            "",
+            f"{len(zero)} modules have no covered statements in this selection:",
+        ]
+        lines += [
+            f"    {path} ({missing} missing statements)"
+            for path, missing in zero[:max_modules]
+        ]
+        if len(zero) > max_modules:
+            lines.append(f"    … and {len(zero) - max_modules} more")
+
+    if len(gaps) > max_modules:
+        lines += [
+            "",
+            f"{len(gaps) - max_modules} further modules have gaps "
+            "(use max_modules to see more).",
+        ]
+    return "\n".join(lines)
+
+
+def _capped_ranges(lines: list[int]) -> str:
+    """The first MAX_RANGES_PER_FUNCTION ranges, with an ellipsis if cut."""
+    ranges = _ranges(sorted(lines))
+    shown = ", ".join(ranges[:MAX_RANGES_PER_FUNCTION])
+    return shown + ", …" if len(ranges) > MAX_RANGES_PER_FUNCTION else shown
+
+
+def _ranges(lines: list[int]) -> list[str]:
+    """Collapse sorted line numbers into "a-b" / "a" strings."""
+    result = []
+    start = end = None
+    for line in lines:
+        if end is not None and line == end + 1:
+            end = line
+            continue
+        if start is not None:
+            result.append(f"{start}-{end}" if end != start else f"{start}")
+        start = end = line
+    if start is not None:
+        result.append(f"{start}-{end}" if end != start else f"{start}")
+    return result
