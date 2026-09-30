@@ -194,3 +194,19 @@ Reviewer prompt tightened: only wrong behaviour, tests that can't pass, unsatisf
 **User decisions**: none
 **Changes**: step_5 (argv, algorithm, prompt, tests 1/1b/2), Decisions.md.
 **Status**: committed
+
+## Round 12 — 2026-09-30
+**Findings**: none (tight reviewer prompt)
+**Decisions**: —
+**User decisions**: none
+**Changes**: none
+**Status**: no changes needed
+
+## Final Status
+Converged after 12 rounds (11 plan commits in this run, plus this log commit). No high findings since round 2; round 12 found nothing that would lead to a wrong build.
+
+User decisions this run: formatter version via a `--version` subprocess per step; ruff floor raised to `>=0.16.8` (committed in `pyproject.toml`); continue past steps that report unparsable files; no issue for the pre-existing isort `--check-only` non-ASCII skip.
+
+Out of scope, noted: `run_ruff_fix_impl` lacks `--no-fix` on its pre-check; the mcp_coder#1173 follow-up should raise mcp_coder's ruff floor when it selects the ruff steps.
+
+Plan is ready for approval.
