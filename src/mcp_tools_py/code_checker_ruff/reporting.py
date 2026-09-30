@@ -7,6 +7,11 @@ and formats LLM-optimized output with max_issues detail/summary control.
 from collections import defaultdict
 from typing import List, NamedTuple, Optional
 
+from mcp_tools_py.utils.report_counts import (
+    format_dir_split,
+    format_total_line,
+    plural,
+)
 from mcp_tools_py.utils.ruff_parsing import RuffMessage
 
 MAX_LOCATIONS_PER_ISSUE: int = 50
@@ -68,6 +73,16 @@ def group_and_sort_issues(
     return issue_groups
 
 
+def _rule_label(code: str, url: str | None) -> str:
+    """Build ``"<code> <name>"`` from the rule URL's last segment.
+
+    Returns:
+        Code and rule name, or the code alone when ``url`` is empty or None.
+    """
+    name = url.rstrip("/").rsplit("/", 1)[-1] if url else ""
+    return f"{code} {name}".strip()
+
+
 def format_ruff_check_report(
     messages: List[RuffMessage],
     max_issues: int = 1,
@@ -82,17 +97,17 @@ def format_ruff_check_report(
         return None
 
     max_issues = max(0, max_issues)
-    sections: list[str] = []
+    sections: list[str] = [format_total_line("ruff", len(messages), len(groups))]
 
     # Detailed sections for top N issue types
     for group in groups[:max_issues]:
-        url = group.messages[0].url
+        label = _rule_label(group.code, group.messages[0].url)
         message_text = group.messages[0].message
         count = len(group.messages)
+        split = format_dir_split(m.filename for m in group.messages)
 
         lines: list[str] = []
-        url_part = f" ({url})" if url else ""
-        lines.append(f"ruff found {count} issues with rule {group.code}{url_part}.")
+        lines.append(f"ruff found {plural(count, 'issue')} with rule {label} {split}.")
         lines.append(message_text)
         lines.append("Locations:")
 
@@ -111,7 +126,11 @@ def format_ruff_check_report(
     if remaining:
         summary_lines: list[str] = []
         for group in remaining:
-            summary_lines.append(f"- {group.code}: {len(group.messages)} occurrences")
+            label = _rule_label(group.code, group.messages[0].url)
+            split = format_dir_split(m.filename for m in group.messages)
+            summary_lines.append(
+                f"- {label}: {plural(len(group.messages), 'occurrence')} {split}"
+            )
         sections.append("\n".join(summary_lines))
 
     return "\n\n".join(sections)
