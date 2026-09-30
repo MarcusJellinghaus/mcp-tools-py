@@ -408,9 +408,8 @@ def get_pytest_addopts(project_dir: str) -> str | None:
 
     Returns:
         The addopts string, or None when the file, section or key is missing.
-
-    Raises:
-        ValueError: If pyproject.toml is not valid TOML.
+        A ``ValueError`` from :func:`_load_pyproject` propagates when
+        pyproject.toml is not valid TOML.
     """
     section: object = _load_pyproject(project_dir)
     for key in ("tool", "pytest", "ini_options"):

@@ -48,7 +48,11 @@ def coverage_args(
 
 
 def read_coverage_report(temp_dir: str) -> dict[str, Any] | None:
-    """Load the coverage JSON from temp_dir, or None when absent or unparsable."""
+    """Load the coverage JSON report written to temp_dir.
+
+    Returns:
+        The parsed report, or None when it is absent or unparsable.
+    """
     try:
         report = json.loads(read_file(os.path.join(temp_dir, COVERAGE_JSON)))
     except (OSError, ValueError):
@@ -125,7 +129,11 @@ def selection_line(
 
 
 def _option_value(tokens: list[str], flag: str) -> str | None:
-    """Last value given for a short option (`-m X` or `-mX`); pytest keeps the last."""
+    """Find the value of a short option (`-m X` or `-mX`) in tokens.
+
+    Returns:
+        The last value given, as pytest keeps the last; None when absent.
+    """
     value = None
     for i, token in enumerate(tokens):
         if token == flag:
@@ -243,14 +251,22 @@ def format_coverage_digest(
 
 
 def _capped_ranges(lines: list[int]) -> str:
-    """The first MAX_RANGES_PER_FUNCTION ranges, with an ellipsis if cut."""
+    """Format line numbers as ranges, capped at MAX_RANGES_PER_FUNCTION.
+
+    Returns:
+        The comma-separated ranges, ending in an ellipsis if cut.
+    """
     ranges = _ranges(sorted(lines))
     shown = ", ".join(ranges[:MAX_RANGES_PER_FUNCTION])
     return shown + ", …" if len(ranges) > MAX_RANGES_PER_FUNCTION else shown
 
 
 def _ranges(lines: list[int]) -> list[str]:
-    """Collapse sorted line numbers into "a-b" / "a" strings."""
+    """Collapse sorted line numbers into consecutive runs.
+
+    Returns:
+        One "a-b" string per run, or "a" for a single line.
+    """
     result = []
     start = end = None
     for line in lines:
