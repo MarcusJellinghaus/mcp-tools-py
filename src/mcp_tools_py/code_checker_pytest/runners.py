@@ -99,7 +99,7 @@ def run_tests(
         python_executable: Optional path to Python interpreter to use. Defaults to sys.executable if not provided
         markers: Optional list of pytest markers to filter tests. Examples: ['slow', 'integration', 'unit']
         verbosity: Integer for pytest verbosity level (0-3). Default is 2. Higher values provide more detailed output
-        extra_args: Optional list of additional pytest arguments. Examples: ['-xvs', '--no-header', '--durations=10']
+        extra_args: Optional list of additional pytest arguments. Examples: ['-x', '--no-header', '--durations=10']
         env_vars: Optional dictionary of environment variables to set for the subprocess. Example: {'DEBUG': '1'}
         venv_bin: Optional bin/Scripts directory to prepend to PATH. This is the directory the interpreter lives in, not a virtual environment root
         keep_temp_files: Whether to keep temporary files after execution (useful for debugging failures)
@@ -485,7 +485,7 @@ def check_code_with_pytest(
         python_executable: Optional path to Python interpreter to use for running tests. If None, defaults to sys.executable
         markers: Optional list of pytest markers to filter tests. Examples: ['slow', 'integration', 'unit']
         verbosity: Integer for pytest verbosity level (0-3), default 2. Higher values provide more detailed output
-        extra_args: Optional list of additional pytest arguments. Examples: ['-xvs', '--no-header']
+        extra_args: Optional list of additional pytest arguments. Examples: ['-x', '--no-header']
         env_vars: Optional dictionary of environment variables for the subprocess. Example: {'DEBUG': '1', 'PYTHONPATH': '/custom/path'}
         venv_bin: Optional bin/Scripts directory to prepend to PATH. This is the directory the interpreter lives in, not a virtual environment root
         keep_temp_files: Whether to keep temporary files after test execution. Useful for debugging when tests fail

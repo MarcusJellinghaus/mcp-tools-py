@@ -52,7 +52,7 @@ def register(mcp: "FastMCPProtocol", checker_tools: "CheckerTools") -> None:
             extra_args=["-k", "calculation"]  # Pattern matching
 
             # Output control
-            extra_args=["-s"]  # Show print statements
+            extra_args=["-s"]  # Show captured print output of passing tests
             extra_args=["--tb=short"]  # Short tracebacks
             extra_args=["-vvv"]  # Maximum verbosity
 
@@ -111,7 +111,7 @@ def register(mcp: "FastMCPProtocol", checker_tools: "CheckerTools") -> None:
 
             # Always show detailed failure output
             result = checker_tools._format_pytest_result_with_details(
-                test_results, show_details=True
+                test_results, show_details=True, show_output=sanitized.show_output
             )
 
             # Prepend deduplication notes so LLM can self-correct

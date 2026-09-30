@@ -20,6 +20,7 @@ from mcp_tools_py.code_checker_pytest.reporting import (
     MAX_OUTPUT_LINES,
     SMALL_TEST_RUN_THRESHOLD,
     create_prompt_for_failed_tests,
+    create_prompt_for_passing_output,
     should_show_details,
 )
 
@@ -59,9 +60,14 @@ class CheckerTools:
         return pylint_prompt
 
     def _format_pytest_result_with_details(
-        self, test_results: dict[str, Any], show_details: bool
+        self,
+        test_results: dict[str, Any],
+        show_details: bool,
+        show_output: bool = False,
     ) -> str:
         """Enhanced formatting that respects show_details parameter.
+
+        With show_output, a passing run also lists the captured output of passing tests.
 
         Returns:
             User-facing summary of the pytest outcome.
@@ -113,9 +119,14 @@ class CheckerTools:
         else:
             # Success case - use existing logic
             if test_results.get("summary_text"):
-                return f"Pytest check completed. {test_results['summary_text']}"
+                result = f"Pytest check completed. {test_results['summary_text']}"
             else:
-                return f"Pytest check completed. All {passed_count} tests passed successfully."
+                result = f"Pytest check completed. All {passed_count} tests passed successfully."
+            if show_output and test_results.get("test_results"):
+                result += "\n\n" + create_prompt_for_passing_output(
+                    test_results["test_results"]
+                )
+            return result
 
     def _format_mypy_result(self, mypy_prompt: str | None) -> str:
         """Format mypy check result.

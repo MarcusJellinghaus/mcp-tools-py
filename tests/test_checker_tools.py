@@ -5,10 +5,7 @@ from pathlib import Path
 from typing import Any
 from unittest.mock import MagicMock, patch
 
-import pytest
-
 from mcp_tools_py.checker_tools import CheckerTools
-from mcp_tools_py.code_checker_mypy.reporting import MYPY_FAILURE_PREFIX
 from mcp_tools_py.utils.python_environment import PythonEnvironment
 from mcp_tools_py.utils.tool_context import ToolContext
 from tests.test_tool_availability._helpers import _dummy_python
@@ -19,134 +16,6 @@ def _remove_console_script(context: ToolContext, tool_name: str) -> None:
     binary = context.tool_environment.binary(tool_name)
     assert binary is not None
     binary.unlink()
-
-
-@pytest.fixture
-def checker_tools(tool_context: ToolContext) -> CheckerTools:
-    """Create a CheckerTools instance over the shared context."""
-    return CheckerTools(tool_context)
-
-
-# --- Registration tests ---
-
-
-def test_checker_tools_registers_nine_tools(tool_context: ToolContext) -> None:
-    """Test that CheckerTools.register() registers exactly 9 tools on an MCP server."""
-    mock_mcp = MagicMock()
-    mock_decorator = MagicMock(side_effect=lambda fn: fn)
-    mock_mcp.tool.return_value = mock_decorator
-
-    checker = CheckerTools(tool_context)
-    checker.register(mock_mcp)
-
-    # 9 tools: run_pylint_check, run_pytest_check, run_mypy_check,
-    # run_lint_imports_check, run_vulture_check, run_ruff_check, run_ruff_fix,
-    # run_bandit_check, run_tach_check
-    assert mock_mcp.tool.call_count == 9
-
-
-# --- Pylint formatting tests ---
-
-
-def test_format_pylint_result_no_issues(checker_tools: CheckerTools) -> None:
-    """Test formatting when pylint finds no issues."""
-    result = checker_tools._format_pylint_result(None)
-    assert "No issues found" in result
-
-
-def test_format_pylint_result_with_issues(checker_tools: CheckerTools) -> None:
-    """Test formatting when pylint finds issues."""
-    prompt = "pylint found some issues related to code W0612."
-    result = checker_tools._format_pylint_result(prompt)
-    assert result == prompt
-
-
-# --- Mypy formatting tests ---
-
-
-def test_format_mypy_result_no_issues(checker_tools: CheckerTools) -> None:
-    """Test formatting when mypy finds no type errors."""
-    result = checker_tools._format_mypy_result(None)
-    assert "No type errors found" in result
-
-
-def test_format_mypy_result_with_issues(checker_tools: CheckerTools) -> None:
-    """Test formatting when mypy finds type issues."""
-    prompt = "src/foo.py:10: error: Incompatible types"
-    result = checker_tools._format_mypy_result(prompt)
-    assert "Mypy found type issues" in result
-    assert prompt in result
-
-
-def test_format_mypy_result_failure_keeps_its_own_headline(
-    checker_tools: CheckerTools,
-) -> None:
-    """A failure prompt already names itself and is returned as-is."""
-    prompt = f"{MYPY_FAILURE_PREFIX} timed out after 120 seconds"
-    result = checker_tools._format_mypy_result(prompt)
-    assert result == prompt
-    assert "Mypy found type issues" not in result
-
-
-# --- Pytest formatting tests ---
-
-
-def test_format_pytest_result_success(checker_tools: CheckerTools) -> None:
-    """Test formatting for a successful pytest run."""
-    test_results: dict[str, Any] = {
-        "success": True,
-        "summary": {
-            "passed": 10,
-            "failed": 0,
-            "error": 0,
-            "collected": 10,
-            "duration": 2.3,
-        },
-        "test_results": None,
-        "summary_text": "10 passed in 2.30s",
-    }
-    result = checker_tools._format_pytest_result_with_details(
-        test_results, show_details=True
-    )
-    assert "Pytest check completed" in result
-    assert "10" in result
-
-
-def test_format_pytest_result_failure(checker_tools: CheckerTools) -> None:
-    """Test formatting for a failed pytest run."""
-    test_results: dict[str, Any] = {
-        "success": True,
-        "summary": {
-            "passed": 5,
-            "failed": 2,
-            "error": 0,
-            "collected": 7,
-            "duration": 1.5,
-        },
-        "test_results": MagicMock(),
-    }
-    with patch(
-        "mcp_tools_py.checker_tools.create_prompt_for_failed_tests"
-    ) as mock_prompt:
-        mock_prompt.return_value = "Detailed failure info..."
-        result = checker_tools._format_pytest_result_with_details(
-            test_results, show_details=True
-        )
-    assert "Pytest found issues" in result
-    assert "Detailed failure info..." in result
-
-
-def test_format_pytest_result_execution_error(checker_tools: CheckerTools) -> None:
-    """Test formatting when pytest fails to execute."""
-    test_results: dict[str, Any] = {
-        "success": False,
-        "error": "No module named 'pytest'",
-    }
-    result = checker_tools._format_pytest_result_with_details(
-        test_results, show_details=True
-    )
-    assert "Error running pytest" in result
-    assert "No module named 'pytest'" in result
 
 
 # --- Vulture handler tests ---

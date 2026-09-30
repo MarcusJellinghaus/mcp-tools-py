@@ -2,9 +2,15 @@
 
 import json
 from pathlib import Path
+from typing import Any, Dict, List
 
 from mcp_tools_py.checker_tools import CheckerTools
+from mcp_tools_py.code_checker_pytest.models import PytestReport
 from mcp_tools_py.code_checker_pytest.parsers import parse_pytest_report
+from mcp_tools_py.code_checker_pytest.reporting import (
+    NO_CAPTURED_OUTPUT_NOTE,
+    create_prompt_for_passing_output,
+)
 from mcp_tools_py.server import ToolServer
 from tests.test_code_checker_pytest._helpers import (
     _create_edge_case_project,
@@ -483,3 +489,131 @@ class TestReporting:
         # All new files should be our intentional test files
         for new_file in actual_new_files:
             assert any(expected in new_file for expected in expected_new_files)
+
+
+def _stage(**fields: Any) -> Dict[str, Any]:
+    """Build a passing json-report stage with the given extra fields."""
+    return {"duration": 0.001, "outcome": "passed", **fields}
+
+
+def _report(tests: List[Dict[str, Any]]) -> PytestReport:
+    """Parse a json-report holding the given test entries."""
+    return parse_pytest_report(
+        json.dumps(
+            {
+                "created": 0.0,
+                "duration": 0.1,
+                "exitcode": 0,
+                "root": "/project",
+                "environment": {},
+                "summary": {"collected": len(tests), "total": len(tests)},
+                "collectors": [],
+                "tests": tests,
+                "warnings": [],
+            }
+        )
+    )
+
+
+def _test(nodeid: str, outcome: str, **stages: Dict[str, Any]) -> Dict[str, Any]:
+    """Build a json-report test entry."""
+    return {
+        "nodeid": nodeid,
+        "lineno": 1,
+        "keywords": [],
+        "outcome": outcome,
+        **stages,
+    }
+
+
+class TestPassingOutput:
+    """Tests for create_prompt_for_passing_output."""
+
+    def test_shows_output_of_every_stage_of_non_failing_tests(self) -> None:
+        """Setup, call and teardown output is labelled; longrepr and failures are not shown."""
+        report = _report(
+            [
+                _test(
+                    "t.py::test_passed",
+                    "passed",
+                    setup=_stage(stdout="SETUP_OUT"),
+                    call=_stage(stdout="CALL_OUT"),
+                    teardown=_stage(stderr="TEARDOWN_ERR"),
+                ),
+                _test(
+                    "t.py::test_skipped",
+                    "skipped",
+                    setup=_stage(outcome="skipped", stderr="SKIP_ERR"),
+                ),
+                _test(
+                    "t.py::test_xfailed",
+                    "xfailed",
+                    call=_stage(
+                        outcome="skipped",
+                        stdout="XFAIL_OUT",
+                        stderr="XFAIL_ERR",
+                        longrepr="XFAIL_LONGREPR",
+                    ),
+                ),
+                _test(
+                    "t.py::test_failed",
+                    "failed",
+                    call=_stage(outcome="failed", stdout="FAILED_OUT"),
+                ),
+            ]
+        )
+
+        result = create_prompt_for_passing_output(report)
+
+        assert result.startswith("Captured output of passing tests:\n")
+        assert "Test ID: t.py::test_passed - outcome passed" in result
+        assert "  Setup stdout:\n```\nSETUP_OUT\n```" in result
+        assert "  Call stdout:\n```\nCALL_OUT\n```" in result
+        assert "  Teardown stderr:\n```\nTEARDOWN_ERR\n```" in result
+        assert "  Setup stderr:\n```\nSKIP_ERR\n```" in result
+        assert "  Call stdout:\n```\nXFAIL_OUT\n```" in result
+        assert "  Call stderr:\n```\nXFAIL_ERR\n```" in result
+        assert "XFAIL_LONGREPR" not in result
+        assert "FAILED_OUT" not in result
+        assert "test_failed" not in result
+        assert result.count("Captured output of passing tests:") == 1
+
+    def test_leaves_out_tests_without_output(self) -> None:
+        """A passing test that printed nothing is not listed."""
+        report = _report(
+            [
+                _test("t.py::test_quiet", "passed", call=_stage()),
+                _test("t.py::test_loud", "passed", call=_stage(stdout="LOUD")),
+            ]
+        )
+
+        result = create_prompt_for_passing_output(report)
+
+        assert "test_quiet" not in result
+        assert "LOUD" in result
+
+    def test_no_output_gives_note(self) -> None:
+        """If no passing test printed, the note is returned."""
+        report = _report(
+            [
+                _test("t.py::test_quiet", "passed", call=_stage(stdout="")),
+                _test("t.py::test_failed", "failed", call=_stage(stdout="X")),
+            ]
+        )
+
+        assert create_prompt_for_passing_output(report) == NO_CAPTURED_OUTPUT_NOTE
+        assert create_prompt_for_passing_output(_report([])) == NO_CAPTURED_OUTPUT_NOTE
+
+    def test_output_is_truncated(self) -> None:
+        """Many printing tests are cut at max_output_lines."""
+        report = _report(
+            [
+                _test(f"t.py::test_{i}", "passed", call=_stage(stdout=f"LINE_{i}"))
+                for i in range(20)
+            ]
+        )
+
+        result = create_prompt_for_passing_output(report, max_output_lines=10)
+
+        assert "[Output truncated" in result
+        assert "LINE_19" not in result

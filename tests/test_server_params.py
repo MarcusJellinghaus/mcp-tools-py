@@ -10,6 +10,7 @@ from unittest.mock import MagicMock, patch
 
 import pytest
 
+from mcp_tools_py.code_checker_pytest.utils import SHOW_OUTPUT_NOTE
 from mcp_tools_py.utils.tool_context import CONSOLE_SCRIPT_TOOLS
 from tests.test_tool_availability._helpers import _dummy_python, _patched_tool_env
 
@@ -687,6 +688,31 @@ async def test_run_pytest_check_prepends_dedup_notes(
         # The note about -m flag should be prepended
         assert "Note:" in result
         assert "-m" in result
+
+
+@pytest.mark.asyncio
+async def test_run_pytest_check_turns_s_into_show_output(
+    mock_server: Tuple[Any, MagicMock],
+) -> None:
+    """-s is removed before pytest runs, -n is kept, and the reply carries the note."""
+    _server, mock_tool = mock_server
+
+    with patch(
+        "mcp_tools_py.checker_tools.pytest_tool.check_code_with_pytest"
+    ) as mock_check:
+        mock_check.return_value = {
+            "success": True,
+            "summary": {"passed": 1, "failed": 0, "error": 0, "collected": 1},
+            "test_results": None,
+        }
+
+        run_pytest_check = _get_tool(mock_tool, "run_pytest_check")
+        result = run_pytest_check(extra_args=["-s", "-n", "auto"])
+
+    passed_args = mock_check.call_args[1]["extra_args"]
+    assert "-s" not in passed_args
+    assert passed_args[passed_args.index("-n") + 1] == "auto"
+    assert SHOW_OUTPUT_NOTE in result
 
 
 # Tests for --check-timeout

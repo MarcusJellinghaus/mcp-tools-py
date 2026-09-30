@@ -6,6 +6,14 @@ from typing import List, Optional, Tuple
 from mcp_tools_py.code_checker_pytest.models import ErrorContext, SanitizedArgs
 from mcp_tools_py.utils.file_utils import read_file as read_file
 
+# Letters of short switches that take no value and may be combined (e.g. -xvs).
+_SWITCH_LETTERS = set("xvsql")
+
+SHOW_OUTPUT_NOTE = (
+    "Note: -s was not passed to pytest. It was turned into the captured-output "
+    "display, which shows output printed by passing tests."
+)
+
 
 def sanitize_extra_args(
     extra_args: Optional[List[str]],
@@ -16,15 +24,17 @@ def sanitize_extra_args(
 
     Extracts verbosity flags, removes flags that are auto-added internally,
     and handles conflicts between extra_args and the markers parameter.
+    ``-s``, ``--capture=no`` and ``--capture no`` are removed and set
+    ``show_output`` instead, so capture stays on.
 
     Limitations:
         - Only ``-m`` as two separate args (``["-m", "slow"]``) is handled,
           not the combined ``-m=slow`` form.
-        - Combined short flags like ``-xvs`` pass through as-is
-          (not decomposed into individual flags).
-        - The xdist-aware ``-s`` strip only triggers on the two-arg
-          ``["-n", VALUE]`` form. The ``--numprocesses`` long form passes
-          through unchanged.
+        - Only single-dash tokens made entirely of the letters ``x v s q l``
+          are split into separate flags. Others (e.g. ``-vrs``) pass through.
+        - An ``-s`` in the project's ``addopts`` or in ``PYTEST_ADDOPTS``
+          still disables capture.
+        - Output printed at import or collection time is not shown.
 
     Args:
         extra_args: Optional list of extra arguments for pytest.
@@ -45,15 +55,34 @@ def sanitize_extra_args(
     verbosity = 2
     notes: List[str] = []
     skip_next = False
+    show_output = False
 
-    for arg in extra_args:
+    for i, arg in enumerate(extra_args):
         if skip_next:
             skip_next = False
             continue
 
-        # Verbosity flags: extract and remove
-        if arg in ("-v", "-vv", "-vvv"):
-            verbosity = arg.count("v")
+        # Combined switch group (e.g. -xvs): extract -v and -s, keep the rest
+        if (
+            len(arg) > 1
+            and arg[0] == "-"
+            and arg[1] != "-"
+            and set(arg[1:]) <= _SWITCH_LETTERS
+        ):
+            if "v" in arg:
+                verbosity = arg.count("v")
+            if "s" in arg:
+                show_output = True
+            cleaned += [f"-{c}" for c in arg[1:] if c in "xql"]
+            continue
+
+        # --capture=no / --capture no: same as -s
+        if arg == "--capture=no":
+            show_output = True
+            continue
+        if arg == "--capture" and i + 1 < len(extra_args) and extra_args[i + 1] == "no":
+            show_output = True
+            skip_next = True
             continue
 
         # Bare "tests" or "tests/" path: auto-appended, remove
@@ -71,21 +100,8 @@ def sanitize_extra_args(
 
         cleaned.append(arg)
 
-    # xdist-aware -s strip: when ["-n", VALUE] with VALUE != "0" is present,
-    # strip -s because xdist's execnet IPC is incompatible with pytest's
-    # disabled capture (causes worker crashes).
-    for i, token in enumerate(cleaned):
-        if token == "-n" and i + 1 < len(cleaned):
-            value = cleaned[i + 1]
-            if value != "0" and "-s" in cleaned:
-                cleaned = [a for a in cleaned if a != "-s"]
-                notes.append(
-                    "Note: -s flag in extra_args was stripped because "
-                    "-n <value> (xdist) is incompatible with -s and causes "
-                    "worker crashes. Use -n 0 (no xdist) or omit -n if you "
-                    "need -s."
-                )
-            break
+    if show_output:
+        notes.append(SHOW_OUTPUT_NOTE)
 
     # Path detection: shape-then-existence classification.
     # Shape match: looks like a path if it contains "/", "\", "::", or ends with ".py".
@@ -125,6 +141,7 @@ def sanitize_extra_args(
         verbosity=verbosity,
         notes=notes,
         has_path_args=has_path_args,
+        show_output=show_output,
     )
 
 
