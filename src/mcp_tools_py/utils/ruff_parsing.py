@@ -24,7 +24,11 @@ class RuffMessage(NamedTuple):
 
 
 def _invalid_reason(item: object) -> str | None:
-    """Why a ruff JSON entry cannot be used as a violation, or None if valid."""
+    """Why a ruff JSON entry cannot be used as a violation, or None if valid.
+
+    Returns:
+        A short reason the entry is unusable, or None if the entry is valid.
+    """
     if not isinstance(item, dict):
         return "entries that are not objects"
     location = item.get("location")

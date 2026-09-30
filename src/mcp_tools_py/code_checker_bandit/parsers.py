@@ -10,7 +10,11 @@ logger = logging.getLogger(__name__)
 
 
 def _invalid_reason(item: object) -> str | None:
-    """Why a bandit result entry cannot be used as a finding, or None if valid."""
+    """Why a bandit result entry cannot be used as a finding, or None if valid.
+
+    Returns:
+        A short reason the entry is unusable, or None if the entry is valid.
+    """
     if not isinstance(item, dict):
         return "results that are not objects"
     if item.get("test_id") is None or item.get("filename") is None:
