@@ -245,6 +245,80 @@ class TestParseBanditJsonOutput:
         assert messages[0].cwe_id == 0
         assert messages[0].cwe_link == ""
 
+    def test_parse_null_cwe_id(self) -> None:
+        """A null CWE id is treated as no CWE id."""
+        raw_output = _make_bandit_json(
+            results=[_make_bandit_result_item(issue_cwe={"id": None})]
+        )
+
+        messages, _, parse_error = parse_bandit_json_output(raw_output, "/project")
+
+        assert parse_error is None
+        assert len(messages) == 1
+        assert messages[0].cwe_id == 0
+        assert messages[0].cwe_link == ""
+
+    def test_missing_results_is_error(self) -> None:
+        """Output without a results key is rejected."""
+        raw_output = json.dumps({"errors": []})
+
+        messages, errors, parse_error = parse_bandit_json_output(raw_output, "/project")
+
+        assert messages == []
+        assert errors == []
+        assert parse_error is not None
+        assert "no 'results' list" in parse_error
+
+    def test_non_list_results_is_error(self) -> None:
+        """A results value that is not a list is rejected."""
+        raw_output = json.dumps({"results": {}})
+
+        messages, errors, parse_error = parse_bandit_json_output(raw_output, "/project")
+
+        assert messages == []
+        assert errors == []
+        assert parse_error is not None
+        assert "no 'results' list" in parse_error
+
+    def test_non_dict_result_is_error(self) -> None:
+        """A result entry that is not an object is rejected."""
+        raw_output = json.dumps({"errors": [], "results": ["B101"]})
+
+        messages, errors, parse_error = parse_bandit_json_output(raw_output, "/project")
+
+        assert messages == []
+        assert errors == []
+        assert parse_error is not None
+        assert "results that are not objects" in parse_error
+        assert "extra_args" in parse_error
+
+    def test_missing_line_number_is_error(self) -> None:
+        """A result without an integer line_number is rejected."""
+        item = _make_bandit_result_item()
+        del item["line_number"]
+        raw_output = _make_bandit_json(results=[item])
+
+        messages, errors, parse_error = parse_bandit_json_output(raw_output, "/project")
+
+        assert messages == []
+        assert errors == []
+        assert parse_error is not None
+        assert "results without line numbers" in parse_error
+        assert "test_id" in parse_error
+
+    def test_missing_test_id_is_error(self) -> None:
+        """A result without test_id is rejected."""
+        item = _make_bandit_result_item()
+        del item["test_id"]
+        raw_output = _make_bandit_json(results=[item])
+
+        messages, errors, parse_error = parse_bandit_json_output(raw_output, "/project")
+
+        assert messages == []
+        assert errors == []
+        assert parse_error is not None
+        assert "results without test_id or filename" in parse_error
+
     def test_parse_very_long_invalid_output(self) -> None:
         """Test parsing very long invalid output (error message truncation)."""
         raw_output = "x" * 300

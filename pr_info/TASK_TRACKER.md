@@ -45,9 +45,9 @@ See [step_3.md](./steps/step_3.md)
 ### Step 4: Strict bandit parser and CWE line
 See [step_4.md](./steps/step_4.md)
 
-- [ ] Implementation: tests + strict `parse_bandit_json_output`, CWE line only when `cwe_id` is set
-- [ ] Quality checks: pylint, pytest, mypy — fix all issues
-- [ ] Commit message prepared
+- [x] Implementation: tests + strict `parse_bandit_json_output`, CWE line only when `cwe_id` is set
+- [x] Quality checks: pylint, pytest, mypy — fix all issues
+- [x] Commit message prepared
 
 ## Pull Request
 

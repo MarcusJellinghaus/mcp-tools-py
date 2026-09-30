@@ -193,6 +193,12 @@ class TestFormatBanditReport:
         assert "CWE-703" in result
         assert "https://cwe.mitre.org/data/definitions/703.html" in result
 
+    def test_format_omits_cwe_line_without_id(self) -> None:
+        msgs = [_make_bandit_message(cwe_id=0, cwe_link="")]
+        result = format_bandit_report(msgs, [], max_issues=1)
+        assert result is not None
+        assert "CWE-" not in result
+
     def test_format_locations_capped(self) -> None:
         """>50 locations -> capped with '... and N more'."""
         count = MAX_LOCATIONS_PER_ISSUE + 10
