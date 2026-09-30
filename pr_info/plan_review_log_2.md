@@ -86,3 +86,22 @@ Supervised plan review (`/plan_review_supervisor`). Continues from `plan_review_
 **User decisions**: none
 **Changes**: step_1, step_2, step_3, step_4, step_5, step_7, step_8, summary.md, Decisions.md. `_fixed_formatter_binary` autouse fixture (whitelisted; steps 4/5 aligned, with real-lookup overrides where needed); step 8 grep criterion rewritten; architecture.md utils/formatter bullets added; `_FAILED_TO_PARSE` regex plus test 7b (probed); churn fixture stdlib-only; step 1 `ImportError` test dropped.
 **Status**: committed
+
+## Round 5 — 2026-09-30
+**Findings**:
+- step_5 — medium — per-file-ignores notice matches any code starting with `I` (`INP001`, `ICN`, `ISC`, `INT`), causing false alarms
+- step_6 — low — `test_invalid_step_raises_valueerror` pattern `"ruff"` will match the valid-steps list
+- step_8/summary — low — `README.md:44` names no formatter; nothing to edit
+- step_1 — low — `utils/ruff_parsing.py` needs a module docstring (ruff `D` rules)
+- step_5 — low — `extend-per-file-ignores` not read
+- Design — `--fix` pass could be skipped when the pre-check finds nothing fixable
+**Decisions**:
+- Code matching: accept — `"ALL"` or `^I\d*$`, plus an `INP001` no-notice test
+- Invalid-step test: accept
+- README:44: accept as "verified, no edit" (the issue lists it, so keep a note)
+- Module docstring: accept
+- `extend-per-file-ignores`: accept as a documented known false negative (no extra reading), consistent with the literal-matching simplification
+- Skip `--fix`: skip — optimisation only; the plan follows the issue's two-invocation design
+**User decisions**: none
+**Changes**: step_1, step_5, step_6, step_8, summary.md, Decisions.md.
+**Status**: committed

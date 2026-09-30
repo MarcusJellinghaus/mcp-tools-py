@@ -120,7 +120,9 @@ acceptance criterion:
   implementing glob semantics would be the largest complexity in the issue for the
   smallest payoff. A leading-literal-segment prefix match satisfies the acceptance
   criterion, and a false negative just means no notice — the status quo. A key with no
-  leading literal segment (`"*.py"`) is skipped as such a false negative.
+  leading literal segment (`"*.py"`) is skipped, and `extend-per-file-ignores` is not
+  read — both such false negatives. Codes match `"ALL"` or `^I\d*$` only, so `INP001`,
+  `ICN`, `ISC` and `INT` entries raise no notice.
 
 ### Version reporting follows the issue text
 
@@ -229,7 +231,7 @@ code cannot discriminate — hence the JSON route.
 
 **Docs**
 
-- `README.md` — lines 44, 115, 149, 150, 152, 158, 198, 203, 204, 205, 460
+- `README.md` — lines 115, 149, 150, 152, 158, 198, 203, 204, 205, 460
 - `docs/architecture/architecture.md` — lines 11, 19, 58, 69-70, 165, 174, 178, 230, 233,
   plus a new `utils/ruff_parsing.py` bullet in the `utils/` list
 - `docs/pyproject-configuration.md` — line 45, plus a new "Formatter selection" section (the key list at line 36 needs no edit)
@@ -243,6 +245,8 @@ code cannot discriminate — hence the JSON route.
 - `docs/architecture/architecture.md:173` — the `probe.py` bullet, adjacent to an edited line
 - `docs/architecture/architecture.md` lines 163, 252 and `tests/test_registrars.py` — "five registrars"
 - `tach.toml` — no new edge
+- `README.md:44` — verified, no edit: listed in the issue, but it is the target-directory
+  auto-detect list and names only `run_format_code`
 - `utils/tool_context.py::resolve_timeout` and `utils/project_config.py::ToolName` — already generic / already include `ruff`
 
 ---

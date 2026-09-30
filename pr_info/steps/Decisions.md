@@ -70,3 +70,19 @@ requires the notice to name the covered directories.
 - **No `ImportError` test for the old `code_checker_ruff` import path.** It tests a
   decision, not behaviour; the deleted modules enforce it.
 - **Rejected:** returning copies from `resolve_steps` — speculative.
+
+## Plan review 4
+
+- **`per-file-ignores` codes match exactly.** Only `"ALL"`, `"I"` or `I` followed by digits
+  (`^I\d*$`) trigger the notice; a bare `I` prefix would also match `INP001`, `ICN`, `ISC`
+  and `INT`. Step 5 adds an `INP001` no-notice test.
+- **`extend-per-file-ignores` is not read.** Listed as a known false negative next to the
+  empty-prefix key.
+- **`test_invalid_step_raises_valueerror` is tightened** to match
+  `Invalid formatter steps: ['ruff']`, since `"ruff"` alone matches the valid-steps list
+  after step 6.
+- **`README.md:44` needs no edit.** The issue lists it, but it names only
+  `run_format_code`; recorded as verified in step 8's do-not-change table.
+- **`utils/ruff_parsing.py` gets a module docstring** — ruff's `D` rules apply to `src/`.
+- **Rejected:** skipping the `--fix` pass when the pre-check finds nothing fixable — an
+  optimisation; the two-invocation design follows the issue.

@@ -247,6 +247,13 @@ Plus:
 `tests/test_formatter_runner.py`:
 
 5. `steps=[]` raises `ValueError` — not a fallback to the defaults, not a zero-step run.
+5b. **Tighten the existing `test_invalid_step_raises_valueerror`.** It passes
+   `steps=["ruff"]` with `match="ruff"`, which after this step also matches the
+   valid-steps half of the message (`ruff_format`, `ruff_imports`) and so no longer proves
+   `"ruff"` was the rejected name. Match the invalid-steps part instead:
+   `match=r"Invalid formatter steps: \['ruff'\]"`. Keep `validate_steps`' existing
+   `f"Invalid formatter steps: {invalid}. Valid steps are: {sorted(_VALID_STEPS)}"`
+   format for unknown names; the empty-list rejection gets its own message.
 6. `steps=None` calls `resolve_steps`; an explicit list does not.
 7. `["isort", "black"]` passed explicitly behaves exactly as before. **Regression
    criterion** — keep the existing tests' assertions and add nothing that weakens them.
@@ -357,7 +364,9 @@ pylint / pytest / mypy / tach / lint-imports / ruff / vulture pass. Check
 > `test_each_step_receives_its_own_timeout`, `test_missing_timeouts_use_default`) would hit
 > the "neither declared" error — `_PROJECT` has no `pyproject.toml`. Pass
 > `steps=["isort", "black"]` explicitly in each and leave their assertions unchanged; that
-> is the stated regression criterion.
+> is the stated regression criterion. Tighten `test_invalid_step_raises_valueerror`'s
+> `match="ruff"` to `r"Invalid formatter steps: \['ruff'\]"` — the bare `"ruff"` now also
+> matches the valid-steps list.
 >
 > Run `run_format_code`, `run_pylint_check`, `run_pytest_check` with
 > `extra_args=["-n", "auto"]`, `run_mypy_check`, `run_tach_check`,

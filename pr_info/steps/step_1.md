@@ -81,6 +81,8 @@ Then by hand:
    define `logger = logging.getLogger(__name__)` and import `json`, `logging` and `os`.
    It must not import from itself (e.g. a rewritten `from .models import RuffMessage`
    pointing back at `ruff_parsing`). Add whatever `move_symbol` did not carry over.
+   Ensure the module has a **module docstring** — `[tool.ruff.lint] select = ["D", ...]`
+   in `pyproject.toml` enforces D100 in `src/` (only `tests/**` is exempted).
 2. Delete the two emptied source modules (`delete_this_file`). Confirm with
    `list_symbols` that neither still holds `RuffMessage` or `parse_ruff_json_output`.
    A leftover `logger` (and its imports) in `parsers.py` is expected — it goes with the
@@ -132,7 +134,8 @@ mode is a layering error, not a test failure.
 > Move `RuffMessage` and `parse_ruff_json_output` into a single new
 > `src/mcp_tools_py/utils/ruff_parsing.py`, delete the two emptied source modules, and
 > drop both symbols from `code_checker_ruff/__init__.py`'s imports and `__all__` — no
-> re-export. Use the `move_symbol` MCP tool so importers are rewritten for you.
+> re-export. Use the `move_symbol` MCP tool so importers are rewritten for you. Give the
+> new module a module docstring — ruff's `D` rules apply to `src/`.
 >
 > Do not add a `tach.toml` edge. Do not move the test files. This is a pure move: do not
 > rewrite either symbol's body.

@@ -231,14 +231,24 @@ tables = read_pyproject_tool_tables(Path(project_dir))
 read tables["ruff"]["lint"]["per-file-ignores"] (and legacy tables["ruff"]["per-file-ignores"])
 for each glob key -> take the leading literal segment before the first * ? [
     if that prefix is empty ("*.py", "**/test_*.py") -> skip the key
-    if its codes contain "ALL" or any code starting with "I":
+    if any code is "ALL" or matches ^I\d*$ ("I", "I001"):
         if that prefix and a target dir overlap -> collect the target dir
 return "" when nothing collected, else one line naming the directories and the key
 ```
 
+**Match codes exactly, not by prefix.** A bare "starts with `I`" also matches unrelated
+rule families — `INP001`, `ICN`, `ISC`, `INT` — and would emit a false notice. Only
+`"ALL"`, `"I"`, or `I` followed by digits names the isort rules.
+
 A false negative on an exotic pattern means no notice — the status quo, not a regression.
-A key with **no** leading literal segment (`"*.py"`, `"**/test_*.py"`) is skipped for
-that reason: an empty prefix would overlap every target directory, and deciding whether
+**Known false negatives** (documented, not bugs):
+
+- a key with no leading literal segment (below);
+- entries under `extend-per-file-ignores` — not read; the notice covers
+  `per-file-ignores` only.
+
+A key with **no** leading literal segment (`"*.py"`, `"**/test_*.py"`) is skipped
+because an empty prefix would overlap every target directory, and deciding whether
 it really matches would need the glob engine this notice avoids. It is a documented
 false negative, not a bug.
 A missing `pyproject.toml` yields an empty mapping and therefore `""`. A malformed one
@@ -307,6 +317,8 @@ and 8 if it runs ruff) restore the real function with
    `[tool.ruff.lint.per-file-ignores]` ignores `I` for a target directory produces the
    notice in `output`. Acceptance criterion.
 9. No `per-file-ignores` at all, and one that ignores a non-`I` code → no notice.
+   Include an `INP001` entry on a target directory (`"src/**" = ["INP001"]`) → no notice:
+   codes match `ALL` or `^I\d*$`, not a bare `I` prefix.
 9a. Keys with no leading literal segment — `"*.py" = ["I001"]` and
    `"**/test_*.py" = ["I"]` — → no notice (documented false negative), no exception.
 9b. A **malformed** `pyproject.toml` → no notice and no exception; the step still runs.
@@ -386,8 +398,10 @@ specifically: it is what catches an accidental `from mcp_tools_py.code_checker_r
 > Add a `per_file_ignores_notice` that reports, in `output`, when an `I` entry in
 > `[tool.ruff.lint.per-file-ignores]` covers a target directory. Do not override the
 > project's ruff config. Keep the matching literal — leading literal path segment, no glob
-> engine — and never let it fail the step. A key with no leading literal segment
-> (`"*.py"`, `"**/test_*.py"`) is skipped: a documented false negative.
+> engine — and never let it fail the step. Match codes `"ALL"` or `^I\d*$` only — a bare
+> `I` prefix would also catch `INP001`, `ICN`, `ISC`, `INT`. A key with no leading literal
+> segment (`"*.py"`, `"**/test_*.py"`) is skipped, and `extend-per-file-ignores` is not
+> read: both are documented false negatives.
 >
 > Read `pyproject.toml` through a **new public**
 > `read_pyproject_tool_tables(project_root: Path)` in `src/mcp_tools_py/utils/project_config.py`,

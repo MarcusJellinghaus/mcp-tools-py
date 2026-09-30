@@ -6,7 +6,7 @@ Two distinct kinds of edit, easy to conflate:
   "five `python -m` tools" to **three**.
 - **Enumeration edits** — every place that *names* the formatters rather than counting.
 
-Plus three traps that must **not** change.
+Plus traps that must **not** change.
 
 ## ⚠️ Do not change
 
@@ -17,6 +17,7 @@ Plus three traps that must **not** change.
 | `docs/architecture/architecture.md:173` | The `utils/target_scripts/probe.py` bullet, immediately above an edited line |
 | `docs/pyproject-configuration.md:36` | `ruff-timeout` is already listed; `black-timeout` and `isort-timeout` both stay valid |
 | `tach.toml` | No new edge, in either direction |
+| `README.md:44` | Verified, no edit. The issue lists it, but it is the target-directory auto-detect list and names only `run_format_code`, not black or isort |
 
 ## Count edits — five → seven console-script, five → three `python -m`
 
@@ -64,7 +65,6 @@ Formatter naming:
   `["isort", "black"]`")
 - `src/mcp_tools_py/formatter/__init__.py:1` — "Formatter package for code formatting
   tools (black, isort)"
-- `README.md:44` — the auto-detect list
 - `README.md:460` — "`run_format_code` | Runs isort then black"
 - `docs/architecture/architecture.md:11` — "code formatting (black, isort)"
 - `docs/architecture/architecture.md:19` — "Formatting: black and isort behind a single
