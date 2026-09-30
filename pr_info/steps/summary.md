@@ -14,8 +14,11 @@
 - **Strict parsing (main fix).** Each parser gets one private
   `_invalid_reason(item) -> str | None` next to it. An entry that is not a dict, or
   lacks a required field, turns the whole parse into an error naming the cause and
-  the entry's keys, ending with: "an argument in extra_args probably changed the
-  output shape." Required = present and non-null; location fields must be `int`
+  the entry's keys. The hint "an argument in extra_args probably changed the
+  output shape" is added by the pylint and bandit parsers, and for ruff by the
+  checker runners only when `extra_args` were passed (the ruff parser is shared
+  with the formatter, which has no `extra_args`). Ruff checks location first.
+  Required = present and non-null; location fields must be `int`
   (`bool` rejected). All other fields keep their defaults and accept `null`.
 
   | Parser | Required | Integers |

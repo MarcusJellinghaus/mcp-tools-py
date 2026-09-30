@@ -27,9 +27,11 @@ def parse_bandit_json_output(raw_output: str, project_dir: str
 
 ## HOW
 
-- Parser, after the `isinstance(data, dict)` check:
+- Parser, after the `isinstance(data, dict)` check and before the existing
+  debug log that calls `len(data.get("results", []))`:
   `results = data.get("results")`; if not a list, return
   `"bandit output has no 'results' list (keys: ...)"` as the parse error.
+  The debug log then uses `len(results)`.
 - Replace the "skip non-dict" branch with `_invalid_reason`.
 - CWE: keep the `isinstance(issue_cwe, dict)` guard;
   `cwe_id = (issue_cwe.get("id") or 0) if isinstance(issue_cwe, dict) else 0`

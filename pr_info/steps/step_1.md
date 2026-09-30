@@ -33,17 +33,21 @@ def parse_ruff_json_output(raw_output: str, project_dir: str
 ```
 _invalid_reason(item):
     if not dict: return "entries that are not objects"
-    if "code" not in item or item.get("message") is None or item.get("filename") is None:
-        return "entries without code, message or filename"
     loc = item.get("location"); row/col = loc.get(...) if dict
     if row or col is not an int (bool excluded): return "entries without locations"
+    if "code" not in item or item.get("message") is None or item.get("filename") is None:
+        return "entries without code, message or filename"
     return None
 
 parse loop:
     reason = _invalid_reason(item)
-    if reason: return [], f"ruff returned {reason} (keys: {keys}); an argument in extra_args probably changed the output shape."
+    if reason: return [], f"ruff returned {reason} (keys: {keys})."
     build RuffMessage; code = item["code"] or "invalid-syntax"
 ```
+
+The location check runs first so `--statistics` entries report "without locations".
+The parser adds no `extra_args` hint: it is shared with the formatter, which
+passes no `extra_args`. The ruff checker runners add the hint (step 2).
 
 `keys` = `", ".join(item)` for a dict, else `type(item).__name__`.
 
@@ -60,7 +64,7 @@ Optional fields read with `or` defaults so `null` is accepted:
 
 - `test_statistics_output_is_error` — feed the issue's `--statistics` JSON
   (`code`, `name`, `count`, `fixable`, `fixable_count`); assert `messages == []`,
-  error mentions "without locations" and "extra_args".
+  error mentions "without locations" and does not mention "extra_args".
 - `test_non_dict_entry_is_error` — `[_make_ruff_item(), 42]` → error.
 - `test_missing_location_row_is_error` / `test_non_int_column_is_error`.
 - `test_missing_message_is_error` / `test_missing_filename_is_error`.

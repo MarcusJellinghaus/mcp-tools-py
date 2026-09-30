@@ -39,6 +39,9 @@ def _build_ruff_command(...)  # signature unchanged; trailing overrides added
   `execute_command`.
 - `run_ruff_fix_impl`: same, with `("--statistics",)` only. `--fix`,
   `--unsafe-fixes` etc. stay accepted.
+- Both runners: when `parse_ruff_json_output` returns an error and `extra_args`
+  is non-empty, append `" An argument in extra_args probably changed the output
+  shape."` to it (constant `_EXTRA_ARGS_HINT`). No hint without `extra_args`.
 - `ruff_check_tool.py` docstrings, `extra_args` line: for `run_ruff_check` add
   "`--fix`, `--fix-only` and `--statistics` are rejected."; for `run_ruff_fix`
   add "`--statistics` is rejected."
@@ -73,6 +76,9 @@ Unit (`test_runners.py`):
   `--statistics` returns exactly `_STATISTICS_ERROR`; fix flags mention `run_ruff_fix`.
 - `TestRunRuffFixImpl`: `--statistics` rejected, ruff not run;
   `extra_args=["--unsafe-fixes"]` still runs ruff.
+- `TestRunRuffCheckImpl`: mocked ruff stdout with an entry lacking `location`;
+  with `extra_args=["--preview"]` the result contains "extra_args"; without
+  `extra_args` it does not.
 
 Integration (`test_integration.py`, `@pytest.mark.integration`):
 - Ruff binary: `PythonEnvironment.resolve().binary("ruff")`; `pytest.skip` if None.
