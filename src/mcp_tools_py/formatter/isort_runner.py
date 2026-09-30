@@ -5,8 +5,10 @@ Invokes isort as a subprocess and returns a FormatterResult.
 
 import re
 
+from mcp_tools_py.formatter.common import formatter_binary
 from mcp_tools_py.formatter.models import FormatterResult
 from mcp_tools_py.utils.project_config import DEFAULT_CHECK_TIMEOUT
+from mcp_tools_py.utils.python_environment import PythonEnvironment
 from mcp_tools_py.utils.subprocess_runner import execute_command
 
 _MAX_LINES = 200
@@ -67,21 +69,35 @@ def run_isort(
     project_dir: str,
     check_only: bool = False,
     timeout_seconds: int = DEFAULT_CHECK_TIMEOUT,
+    *,
+    environment: PythonEnvironment | None = None,
 ) -> FormatterResult:
     """Run isort on target directories.
 
     Args:
-        python_executable: Path to the Python executable.
+        python_executable: Deprecated. Accepted and ignored; isort runs from
+            `environment`.
         target_dirs: List of directories to sort imports in.
         project_dir: Root project directory (cwd for subprocess).
         check_only: If True, pass --check-only to only verify sorting.
         timeout_seconds: Maximum seconds to wait for isort.
+        environment: Environment whose isort console script runs. None means
+            mcp-tools-py's own environment.
 
     Returns:
         FormatterResult with output, changed files, and any files isort could
         not read. success is True only when isort exited 0 and read every file.
     """
-    command = [python_executable, "-m", "isort"]
+    env = environment or PythonEnvironment.resolve()
+    binary = formatter_binary("isort", env)
+    if binary is None:
+        return FormatterResult(
+            output=f"isort is not available: no console script found in {env.bin_dir}",
+            success=False,
+            files_changed=[],
+        )
+
+    command = [binary]
     if check_only:
         command.append("--check-only")
     command.extend(target_dirs)

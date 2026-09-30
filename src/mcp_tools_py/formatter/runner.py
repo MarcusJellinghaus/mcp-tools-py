@@ -11,6 +11,7 @@ from mcp_tools_py.formatter.black_runner import run_black
 from mcp_tools_py.formatter.isort_runner import run_isort
 from mcp_tools_py.formatter.models import FormatterResult
 from mcp_tools_py.utils.project_config import DEFAULT_CHECK_TIMEOUT
+from mcp_tools_py.utils.python_environment import PythonEnvironment
 
 DEFAULT_STEPS: list[str] = ["isort", "black"]
 
@@ -47,11 +48,14 @@ def run_format_code(
     steps: list[str] | None = None,
     check_only: bool = False,
     timeouts: dict[str, int] | None = None,
+    *,
+    environment: PythonEnvironment | None = None,
 ) -> dict[str, FormatterResult]:
     """Run code formatters on the project.
 
     Args:
-        python_executable: Path to the Python executable.
+        python_executable: Deprecated. Accepted and ignored; the formatters
+            run from `environment`.
         project_root: Root project directory.
         target_dirs: Directories to format.
         steps: Formatter steps to run in order.  Defaults to
@@ -59,6 +63,8 @@ def run_format_code(
         check_only: If True, only check formatting without modifying files.
         timeouts: Per-step timeout in seconds.  Each step gets its own budget;
             a missing step falls back to :data:`DEFAULT_CHECK_TIMEOUT`.
+        environment: Environment whose formatter console scripts run. None
+            means mcp-tools-py's own environment.
 
     Returns:
         Dict keyed by step name with :class:`FormatterResult` values,
@@ -80,6 +86,7 @@ def run_format_code(
             str(project_root),
             check_only,
             (timeouts or {}).get(step, DEFAULT_CHECK_TIMEOUT),
+            environment=environment,
         )
         results[step] = result
         if not result.success and not check_only:

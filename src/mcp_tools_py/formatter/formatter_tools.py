@@ -92,6 +92,7 @@ class FormatterTools:
                     resolved_steps,
                     check_only,
                     timeouts=timeouts,
+                    environment=self.context.tool_environment,
                 )
             except ValueError as exc:
                 return f"Error: {exc}"

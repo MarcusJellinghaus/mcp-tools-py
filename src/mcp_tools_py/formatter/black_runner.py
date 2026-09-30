@@ -3,8 +3,10 @@
 Invokes black as a subprocess and returns a FormatterResult.
 """
 
+from mcp_tools_py.formatter.common import formatter_binary
 from mcp_tools_py.formatter.models import FormatterResult
 from mcp_tools_py.utils.project_config import DEFAULT_CHECK_TIMEOUT
+from mcp_tools_py.utils.python_environment import PythonEnvironment
 from mcp_tools_py.utils.subprocess_runner import execute_command
 
 _MAX_LINES = 200
@@ -50,20 +52,34 @@ def run_black(
     project_dir: str,
     check_only: bool = False,
     timeout_seconds: int = DEFAULT_CHECK_TIMEOUT,
+    *,
+    environment: PythonEnvironment | None = None,
 ) -> FormatterResult:
     """Run black on target directories.
 
     Args:
-        python_executable: Path to the Python executable.
+        python_executable: Deprecated. Accepted and ignored; black runs from
+            `environment`.
         target_dirs: List of directories to format.
         project_dir: Root project directory (cwd for subprocess).
         check_only: If True, pass --check to only verify formatting.
         timeout_seconds: Maximum seconds to wait for black.
+        environment: Environment whose black console script runs. None means
+            mcp-tools-py's own environment.
 
     Returns:
         FormatterResult with output, success status, and changed files.
     """
-    command = [python_executable, "-m", "black"]
+    env = environment or PythonEnvironment.resolve()
+    binary = formatter_binary("black", env)
+    if binary is None:
+        return FormatterResult(
+            output=f"black is not available: no console script found in {env.bin_dir}",
+            success=False,
+            files_changed=[],
+        )
+
+    command = [binary]
     if check_only:
         command.append("--check")
     command.extend(target_dirs)

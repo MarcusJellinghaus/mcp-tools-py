@@ -6,7 +6,6 @@ from unittest.mock import MagicMock, patch
 from mcp_tools_py.formatter.formatter_tools import FormatterTools, _format_results
 from mcp_tools_py.formatter.models import FormatterResult
 from mcp_tools_py.utils.tool_context import ToolContext
-from tests.conftest import make_environment_info
 
 
 def _capture_run_format_code(tool_context: ToolContext) -> Any:
@@ -289,20 +288,29 @@ class TestToolAvailability:
         """black not available, verify error before runner is called."""
         run_format = _capture_run_format_code(tool_context)
 
+        binary = tool_context.tool_environment.binary("black")
+        assert binary is not None
+        binary.unlink()
+
         mock_runner = MagicMock()
 
-        with (
-            patch(_RUNNER_PATCH, mock_runner),
-            patch(
-                "mcp_tools_py.utils.tool_context.get_environment_info",
-                return_value=make_environment_info(black=False),
-            ),
-        ):
+        with patch(_RUNNER_PATCH, mock_runner):
             result = run_format(target_directories=["src"])
 
         # Runner should NOT have been called
         mock_runner.assert_not_called()
         assert "black is not available" in result
+
+    def test_runner_gets_tool_environment(self, tool_context: ToolContext) -> None:
+        """The runners invoke the environment availability was checked against."""
+        run_format = _capture_run_format_code(tool_context)
+
+        mock_runner = MagicMock(return_value={})
+
+        with patch(_RUNNER_PATCH, mock_runner):
+            run_format(target_directories=["src"])
+
+        assert mock_runner.call_args[1]["environment"] is tool_context.tool_environment
 
 
 _CONFLICT_PATCH = "mcp_tools_py.formatter.formatter_tools.check_line_length_conflicts"
