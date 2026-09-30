@@ -4,9 +4,9 @@ Layer 1 and 2 of the environment model, seen from a registrar: the values a
 tool needs to build its command line, plus the two questions it asks about
 its own environment — is this tool there, and what do I say when it is not.
 
-Which environment answers depends on the tool.  The five console-script tools
+Which environment answers depends on the tool.  The seven console-script tools
 are mcp-tools-py's own dependencies and are answered from `tool_environment`;
-the five `python -m` tools must import the project's dependencies and are
+the three `python -m` tools must import the project's dependencies and are
 answered from `environment`, the interpreter `--python-executable` names.
 """
 
@@ -40,16 +40,16 @@ class ToolContext:
     Attributes:
         project_dir: Path to the project the tools run against.
         environment: The project's Python environment, named by
-            `--python-executable`.  pytest, pylint, mypy, black and isort run
-            in it, and Python names resolve against it.
+            `--python-executable`.  pytest, pylint and mypy run in it, and
+            Python names resolve against it.
         test_folder: Path to the test folder, relative to `project_dir`.
         keep_temp_files: Whether to keep temporary files after a test run.
         vulture_whitelist: Filename of the vulture whitelist.
         check_timeout: Server-level subprocess timeout in seconds, if any.
         tool_environment: The environment mcp-tools-py itself runs in, holding
-            its console-script dependencies.  ruff, bandit, vulture, tach and
-            lint-imports run from it.  Defaults to `sys.executable`'s
-            environment; not configurable from the CLI.
+            its console-script dependencies.  black, isort, ruff, bandit,
+            vulture, tach and lint-imports run from it.  Defaults to
+            `sys.executable`'s environment; not configurable from the CLI.
     """
 
     project_dir: Path
@@ -67,7 +67,7 @@ class ToolContext:
 
         A console-script-only tool is answered from the filesystem; the probe
         cannot answer for one, because it is asked about module names.  All
-        five are looked for in `tool_environment`, since mcp-tools-py depends
+        seven are looked for in `tool_environment`, since mcp-tools-py depends
         on them.  Every other tool is answered from the one-shot environment
         probe, which fails open: a probe that could not be trusted reports the
         tool available so the call proceeds and surfaces the real error.
@@ -108,7 +108,7 @@ class ToolContext:
             tool_name: Tool key that could not be run.
 
         Returns:
-            A message naming the location searched.  All five console-script
+            A message naming the location searched.  All seven console-script
             tools name the tool env and say mcp-tools-py's own install is
             incomplete.  The distribution to install comes from
             `TOOL_PACKAGES`, which maps a key to its distribution when the two

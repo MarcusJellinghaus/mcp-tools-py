@@ -3,13 +3,13 @@
 import logging
 import os
 
-from mcp_tools_py.code_checker_ruff.parsers import parse_ruff_json_output
 from mcp_tools_py.code_checker_ruff.reporting import (
     format_ruff_check_report,
     format_ruff_fix_report,
 )
 from mcp_tools_py.log_utils import log_function_call
 from mcp_tools_py.utils.project_config import DEFAULT_CHECK_TIMEOUT
+from mcp_tools_py.utils.ruff_parsing import parse_ruff_json_output
 from mcp_tools_py.utils.subprocess_runner import execute_command
 
 logger = logging.getLogger(__name__)

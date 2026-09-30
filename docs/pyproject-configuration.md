@@ -42,7 +42,7 @@ one budget:
 
 | Tool call | Worst case |
 |-----------|------------|
-| `run_format_code` | `black-timeout` + `isort-timeout` |
+| `run_format_code` | `isort-timeout` + `black-timeout` for the black steps; 3 × `ruff-timeout` for the ruff steps (`ruff_imports` is a pre-check run then the apply run, `ruff_format` one run) |
 | `run_ruff_fix` | 2 × `ruff-timeout` (a pre-check run, then the apply run) |
 | `run_pytest_check` | 2 × `pytest-timeout` + 60s, when the pytest-json-report plugin is missing and the run is retried |
 
@@ -70,6 +70,36 @@ but the similarity is worth knowing.
 
 **Not a guarantee.** The effective limit is `min(server timeout, harness timeout)`:
 a calling agent's watchdog can cut a tool call short regardless of this setting.
+
+---
+
+## `[tool.mcp-tools-py] formatter` — formatter selection
+
+When `run_format_code` is called without `steps`, it picks the formatter from
+`pyproject.toml`:
+
+```toml
+[tool.mcp-tools-py]
+formatter = "ruff"   # or "black"
+```
+
+| Formatter | Steps, in order |
+|-----------|-----------------|
+| `"black"` | `isort`, `black` |
+| `"ruff"` | `ruff_imports` (`ruff check --select I --fix`), `ruff_format` |
+
+The key wins when present. Without it, the formatter is detected from the tables
+the project already has:
+
+- `[tool.ruff.format]` present and `[tool.black]` absent → ruff
+- `[tool.black]` present and `[tool.ruff.format]` absent → black
+- both present, or neither → error naming the key and the file
+
+**Migrating to ruff:** add `[tool.ruff.format]`, even if empty, and remove
+`[tool.black]`. The empty table is the signal; detection deliberately does not
+look at anything else. Alternatively set the key.
+
+Passing `steps` explicitly bypasses selection. `steps=[]` is an error.
 
 ---
 

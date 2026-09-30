@@ -4,9 +4,9 @@ import logging
 from typing import TYPE_CHECKING
 
 from mcp_tools_py.formatter.models import FormatterResult
-from mcp_tools_py.formatter.runner import DEFAULT_STEPS
+from mcp_tools_py.formatter.runner import resolve_steps
 from mcp_tools_py.formatter.runner import run_format_code as _run_format_code
-from mcp_tools_py.formatter.runner import validate_steps
+from mcp_tools_py.formatter.runner import step_tool, validate_steps
 from mcp_tools_py.log_utils import log_function_call
 from mcp_tools_py.utils.project_config import (
     check_line_length_conflicts,
@@ -40,11 +40,15 @@ class FormatterTools:
             target_directories: list[str] | None = None,
             check_only: bool = False,
         ) -> str:
-            """Run code formatters (black, isort) on the project.
+            """Run code formatters on the project.
 
             Args:
-                steps: Formatter steps to run in order. Defaults to ["isort", "black"].
-                    Valid values: "isort", "black".
+                steps: Formatter steps to run in order. Valid values: "isort",
+                    "black", "ruff_imports", "ruff_format". When omitted, resolved
+                    from pyproject.toml: [tool.mcp-tools-py] formatter = "black"
+                    (isort, black) or "ruff" (ruff_imports, ruff_format); else
+                    [tool.ruff.format] versus [tool.black]. Both or neither
+                    declared is an error, and so is an empty list.
                 target_directories: Directories to format relative to project_dir.
                     Defaults to auto-detection from pyproject.toml.
                 check_only: If True, only check formatting without modifying files.
@@ -52,11 +56,12 @@ class FormatterTools:
             Returns:
                 Formatted output with markdown headers per step.
             """
-            resolved_steps = steps or DEFAULT_STEPS
-
             # Reject unknown steps before they reach the availability check,
             # which would otherwise report them as uninstalled tools.
             try:
+                resolved_steps = (
+                    resolve_steps(self.context.project_dir) if steps is None else steps
+                )
                 validate_steps(resolved_steps)
             except ValueError as exc:
                 return f"Error: {exc}"
@@ -71,19 +76,21 @@ class FormatterTools:
 
             # Check tool availability upfront
             for step in resolved_steps:
-                if not self.context.is_tool_available(step):
-                    return f"Error: {self.context.unavailable_message(step)}"
+                tool = step_tool(step)
+                if not self.context.is_tool_available(tool):
+                    return f"Error: {self.context.unavailable_message(tool)}"
 
             # Check for line-length conflicts
             warnings = check_line_length_conflicts(
-                str(self.context.project_dir), resolved_steps
+                str(self.context.project_dir),
+                sorted({step_tool(s) for s in resolved_steps}),
             )
 
             # Delegate to runner
             try:
                 timeouts = {
-                    "isort": self.context.resolve_timeout("isort"),
-                    "black": self.context.resolve_timeout("black"),
+                    step: self.context.resolve_timeout(step_tool(step))
+                    for step in resolved_steps
                 }
                 results = _run_format_code(
                     str(self.context.environment.interpreter),
@@ -92,6 +99,7 @@ class FormatterTools:
                     resolved_steps,
                     check_only,
                     timeouts=timeouts,
+                    environment=self.context.tool_environment,
                 )
             except ValueError as exc:
                 return f"Error: {exc}"
@@ -117,7 +125,7 @@ def _unparsable_block(step: str, files: list[str]) -> str:
         f"ERROR: {step} could not read {len(files)} file(s) - "
         f"they were NOT checked.",
         "A clean result here does NOT mean CI will pass.",
-        "Known limitation (Windows, piped stdout).",
+        "The formatter could not parse these files.",
     ]
     lines += [f"  {path}" for path in files[:_UNPARSABLE_CAP]]
     if len(files) > _UNPARSABLE_CAP:

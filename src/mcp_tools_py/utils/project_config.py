@@ -8,6 +8,7 @@ import dataclasses
 import logging
 import os
 import tomllib
+from pathlib import Path
 from typing import Literal
 
 logger = logging.getLogger(__name__)
@@ -233,6 +234,33 @@ def validate_timeout(value: object, source: str) -> int:
     return value
 
 
+def read_pyproject_tool_tables(project_root: Path) -> dict[str, object]:
+    """The ``[tool]`` table of ``project_root/pyproject.toml``, empty when absent.
+
+    Args:
+        project_root: Path to project root containing pyproject.toml.
+
+    Returns:
+        The ``[tool]`` table as a dict, or an empty dict when the file is
+        missing or has no ``[tool]`` table.
+
+    Raises:
+        ValueError: If pyproject.toml is not valid TOML.
+    """
+    pyproject_path = project_root / "pyproject.toml"
+    if not pyproject_path.is_file():
+        return {}
+
+    with pyproject_path.open("rb") as f:
+        try:
+            toml_data = tomllib.load(f)
+        except tomllib.TOMLDecodeError as exc:
+            raise ValueError(f"Invalid pyproject.toml: {exc}") from exc
+
+    tool_section = toml_data.get("tool")
+    return tool_section if isinstance(tool_section, dict) else {}
+
+
 def _read_mcp_tools_section(project_dir: str) -> dict[str, object]:
     """Read the ``[tool.mcp-tools-py]`` table from pyproject.toml.
 
@@ -241,26 +269,10 @@ def _read_mcp_tools_section(project_dir: str) -> dict[str, object]:
 
     Returns:
         The section as a dict, or an empty dict when the file or section
-        is missing or the section is not a table.
-
-    Raises:
-        ValueError: If pyproject.toml is not valid TOML.
+        is missing or the section is not a table.  A ``ValueError`` from
+        :func:`read_pyproject_tool_tables` propagates on invalid TOML.
     """
-    pyproject_path = os.path.join(project_dir, "pyproject.toml")
-    if not os.path.isfile(pyproject_path):
-        return {}
-
-    with open(pyproject_path, "rb") as f:
-        try:
-            toml_data = tomllib.load(f)
-        except tomllib.TOMLDecodeError as exc:
-            raise ValueError(f"Invalid pyproject.toml: {exc}") from exc
-
-    tool_section = toml_data.get("tool")
-    if not isinstance(tool_section, dict):
-        return {}
-
-    section = tool_section.get(_CONFIG_SECTION)
+    section = read_pyproject_tool_tables(Path(project_dir)).get(_CONFIG_SECTION)
     return section if isinstance(section, dict) else {}
 
 

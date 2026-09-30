@@ -36,7 +36,7 @@ class ToolServer:
 
         Args:
             project_dir: Path to the project directory to check
-            python_executable: Optional path to the Python interpreter of the project's environment. The checkers run in it and library/symbol lookups resolve against it, so it must be the environment holding the project's dependencies. The console-script tools ruff, bandit, vulture, tach and lint-imports come from mcp-tools-py's own environment instead. If None, defaults to sys.executable.
+            python_executable: Optional path to the Python interpreter of the project's environment. The checkers run in it and library/symbol lookups resolve against it, so it must be the environment holding the project's dependencies. The console-script tools black, isort, ruff, bandit, vulture, tach and lint-imports come from mcp-tools-py's own environment instead. If None, defaults to sys.executable.
             venv_path: Deprecated, use python_executable instead. Optional path to a virtual environment. When specified, the Python executable from this venv is used instead of python_executable, which is now its only effect: it no longer locates the tools.
             test_folder: Path to the test folder (relative to project_dir). Defaults to 'tests'.
             keep_temp_files: Whether to keep temporary files after test execution. Useful for debugging when tests fail.
@@ -70,7 +70,7 @@ class ToolServer:
         """Warn at startup about console scripts missing from the tool env.
 
         Stores nothing: availability is answered at use time by the context.
-        The five `python -m` tools are left to the lazy probe.
+        The three `python -m` tools are left to the lazy probe.
         """
         for key in sorted(CONSOLE_SCRIPT_TOOLS):
             if self.context.tool_environment.binary(key) is None:
@@ -98,7 +98,7 @@ def create_server(
 
     Args:
         project_dir: Path to the project directory to check
-        python_executable: Optional path to the Python interpreter of the project's environment. The checkers run in it and library/symbol lookups resolve against it, so it must be the environment holding the project's dependencies. The console-script tools ruff, bandit, vulture, tach and lint-imports come from mcp-tools-py's own environment instead. If None, defaults to sys.executable.
+        python_executable: Optional path to the Python interpreter of the project's environment. The checkers run in it and library/symbol lookups resolve against it, so it must be the environment holding the project's dependencies. The console-script tools black, isort, ruff, bandit, vulture, tach and lint-imports come from mcp-tools-py's own environment instead. If None, defaults to sys.executable.
         venv_path: Deprecated, use python_executable instead. Optional path to a virtual environment. When specified, the Python executable from this venv is used instead of python_executable, which is now its only effect: it no longer locates the tools.
         test_folder: Path to the test folder (relative to project_dir). Defaults to 'tests'.
         keep_temp_files: Whether to keep temporary files after test execution. Useful for debugging when tests fail.

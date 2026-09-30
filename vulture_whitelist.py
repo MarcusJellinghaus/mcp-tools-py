@@ -63,6 +63,10 @@ _._no_ambient_cache_env  # Autouse fixture, invoked by pytest not by name
 _clear_environment_info_cache  # Autouse fixture in tests/conftest.py
 all_modules_importable  # Fixture requested for its patching, never read by name
 _clear_project_cache  # Autouse fixture in tests/test_refactoring/conftest.py and tests/test_environment_integration.py
+_fixed_formatter_binary  # Autouse fixture in the formatter runner test modules
+_fixed_version_line  # Autouse fixture in the formatter runner test modules
+_declare_formatter  # Autouse fixture in tests/test_formatter_tools.py
+python_executable  # Deprecated runner parameter, accepted and ignored until mcp_coder#1173
 
 # Data file variables used for module resolution
 _.module_file_absolute

@@ -71,7 +71,7 @@ Examples:
             "Path to the Python interpreter of the project's environment. The "
             "checkers run in it and library/symbol lookups resolve against it, "
             "so it must be the environment holding the project's dependencies. "
-            "ruff, bandit, vulture, tach and lint-imports come from "
+            "black, isort, ruff, bandit, vulture, tach and lint-imports come from "
             "mcp-tools-py's own environment and need not be installed here. "
             "A path that neither exists nor resolves on PATH fails at startup. "
             "Defaults to the current Python interpreter (sys.executable)"

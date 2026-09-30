@@ -3,7 +3,7 @@
 import json
 import os
 
-from mcp_tools_py.code_checker_ruff.parsers import parse_ruff_json_output
+from mcp_tools_py.utils.ruff_parsing import parse_ruff_json_output
 
 
 def _make_ruff_item(

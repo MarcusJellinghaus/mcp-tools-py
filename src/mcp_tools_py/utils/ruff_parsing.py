@@ -1,13 +1,26 @@
-"""Functions for parsing ruff output."""
+"""Ruff JSON output model and parser, shared by the ruff checker and formatter."""
 
 import json
 import logging
 import os
-from typing import List
-
-from .models import RuffMessage
+from typing import List, NamedTuple
 
 logger = logging.getLogger(__name__)
+
+
+class RuffMessage(NamedTuple):
+    """Represents a single ruff violation message."""
+
+    code: str
+    message: str
+    filename: str
+    line: int
+    column: int
+    end_line: int
+    end_column: int
+    url: str
+    fixable: bool
+    noqa_row: int
 
 
 def parse_ruff_json_output(

@@ -7,7 +7,7 @@ and formats LLM-optimized output with max_issues detail/summary control.
 from collections import defaultdict
 from typing import List, NamedTuple, Optional
 
-from mcp_tools_py.code_checker_ruff.models import RuffMessage
+from mcp_tools_py.utils.ruff_parsing import RuffMessage
 
 MAX_LOCATIONS_PER_ISSUE: int = 50
 

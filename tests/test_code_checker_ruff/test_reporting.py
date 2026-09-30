@@ -1,6 +1,5 @@
 """Unit tests for ruff reporting module."""
 
-from mcp_tools_py.code_checker_ruff.models import RuffMessage
 from mcp_tools_py.code_checker_ruff.reporting import (
     MAX_LOCATIONS_PER_ISSUE,
     format_ruff_check_report,
@@ -8,6 +7,7 @@ from mcp_tools_py.code_checker_ruff.reporting import (
     get_rule_prefix,
     group_and_sort_issues,
 )
+from mcp_tools_py.utils.ruff_parsing import RuffMessage
 
 
 def _make_ruff_message(

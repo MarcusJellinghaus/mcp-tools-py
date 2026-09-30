@@ -1,10 +1,34 @@
 """Tests for the black runner module."""
 
+from pathlib import Path
 from unittest.mock import MagicMock, patch
 
+import pytest
+
+from mcp_tools_py.formatter import black_runner, common
 from mcp_tools_py.formatter.black_runner import run_black
+from mcp_tools_py.utils.python_environment import PythonEnvironment
 from mcp_tools_py.utils.subprocess_runner import CommandResult
 from tests.conftest import make_command_result
+from tests.test_tool_availability._helpers import _dummy_python
+
+_BLACK_BINARY = "/tool-env/bin/black"
+
+
+@pytest.fixture(autouse=True)
+def _fixed_formatter_binary(monkeypatch: pytest.MonkeyPatch) -> None:
+    """Pin the black binary, independent of the interpreter running the suite."""
+    monkeypatch.setattr(
+        black_runner, "formatter_binary", MagicMock(return_value=_BLACK_BINARY)
+    )
+
+
+@pytest.fixture(autouse=True)
+def _fixed_version_line(monkeypatch: pytest.MonkeyPatch) -> MagicMock:
+    """Pin the version banner so no test spawns a `--version` subprocess."""
+    mock = MagicMock(return_value="black 0.0.0")
+    monkeypatch.setattr(black_runner, "version_line", mock)
+    return mock
 
 
 def _make_result(
@@ -75,7 +99,7 @@ def test_run_black_truncates_output(mock_exec: MagicMock) -> None:
     lines = result.output.splitlines()
     assert len(lines) == 201  # 200 lines + truncation notice
     assert "truncated" in lines[-1]
-    assert "50 more lines" in lines[-1]
+    assert "51 more lines" in lines[-1]
 
 
 @patch("mcp_tools_py.formatter.black_runner.execute_command")
@@ -168,3 +192,91 @@ def test_run_black_default_timeout(mock_exec: MagicMock) -> None:
     run_black("/usr/bin/python", ["src"], "/project")
 
     assert mock_exec.call_args[1]["timeout_seconds"] == 120
+
+
+@patch("mcp_tools_py.formatter.black_runner.execute_command")
+def test_run_black_invokes_console_script(mock_exec: MagicMock) -> None:
+    mock_exec.return_value = _make_result()
+
+    run_black("/usr/bin/python", ["src"], "/project")
+
+    command = mock_exec.call_args[0][0]
+    assert command == [_BLACK_BINARY, "src"]
+    assert "-m" not in command
+
+
+@patch("mcp_tools_py.formatter.black_runner.execute_command")
+def test_run_black_ignores_python_executable(mock_exec: MagicMock) -> None:
+    mock_exec.return_value = _make_result()
+
+    run_black("/usr/bin/python", ["src"], "/project")
+    expected = mock_exec.call_args[0][0]
+    run_black("/nonexistent/python", ["src"], "/project")
+
+    assert mock_exec.call_args[0][0] == expected
+
+
+@patch("mcp_tools_py.formatter.black_runner.execute_command")
+def test_run_black_missing_binary(
+    mock_exec: MagicMock, monkeypatch: pytest.MonkeyPatch
+) -> None:
+    monkeypatch.setattr(black_runner, "formatter_binary", MagicMock(return_value=None))
+
+    result = run_black("/usr/bin/python", ["src"], "/project")
+
+    mock_exec.assert_not_called()
+    assert result.success is False
+    assert "black is not available" in result.output
+    assert result.files_changed == []
+
+
+@patch("mcp_tools_py.formatter.black_runner.execute_command")
+def test_run_black_uses_injected_environment(
+    mock_exec: MagicMock, monkeypatch: pytest.MonkeyPatch, tmp_path: Path
+) -> None:
+    monkeypatch.setattr(black_runner, "formatter_binary", common.formatter_binary)
+    mock_exec.return_value = _make_result()
+    environment = PythonEnvironment(Path(_dummy_python(tmp_path, "black")))
+
+    run_black("/usr/bin/python", ["src"], "/project", environment=environment)
+
+    expected = environment.binary("black")
+    assert expected is not None
+    assert mock_exec.call_args[0][0][0] == str(expected)
+
+
+@patch("mcp_tools_py.formatter.black_runner.execute_command")
+def test_run_black_output_starts_with_version_banner(
+    mock_exec: MagicMock, _fixed_version_line: MagicMock
+) -> None:
+    mock_exec.return_value = _make_result(stderr="All done!")
+
+    result = run_black("/usr/bin/python", ["src"], "/project", False, 45)
+
+    assert result.output.splitlines()[0] == "black 0.0.0"
+    tool, binary, timeout = _fixed_version_line.call_args[0]
+    assert tool == "black"
+    assert binary == mock_exec.call_args[0][0][0]
+    assert timeout <= 45
+
+
+@pytest.mark.parametrize(
+    "command_result",
+    [
+        make_command_result(timed_out=True, execution_error="timed out"),
+        make_command_result(execution_error="FileNotFoundError: black"),
+    ],
+    ids=["timed_out", "execution_error"],
+)
+@patch("mcp_tools_py.formatter.black_runner.execute_command")
+def test_run_black_failure_paths_have_no_banner(
+    mock_exec: MagicMock,
+    _fixed_version_line: MagicMock,
+    command_result: CommandResult,
+) -> None:
+    mock_exec.return_value = command_result
+
+    result = run_black("/usr/bin/python", ["src"], "/project")
+
+    _fixed_version_line.assert_not_called()
+    assert "black 0.0.0" not in result.output
