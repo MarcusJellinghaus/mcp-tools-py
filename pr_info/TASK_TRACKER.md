@@ -38,9 +38,9 @@ See [step_2.md](./steps/step_2.md)
 ### Step 3: `SanitizedArgs.path_args`
 See [step_3.md](./steps/step_3.md)
 
-- [ ] Implementation: tests + `path_args` field in `models.py`, populated by `sanitize_extra_args`
-- [ ] Quality checks: pylint, pytest, mypy — fix all issues
-- [ ] Commit message prepared
+- [x] Implementation: tests + `path_args` field in `models.py`, populated by `sanitize_extra_args`
+- [x] Quality checks: pylint, pytest, mypy — fix all issues
+- [x] Commit message prepared
 
 ### Step 4: Coverage run plumbing
 See [step_4.md](./steps/step_4.md)
