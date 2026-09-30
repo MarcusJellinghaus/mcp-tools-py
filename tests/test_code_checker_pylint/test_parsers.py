@@ -1,8 +1,26 @@
 """Unit tests for pylint parsers module."""
 
 import json
+from typing import Any
 
 from mcp_tools_py.code_checker_pylint.parsers import parse_pylint_json_output
+
+
+def _valid_item(**overrides: Any) -> dict[str, Any]:
+    """Build a valid pylint JSON entry, with optional field overrides."""
+    item: dict[str, Any] = {
+        "type": "error",
+        "module": "test_module",
+        "obj": "",
+        "line": 1,
+        "column": 1,
+        "path": "test.py",
+        "symbol": "test",
+        "message": "Test message",
+        "message-id": "E0001",
+    }
+    item.update(overrides)
+    return item
 
 
 class TestParsePylintJsonOutput:
@@ -130,42 +148,75 @@ class TestParsePylintJsonOutput:
 
         messages, error = parse_pylint_json_output(raw_output)
 
-        assert error is None
-        assert len(messages) == 2  # Only dict items are processed
-        assert messages[0].message_id == "E0001"
-        assert messages[1].message_id == "W0001"
+        assert messages == []
+        assert error is not None
+        assert "entries that are not objects" in error
+        assert "extra_args" in error
 
     def test_parse_json_with_missing_fields(self) -> None:
-        """Test parsing JSON with missing fields."""
+        """Test parsing JSON with missing required fields is an error."""
         json_data = [
-            {
-                "type": "error",
-                # Missing most fields
-            },
             {
                 "type": "warning",
                 "module": "test_module",
                 "line": 10,
-                # Missing other fields
+                "column": 0,
+                # Missing path, symbol and message-id
             },
         ]
         raw_output = json.dumps(json_data)
 
         messages, error = parse_pylint_json_output(raw_output)
 
-        assert error is None
-        assert len(messages) == 2
+        assert messages == []
+        assert error is not None
+        assert "entries without path, symbol or message-id" in error
+        assert "keys: type, module, line, column" in error
 
-        # Check default values for missing fields
-        assert messages[0].type == "error"
-        assert messages[0].module == ""
-        assert messages[0].obj == ""
-        assert messages[0].line == -1
-        assert messages[0].column == -1
-        assert messages[0].path == ""
-        assert messages[0].symbol == ""
-        assert messages[0].message == ""
-        assert messages[0].message_id == ""
+    def test_non_dict_first_entry_is_error(self) -> None:
+        """A non-dict first entry is reported, not a crash."""
+        raw_output = json.dumps(["x", _valid_item()])
+
+        messages, error = parse_pylint_json_output(raw_output)
+
+        assert messages == []
+        assert error is not None
+        assert "entries that are not objects" in error
+        assert "keys: str" in error
+
+    def test_non_int_line_is_error(self) -> None:
+        """A line that is not an int is an error."""
+        raw_output = json.dumps([_valid_item(line="1")])
+
+        messages, error = parse_pylint_json_output(raw_output)
+
+        assert messages == []
+        assert error is not None
+        assert "entries without locations" in error
+
+    def test_bool_column_is_error(self) -> None:
+        """A bool column is not accepted as an int."""
+        raw_output = json.dumps([_valid_item(column=True)])
+
+        messages, error = parse_pylint_json_output(raw_output)
+
+        assert messages == []
+        assert error is not None
+        assert "entries without locations" in error
+
+    def test_command_line_entry_parses(self) -> None:
+        """Pylint's 'Command line' entries are valid messages."""
+        raw_output = json.dumps(
+            [_valid_item(path="Command line", line=1, column=0, module="")]
+        )
+
+        messages, error = parse_pylint_json_output(raw_output)
+
+        assert error is None
+        assert len(messages) == 1
+        assert messages[0].path == "Command line"
+        assert messages[0].line == 1
+        assert messages[0].column == 0
 
     def test_parse_very_long_output(self) -> None:
         """Test parsing very long output (error message truncation)."""

@@ -4,7 +4,10 @@ import json
 from typing import Any
 from unittest.mock import patch
 
+import pytest
+
 from mcp_tools_py.code_checker_ruff.runners import (
+    _STATISTICS_ERROR,
     _build_ruff_command,
     run_ruff_check_impl,
     run_ruff_fix_impl,
@@ -58,8 +61,19 @@ class TestBuildRuffCommand:
             "check",
             "--output-format",
             "json",
+            "--no-fix",
+            "--no-fix-only",
             "src",
         ]
+
+    def test_overrides_after_extra_args(self) -> None:
+        cmd = _build_ruff_command("/usr/bin/ruff", ["src"], extra_args=["--fix"])
+        assert cmd[-4:] == ["--fix", "--no-fix", "--no-fix-only", "src"]
+
+    def test_fix_appends_no_fix_only(self) -> None:
+        cmd = _build_ruff_command("/usr/bin/ruff", ["src"], fix=True)
+        assert cmd[-2:] == ["--no-fix-only", "src"]
+        assert "--no-fix" not in cmd
 
     def test_with_select(self) -> None:
         cmd = _build_ruff_command("/usr/bin/ruff", ["src"], select=["D", "DOC"])
@@ -196,10 +210,47 @@ class TestRunRuffCheckImpl:
 
     def test_invalid_project_dir(self) -> None:
         """Raise FileNotFoundError when project_dir does not exist."""
-        import pytest
-
         with pytest.raises(FileNotFoundError, match="not-a-real-dir"):
             run_ruff_check_impl("/usr/bin/ruff", "/not-a-real-dir", ["src"])
+
+    @pytest.mark.parametrize("flag", ["--statistics", "--fix", "--fix-only"])
+    @patch("os.path.isdir", return_value=True)
+    @patch(f"{MODULE_PATH}.execute_command")
+    def test_rejected_flags(self, mock_exec: Any, _mock_isdir: Any, flag: str) -> None:
+        """Rejected flags return an error without running ruff."""
+        result = run_ruff_check_impl(
+            "/usr/bin/ruff", "/project", ["src"], extra_args=["--preview", flag]
+        )
+
+        if flag == "--statistics":
+            assert result == _STATISTICS_ERROR
+        else:
+            assert flag in result
+            assert "run_ruff_fix" in result
+        mock_exec.assert_not_called()
+
+    @pytest.mark.parametrize(
+        ("extra_args", "hinted"), [(["--preview"], True), (None, False)]
+    )
+    @patch("os.path.isdir", return_value=True)
+    @patch(f"{MODULE_PATH}.execute_command")
+    def test_parse_error_hint(
+        self,
+        mock_exec: Any,
+        _mock_isdir: Any,
+        extra_args: list[str] | None,
+        hinted: bool,
+    ) -> None:
+        """The extra_args hint is added to parse errors only when extra_args were passed."""
+        output = json.dumps([{"code": "E501", "message": "x", "filename": "a.py"}])
+        mock_exec.return_value = make_command_result(return_code=1, stdout=output)
+
+        result = run_ruff_check_impl(
+            "/usr/bin/ruff", "/project", ["src"], extra_args=extra_args
+        )
+
+        assert "location" in result
+        assert ("extra_args" in result) is hinted
 
 
 class TestRunRuffFixImpl:
@@ -207,10 +258,31 @@ class TestRunRuffFixImpl:
 
     def test_invalid_project_dir(self) -> None:
         """Raise FileNotFoundError when project_dir does not exist."""
-        import pytest
-
         with pytest.raises(FileNotFoundError, match="not-a-real-dir"):
             run_ruff_fix_impl("/usr/bin/ruff", "/not-a-real-dir", ["src"])
+
+    @patch("os.path.isdir", return_value=True)
+    @patch(f"{MODULE_PATH}.execute_command")
+    def test_statistics_rejected(self, mock_exec: Any, _mock_isdir: Any) -> None:
+        """--statistics returns an error without running ruff."""
+        result = run_ruff_fix_impl(
+            "/usr/bin/ruff", "/project", ["src"], extra_args=["--statistics"]
+        )
+
+        assert result == _STATISTICS_ERROR
+        mock_exec.assert_not_called()
+
+    @patch("os.path.isdir", return_value=True)
+    @patch(f"{MODULE_PATH}.execute_command")
+    def test_unsafe_fixes_accepted(self, mock_exec: Any, _mock_isdir: Any) -> None:
+        """--unsafe-fixes still runs ruff."""
+        mock_exec.return_value = make_command_result(return_code=0, stdout="[]")
+
+        run_ruff_fix_impl(
+            "/usr/bin/ruff", "/project", ["src"], extra_args=["--unsafe-fixes"]
+        )
+
+        assert "--unsafe-fixes" in mock_exec.call_args[0][0]
 
     @patch("os.path.isdir", return_value=True)
     @patch(f"{MODULE_PATH}.execute_command")

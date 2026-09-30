@@ -32,6 +32,7 @@ def register(mcp: "FastMCPProtocol", checker_tools: "CheckerTools") -> None:
             select: Override rule selection (e.g. ["D", "DOC"]). Defaults to project config.
             target_directories: Directories to check relative to project_dir. Auto-detected when None.
             extra_args: Additional ruff CLI flags (e.g. ["--preview"] for DOC rules).
+                `--fix`, `--fix-only` and `--statistics` are rejected.
             max_issues: Number of issue types shown in detail (default: 1).
 
         Returns:
