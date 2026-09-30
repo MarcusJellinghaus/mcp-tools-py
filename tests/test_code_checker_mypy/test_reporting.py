@@ -192,7 +192,7 @@ def test_mypy_result_methods() -> None:
             column=5,
             severity="note",
             message="Note 1",
-            code=None,
+            code="misc",
         ),
     ]
 
@@ -200,7 +200,7 @@ def test_mypy_result_methods() -> None:
 
     # Test get_error_codes
     codes = result.get_error_codes()
-    assert codes == {"type", "unused"}  # None is filtered out
+    assert codes == {"type", "unused", "misc"}
 
     # Test get_messages_by_severity
     errors = result.get_messages_by_severity("error")

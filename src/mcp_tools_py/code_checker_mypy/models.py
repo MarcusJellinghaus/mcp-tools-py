@@ -21,6 +21,7 @@ class MypyMessage(NamedTuple):
     severity: str
     message: str
     code: str | None = None  # e.g., "[arg-type]", "[import]"
+    hint: str | None = None  # notes attached to this error, newline-separated
 
 
 class MypyResult(NamedTuple):
