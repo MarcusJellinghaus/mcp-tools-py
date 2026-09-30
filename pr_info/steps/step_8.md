@@ -40,6 +40,9 @@ max_issues: Number of error codes shown in detail (5 locations each).
 
 - `README.md` Pylint Parameters table, `max_issues` row: add "`0` = counts only (per-rule count and
   directory split)".
+- `README.md` Mypy Parameters table: add a `max_issues` row — type integer, default None, description
+  "Number of error codes shown in detail (5 locations each); the rest get one summary line each. None
+  details every code; `0` = counts only (per-code count and directory split)".
 - `docs/architecture/architecture.md` utils list: add a bullet for `utils/report_counts.py` — shared
   per-rule report helpers (directory split, total line, plural) for the ruff, pylint, bandit and mypy
   reports.
