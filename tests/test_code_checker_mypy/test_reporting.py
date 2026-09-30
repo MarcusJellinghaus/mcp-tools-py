@@ -114,7 +114,7 @@ def test_create_mypy_prompt_max_issues_one() -> None:
 def test_create_mypy_prompt_counts_only(max_issues: int) -> None:
     """max_issues <= 0 shows the total line and summary lines only."""
     result = _mixed_result()
-    notes = [_msg("src/a.py", 9, None, severity="note", message="Revealed")]
+    notes = [_msg("src/a.py", 9, "misc", severity="note", message="Revealed")]
     result = result._replace(messages=result.messages + notes)
 
     prompt = create_mypy_prompt(result, max_issues=max_issues)
@@ -146,9 +146,15 @@ def test_create_mypy_prompt_notes_section_at_end() -> None:
     result = MypyResult(
         return_code=1,
         messages=[
-            _msg("src/a.py", 9, None, severity="note", message="Revealed A"),
+            _msg("src/a.py", 9, "misc", severity="note", message="Revealed A"),
             _msg("src/a.py", 1, "arg-type"),
-            _msg("src/b.py", 2, None, severity="note", message="Revealed B"),
+            _msg(
+                "src/b.py",
+                2,
+                "annotation-unchecked",
+                severity="note",
+                message="Revealed B",
+            ),
         ],
     )
     prompt = create_mypy_prompt(result)
@@ -160,7 +166,8 @@ def test_create_mypy_prompt_notes_section_at_end() -> None:
     assert prompt.index("- src/a.py:9:1 - Revealed A") > notes_at
     assert prompt.index("- src/b.py:2:1 - Revealed B") > notes_at
     assert notes_at < prompt.index("To fix these issues:")
-    assert "other" not in prompt
+    assert "**misc" not in prompt
+    assert "**annotation-unchecked" not in prompt
 
 
 def test_create_mypy_prompt_notes_only() -> None:
@@ -171,7 +178,7 @@ def test_create_mypy_prompt_notes_only() -> None:
             _msg(
                 "src/a.py",
                 9,
-                None,
+                "misc",
                 severity="note",
                 message='Revealed type is "builtins.int"',
             )
