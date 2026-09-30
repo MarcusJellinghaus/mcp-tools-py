@@ -38,9 +38,9 @@ See [step_2.md](./steps/step_2.md)
 ### Step 3: Strict pylint parser
 See [step_3.md](./steps/step_3.md)
 
-- [ ] Implementation: tests + strict `parse_pylint_json_output` with `_invalid_reason`
-- [ ] Quality checks: pylint, pytest, mypy — fix all issues
-- [ ] Commit message prepared
+- [x] Implementation: tests + strict `parse_pylint_json_output` with `_invalid_reason`
+- [x] Quality checks: pylint, pytest, mypy — fix all issues
+- [x] Commit message prepared
 
 ### Step 4: Strict bandit parser and CWE line
 See [step_4.md](./steps/step_4.md)
