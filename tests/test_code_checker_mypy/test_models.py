@@ -35,13 +35,33 @@ def test_mypy_message_creation() -> None:
     assert msg.code == "type-error"
 
 
-def test_mypy_message_optional_code() -> None:
-    """Test MypyMessage with optional code field."""
+def test_mypy_message_optional_hint() -> None:
+    """Test MypyMessage hint defaults to None."""
     msg = MypyMessage(
-        file="test.py", line=10, column=5, severity="note", message="See above"
+        file="test.py",
+        line=10,
+        column=5,
+        severity="note",
+        message="See above",
+        code="misc",
     )
 
-    assert msg.code is None
+    assert msg.hint is None
+
+
+def test_mypy_message_with_hint() -> None:
+    """Test MypyMessage stores a hint."""
+    msg = MypyMessage(
+        file="test.py",
+        line=10,
+        column=5,
+        severity="error",
+        message="Bad arg",
+        code="arg-type",
+        hint="Line 1\nLine 2",
+    )
+
+    assert msg.hint == "Line 1\nLine 2"
 
 
 def test_mypy_result_creation() -> None:
@@ -95,14 +115,14 @@ def test_mypy_result_get_error_codes() -> None:
             file="c.py", line=3, column=3, severity="error", message="E3", code="err1"
         ),  # Duplicate
         MypyMessage(
-            file="d.py", line=4, column=4, severity="note", message="N1", code=None
-        ),  # No code
+            file="d.py", line=4, column=4, severity="note", message="N1", code="misc"
+        ),
     ]
 
     result = MypyResult(return_code=1, messages=messages)
     codes = result.get_error_codes()
 
-    assert codes == {"err1", "err2"}
+    assert codes == {"err1", "err2", "misc"}
 
 
 def test_mypy_result_get_messages_by_severity() -> None:
@@ -123,7 +143,7 @@ def test_mypy_result_get_messages_by_severity() -> None:
             file="c.py", line=3, column=3, severity="error", message="E2", code="err2"
         ),
         MypyMessage(
-            file="d.py", line=4, column=4, severity="note", message="N1", code=None
+            file="d.py", line=4, column=4, severity="note", message="N1", code="misc"
         ),
         MypyMessage(
             file="e.py",

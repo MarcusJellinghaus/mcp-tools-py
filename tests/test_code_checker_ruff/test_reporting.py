@@ -2,6 +2,7 @@
 
 from mcp_tools_py.code_checker_ruff.reporting import (
     MAX_LOCATIONS_PER_ISSUE,
+    _rule_label,
     format_ruff_check_report,
     format_ruff_fix_report,
     get_rule_prefix,
@@ -113,16 +114,84 @@ class TestFormatRuffCheckReport:
         result = format_ruff_check_report(msgs, max_issues=1)
         assert result is not None
 
+        assert result.split("\n")[0] == "ruff found 3 issues across 3 rules"
+
         # First group (E501) should be detailed
-        assert "ruff found 1 issues with rule E501" in result
+        assert (
+            "ruff found 1 issue with rule E501 undocumented-public-module "
+            "((root): 1)." in result
+        )
         assert "a.py:10:89" in result
 
         # Remaining should be summary only
-        assert "- W291: 1 occurrences" in result
-        assert "- D100: 1 occurrences" in result
+        assert "- W291 undocumented-public-module: 1 occurrence ((root): 1)" in result
+        assert "- D100 undocumented-public-module: 1 occurrence ((root): 1)" in result
 
         # No detailed locations for remaining
         assert "b.py:5:0" not in result
+
+    def test_total_line_singular(self) -> None:
+        result = format_ruff_check_report([_make_ruff_message()])
+        assert result is not None
+        assert result.split("\n")[0] == "ruff found 1 issue across 1 rule"
+
+    def test_max_issues_0_counts_only(self) -> None:
+        msgs = [
+            _make_ruff_message(
+                code="SIM117",
+                filename="tests/a.py",
+                line=3,
+                column=5,
+                url="https://docs.astral.sh/ruff/rules/multiple-with-statements",
+            ),
+            _make_ruff_message(
+                code="SIM102",
+                filename="src/b.py",
+                line=7,
+                column=1,
+                url="https://docs.astral.sh/ruff/rules/collapsible-if",
+            ),
+            _make_ruff_message(
+                code="SIM102",
+                filename="tests/c.py",
+                line=8,
+                column=2,
+                url="https://docs.astral.sh/ruff/rules/collapsible-if",
+            ),
+        ]
+        result = format_ruff_check_report(msgs, max_issues=0)
+        assert result == (
+            "ruff found 3 issues across 2 rules\n"
+            "\n"
+            "- SIM102 collapsible-if: 2 occurrences (src: 1, tests: 1)\n"
+            "- SIM117 multiple-with-statements: 1 occurrence (tests: 1)"
+        )
+
+    def test_detail_header_shows_name_and_split_not_url(self) -> None:
+        msgs = [
+            _make_ruff_message(code="E501", filename="src/a.py"),
+            _make_ruff_message(code="E501", filename="src/b.py"),
+            _make_ruff_message(code="E501", filename="tests/c.py"),
+        ]
+        result = format_ruff_check_report(msgs, max_issues=1)
+        assert result is not None
+        assert (
+            "ruff found 3 issues with rule E501 undocumented-public-module "
+            "(src: 2, tests: 1)." in result
+        )
+        assert "https://" not in result
+
+    def test_empty_url_shows_code_only(self) -> None:
+        msgs = [_make_ruff_message(code="invalid-syntax", url="")]
+        result = format_ruff_check_report(msgs, max_issues=1)
+        assert result is not None
+        assert "ruff found 1 issue with rule invalid-syntax (src: 1)." in result
+
+    def test_outside_path_in_split(self) -> None:
+        msgs = [_make_ruff_message(filename="D:\\other\\x.py")]
+        result = format_ruff_check_report(msgs, max_issues=0)
+        assert result is not None
+        assert "((outside): 1)" in result
 
     def test_locations_capped(self) -> None:
         """More than MAX_LOCATIONS_PER_ISSUE locations should be capped."""
@@ -140,6 +209,28 @@ class TestFormatRuffCheckReport:
             line for line in result.split("\n") if line.startswith("- file")
         ]
         assert len(location_lines) == MAX_LOCATIONS_PER_ISSUE
+
+
+class TestRuleLabel:
+    """Test cases for _rule_label."""
+
+    def test_name_from_url(self) -> None:
+        assert (
+            _rule_label("SIM102", "https://docs.astral.sh/ruff/rules/collapsible-if")
+            == "SIM102 collapsible-if"
+        )
+
+    def test_trailing_slash(self) -> None:
+        assert (
+            _rule_label("SIM102", "https://docs.astral.sh/ruff/rules/collapsible-if/")
+            == "SIM102 collapsible-if"
+        )
+
+    def test_none_url(self) -> None:
+        assert _rule_label("invalid-syntax", None) == "invalid-syntax"
+
+    def test_empty_url(self) -> None:
+        assert _rule_label("invalid-syntax", "") == "invalid-syntax"
 
 
 class TestFormatRuffFixReport:

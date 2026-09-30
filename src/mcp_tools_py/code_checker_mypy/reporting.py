@@ -4,79 +4,89 @@ import logging
 
 from mcp_tools_py.code_checker_mypy.models import MypyMessage, MypyResult
 from mcp_tools_py.utils.project_config import DEFAULT_CHECK_TIMEOUT
+from mcp_tools_py.utils.report_counts import format_dir_split, format_total_line, plural
 
 logger = logging.getLogger(__name__)
 
 # Prefix that marks a prompt as a failure rather than a list of type issues
 MYPY_FAILURE_PREFIX = "Mypy execution failed:"
 
+MAX_LOCATIONS_PER_CODE = 5
 
-def create_mypy_prompt(result: MypyResult) -> str | None:
+
+def _format_message(msg: MypyMessage) -> list[str]:
+    """Format one mypy message.
+
+    Returns:
+        The location line followed by the message's indented hint lines.
+    """
+    lines = [f"- {msg.file}:{msg.line}:{msg.column} - {msg.message}"]
+    if msg.hint:
+        lines.extend(f"    {hint_line}" for hint_line in msg.hint.splitlines())
+    return lines
+
+
+def create_mypy_prompt(result: MypyResult, max_issues: int | None = None) -> str | None:
     """Generate LLM-friendly prompt from mypy results.
 
     Args:
         result: MypyResult from type checking
+        max_issues: Number of error codes to show in detail; the rest get one
+            summary line each. None shows all; 0 or less shows counts only.
 
     Returns:
-        Formatted prompt string or None if no issues
+        Formatted prompt string or None if no messages
     """
     if not result.messages:
         return None
 
-    # Calculate summary statistics
-    total_errors = len([m for m in result.messages if m.severity == "error"])
-    total_warnings = len([m for m in result.messages if m.severity == "warning"])
-    total_notes = len([m for m in result.messages if m.severity == "note"])
+    issues = [m for m in result.messages if m.severity != "note"]
+    notes = [m for m in result.messages if m.severity == "note"]
 
-    # Get unique files with issues
-    files_with_issues = len(set(msg.file for msg in result.messages))
-
-    # Group messages by error code
     by_code: dict[str, list[MypyMessage]] = {}
-    for msg in result.messages:
-        code = msg.code or "other"
-        if code not in by_code:
-            by_code[code] = []
-        by_code[code].append(msg)
+    for msg in issues:
+        by_code.setdefault(msg.code or "other", []).append(msg)
+    groups = sorted(by_code.items(), key=lambda kv: (-len(kv[1]), kv[0]))
+    limit = len(groups) if max_issues is None else max(0, max_issues)
 
-    # Build prompt with summary
-    lines = [f"Mypy found {len(result.messages)} type issues that need attention:"]
+    lines: list[str] = []
+    if issues:
+        lines += ["Mypy found type issues that need attention:", ""]
+    lines += [format_total_line("mypy", len(issues), len(groups)), ""]
 
-    # Add summary statistics
-    lines.append("\n**Summary:**")
-    lines.append(f"- Total issues: {len(result.messages)}")
-    lines.append(f"- Errors: {total_errors}")
-    if total_warnings > 0:
-        lines.append(f"- Warnings: {total_warnings}")
-    if total_notes > 0:
-        lines.append(f"- Notes: {total_notes}")
-    lines.append(f"- Files affected: {files_with_issues}")
-    lines.append(f"- Error categories: {len(by_code)}")
-    lines.append("")
-
-    # Sort by error code for consistent output
-    for code in sorted(by_code.keys()):
-        messages = by_code[code]
-        lines.append(f"**{code} ({len(messages)} issues)**")
-
-        for msg in messages[:5]:  # Limit to first 5 per category
-            location = f"{msg.file}:{msg.line}:{msg.column}"
-            lines.append(f"- {location} - {msg.message}")
-
-        if len(messages) > 5:
-            lines.append(f"  ... and {len(messages) - 5} more")
+    for code, messages in groups[:limit]:
+        split = format_dir_split(m.file for m in messages)
+        lines.append(f"**{code} ({plural(len(messages), 'issue')}) {split}**")
+        for msg in messages[:MAX_LOCATIONS_PER_CODE]:
+            lines.extend(_format_message(msg))
+        if len(messages) > MAX_LOCATIONS_PER_CODE:
+            lines.append(f"  ... and {len(messages) - MAX_LOCATIONS_PER_CODE} more")
         lines.append("")
 
-    # Add fix suggestions
-    lines.append("\nTo fix these issues:")
-    lines.append("1. Add missing type annotations where indicated")
-    lines.append("2. Ensure all function arguments and return types are properly typed")
-    lines.append("3. Fix any import errors or undefined attributes")
-    lines.append(
-        "4. Review the specific error messages and adjust your code accordingly"
-    )
+    if groups[limit:]:
+        for code, messages in groups[limit:]:
+            split = format_dir_split(m.file for m in messages)
+            lines.append(f"- {code}: {plural(len(messages), 'occurrence')} {split}")
+        lines.append("")
 
-    return "\n".join(lines)
+    if notes and (max_issues is None or max_issues > 0):
+        lines.append("Notes:")
+        for msg in notes:
+            lines.extend(_format_message(msg))
+        lines.append("")
+
+    if issues:
+        lines.append("To fix these issues:")
+        lines.append("1. Add missing type annotations where indicated")
+        lines.append(
+            "2. Ensure all function arguments and return types are properly typed"
+        )
+        lines.append("3. Fix any import errors or undefined attributes")
+        lines.append(
+            "4. Review the specific error messages and adjust your code accordingly"
+        )
+
+    return "\n".join(lines).rstrip("\n")
 
 
 def get_mypy_prompt(
@@ -87,6 +97,7 @@ def get_mypy_prompt(
     follow_imports: str | None = None,
     cache_dir: str | None = None,
     timeout_seconds: int = DEFAULT_CHECK_TIMEOUT,
+    max_issues: int | None = None,
 ) -> str | None:
     """Run mypy and generate an LLM prompt if issues are found.
 
@@ -101,6 +112,7 @@ def get_mypy_prompt(
             omitted from the command line when None
         cache_dir: Custom cache directory for incremental checking
         timeout_seconds: Maximum seconds to wait for mypy
+        max_issues: Number of error codes to show in detail (see create_mypy_prompt)
 
     Returns:
         LLM prompt string or None if no issues
@@ -120,4 +132,4 @@ def get_mypy_prompt(
     if result.error:
         return f"{MYPY_FAILURE_PREFIX} {result.error}"
 
-    return create_mypy_prompt(result)
+    return create_mypy_prompt(result, max_issues=max_issues)

@@ -29,7 +29,7 @@ The pylint tools expose the following parameters for customization:
 |-----------|------|---------|-------------|
 | `extra_args` | list | None | Optional list of additional pylint CLI arguments (e.g. `["--disable=W0611"]`) |
 | `target_directories` | list | None (auto-detected) | Directories to analyze relative to project_dir. Auto-detected from `pyproject.toml` when omitted |
-| `max_issues` | integer | 1 | Number of issue types shown in detail; the rest are summarised as counts |
+| `max_issues` | integer | 1 | Number of issue types shown in detail; the rest are summarised as counts. `0` = counts only (per-rule count and directory split) |
 
 ### Pylint Configuration
 
@@ -84,6 +84,7 @@ The mypy tools expose the following parameters for customization:
 | `follow_imports` | string | None (no flag sent; the project's `[tool.mypy]` decides) | How to handle imports during type checking |
 | `cache_dir` | string | None (no flag sent; `MYPY_CACHE_DIR` decides, else `[tool.mypy] cache_dir`, else `.mypy_cache`) | Custom cache directory for incremental checking |
 | `timeout_seconds` | integer | None (resolved from config, else 120) | Maximum seconds to wait for mypy. Positive integers only |
+| `max_issues` | integer | None | Number of error codes shown in detail (5 locations each); the rest get one summary line each. None details every code; `0` = counts only (per-code count and directory split) |
 
 ### Mypy Configuration
 

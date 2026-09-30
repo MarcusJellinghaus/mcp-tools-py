@@ -26,6 +26,7 @@ def register(mcp: "FastMCPProtocol", checker_tools: "CheckerTools") -> None:
         follow_imports: str | None = None,
         cache_dir: str | None = None,
         timeout_seconds: int | None = None,
+        max_issues: int | None = None,
     ) -> str:
         """Run mypy type checking on the project code.
 
@@ -68,6 +69,10 @@ def register(mcp: "FastMCPProtocol", checker_tools: "CheckerTools") -> None:
                 configured limit for this call. Must be a positive integer.
                 Defaults to `[tool.mcp-tools-py]` config, then `--check-timeout`,
                 then 120.
+            max_issues: Number of error codes shown in detail (5 locations each).
+                None (default) details every code. 0 = counts only: one line per code
+                with count and directory split, no file paths. Remaining codes get one
+                summary line each.
 
         Returns:
             A string containing mypy results or a prompt for an LLM to interpret
@@ -93,6 +98,7 @@ def register(mcp: "FastMCPProtocol", checker_tools: "CheckerTools") -> None:
                     "project_dir": str(context.project_dir),
                     "disable_error_codes": disable_error_codes,
                     "target_directories": resolved,
+                    "max_issues": max_issues,
                 },
             )
 
@@ -105,6 +111,7 @@ def register(mcp: "FastMCPProtocol", checker_tools: "CheckerTools") -> None:
                 follow_imports=follow_imports,
                 cache_dir=cache_dir,
                 timeout_seconds=resolved_timeout,
+                max_issues=max_issues,
             )
 
             # Format result

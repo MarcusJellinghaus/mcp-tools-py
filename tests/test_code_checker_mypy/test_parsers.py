@@ -34,7 +34,7 @@ def test_parse_mypy_json_output_with_empty_lines() -> None:
     json_output = """
 {"file": "test.py", "line": 10, "column": 5, "severity": "error", "message": "Type error", "code": "type"}
 
-{"file": "test2.py", "line": 5, "column": 3, "severity": "note", "message": "See above", "code": null}
+{"file": "test2.py", "line": 5, "column": 3, "severity": "note", "message": "See above", "code": "misc"}
 """
 
     messages, error = parse_mypy_json_output(json_output)
@@ -43,7 +43,31 @@ def test_parse_mypy_json_output_with_empty_lines() -> None:
     assert len(messages) == 2
     assert messages[0].file == "test.py"
     assert messages[1].file == "test2.py"
-    assert messages[1].code is None
+    assert messages[1].code == "misc"
+
+
+def test_parse_mypy_json_output_reads_hint() -> None:
+    """Test that the hint field is parsed."""
+    json_output = '{"file": "a.py", "line": 3, "column": 4, "message": "Bad arg", "hint": "Line 1\\nLine 2", "code": "arg-type", "severity": "error"}'
+
+    messages, error = parse_mypy_json_output(json_output)
+
+    assert error is None
+    assert messages[0].hint == "Line 1\nLine 2"
+
+
+@pytest.mark.parametrize("hint_field", ["", ', "hint": null'])
+def test_parse_mypy_json_output_missing_hint_is_none(hint_field: str) -> None:
+    """Test that a missing or null hint parses as None."""
+    json_output = (
+        '{"file": "a.py", "line": 3, "column": 4, "message": "Bad arg", '
+        f'"code": "arg-type", "severity": "error"{hint_field}}}'
+    )
+
+    messages, error = parse_mypy_json_output(json_output)
+
+    assert error is None
+    assert messages[0].hint is None
 
 
 def test_parse_mypy_json_output_mixed_content() -> None:

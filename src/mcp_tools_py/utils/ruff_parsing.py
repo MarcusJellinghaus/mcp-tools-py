@@ -69,7 +69,10 @@ def parse_ruff_json_output(
             end_location = item.get("end_location", {})
             filename = item.get("filename", "")
             if filename:
-                filename = os.path.relpath(filename, project_dir)
+                try:
+                    filename = os.path.relpath(filename, project_dir)
+                except ValueError:
+                    pass  # other drive: keep the path unchanged
 
             messages.append(
                 RuffMessage(

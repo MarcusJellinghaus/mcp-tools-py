@@ -31,6 +31,7 @@ def register(mcp: "FastMCPProtocol", checker_tools: "CheckerTools") -> None:
             extra_args: Additional pylint arguments.
             target_directories: Directories to analyze relative to project_dir. Auto-detected from pyproject.toml when None.
             max_issues: Number of issue types to show in detail (default: 1). Remaining issues shown as summary counts.
+                0 = counts only: one line per rule with count and directory split, no file paths.
 
         Returns:
             Formatted pylint result, or an error message string.

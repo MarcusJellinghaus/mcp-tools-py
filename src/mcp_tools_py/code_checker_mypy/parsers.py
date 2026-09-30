@@ -38,6 +38,7 @@ def parse_mypy_json_output(output: str) -> tuple[list[MypyMessage], str | None]:
                 severity=data.get("severity", "error"),
                 message=data.get("message", ""),
                 code=data.get("code"),
+                hint=data.get("hint"),
             )
             messages.append(message)
 

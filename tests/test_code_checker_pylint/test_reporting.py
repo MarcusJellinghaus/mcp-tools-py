@@ -172,10 +172,12 @@ class TestGetPromptForKnownPylintCode:
         ]
 
         result = PylintResult(return_code=0, messages=messages)
-        prompt = get_prompt_for_known_pylint_code("W0612", "/home/user/project", result)
+        prompt = get_prompt_for_known_pylint_code(
+            "W0612", "/home/user/project", result, "HEADER LINE"
+        )
 
         assert prompt is not None
-        assert "W0612" in prompt
+        assert prompt.startswith("HEADER LINE\n")
         assert "use the variable or remove" in prompt
         # Check that the normalized path appears in the prompt
         # The path could be represented as src/test.py or src\\\\test.py in JSON
@@ -205,7 +207,7 @@ class TestGetPromptForKnownPylintCode:
         ]
 
         result = PylintResult(return_code=0, messages=messages)
-        prompt = get_prompt_for_known_pylint_code("X9999", "/project", result)
+        prompt = get_prompt_for_known_pylint_code("X9999", "/project", result, "H")
 
         assert prompt is None
 
@@ -231,10 +233,11 @@ class TestGetPromptForUnknownPylintCode:
 
         result = PylintResult(return_code=0, messages=messages)
         prompt = get_prompt_for_unknown_pylint_code(
-            "X9999", "/home/user/project", result
+            "X9999", "/home/user/project", result, "HEADER LINE"
         )
 
         assert prompt is not None
+        assert prompt.startswith("HEADER LINE\n")
         assert "X9999" in prompt
         assert "some-unknown-check" in prompt
         assert "Please do two things:" in prompt
@@ -276,7 +279,7 @@ class TestGetPromptForUnknownPylintCode:
         ]
 
         result = PylintResult(return_code=0, messages=messages)
-        prompt = get_prompt_for_unknown_pylint_code("Z0001", "/project", result)
+        prompt = get_prompt_for_unknown_pylint_code("Z0001", "/project", result, "H")
 
         assert prompt is not None
         assert "Z0001" in prompt
@@ -381,11 +384,15 @@ class TestGetPylintPromptMaxIssues:
             prompt = get_pylint_prompt("/project", python_executable=sys.executable)
 
         assert prompt is not None
+        assert prompt.startswith("pylint found 9 issues across 3 rules\n\n")
         # First type (error, highest severity) should be detailed
-        assert "E0602" in prompt
+        assert (
+            "pylint found 3 issues with rule E0602 undefined-variable (src: 3)."
+            in prompt
+        )
         # Summary section for remaining types
-        assert "W0613 unused-argument: 4 occurrences" in prompt
-        assert "C0411 wrong-import-order: 2 occurrences" in prompt
+        assert "- W0613 unused-argument: 4 occurrences (src: 4)" in prompt
+        assert "- C0411 wrong-import-order: 2 occurrences (src: 2)" in prompt
         # Hint to see more
         assert "max_issues=" in prompt
 
@@ -407,17 +414,109 @@ class TestGetPylintPromptMaxIssues:
                 "/project", python_executable=sys.executable, max_issues=0
             )
 
-        assert prompt is not None
-        # Stats header
-        assert "2 issue types" in prompt
-        assert "7 total occurrences" in prompt
-        # Per-type counts
-        assert "E0602 undefined-variable: 3 occurrences" in prompt
-        assert "W0613 unused-argument: 4 occurrences" in prompt
-        # Hint
-        assert "max_issues>=1 to see details" in prompt
+        assert prompt == (
+            "pylint found 7 issues across 2 rules\n"
+            "\n"
+            "- E0602 undefined-variable: 3 occurrences (src: 3)\n"
+            "- W0613 unused-argument: 4 occurrences (src: 4)\n"
+            "\n"
+            "Use max_issues>=1 to see details for one or more issue types."
+        )
         # No detailed location data (no JSON blocks)
         assert "locations in the source code" not in prompt
+        assert '"path"' not in prompt
+
+    def test_max_issues_zero_split_across_dirs(self) -> None:
+        """max_issues=0: split counts each top-level directory."""
+        messages = self._make_messages([("W0613", "unused-argument", "warning", 4)])
+        messages[3] = messages[3]._replace(path="/project/tests/test_a.py")
+        mock_result = PylintResult(return_code=4, messages=messages)
+
+        with patch(
+            "mcp_tools_py.code_checker_pylint.reporting.get_pylint_results",
+            return_value=mock_result,
+        ):
+            prompt = get_pylint_prompt(
+                "/project", python_executable=sys.executable, max_issues=0
+            )
+
+        assert prompt is not None
+        assert "- W0613 unused-argument: 4 occurrences (src: 3, tests: 1)" in prompt
+
+    def test_single_issue_singular_wording(self) -> None:
+        """One issue uses singular wording in total line and header."""
+        messages = self._make_messages([("W0612", "unused-variable", "warning", 1)])
+        mock_result = PylintResult(return_code=4, messages=messages)
+
+        with patch(
+            "mcp_tools_py.code_checker_pylint.reporting.get_pylint_results",
+            return_value=mock_result,
+        ):
+            prompt = get_pylint_prompt("/project", python_executable=sys.executable)
+            stats = get_pylint_prompt(
+                "/project", python_executable=sys.executable, max_issues=0
+            )
+
+        assert prompt is not None
+        assert prompt.startswith("pylint found 1 issue across 1 rule\n\n")
+        assert (
+            "pylint found 1 issue with rule W0612 unused-variable (src: 1).\n" in prompt
+        )
+        assert stats is not None
+        assert stats.startswith("pylint found 1 issue across 1 rule\n")
+        assert "- W0612 unused-variable: 1 occurrence (src: 1)" in stats
+
+    def test_known_code_header(self) -> None:
+        """Known-code detail starts with count, symbol and split header."""
+        messages = self._make_messages([("W0612", "unused-variable", "warning", 2)])
+        mock_result = PylintResult(return_code=4, messages=messages)
+
+        with patch(
+            "mcp_tools_py.code_checker_pylint.reporting.get_pylint_results",
+            return_value=mock_result,
+        ):
+            prompt = get_pylint_prompt("/project", python_executable=sys.executable)
+
+        assert prompt is not None
+        assert (
+            "pylint found 2 issues with rule W0612 unused-variable (src: 2).\n"
+            in prompt
+        )
+        assert "use the variable or remove" in prompt
+
+    def test_unknown_code_header(self) -> None:
+        """Unknown-code detail has the header and keeps its instruction lines."""
+        messages = self._make_messages([("X9999", "custom-check", "error", 2)])
+        mock_result = PylintResult(return_code=4, messages=messages)
+
+        with patch(
+            "mcp_tools_py.code_checker_pylint.reporting.get_pylint_results",
+            return_value=mock_result,
+        ):
+            prompt = get_pylint_prompt("/project", python_executable=sys.executable)
+
+        assert prompt is not None
+        assert (
+            "pylint found 2 issues with rule X9999 custom-check (src: 2).\n" in prompt
+        )
+        assert 'fix pylint code "X9999" (custom-check)' in prompt
+
+    def test_command_line_path_counts_as_outside(self) -> None:
+        """Pylint's 'Command line' pseudo-path counts as (outside)."""
+        messages = self._make_messages([("E0015", "unrecognized-option", "error", 1)])
+        messages[0] = messages[0]._replace(path="Command line")
+        mock_result = PylintResult(return_code=4, messages=messages)
+
+        with patch(
+            "mcp_tools_py.code_checker_pylint.reporting.get_pylint_results",
+            return_value=mock_result,
+        ):
+            prompt = get_pylint_prompt(
+                "/project", python_executable=sys.executable, max_issues=0
+            )
+
+        assert prompt is not None
+        assert "- E0015 unrecognized-option: 1 occurrence ((outside): 1)" in prompt
 
     def test_max_issues_greater_than_types(self) -> None:
         """max_issues exceeds type count: all detailed, no summary, no hint."""
@@ -464,7 +563,11 @@ class TestGetPylintPromptMaxIssues:
             )
 
         assert prompt is not None
-        assert "W0613" in prompt
+        # Header count is the full count, not the capped one
+        assert (
+            "pylint found 60 issues with rule W0613 unused-argument (src: 60)."
+            in prompt
+        )
         # Overflow note
         assert "10 more occurrences" in prompt
         # Verify the cap constant is 50

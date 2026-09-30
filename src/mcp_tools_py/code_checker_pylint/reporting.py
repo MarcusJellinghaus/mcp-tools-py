@@ -13,6 +13,11 @@ from mcp_tools_py.code_checker_pylint.runners import get_pylint_results
 from mcp_tools_py.code_checker_pylint.utils import normalize_path
 from mcp_tools_py.log_utils import log_function_call
 from mcp_tools_py.utils.project_config import DEFAULT_CHECK_TIMEOUT
+from mcp_tools_py.utils.report_counts import (
+    format_dir_split,
+    format_total_line,
+    plural,
+)
 
 MAX_LOCATIONS_PER_ISSUE = 50
 
@@ -61,6 +66,30 @@ def _group_and_sort_issues(messages: list[PylintMessage]) -> list[IssueGroup]:
     return issue_groups
 
 
+def _dir_split(group: IssueGroup, project_dir: str) -> str:
+    """Format the group's count split by top-level directory.
+
+    Returns:
+        The directory split, e.g. ``(src: 11, tests: 2)``.
+    """
+    return format_dir_split(
+        normalize_path(msg.path, project_dir) for msg in group.messages
+    )
+
+
+def _summary_line(group: IssueGroup, project_dir: str) -> str:
+    """Format one rule line.
+
+    Returns:
+        The line with message id, symbol, count and directory split.
+    """
+    return (
+        f"- {group.message_id} {group.symbol}: "
+        f"{plural(len(group.messages), 'occurrence')} "
+        f"{_dir_split(group, project_dir)}"
+    )
+
+
 logger = logging.getLogger(__name__)
 
 
@@ -103,7 +132,7 @@ def get_direct_instruction_for_pylint_code(code: str) -> Optional[str]:
 
 
 def get_prompt_for_known_pylint_code(
-    code: str, project_dir: str, pylint_results: PylintResult
+    code: str, project_dir: str, pylint_results: PylintResult, header: str
 ) -> Optional[str]:
     """Generate a prompt for a known pylint code with instructions and details.
 
@@ -111,6 +140,7 @@ def get_prompt_for_known_pylint_code(
         code: The pylint code (e.g., "E0602")
         project_dir: The project directory path
         pylint_results: The pylint analysis results
+        header: First line of the prompt (count, symbol and directory split)
 
     Returns:
         A formatted prompt string or None if no instruction is found for the code
@@ -137,7 +167,7 @@ def get_prompt_for_known_pylint_code(
         details_lines.append(json.dumps(issue_dict, indent=4) + ",")
 
     details_str = "\n".join(details_lines)
-    query = f"""pylint found some issues related to code {code}.
+    query = f"""{header}
     {instruction}
     Please consider especially the following locations in the source code:
     {details_str}"""
@@ -145,7 +175,7 @@ def get_prompt_for_known_pylint_code(
 
 
 def get_prompt_for_unknown_pylint_code(
-    code: str, project_dir: str, pylint_results: PylintResult
+    code: str, project_dir: str, pylint_results: PylintResult, header: str
 ) -> str:
     """Generate a prompt for an unknown pylint code with issue details.
 
@@ -153,6 +183,7 @@ def get_prompt_for_unknown_pylint_code(
         code: The pylint code (e.g., "E0602")
         project_dir: The project directory path
         pylint_results: The pylint analysis results
+        header: First line of the prompt (count, symbol and directory split)
 
     Returns:
         A formatted prompt string requesting instructions for this code
@@ -180,7 +211,7 @@ def get_prompt_for_unknown_pylint_code(
     # Store the entire details section in a variable first
     details_str = "\n".join(details_lines)
 
-    query = f"""pylint found some issues related to code {code} / symbol {symbol}.
+    query = f"""{header}
     
     Please do two things:
     1. Please provide 1 direct instruction on how to fix pylint code "{code}" ({symbol}) in the general comment of the response.
@@ -247,18 +278,12 @@ def get_pylint_prompt(
 
     total_types = len(groups)
     total_occurrences = sum(len(g.messages) for g in groups)
+    total_line = format_total_line("pylint", total_occurrences, total_types)
 
     # Stats-only mode
     if max_issues == 0:
-        lines = [
-            f"pylint found {total_types} issue types "
-            f"({total_occurrences} total occurrences):",
-        ]
-        for group in groups:
-            lines.append(
-                f"- {group.message_id} {group.symbol}: "
-                f"{len(group.messages)} occurrences"
-            )
+        lines = [total_line, ""]
+        lines.extend(_summary_line(group, project_dir) for group in groups)
         lines.append("\nUse max_issues>=1 to see details for one or more issue types.")
         return "\n".join(lines)
 
@@ -268,7 +293,7 @@ def get_pylint_prompt(
     )
 
     # Detailed sections for top N issue types
-    sections: list[str] = []
+    sections: list[str] = [total_line]
     for group in groups[:max_issues]:
         capped_messages = group.messages[:MAX_LOCATIONS_PER_ISSUE]
         overflow = len(group.messages) - len(capped_messages)
@@ -278,14 +303,20 @@ def get_pylint_prompt(
             messages=capped_messages,
         )
 
+        # Built from the full group so the count is the true total
+        header = (
+            f"pylint found {plural(len(group.messages), 'issue')} with rule "
+            f"{group.message_id} {group.symbol} {_dir_split(group, project_dir)}."
+        )
         prompt = get_prompt_for_known_pylint_code(
-            group.message_id, project_dir, capped_result
+            group.message_id, project_dir, capped_result, header
         )
         if prompt is None:
             prompt = get_prompt_for_unknown_pylint_code(
                 group.message_id,
                 project_dir=project_dir,
                 pylint_results=capped_result,
+                header=header,
             )
 
         if overflow > 0:
@@ -302,11 +333,7 @@ def get_pylint_prompt(
             f"{'s' if len(remaining) != 1 else ''} found "
             f"({remaining_count} occurrences) ---",
         ]
-        for group in remaining:
-            summary_lines.append(
-                f"- {group.message_id} {group.symbol}: "
-                f"{len(group.messages)} occurrences"
-            )
+        summary_lines.extend(_summary_line(group, project_dir) for group in remaining)
         summary_lines.append(
             f"\nUse max_issues={total_types} to see details for all issue types."
         )

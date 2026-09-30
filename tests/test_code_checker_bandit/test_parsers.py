@@ -2,6 +2,10 @@
 
 import json
 import os
+from pathlib import Path
+from unittest.mock import patch
+
+import pytest
 
 from mcp_tools_py.code_checker_bandit.parsers import parse_bandit_json_output
 
@@ -185,6 +189,42 @@ class TestParseBanditJsonOutput:
         assert len(messages) == 1
         expected = os.path.relpath("/project/src/deep/module.py", project_dir)
         assert messages[0].filename == expected
+
+    def test_parse_relative_path_independent_of_cwd(
+        self, tmp_path: Path, monkeypatch: pytest.MonkeyPatch
+    ) -> None:
+        """Test that relative paths resolve against project_dir, not the cwd."""
+        elsewhere = tmp_path / "elsewhere"
+        elsewhere.mkdir()
+        monkeypatch.chdir(elsewhere)
+        project_dir = str(tmp_path / "proj")
+        raw_output = _make_bandit_json(
+            results=[_make_bandit_result_item(filename="src/a.py")]
+        )
+
+        messages, _, parse_error = parse_bandit_json_output(raw_output, project_dir)
+
+        assert parse_error is None
+        assert len(messages) == 1
+        assert messages[0].filename == os.path.join("src", "a.py")
+
+    def test_parse_relpath_value_error_keeps_path(self) -> None:
+        """Test that a path on another drive is kept unchanged."""
+        raw_output = _make_bandit_json(
+            results=[_make_bandit_result_item(filename="D:/other/src/a.py")]
+        )
+
+        with patch(
+            "mcp_tools_py.code_checker_bandit.parsers.os.path.relpath",
+            side_effect=ValueError("path is on mount 'D:'"),
+        ):
+            messages, _, parse_error = parse_bandit_json_output(
+                raw_output, "C:/project"
+            )
+
+        assert parse_error is None
+        assert len(messages) == 1
+        assert messages[0].filename == "D:/other/src/a.py"
 
     def test_parse_missing_cwe_fields(self) -> None:
         """Test parsing result with missing issue_cwe."""

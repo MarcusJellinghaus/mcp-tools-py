@@ -21,6 +21,7 @@
 | 1b | Scoped to directory | ⬜ | | |
 | 1c | Extra args | ⬜ | | |
 | 1d | Max issues | ⬜ | | |
+| 1e | Counts only | ⬜ | | |
 
 ### Test 2: `run_pytest_check`
 
@@ -40,6 +41,8 @@
 | 3b | Config-driven strictness | ⬜ | | |
 | 3c | Disable error codes | ⬜ | | |
 | 3d | Follow imports: skip | ⬜ | | |
+| 3e | Counts only | ⬜ | | |
+| 3f | One code in detail | ⬜ | | |
 
 ### Test 4: `list_symbols`
 
@@ -58,6 +61,13 @@
 | 5b | Class across modules | ⬜ | | |
 | 5c | Function with fewer refs | ⬜ | | |
 | 5d | Nonexistent symbol | ⬜ | | |
+
+### Test 9: counts-only reports for ruff and bandit
+
+| # | Test | Status | Duration | Notes |
+|---|------|--------|----------|-------|
+| 9a | Ruff counts only | ⬜ | | |
+| 9b | Bandit counts only | ⬜ | | |
 
 ---
 

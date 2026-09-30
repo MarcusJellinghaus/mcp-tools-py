@@ -2,6 +2,7 @@
 
 import json
 import os
+from unittest.mock import patch
 
 from mcp_tools_py.utils.ruff_parsing import parse_ruff_json_output
 
@@ -145,6 +146,21 @@ class TestParseRuffJsonOutput:
         assert len(messages) == 1
         expected = os.path.relpath("/project/src/deep/module.py", project_dir)
         assert messages[0].filename == expected
+
+    def test_parse_relpath_value_error_keeps_path(self) -> None:
+        """Test that a path on another drive is kept unchanged."""
+        json_data = [_make_ruff_item(filename="D:/other/src/file.py")]
+        raw_output = json.dumps(json_data)
+
+        with patch(
+            "mcp_tools_py.utils.ruff_parsing.os.path.relpath",
+            side_effect=ValueError("path is on mount 'D:'"),
+        ):
+            messages, error = parse_ruff_json_output(raw_output, "C:/project")
+
+        assert error is None
+        assert len(messages) == 1
+        assert messages[0].filename == "D:/other/src/file.py"
 
     def test_parse_fixable_detection(self) -> None:
         """Test fixable detection: with fix key -> True, without -> False."""

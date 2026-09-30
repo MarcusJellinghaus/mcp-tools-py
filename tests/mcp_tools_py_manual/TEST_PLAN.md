@@ -139,6 +139,13 @@ state without relying on git.
 | **Call** | `run_pylint_check(max_issues=5)` |
 | **Expected** | Shows up to 5 issue types in detail; remaining as summary counts. |
 
+### 1e — Counts only
+
+| Field | Value |
+|-------|-------|
+| **Call** | `run_pylint_check(max_issues=0)` |
+| **Expected** | Starts with `pylint found N issues across M rules`. One line per rule with code, symbol, count and directory split, e.g. `- W0613 unused-argument: 4 occurrences (src: 4)`. No file paths. |
+
 ---
 
 ## Test 2: `run_pytest_check`
@@ -209,6 +216,38 @@ state without relying on git.
 |-------|-------|
 | **Call** | `run_mypy_check(target_directories=["tests/mcp_tools_py_manual/sample_project"], follow_imports="skip")` |
 | **Expected** | Only checks files in target dir, doesn't follow imports to other packages. |
+
+### 3e — Counts only
+
+| Field | Value |
+|-------|-------|
+| **Call** | `run_mypy_check(max_issues=0)` |
+| **Expected** | If issues exist: starts with `mypy found N issues across M rules`, then one line per error code with count and directory split, e.g. `- arg-type: 2 occurrences (src: 2)`, sorted by count descending. No file paths, no `Notes:` section. |
+
+### 3f — One code in detail
+
+| Field | Value |
+|-------|-------|
+| **Call** | `run_mypy_check(max_issues=1)` |
+| **Expected** | Most frequent code shown in detail with up to 5 locations; every other code gets one summary line. |
+
+---
+
+## Test 9: counts-only reports for ruff and bandit
+
+### 9a — Ruff counts only
+
+| Field | Value |
+|-------|-------|
+| **Call** | `run_ruff_check(max_issues=0)` |
+| **Expected** | Starts with `ruff found N issues across M rules`. One line per rule with code, rule name, count and directory split, e.g. `- SIM102 collapsible-if: 13 occurrences (src: 11, tests: 2)`. No file paths. |
+
+### 9b — Bandit counts only
+
+| Field | Value |
+|-------|-------|
+| **Call** | `run_bandit_check(max_issues=0)` |
+| **Expected** | Starts with `bandit found N issues across M rules`. One line per test with ID, name, severity, count and directory split, e.g. `- B101 assert_used (LOW): 3 occurrences (tests: 3)`. No file paths. |
 
 ---
 
@@ -381,7 +420,7 @@ Delete `sample_project/` and recreate from [SAMPLE_PROJECT_FILES.md](SAMPLE_PROJ
 | Phase | Tests | Side effects |
 |-------|-------|-------------|
 | **0. Setup** | Create files, verify tests, copy tracker | Sample project on disk |
-| **1. Read-only** | 1a–1d, 2a–2e, 3a–3d, 4a–4d, 5a–5d | None — safe to run in any order |
+| **1. Read-only** | 1a–1e, 2a–2e, 3a–3f, 4a–4d, 5a–5d, 9a–9b | None — safe to run in any order |
 | **2. Dry-run mutations** | 6a, 7a, 7d, 8a | None — preview only, verify files unchanged. **Run sequentially, not in parallel.** |
 | **3. Apply + verify + recreate** | 6b→6c, 7b→7c, 7e→7f, 8b→8c | One at a time. Delete + recreate before next. |
 | **4. Report** | Generate status report, update tracker | Files written |
