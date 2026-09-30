@@ -7,6 +7,7 @@ configures or the user passes: coverage is reported, never enforced.
 
 import json
 import os
+import shlex
 from typing import Any
 
 from mcp_tools_py.utils.environment_info import PROBE_TIMEOUT_SECONDS
@@ -72,3 +73,60 @@ def read_fail_under(interpreter: str, project_dir: str) -> float | None:
         return float(result.stdout.strip())
     except ValueError:
         return None
+
+
+def selection_line(
+    markers: list[str] | None,
+    cleaned_args: list[str],
+    path_args: list[str],
+    addopts: str | None,
+) -> str:
+    """One line naming everything that narrowed the run, or saying nothing did.
+
+    The command line overrides ``addopts`` (pytest prepends addopts), so the
+    effective ``-m`` and ``-k`` are reported, labelled with their source.
+
+    Args:
+        markers: The ``markers`` parameter of run_pytest_check.
+        cleaned_args: The sanitized extra_args.
+        path_args: The path arguments among cleaned_args.
+        addopts: The target project's pytest ``addopts``, if any.
+
+    Returns:
+        A line starting with ``selection: ``.
+    """
+    try:
+        add = shlex.split(addopts or "")
+    except ValueError:
+        add = []
+
+    parts = []
+    cmd_m = " and ".join(markers) if markers else _option_value(cleaned_args, "-m")
+    if cmd_m:
+        parts.append(f"markers '{cmd_m}'")
+    elif add_m := _option_value(add, "-m"):
+        parts.append(f"addopts -m '{add_m}'")
+
+    if cmd_k := _option_value(cleaned_args, "-k"):
+        parts.append(f"-k '{cmd_k}'")
+    elif add_k := _option_value(add, "-k"):
+        parts.append(f"addopts -k '{add_k}'")
+
+    if path_args:
+        parts.append("paths " + ", ".join(path_args))
+
+    if not parts:
+        return "selection: full suite (no markers, -k or path arguments)"
+    return "selection: " + "; ".join(parts)
+
+
+def _option_value(tokens: list[str], flag: str) -> str | None:
+    """Last value given for a short option (`-m X` or `-mX`); pytest keeps the last."""
+    value = None
+    for i, token in enumerate(tokens):
+        if token == flag:
+            if i + 1 < len(tokens):
+                value = tokens[i + 1]
+        elif token.startswith(flag):
+            value = token[len(flag) :]
+    return value

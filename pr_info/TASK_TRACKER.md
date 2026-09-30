@@ -52,9 +52,9 @@ See [step_4.md](./steps/step_4.md)
 ### Step 5: Selection echo
 See [step_5.md](./steps/step_5.md)
 
-- [ ] Implementation: tests + `selection_line` and `_option_value` in `coverage.py`
-- [ ] Quality checks: pylint, pytest, mypy — fix all issues
-- [ ] Commit message prepared
+- [x] Implementation: tests + `selection_line` and `_option_value` in `coverage.py`
+- [x] Quality checks: pylint, pytest, mypy — fix all issues
+- [x] Commit message prepared
 
 ### Step 6: Coverage digest formatter
 See [step_6.md](./steps/step_6.md)

@@ -9,6 +9,7 @@ from mcp_tools_py.code_checker_pytest.coverage import (
     coverage_args,
     read_coverage_report,
     read_fail_under,
+    selection_line,
 )
 from tests.conftest import make_command_result
 
@@ -121,3 +122,77 @@ class TestReadFailUnder:
             mock_exec.return_value = make_command_result(stdout="garbage")
 
             assert read_fail_under("/some/python", "/proj") is None
+
+
+class TestSelectionLine:
+    """Test the one-line echo of what narrowed the run."""
+
+    def test_full_suite(self) -> None:
+        """Nothing narrowing yields the full-suite line."""
+        assert selection_line(None, [], [], None) == (
+            "selection: full suite (no markers, -k or path arguments)"
+        )
+
+    def test_markers_parameter(self) -> None:
+        """The markers parameter is joined with 'and'."""
+        assert selection_line(["a", "b"], [], [], None) == (
+            "selection: markers 'a and b'"
+        )
+
+    def test_m_in_cleaned_args(self) -> None:
+        """-m in the args is reported when markers is not given."""
+        assert selection_line(None, ["-m", "slow"], [], None) == (
+            "selection: markers 'slow'"
+        )
+
+    def test_m_in_addopts(self) -> None:
+        """-m in addopts is reported with its source."""
+        line = selection_line(None, [], [], "-n auto -m 'not integration'")
+
+        assert line == "selection: addopts -m 'not integration'"
+
+    def test_command_line_m_wins_over_addopts(self) -> None:
+        """A command-line marker expression overrides the addopts one."""
+        line = selection_line(["slow"], [], [], "-m 'not integration'")
+
+        assert line == "selection: markers 'slow'"
+
+    def test_k_in_args(self) -> None:
+        """-k in the args is reported."""
+        assert selection_line(None, ["-k", "install"], [], None) == (
+            "selection: -k 'install'"
+        )
+
+    def test_k_joined_form(self) -> None:
+        """The joined -kfoo form is recognised."""
+        assert selection_line(None, ["-kfoo"], [], None) == "selection: -k 'foo'"
+
+    def test_k_in_addopts(self) -> None:
+        """-k in addopts is reported with its source."""
+        assert selection_line(None, [], [], "-k install") == (
+            "selection: addopts -k 'install'"
+        )
+
+    def test_last_value_wins(self) -> None:
+        """pytest keeps the last value of a repeated option."""
+        assert selection_line(None, ["-k", "a", "-k", "b"], [], None) == (
+            "selection: -k 'b'"
+        )
+
+    def test_combined(self) -> None:
+        """Several mechanisms are joined with '; '."""
+        line = selection_line(None, ["-k", "install"], [], "-m 'not integration'")
+
+        assert line == "selection: addopts -m 'not integration'; -k 'install'"
+
+    def test_path_args(self) -> None:
+        """Path arguments are listed."""
+        line = selection_line(None, [], ["tests/a.py", "tests/b.py::test_x"], None)
+
+        assert line == "selection: paths tests/a.py, tests/b.py::test_x"
+
+    def test_unbalanced_quotes_in_addopts(self) -> None:
+        """Unparsable addopts is treated as empty rather than raising."""
+        assert selection_line(None, [], [], "-m 'not integration") == (
+            "selection: full suite (no markers, -k or path arguments)"
+        )
