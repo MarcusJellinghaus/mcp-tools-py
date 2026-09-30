@@ -12,6 +12,7 @@ MAX_OUTPUT_LINES = 300
 MAX_FAILURES = 10
 SMALL_TEST_RUN_THRESHOLD = 3
 FAILED_OUTCOMES = ["failed", "error"]
+NO_CAPTURED_OUTPUT_NOTE = "Note: no passing test produced captured output."
 
 
 class OutputBuilder:
@@ -379,6 +380,60 @@ def create_prompt_for_failed_tests(
         return output.get_result()
 
     return None
+
+
+@log_function_call
+def create_prompt_for_passing_output(
+    test_session_result: PytestReport,
+    max_output_lines: int = MAX_OUTPUT_LINES,
+) -> str:
+    """List the captured stdout and stderr of tests that did not fail.
+
+    Covers the setup, call and teardown stages. Longrepr is never shown.
+
+    Args:
+        test_session_result: The test session result to read output from
+        max_output_lines: Overall output line limit with truncation indicator
+
+    Returns:
+        The captured output per test, or NO_CAPTURED_OUTPUT_NOTE if no test printed
+    """
+    output = OutputBuilder(max_output_lines)
+    any_added = False
+
+    for test in test_session_result.tests or []:
+        if test.outcome in FAILED_OUTCOMES:
+            continue
+        stages = [
+            (name, stage)
+            for name, stage in (
+                ("Setup", test.setup),
+                ("Call", test.call),
+                ("Teardown", test.teardown),
+            )
+            if stage
+        ]
+        blocks = [
+            (f"{name} {kind}", text)
+            for name, stage in stages
+            for kind, text in (("stdout", stage.stdout), ("stderr", stage.stderr))
+            if text
+        ]
+        if not blocks:
+            continue
+
+        if not any_added:
+            any_added = True
+            if not output.add("Captured output of passing tests:\n"):
+                break
+        if not output.add(f"Test ID: {test.nodeid} - outcome {test.outcome}\n"):
+            break
+        if not all(
+            output.add(f"  {label}:\n```\n{text}\n```\n") for label, text in blocks
+        ):
+            break
+
+    return output.get_result() if any_added else NO_CAPTURED_OUTPUT_NOTE
 
 
 def get_detailed_test_summary(

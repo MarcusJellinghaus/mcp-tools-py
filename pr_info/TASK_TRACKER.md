@@ -31,9 +31,9 @@ See [step_1.md](./steps/step_1.md)
 ### Step 2: Show captured output of passing tests
 See [step_2.md](./steps/step_2.md)
 
-- [ ] Implementation: tests (reporting, checker_tools, server_params, integration), then `create_prompt_for_passing_output`, `show_output` wiring and docstrings
-- [ ] Quality checks: pylint, pytest, mypy — fix all issues
-- [ ] Commit message prepared
+- [x] Implementation: tests (reporting, checker_tools, server_params, integration), then `create_prompt_for_passing_output`, `show_output` wiring and docstrings
+- [x] Quality checks: pylint, pytest, mypy — fix all issues
+- [x] Commit message prepared
 
 ## Pull Request
 

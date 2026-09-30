@@ -1,5 +1,6 @@
 """Tests for CheckerTools extraction from server.py."""
 
+import json
 import textwrap
 from pathlib import Path
 from typing import Any
@@ -9,6 +10,8 @@ import pytest
 
 from mcp_tools_py.checker_tools import CheckerTools
 from mcp_tools_py.code_checker_mypy.reporting import MYPY_FAILURE_PREFIX
+from mcp_tools_py.code_checker_pytest.models import PytestReport
+from mcp_tools_py.code_checker_pytest.parsers import parse_pytest_report
 from mcp_tools_py.utils.python_environment import PythonEnvironment
 from mcp_tools_py.utils.tool_context import ToolContext
 from tests.test_tool_availability._helpers import _dummy_python
@@ -134,6 +137,90 @@ def test_format_pytest_result_failure(checker_tools: CheckerTools) -> None:
         )
     assert "Pytest found issues" in result
     assert "Detailed failure info..." in result
+
+
+def _passing_report_with_output() -> PytestReport:
+    """Build a passing PytestReport whose one test printed to stdout."""
+    return parse_pytest_report(
+        json.dumps(
+            {
+                "created": 0.0,
+                "duration": 0.1,
+                "exitcode": 0,
+                "root": "/project",
+                "environment": {},
+                "summary": {"collected": 1, "passed": 1, "total": 1},
+                "collectors": [],
+                "tests": [
+                    {
+                        "nodeid": "tests/test_a.py::test_prints",
+                        "lineno": 1,
+                        "keywords": [],
+                        "outcome": "passed",
+                        "call": {
+                            "duration": 0.001,
+                            "outcome": "passed",
+                            "stdout": "HELLO\n",
+                        },
+                    }
+                ],
+                "warnings": [],
+            }
+        )
+    )
+
+
+def _passing_results() -> dict[str, Any]:
+    """Build the results dict of a passing run whose test printed."""
+    return {
+        "success": True,
+        "summary": {"passed": 1, "failed": 0, "error": 0, "collected": 1},
+        "test_results": _passing_report_with_output(),
+        "summary_text": "1 passed in 0.10s",
+    }
+
+
+def test_format_pytest_result_success_with_show_output(
+    checker_tools: CheckerTools,
+) -> None:
+    """With show_output, a passing run adds the captured output after the summary."""
+    result = checker_tools._format_pytest_result_with_details(
+        _passing_results(), show_details=True, show_output=True
+    )
+    assert result.startswith("Pytest check completed. 1 passed in 0.10s\n\n")
+    assert "Captured output of passing tests:" in result
+    assert "HELLO" in result
+
+
+def test_format_pytest_result_success_without_show_output(
+    checker_tools: CheckerTools,
+) -> None:
+    """Without show_output, a passing run returns only the summary line."""
+    result = checker_tools._format_pytest_result_with_details(
+        _passing_results(), show_details=True
+    )
+    assert result == "Pytest check completed. 1 passed in 0.10s"
+
+
+def test_format_pytest_result_failure_ignores_show_output(
+    checker_tools: CheckerTools,
+) -> None:
+    """A failing run keeps the failed-tests prompt and adds no passing output."""
+    test_results: dict[str, Any] = {
+        "success": True,
+        "summary": {"passed": 1, "failed": 1, "error": 0, "collected": 2},
+        "test_results": _passing_report_with_output(),
+    }
+    with patch(
+        "mcp_tools_py.checker_tools.create_prompt_for_failed_tests"
+    ) as mock_prompt:
+        mock_prompt.return_value = "Detailed failure info..."
+        result = checker_tools._format_pytest_result_with_details(
+            test_results, show_details=True, show_output=True
+        )
+    mock_prompt.assert_called_once()
+    assert "Detailed failure info..." in result
+    assert "Captured output of passing tests" not in result
 
 
 def test_format_pytest_result_execution_error(checker_tools: CheckerTools) -> None:
