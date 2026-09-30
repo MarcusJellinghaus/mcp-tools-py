@@ -3,6 +3,7 @@
 import logging
 import os
 import textwrap
+from pathlib import Path
 
 import pytest
 
@@ -12,6 +13,7 @@ from mcp_tools_py.utils.project_config import (
     check_line_length_conflicts,
     get_check_timeout,
     get_target_directories,
+    read_pyproject_tool_tables,
     resolve_target_directories,
     validate_timeout,
 )
@@ -472,3 +474,47 @@ class TestGetCheckTimeout:
 
         with pytest.raises(ValueError, match="Invalid pyproject.toml"):
             get_check_timeout(path, "mypy")
+
+
+class TestReadPyprojectToolTables:
+    """Tests for the read_pyproject_tool_tables function."""
+
+    def test_returns_tool_tables(self, tmp_path: Path) -> None:
+        """Both [tool.black] and [tool.ruff.format] are returned."""
+        _write_pyproject(
+            str(tmp_path),
+            """\
+            [tool.black]
+            line-length = 88
+
+            [tool.ruff.format]
+            quote-style = "double"
+            """,
+        )
+
+        tables = read_pyproject_tool_tables(tmp_path)
+
+        assert "black" in tables
+        assert "ruff" in tables
+
+    def test_missing_pyproject_returns_empty(self, tmp_path: Path) -> None:
+        """No pyproject.toml yields an empty mapping."""
+        assert not read_pyproject_tool_tables(tmp_path)
+
+    def test_no_tool_table_returns_empty(self, tmp_path: Path) -> None:
+        """A pyproject.toml without [tool] yields an empty mapping."""
+        _write_pyproject(
+            str(tmp_path),
+            """\
+            [project]
+            name = "x"
+            """,
+        )
+        assert not read_pyproject_tool_tables(tmp_path)
+
+    def test_malformed_pyproject_raises(self, tmp_path: Path) -> None:
+        """Invalid TOML raises ValueError."""
+        (tmp_path / "pyproject.toml").write_text("invalid toml {{{{", encoding="utf-8")
+
+        with pytest.raises(ValueError, match="Invalid pyproject.toml"):
+            read_pyproject_tool_tables(tmp_path)
