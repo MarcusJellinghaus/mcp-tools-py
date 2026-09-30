@@ -150,3 +150,16 @@ Supervised plan review (`/plan_review_supervisor`). Continues from `plan_review_
 **User decisions**: none
 **Changes**: step_5, step_6, step_8, summary.md, Decisions.md.
 **Status**: committed
+
+## Round 9 — 2026-09-30
+**Findings**:
+- step_4 — medium — `ruff format --check` text parser relies on the default `full` output; project `output-format = "concise"` or `RUFF_OUTPUT_FORMAT` would silently break it
+- Design (simplification) — use `--output-format json` in check mode and reuse `parse_ruff_json_output`, dropping the marker parser
+- step_5 — low — `fix.stdout + fix.stderr` duplicates step 3's `combine_output`
+**Decisions**:
+- Output format: accept — resolved by probe before choosing
+- JSON simplification: supervisor decision after probe (smaller code, consistent with `ruff_imports`, and also closes the output-format gap); not escalated
+- `combine_output`: accept
+**User decisions**: none
+**Changes**: step_4, step_5, summary.md, Decisions.md. Probe (ruff 0.16.9): JSON check output gives `code == "unformatted"` / `"invalid-syntax"` with one entry per affected file, parsed correctly by `parse_ruff_json_output`; concise config/env breaks the text markers; an explicit `--output-format` flag wins over config/env. Check mode now uses JSON; `_is_syntax_error` and `_render_diagnostics` are defined once in `ruff_runner.py` and shared with step 5; `_ARROW_PATH` and the marker parser are removed; write-mode `_FAILED_TO_PARSE` kept.
+**Status**: committed

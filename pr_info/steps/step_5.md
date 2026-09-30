@@ -66,7 +66,8 @@ errors are detected from `--output-format json` syntax-error diagnostics instead
 **Verified shape (probed against ruff 0.16.9):** a syntax-error diagnostic carries
 `code == "invalid-syntax"` — **not** `null` — with no `fix`, and ruff may emit several
 for one file (`def f(:` yields two). The filename comes from `filename`. The
-discriminator is therefore a single helper:
+discriminator is the `_is_syntax_error` helper step 4 defined in `ruff_runner.py` —
+reuse it, do not define a second one:
 
 ```python
 def _is_syntax_error(m: RuffMessage) -> bool:
@@ -94,7 +95,7 @@ unparsable = sorted({norm(m.filename) for m in messages if _is_syntax_error(m)})
 violations = sorted({norm(m.filename) for m in messages if not _is_syntax_error(m)})   # any I diagnostic
 changed    = sorted({norm(m.filename) for m in messages if m.fixable})
 if check_only:  success = (not violations and not unparsable)
-                combined = one line per diagnostic, "<norm(filename)>: <code or 'invalid-syntax'> <message>"
+                combined = _render_diagnostics(messages, project_dir)   # step 4 helper
 else:           started = time.monotonic()
                 fix = execute_command([binary, "check", "--select", "I", "--fix"] + target_dirs, ...)
                 timed_out / execution_error -> early return, no version banner
@@ -103,7 +104,7 @@ else:           started = time.monotonic()
                 # runs even when `unparsable` is non-empty — ruff skips the
                 # unparsable file and still sorts the rest
                 success = (fix.return_code == 0 and not unparsable)
-                combined = fix.stdout + fix.stderr     # ruff's default text output
+                combined = combine_output(fix)         # step 3 helper; ruff's text output
 remaining = int(timeout_seconds - (time.monotonic() - started))   # budget of the last invocation
 output = version_line("ruff", binary, remaining) + per_file_ignores_notice(...) + combined
 ```
@@ -131,8 +132,8 @@ below.
   summary of what remains.
 - **Check mode:** the only invocation is the JSON pre-check, whose stdout is a raw JSON
   array and not fit for `output`. Render a short readable list from the already-parsed
-  `messages` instead — one line per diagnostic, file path normalised as below. **No
-  second invocation.** Empty when there are no diagnostics.
+  `messages` instead with step 4's `_render_diagnostics` — one line per diagnostic, file
+  path normalised as below. **No second invocation.** Empty when there are no diagnostics.
 
 The `--fix` run gets the **same** timed-out / execution-error early return as the
 pre-check: `success=False`, the bare `ruff timed out …` / `ruff failed to run: …` message,
@@ -161,7 +162,7 @@ parser applied `os.path.relpath` to them — so an unconditional second
 `os.path.relpath(path, project_dir)` re-anchors them against the *process's* cwd rather
 than `project_dir` and turns `src/bad.py` into `../../../repo/src/bad.py`. The
 `os.path.isabs` guard is what makes one helper correct for both the parser's output here
-and ruff's raw stdout in `step_4.md`.
+and ruff's raw write-mode stderr in `step_4.md`.
 
 Every assertion names the full relative path — `"src/bad.py"`, never a bare `"bad.py"`.
 
@@ -375,7 +376,7 @@ specifically: it is what catches an accidental `from mcp_tools_py.code_checker_r
 > Detect parse errors from the JSON syntax-error diagnostics, not the exit code — `--fix`
 > exits 1 for both a parse error and an ordinary violation and writes nothing to stderr.
 > On ruff 0.16.9 a syntax-error diagnostic has `code == "invalid-syntax"`, **not** `null`;
-> use one `_is_syntax_error(m)` predicate (`not m.code or m.code == "invalid-syntax"`)
+> reuse step 4's `_is_syntax_error(m)` predicate (`not m.code or m.code == "invalid-syntax"`)
 > for both `unparsable` and its complement `violations`.
 >
 > A syntax error sets `success=False` and populates `unparsable_files` but **does not**
@@ -391,9 +392,9 @@ specifically: it is what catches an accidental `from mcp_tools_py.code_checker_r
 > pre-check found syntax errors: step 6's loop continues past any step that reports
 > unparsable files, and these failures must stop it.
 >
-> In write mode, `output` carries the `--fix` run's text output. In check mode, render a
-> short readable per-file list from the already-parsed messages — never the raw JSON, and
-> no second invocation.
+> In write mode, `output` carries the `--fix` run's text output via `combine_output`. In
+> check mode, render the already-parsed messages with step 4's `_render_diagnostics` —
+> never the raw JSON, and no second invocation.
 >
 > Both invocations get the same timed-out / execution-error early return — no version
 > banner, no version subprocess. The version banner otherwise comes from

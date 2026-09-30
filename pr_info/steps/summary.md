@@ -168,27 +168,29 @@ but reported unparsable files.
 
 | | `ruff_format` | `ruff_imports` |
 |---|---|---|
-| command | `ruff format [--check] <dirs>` | `ruff check --select I [--fix] <dirs>` |
+| command | `ruff format [--check --output-format json] <dirs>` | `ruff check --select I [--fix] <dirs>` |
 | write mode | one invocation | **two** — JSON pre-check, then `--fix` |
-| `files_changed` | empty in write mode; parsed in `--check` only | from the pre-check `fixable` messages |
-| parse errors | exit 2 + `error: Failed to parse` on stderr, plus the `invalid-syntax:` marker paths in `--check` mode | JSON diagnostics with `code == "invalid-syntax"`; the pre-check still exits 1, not 2 |
+| `files_changed` | empty in write mode; `--check` only, from JSON diagnostics with `code == "unformatted"` | from the pre-check `fixable` messages |
+| parse errors | exit 2; write mode: `error: Failed to parse` on stderr; `--check`: JSON diagnostics with `code == "invalid-syntax"` | JSON diagnostics with `code == "invalid-syntax"`; the pre-check still exits 1, not 2 |
 | exit 2 | a source parse error; the other files are still formatted | ruff itself failed (e.g. invalid `[tool.ruff]` config): `success=False`, stderr in `output`, no fix run after a pre-check exit 2 |
-| `output` body | ruff's stdout and stderr | write mode: the `--fix` run's text output; check mode: a per-diagnostic list rendered from the parsed pre-check JSON |
+| `output` body | write mode: ruff's stdout and stderr; check mode: a per-diagnostic list rendered from the parsed JSON | write mode: the `--fix` run's text output; check mode: a per-diagnostic list rendered from the parsed pre-check JSON |
 
 Both runners report `files_changed` and `unparsable_files` as **project-relative paths with
 forward slashes**, via one `relative_path` helper in `formatter/common.py` that
-relativizes **only absolute** paths — ruff prints relative to its `cwd=project_dir` and
-`parse_ruff_json_output` has already relativized `filename`, so an unconditional
+relativizes **only absolute** paths — ruff's stderr paths are relative to its
+`cwd=project_dir` and `parse_ruff_json_output` has already relativized `filename`, so an unconditional
 `os.path.relpath` would re-anchor them against the process's cwd.
 `ruff_imports` check-mode `success` is keyed on *any* `I` diagnostic, not only the fixable
 subset, so an unfixable unsorted import still fails the check.
 
 `ruff format` does **not** sort imports, so `ruff_imports` is load-bearing, not
 belt-and-braces. `ruff format` write mode prints only `N files reformatted` and never
-names files. A `--check` parser must key on the **marker line**
-(`unformatted:` / `invalid-syntax:`), never on `-->`, or unparsable files are silently
-recorded as "would be reformatted". The `invalid-syntax:` path is **recorded in
-`unparsable_files`**, not discarded, or `--check` mode fails while naming nothing. `ruff check --select I --fix` exits 1 for both a
+names files. `--check` mode passes `--output-format json`, because a project's
+`output-format` setting or `RUFF_OUTPUT_FORMAT` changes the text output, and keys on each
+diagnostic's `code`: `unformatted` is a change, `invalid-syntax` is **recorded in
+`unparsable_files`** — never counted as a change, and not discarded, or `--check` mode
+fails while naming nothing. The two ruff runners share `_is_syntax_error` and
+`_render_diagnostics` in `ruff_runner.py`. `ruff check --select I --fix` exits 1 for both a
 parse error and an ordinary unfixed violation and writes nothing to stderr, so its exit
 code cannot discriminate — hence the JSON route.
 
@@ -200,7 +202,7 @@ code cannot discriminate — hence the JSON route.
 |---|---|
 | `src/mcp_tools_py/utils/ruff_parsing.py` | `RuffMessage` + `parse_ruff_json_output`, moved down a layer |
 | `src/mcp_tools_py/formatter/common.py` | `formatter_binary` (step 2); `truncate_output`, `combine_output`, `formatter_version` (a `<binary> --version` subprocess), `version_line` (step 3); `relative_path` (step 4) |
-| `src/mcp_tools_py/formatter/ruff_runner.py` | `run_ruff_format`, `run_ruff_imports` |
+| `src/mcp_tools_py/formatter/ruff_runner.py` | `run_ruff_format`, `run_ruff_imports`, and their shared `_is_syntax_error` / `_render_diagnostics` (step 4) |
 | `tests/test_formatter_common.py` | Step 3 |
 | `tests/test_ruff_format_runner.py` | Step 4 |
 | `tests/test_ruff_imports_runner.py` | Step 5 |
@@ -219,8 +221,8 @@ code cannot discriminate — hence the JSON route.
 
 **Packaging**
 
-- `pyproject.toml` — `ruff>=0.9.0` raised to `ruff>=0.16.8`, the oldest version whose
-  `ruff format --check` markers and syntax-error JSON the step 4/5 parsers read. Already
+- `pyproject.toml` — `ruff>=0.9.0` raised to `ruff>=0.16.8`, the version whose
+  `ruff format --check` and `ruff check` JSON output the step 4/5 parsers were verified against. Already
   applied alongside the plan, so no step owns it
 
 **Source**

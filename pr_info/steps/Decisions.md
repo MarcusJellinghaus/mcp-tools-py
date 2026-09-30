@@ -139,3 +139,18 @@ test 6a now expects both ruff steps in the result, both `success=False` with
   fallback is added; the issue chose one lookup rule for all four steps. And version
   drift: a project whose CI runs its own pinned black/isort should keep ranges compatible
   with mcp-tools-py's, as `README.md:152` advises.
+
+## `ruff format --check` reads JSON (supervisor simplification, based on a probe)
+
+A probe on ruff 0.16.9 showed `ruff format --check --output-format json` emits one
+diagnostic per file with `code == "unformatted"` or `code == "invalid-syntax"`, which
+`parse_ruff_json_output` parses unchanged. It also showed the default text output is not
+stable: `[tool.ruff] output-format = "concise"` or `RUFF_OUTPUT_FORMAT=concise` removes the
+line-leading markers and ` --> ` headers, while an explicit `--output-format` flag wins
+over both. Step 4's check mode therefore passes `--output-format json` and keys
+`files_changed` / `unparsable_files` on the diagnostic code. The marker-line parser,
+`_ARROW_PATH` and its test 7c are removed (superseding the plan review 5 bullet on the
+` --> ` header parser); write mode keeps the stderr `_FAILED_TO_PARSE` regex. The issue's
+"key on the marker line" warning concerned text parsing and is satisfied by structured
+output. `_is_syntax_error` and `_render_diagnostics` are defined once in `ruff_runner.py`
+in step 4 and reused by step 5, and step 5's write-mode `output` uses `combine_output`.
