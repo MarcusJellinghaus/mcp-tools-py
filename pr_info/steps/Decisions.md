@@ -130,3 +130,12 @@ an isort step that exited 0 but reported unparsable files. Step 7
 test 6a now expects both ruff steps in the result, both `success=False` with
 `src/bad.py` in `unparsable_files`, and the good file sorted and reformatted; the separate
 `steps=["ruff_format"]` write-mode test is dropped as redundant.
+
+## Plan review 7
+
+- **Release note gains two points.** The known limitation: console scripts are looked up
+  only in the tool-env interpreter's directory, which the move now extends to black and
+  isort, so `pip install --user` and some conda layouts report "not available". No
+  fallback is added; the issue chose one lookup rule for all four steps. And version
+  drift: a project whose CI runs its own pinned black/isort should keep ranges compatible
+  with mcp-tools-py's, as `README.md:152` advises.

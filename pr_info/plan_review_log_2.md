@@ -136,3 +136,17 @@ Supervised plan review (`/plan_review_supervisor`). Continues from `plan_review_
 - isort non-ASCII `--check-only` skip: do not open an issue
 **Changes**: step_2–step_5, step_6, step_7, step_8, summary.md, Decisions.md. Step 8 do-not-change table completed from an actual grep run (README 198/205 also got enumeration edits); churn test fixed; runner resolves `env` once; per-file-ignores compared by path component (test 9c); step 3 intro reworded. The engineer first implemented B with a new `FormatterResult.only_unparsable` field and per-runner rules. The supervisor replaced that with the simpler loop rule `if not success and not unparsable_files: break`: no new field (the issue avoids mcp_coder-visible `FormatterResult` changes), and steps are independent and idempotent. Early returns now guarantee empty `unparsable_files` (a gap in `ruff_imports` fix-run returns was closed). Named regression exception: black now runs after isort reports unparsable files.
 **Status**: committed
+
+## Round 8 — 2026-09-30
+**Findings**:
+- step_5 — low — "every mocked syntax-error diagnostic uses `invalid-syntax`" contradicts test 6's `null` repeat
+- step_6 — low — "five cases" vs a six-row table
+- Design — medium — console scripts are only found in the interpreter's own directory; black/isort inherit ruff's limitation (`pip install --user`, conda layouts)
+- Design — low — release note misses CI version drift for projects pinning their own black/isort
+**Decisions**:
+- Both wording defects: accept
+- Script lookup: accept as a documented known limitation in `docs/upgrade-notes.md`; no fallback, since the issue decided one rule for all four steps. Docs only, no scope change, so not escalated.
+- CI drift: accept — one line in the upgrade note, mirroring `README.md:152`
+**User decisions**: none
+**Changes**: step_5, step_6, step_8, summary.md, Decisions.md.
+**Status**: committed

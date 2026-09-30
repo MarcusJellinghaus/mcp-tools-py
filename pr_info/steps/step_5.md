@@ -75,7 +75,8 @@ def _is_syntax_error(m: RuffMessage) -> bool:
 
 The `not m.code` arm is defensive: an earlier note recorded a `null` code, which 0.16.9
 does not produce, and a code-less diagnostic cannot be an import-sorting violation.
-Every mocked syntax-error diagnostic in the tests uses `"code": "invalid-syntax"`.
+Every mocked syntax-error diagnostic in the tests uses `"code": "invalid-syntax"`, except
+the one `null` repeat in test 6.
 
 ## ALGORITHM
 

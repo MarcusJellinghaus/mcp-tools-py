@@ -134,6 +134,19 @@ notes append to the same file.
 Mention in the note that each step now reports its formatter version, so any future drift
 is visible rather than mysterious.
 
+Also add two short points:
+
+- **Known limitation.** Console scripts are looked up only in the tool-env interpreter's
+  own directory (`PythonEnvironment.binary` checks `bin_dir` only, no PATH fallback). That
+  already applied to ruff, bandit, vulture, tach and lint-imports; it now applies to black
+  and isort too. Setups whose scripts live elsewhere (e.g. `pip install --user`, some
+  conda layouts) get "not available" where `python -m` used to work. No fallback is added: the
+  issue chose one lookup rule for all four steps.
+- **Version drift.** A project whose CI runs its own pinned black/isort (e.g.
+  `black --check`) should keep version ranges compatible with mcp-tools-py's, as
+  `README.md:152` already advises for the tool-env tools. Otherwise agent formatting and
+  CI disagree on every commit.
+
 ## Regenerated graph
 
 `docs/architecture/dependencies/pydeps_graph.dot` and `.svg` carry
@@ -214,8 +227,10 @@ blocks a PR carrying one.
 > wrote or rewrote. `README.md:198` and `:205` take both a count and an enumeration edit.
 >
 > Put the release note — the first `run_format_code` after upgrade may reformat, because
-> the formatter now comes from the tool env — in a new `docs/upgrade-notes.md`, link it
-> from `docs/README.md` under Configuration, and repeat it in the PR description.
+> the formatter now comes from the tool env — in a new `docs/upgrade-notes.md`, with the
+> two short points from the step file (console scripts found only next to the tool-env
+> interpreter; keep CI's black/isort pins compatible), link it from `docs/README.md`
+> under Configuration, and repeat it in the PR description.
 >
 > Delete `.scratch/` if any earlier step left one.
 >

@@ -51,7 +51,9 @@ identical exit codes, messages and results for black and isort. Details in `step
 
 **Release risk:** the first `run_format_code` after upgrade reformats if the tool-env
 formatter version differs from what the project env had. This needs a release note, and
-is why each step reports the version it ran.
+is why each step reports the version it ran. The note also covers two other effects of
+the move: black/isort scripts are now found only next to the tool-env interpreter, and a
+project's CI-pinned black/isort must stay compatible with mcp-tools-py's.
 
 ### One defaulting rule, two entry points
 
@@ -204,7 +206,7 @@ code cannot discriminate — hence the JSON route.
 | `tests/test_ruff_imports_runner.py` | Step 5 |
 | `tests/test_formatter_resolution.py` | Step 6 |
 | `tests/test_formatter_integration.py` | Step 7 |
-| `docs/upgrade-notes.md` | Step 8 — the reformat-on-first-run release note |
+| `docs/upgrade-notes.md` | Step 8 — release note: reformat on first run, script-lookup limitation, CI version drift |
 
 ## Files deleted
 

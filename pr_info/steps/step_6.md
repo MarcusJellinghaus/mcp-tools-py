@@ -258,8 +258,8 @@ non-empty, ordered by execution.
 
 **Write first.**
 
-`tests/test_formatter_resolution.py` — one `pytest.mark.parametrize` over the five cases,
-not five functions:
+`tests/test_formatter_resolution.py` — one `pytest.mark.parametrize` over the six cases,
+not six functions:
 
 | `pyproject.toml` | expected |
 |---|---|
