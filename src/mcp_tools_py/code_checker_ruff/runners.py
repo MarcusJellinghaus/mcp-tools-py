@@ -14,6 +14,46 @@ from mcp_tools_py.utils.subprocess_runner import execute_command
 
 logger = logging.getLogger(__name__)
 
+_STATISTICS_ERROR = (
+    "--statistics changes ruff's output format and is not supported.\n"
+    "Use the built-in rule counts in the summary instead."
+)
+_FIX_IN_CHECK_ERROR = (
+    "{flag} modifies files and is not supported by run_ruff_check. "
+    "Use run_ruff_fix instead."
+)
+_EXTRA_ARGS_HINT = " An argument in extra_args probably changed the output shape."
+
+
+def _rejected_flag(extra_args: list[str] | None, flags: tuple[str, ...]) -> str | None:
+    """First token in extra_args that exactly equals one of flags, else None.
+
+    Returns:
+        The first matching rejected flag, or None.
+    """
+    return next((arg for arg in extra_args or [] if arg in flags), None)
+
+
+def _rejection_message(flag: str) -> str:
+    """Error returned instead of running ruff with a rejected flag.
+
+    Returns:
+        The error message for the rejected flag.
+    """
+    if flag == "--statistics":
+        return _STATISTICS_ERROR
+    return _FIX_IN_CHECK_ERROR.format(flag=flag)
+
+
+def _with_hint(parse_error: str, extra_args: list[str] | None) -> str:
+    """Append the extra_args hint to a parse error when extra_args were passed.
+
+    Returns:
+        The parse error, with the extra_args hint appended when extra_args
+        were passed.
+    """
+    return parse_error + _EXTRA_ARGS_HINT if extra_args else parse_error
+
 
 def _build_ruff_command(
     ruff_binary: str,
@@ -36,6 +76,9 @@ def _build_ruff_command(
         cmd.extend(["--select", ",".join(select)])
     if extra_args:
         cmd.extend(extra_args)
+    # Last flag wins in ruff: project config and extra_args cannot make a
+    # non-fix command write files.
+    cmd.extend(["--no-fix-only"] if fix else ["--no-fix", "--no-fix-only"])
     cmd.extend(target_directories)
     return cmd
 
@@ -61,6 +104,10 @@ def run_ruff_check_impl(
     if not os.path.isdir(project_dir):
         raise FileNotFoundError(f"Project directory not found: {project_dir}")
 
+    rejected = _rejected_flag(extra_args, ("--statistics", "--fix", "--fix-only"))
+    if rejected:
+        return _rejection_message(rejected)
+
     cmd = _build_ruff_command(
         ruff_binary,
         target_directories,
@@ -80,7 +127,7 @@ def run_ruff_check_impl(
 
     messages, parse_error = parse_ruff_json_output(result.stdout, project_dir)
     if parse_error:
-        return parse_error
+        return _with_hint(parse_error, extra_args)
 
     report = format_ruff_check_report(messages, max_issues)
     return report or "No ruff issues found."
@@ -109,6 +156,10 @@ def run_ruff_fix_impl(
     if not os.path.isdir(project_dir):
         raise FileNotFoundError(f"Project directory not found: {project_dir}")
 
+    rejected = _rejected_flag(extra_args, ("--statistics",))
+    if rejected:
+        return _rejection_message(rejected)
+
     # Pre-check to identify fixable files
     check_cmd = _build_ruff_command(
         ruff_binary,
@@ -131,7 +182,7 @@ def run_ruff_fix_impl(
 
     pre_messages, parse_error = parse_ruff_json_output(check_result.stdout, project_dir)
     if parse_error:
-        return parse_error
+        return _with_hint(parse_error, extra_args)
 
     changed_files = sorted({m.filename for m in pre_messages if m.fixable})
 
@@ -161,6 +212,9 @@ def run_ruff_fix_impl(
 
     remaining, parse_error = parse_ruff_json_output(fix_result.stdout, project_dir)
     if parse_error:
-        return f"Ruff applied fixes but could not parse remaining issues: {parse_error}"
+        return (
+            "Ruff applied fixes but could not parse remaining issues: "
+            f"{_with_hint(parse_error, extra_args)}"
+        )
 
     return format_ruff_fix_report(changed_files, remaining)

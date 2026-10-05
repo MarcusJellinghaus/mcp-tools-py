@@ -33,7 +33,7 @@ def register(mcp: "FastMCPProtocol", checker_tools: "CheckerTools") -> None:
         Args:
             select: Override rule selection. Defaults to project config.
             target_directories: Directories to fix relative to project_dir. Auto-detected when None.
-            extra_args: Additional ruff CLI flags.
+            extra_args: Additional ruff CLI flags. `--statistics` is rejected.
 
         Returns:
             Formatted fix report, or an error message string.

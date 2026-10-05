@@ -23,6 +23,31 @@ class RuffMessage(NamedTuple):
     noqa_row: int
 
 
+def _invalid_reason(item: object) -> str | None:
+    """Why a ruff JSON entry cannot be used as a violation, or None if valid.
+
+    Returns:
+        A short reason the entry is unusable, or None if the entry is valid.
+    """
+    if not isinstance(item, dict):
+        return "entries that are not objects"
+    location = item.get("location")
+    row = location.get("row") if isinstance(location, dict) else None
+    column = location.get("column") if isinstance(location, dict) else None
+    if not all(
+        isinstance(value, int) and not isinstance(value, bool)
+        for value in (row, column)
+    ):
+        return "entries without locations"
+    if (
+        "code" not in item
+        or item.get("message") is None
+        or item.get("filename") is None
+    ):
+        return "entries without code, message or filename"
+    return None
+
+
 def parse_ruff_json_output(
     raw_output: str,
     project_dir: str,
@@ -58,16 +83,18 @@ def parse_ruff_json_output(
         )
 
         for item in data:
-            if not isinstance(item, dict):
-                logger.warning(
-                    "Skipping non-dict item in ruff output",
-                    extra={"item_type": type(item).__name__},
+            reason = _invalid_reason(item)
+            if reason:
+                keys = (
+                    ", ".join(item) if isinstance(item, dict) else type(item).__name__
                 )
-                continue
+                error_message = f"ruff returned {reason} (keys: {keys})."
+                logger.error("Invalid ruff output entry", extra={"reason": reason})
+                return [], error_message
 
-            location = item.get("location", {})
-            end_location = item.get("end_location", {})
-            filename = item.get("filename", "")
+            location = item["location"]
+            end_location = item.get("end_location") or {}
+            filename = item["filename"]
             if filename:
                 try:
                     filename = os.path.relpath(filename, project_dir)
@@ -76,16 +103,16 @@ def parse_ruff_json_output(
 
             messages.append(
                 RuffMessage(
-                    code=item.get("code", ""),
-                    message=item.get("message", ""),
+                    code=item["code"] or "invalid-syntax",
+                    message=item["message"],
                     filename=filename,
-                    line=location.get("row", -1),
-                    column=location.get("column", -1),
+                    line=location["row"],
+                    column=location["column"],
                     end_line=end_location.get("row", -1),
                     end_column=end_location.get("column", -1),
-                    url=item.get("url", ""),
+                    url=item.get("url") or "",
                     fixable=bool(item.get("fix")),
-                    noqa_row=item.get("noqa_row", -1),
+                    noqa_row=item.get("noqa_row") or -1,
                 )
             )
     except json.JSONDecodeError as e:

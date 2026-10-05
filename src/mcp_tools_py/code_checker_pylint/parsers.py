@@ -9,6 +9,24 @@ from .models import PylintMessage
 logger = logging.getLogger(__name__)
 
 
+def _invalid_reason(item: object) -> str | None:
+    """Why a pylint JSON entry cannot be used as a message, or None if valid.
+
+    Returns:
+        A short reason the entry is unusable, or None if the entry is valid.
+    """
+    if not isinstance(item, dict):
+        return "entries that are not objects"
+    if any(item.get(key) is None for key in ("path", "symbol", "message-id")):
+        return "entries without path, symbol or message-id"
+    if not all(
+        isinstance(item.get(key), int) and not isinstance(item.get(key), bool)
+        for key in ("line", "column")
+    ):
+        return "entries without locations"
+    return None
+
+
 def parse_pylint_json_output(
     raw_output: str,
 ) -> tuple[List[PylintMessage], str | None]:
@@ -40,6 +58,19 @@ def parse_pylint_json_output(
             )
             return messages, error_message
 
+        for item in pylint_output:
+            reason = _invalid_reason(item)
+            if reason:
+                keys = (
+                    ", ".join(item) if isinstance(item, dict) else type(item).__name__
+                )
+                error_message = (
+                    f"pylint returned {reason} (keys: {keys}); an argument in "
+                    "extra_args probably changed the output shape."
+                )
+                logger.error("Invalid pylint output entry", extra={"reason": reason})
+                return [], error_message
+
         # Log details about JSON parsing success
         logger.debug(
             "Successfully parsed pylint JSON output",
@@ -52,24 +83,17 @@ def parse_pylint_json_output(
         )
 
         for item in pylint_output:
-            if not isinstance(item, dict):
-                logger.warning(
-                    "Skipping non-dict item in pylint output",
-                    extra={"item_type": type(item).__name__},
-                )
-                continue
-
             messages.append(
                 PylintMessage(
                     type=item.get("type", ""),
                     module=item.get("module", ""),
                     obj=item.get("obj", ""),
-                    line=item.get("line", -1),
-                    column=item.get("column", -1),
-                    path=item.get("path", ""),
-                    symbol=item.get("symbol", ""),
+                    line=item["line"],
+                    column=item["column"],
+                    path=item["path"],
+                    symbol=item["symbol"],
                     message=item.get("message", ""),
-                    message_id=item.get("message-id", ""),
+                    message_id=item["message-id"],
                 )
             )
     except json.JSONDecodeError as e:

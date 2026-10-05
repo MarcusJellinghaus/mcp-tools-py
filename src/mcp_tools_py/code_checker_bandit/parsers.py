@@ -9,6 +9,22 @@ from .models import BanditMessage
 logger = logging.getLogger(__name__)
 
 
+def _invalid_reason(item: object) -> str | None:
+    """Why a bandit result entry cannot be used as a finding, or None if valid.
+
+    Returns:
+        A short reason the entry is unusable, or None if the entry is valid.
+    """
+    if not isinstance(item, dict):
+        return "results that are not objects"
+    if item.get("test_id") is None or item.get("filename") is None:
+        return "results without test_id or filename"
+    line_number = item.get("line_number")
+    if not isinstance(line_number, int) or isinstance(line_number, bool):
+        return "results without line numbers"
+    return None
+
+
 def parse_bandit_json_output(
     raw_output: str,
     project_dir: str,
@@ -41,9 +57,17 @@ def parse_bandit_json_output(
             )
             return messages, file_errors, error_message
 
+        results = data.get("results")
+        if not isinstance(results, list):
+            error_message = (
+                f"bandit output has no 'results' list (keys: {', '.join(data)})"
+            )
+            logger.error("Invalid bandit output format", extra={"keys": list(data)})
+            return messages, file_errors, error_message
+
         logger.debug(
             "Successfully parsed bandit JSON output",
-            extra={"results_count": len(data.get("results", []))},
+            extra={"results_count": len(results)},
         )
 
         for error_item in data.get("errors", []):
@@ -52,15 +76,21 @@ def parse_bandit_json_output(
                 reason = error_item.get("reason", "unknown error")
                 file_errors.append(f"{filename}: {reason}")
 
-        for item in data.get("results", []):
-            if not isinstance(item, dict):
-                logger.warning(
-                    "Skipping non-dict item in bandit results",
-                    extra={"item_type": type(item).__name__},
+        for item in results:
+            reason = _invalid_reason(item)
+            if reason:
+                keys = (
+                    ", ".join(item) if isinstance(item, dict) else type(item).__name__
                 )
-                continue
+                error_message = (
+                    f"bandit returned {reason} (keys: {keys}); an argument in "
+                    "extra_args probably changed the output shape."
+                )
+                logger.error("Invalid bandit result entry", extra={"reason": reason})
+                return [], [], error_message
 
-            filename = item.get("filename", "")
+        for item in results:
+            filename = item["filename"]
             if filename:
                 # Bandit reports paths relative to its cwd, which is project_dir
                 try:
@@ -70,19 +100,21 @@ def parse_bandit_json_output(
                 except ValueError:
                     pass  # other drive: keep the path unchanged
 
-            issue_cwe = item.get("issue_cwe") or {}
-            cwe_id = issue_cwe.get("id", 0) if isinstance(issue_cwe, dict) else 0
-            cwe_link = issue_cwe.get("link", "") if isinstance(issue_cwe, dict) else ""
+            issue_cwe = item.get("issue_cwe")
+            cwe_id = (issue_cwe.get("id") or 0) if isinstance(issue_cwe, dict) else 0
+            cwe_link = (
+                (issue_cwe.get("link") or "") if isinstance(issue_cwe, dict) else ""
+            )
 
             messages.append(
                 BanditMessage(
-                    test_id=item.get("test_id", ""),
+                    test_id=item["test_id"],
                     test_name=item.get("test_name", ""),
                     issue_severity=item.get("issue_severity", ""),
                     issue_confidence=item.get("issue_confidence", ""),
                     issue_text=item.get("issue_text", ""),
                     filename=filename,
-                    line_number=item.get("line_number", 0),
+                    line_number=item["line_number"],
                     more_info=item.get("more_info", ""),
                     cwe_id=cwe_id,
                     cwe_link=cwe_link,
