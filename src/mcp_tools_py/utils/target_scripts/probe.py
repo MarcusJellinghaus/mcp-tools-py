@@ -20,7 +20,7 @@ from typing import Any, Callable, Union, cast
 
 _USAGE = (
     "usage: probe.py info [MODULE ...] | probe.py source IMPORT_PATH MAX_LINES"
-    " | probe.py locate NAME [NAME ...]"
+    " | probe.py locate NAME [NAME ...] | probe.py scope NAME"
 )
 
 
@@ -201,6 +201,7 @@ def _info(module_names: list[str]) -> dict[str, object]:
     return {
         "version": platform.python_version(),
         "sys_path": list(sys.path),
+        "stdlib": sysconfig.get_paths()["stdlib"],
         "distributions": _distributions(),
         "importable": _importable(module_names),
     }
@@ -310,6 +311,33 @@ def _resolve_source(import_path: str, max_lines: int) -> str:
     return source
 
 
+def _scope(name: str) -> str:
+    """Resolve `name` to the directory its own source lives in.
+
+    Args:
+        name: Module or package name to resolve.
+
+    Returns:
+        The package's own directory, or the containing directory of a plain
+        module.
+
+    Raises:
+        LookupError: `name` does not resolve to an importable file location.
+    """
+    try:
+        spec = importlib.util.find_spec(name)
+    except Exception as exc:  # pylint: disable=broad-exception-caught
+        raise LookupError(f"module '{name}' not found") from exc
+    if spec is None:
+        raise LookupError(f"module '{name}' not found")
+    locations = list(spec.submodule_search_locations or [])
+    if locations:
+        return locations[0]
+    if spec.origin and os.path.isfile(spec.origin):
+        return os.path.dirname(spec.origin)
+    raise LookupError(f"no file location for '{name}'")
+
+
 def main(argv: list[str]) -> int:
     """Run the subcommand named in ``argv`` and write its result to stdout.
 
@@ -331,6 +359,13 @@ def main(argv: list[str]) -> int:
         return 0
     if len(argv) >= 3 and argv[1] == "locate":
         json.dump(_locate(argv[2:]), sys.stdout)
+        return 0
+    if len(argv) == 3 and argv[1] == "scope":
+        try:
+            sys.stdout.write(_scope(argv[2]))
+        except LookupError as exc:
+            print(str(exc), file=sys.stderr)
+            return 1
         return 0
     print(_USAGE, file=sys.stderr)
     return 2

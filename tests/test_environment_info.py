@@ -515,3 +515,51 @@ class TestProbeScript:
         blob = json.loads(result.stdout)
         directories = blob["packages"]["ns.pkg"]
         assert [Path(directory) for directory in directories] == [tmp_path]
+
+    def test_real_child_reports_the_stdlib_directory(self) -> None:
+        """The info blob names this interpreter's stdlib directory."""
+        result = execute_command(
+            [sys.executable, str(probe_script_path()), "info", "json"],
+            timeout_seconds=60,
+        )
+
+        assert result.return_code == 0, result.stderr
+        blob = json.loads(result.stdout)
+        stdlib = Path(blob["stdlib"])
+        assert stdlib.is_dir()
+        assert (stdlib / "os.py").is_file()
+
+    def test_real_child_resolves_a_package_scope(self) -> None:
+        """`scope NAME` resolves a package name to its own directory."""
+        result = execute_command(
+            [sys.executable, str(probe_script_path()), "scope", "json"],
+            timeout_seconds=60,
+        )
+
+        assert result.return_code == 0, result.stderr
+        assert (Path(result.stdout.strip()) / "__init__.py").is_file()
+
+    def test_real_child_resolves_a_dotted_module_scope(self) -> None:
+        """A dotted module name resolves to its root package's directory."""
+        package_result = execute_command(
+            [sys.executable, str(probe_script_path()), "scope", "json"],
+            timeout_seconds=60,
+        )
+        module_result = execute_command(
+            [sys.executable, str(probe_script_path()), "scope", "json.decoder"],
+            timeout_seconds=60,
+        )
+
+        assert package_result.return_code == 0, package_result.stderr
+        assert module_result.return_code == 0, module_result.stderr
+        assert Path(module_result.stdout.strip()) == Path(package_result.stdout.strip())
+
+    def test_real_child_scope_reports_unknown_name(self) -> None:
+        """An unresolvable name fails with a message naming it."""
+        result = execute_command(
+            [sys.executable, str(probe_script_path()), "scope", "nosuchmodule_xyz123"],
+            timeout_seconds=60,
+        )
+
+        assert result.return_code != 0
+        assert "nosuchmodule_xyz123" in result.stderr
