@@ -23,4 +23,37 @@ This tracks **Feature Implementation** consisting of multiple **Tasks**.
 
 <!-- Tasks populated from pr_info/steps/ by prepare_task_tracker -->
 
+### Step 1: probe.py — stdlib info field + scope subcommand
+
+- [ ] Implementation (tests + production code) — see [step_1.md](./steps/step_1.md)
+- [ ] Quality checks: pylint, pytest, mypy — fix all issues
+- [ ] Commit message prepared
+
+### Step 2: environment_info.py — EnvironmentInfo.stdlib + resolve_scope()
+
+- [ ] Implementation (tests + production code) — see [step_2.md](./steps/step_2.md)
+- [ ] Quality checks: pylint, pytest, mypy — fix all issues
+- [ ] Commit message prepared
+
+### Step 3: library_search.py — directory search core
+
+- [ ] Implementation (tests + production code) — see [step_3.md](./steps/step_3.md)
+- [ ] Quality checks: pylint, pytest, mypy — fix all issues
+- [ ] Commit message prepared
+
+### Step 4: library_search.py — LibrarySearchTools registrar
+
+- [ ] Implementation (tests + production code) — see [step_4.md](./steps/step_4.md)
+- [ ] Quality checks: pylint, pytest, mypy — fix all issues
+- [ ] Commit message prepared
+
+### Step 5: wire into server, architecture configs, and docs
+
+- [ ] Implementation (production code + updated tests/docs) — see [step_5.md](./steps/step_5.md)
+- [ ] Quality checks: tach, lint-imports, pylint, pytest, mypy — fix all issues
+- [ ] Commit message prepared
+
 ## Pull Request
+
+- [ ] PR review (diff matches [summary.md](./steps/summary.md); no unrelated changes)
+- [ ] PR description written/updated
