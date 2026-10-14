@@ -35,7 +35,7 @@ their own failures (message, non-zero exit) — it must not propagate.
 
 ```
 spec = importlib.util.find_spec(name)   # may raise -> re-raise as LookupError
-if spec is None: raise LookupError("not found")
+if spec is None: raise LookupError(f"module '{name}' not found")
 locations = list(spec.submodule_search_locations or [])
 if locations: return locations[0]              # package
 if spec.origin and isfile(spec.origin): return dirname(spec.origin)  # module
