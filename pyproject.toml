@@ -58,6 +58,9 @@ typecheck = ["mypy>=1.13.0"]
 [project.scripts]
 mcp-tools-py = "mcp_tools_py.main:main"
 
+[project.entry-points."mcp_coder.toolkits"]
+mcp-tools-py = "mcp_tools_py.toolkit:PythonToolkit"
+
 [project.urls]
 "Homepage" = "https://github.com/MarcusJellinghaus/mcp-tools-py"
 "Bug Tracker" = "https://github.com/MarcusJellinghaus/mcp-tools-py/issues"
