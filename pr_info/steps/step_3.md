@@ -95,6 +95,15 @@ own validation would otherwise reject it.)
 - `_merge` unit-tested directly: `[ok, ok] -> ok`; `[ok, findings] -> findings`
   with concatenated findings; `[findings, error] -> error`; any status with
   `skipped` present but nothing worse stays at the worse of the two.
+- `ActionResult`'s own status-validation rules (inherited from
+  `mcp-coder-utils`, per issue #245's done-when), exercised directly rather
+  than only through the toolkit's branching: constructing `ActionResult`
+  with an unknown `status` string raises `ValueError`; `status="findings"`
+  with an empty `findings` list raises `ValueError`; `status="ok"` and
+  `status="skipped"` each raise `ValueError` when `findings` is non-empty.
+  These confirm the toolkit is coded against the contract it actually has,
+  not just exercising the happy paths `_result_from_findings`/`_merge`
+  construct.
 
 ---
 

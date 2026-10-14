@@ -5,7 +5,12 @@ See `pr_info/steps/summary.md` for full architectural context.
 ## WHERE
 
 - Modify `src/mcp_tools_py/toolkit.py`: add `PythonToolkit.verify`.
-- Extend `tests/test_toolkit.py`.
+- Extend `tests/test_toolkit.py`. By this step the file carries every
+  scenario from steps 1–5; if it is over the project's file-size check
+  (`mcp-coder check file-size`) once this step's tests are added, split it
+  into `tests/test_toolkit_*.py` files by action (`test_toolkit_format.py`,
+  `test_toolkit_check.py`, `test_toolkit_test.py`, `test_toolkit_verify.py`)
+  rather than leaving it oversized.
 - Modify `docs/upgrade-notes.md`: add a new entry at the top (newest first).
 
 ## WHAT

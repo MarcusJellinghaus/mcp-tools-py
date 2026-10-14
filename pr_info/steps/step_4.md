@@ -59,7 +59,13 @@ worst-status-wins merge already generalize.
   (step 3's import) where the underlying runner needs them (vulture, ruff,
   bandit); tach and lint-imports take none.
 
-## ALGORITHM (degraded tools — single finding per action+depth)
+## ALGORITHM (degraded tools — single finding per tool+depth)
+
+Keyed by tool name, not action name: vulture, lint-imports and tach all run
+under the `check` action, so a key of `action+depth` (e.g. `check|full`)
+would be identical for all three and their findings would collide within
+one `check@full` result. `tool+depth` (`vulture|full`, `lint-imports|full`,
+`tach|full`) keeps them distinct.
 
 ```
 # vulture

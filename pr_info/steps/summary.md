@@ -33,8 +33,12 @@ dispatches on `request.action`:
   **finding** ("would reformat"); a real tool failure (`unparsable_files`,
   or a non-zero exit in apply mode) is an **error**.
 - **`check`** (`quick`/`standard`/`full`): a small per-tool dispatch table
-  (tool name → run function, and tool name → MCP tool name) drives both
-  `run()` and `describe()`'s `llm_permissions`, so the two can't drift apart.
+  (tool name → run function) drives `run()`'s dispatch — `_CHECK_RUNNERS`/
+  `_CHECK_DEPTHS`, built in steps 3–4. `describe()`'s `llm_permissions` for
+  `check` is a separate, hand-written literal (step 1) listing the MCP tool
+  name per depth; it is not derived from `_CHECK_RUNNERS`/`_CHECK_DEPTHS`, so
+  the two mappings can drift if a future change to one (e.g. adding a tool to
+  a depth) is not mirrored by hand in the other.
   `quick` = mypy; `standard` = mypy+pylint; `full` adds vulture,
   lint-imports, tach, ruff, bandit. Before running anything at a depth,
   every tool in that depth's list is checked for availability
@@ -64,7 +68,10 @@ place of the old `[mypy_output]` placeholder.
 - mypy, pylint, ruff, bandit: `path+rule+message` (each already a `NamedTuple`
   with those fields).
 - vulture, lint-imports, tach: no stable per-location keys today, so each
-  gets **one** degraded `Finding` keyed by `action+depth`:
+  gets **one** degraded `Finding` keyed by `tool+depth` (e.g. `vulture|full`)
+  — tool name rather than action name, since all three run under the same
+  `check` action and would otherwise collide on one key within the same
+  `check@full` result:
   - vulture: its existing runner already returns deterministic sentinel text
     (`"vulture produced no output."` / `"...timed out..."` /
     `"...failed to run:..."`) — matched directly, no new code.
