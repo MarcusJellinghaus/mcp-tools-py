@@ -19,6 +19,7 @@ from mcp_coder_utils.toolkit import (
     Finding,
     Toolkit,
     ToolkitInfo,
+    VerifyItem,
 )
 
 from mcp_tools_py.code_checker_bandit.runners import run_bandit_check_impl
@@ -49,7 +50,7 @@ from mcp_tools_py.utils.project_config import (
 from mcp_tools_py.utils.python_environment import PythonEnvironment
 from mcp_tools_py.utils.ruff_parsing import parse_ruff_json_output
 from mcp_tools_py.utils.subprocess_runner import execute_command
-from mcp_tools_py.utils.tool_context import ToolContext
+from mcp_tools_py.utils.tool_context import CONSOLE_SCRIPT_TOOLS, ToolContext
 
 _FAILED_OUTCOMES = ("failed", "error")
 
@@ -765,6 +766,32 @@ class PythonToolkit(Toolkit):
         if request.action == "check":
             return _run_check(context, request.depth)
         raise NotImplementedError(request.action)
+
+    def verify(self, project_dir: Path) -> list[VerifyItem]:
+        """Check that every tool this toolkit drives is available.
+
+        Returns:
+            One VerifyItem per console-script tool, per `python -m` tool
+            (mypy, pylint, pytest), and one more named "formatter" for
+            whether a formatter can be resolved for `project_dir`.
+        """
+        context = _build_context(project_dir)
+        items: list[VerifyItem] = []
+        for tool in sorted(CONSOLE_SCRIPT_TOOLS | {"mypy", "pylint", "pytest"}):
+            ok = context.is_tool_available(tool)
+            items.append(
+                VerifyItem(
+                    name=tool,
+                    status="ok" if ok else "error",
+                    message="" if ok else context.unavailable_message(tool),
+                )
+            )
+        try:
+            resolve_steps(project_dir)
+            items.append(VerifyItem(name="formatter", status="ok"))
+        except ValueError as exc:
+            items.append(VerifyItem(name="formatter", status="error", message=str(exc)))
+        return items
 
     def prompt_fragments(self) -> dict[str, str]:
         """Prompt text PythonToolkit contributes to mcp-coder's prompts.
