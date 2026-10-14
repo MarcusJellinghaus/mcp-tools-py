@@ -37,7 +37,12 @@ def _run_check(context: ToolContext, depth: str) -> ActionResult: ...
   `get_pylint_results` from `mcp_tools_py.code_checker_pylint.runners`.
 - Import `resolve_target_directories` from `mcp_tools_py.utils.project_config`
   (both mypy and pylint need resolved target directories, same as their
-  `checker_tools/*` registrars).
+  `checker_tools/*` registrars). It returns `list[str] | str`, a `str`
+  meaning a config error (e.g. no detectable source directories); both
+  `_run_mypy` and `_run_pylint` must check `isinstance(resolved, str)` and
+  return that string as an `error` `ActionResult` immediately, same as
+  `mypy_tool.py`'s `if isinstance(resolved, str): return resolved` and
+  step 2's `format` algorithm ("str return -> error").
 - `describe()`'s `llm_permissions["check"]` already names the tools per
   depth (step 1); `_CHECK_RUNNERS`/`_CHECK_DEPTHS` here are `run()`'s mirror
   of that same mapping — keep the tool-name strings (`"mypy"`, `"pylint"`)
@@ -72,11 +77,17 @@ own validation would otherwise reject it.)
 
 ## DATA
 
-- `_run_mypy`: `result = run_mypy_check(...)`; `result.error` → error branch
-  of `_result_from_findings`; else `Finding(key=f"{m.file}|{m.code}|{m.message}", message=m.message, path=m.file, rule=m.code, severity=m.severity)`
+- `_run_mypy`: `dirs = resolve_target_directories(project_dir, None)`;
+  `isinstance(dirs, str)` → `error` (dirs itself is the message); else
+  `result = run_mypy_check(..., target_directories=dirs)`; `result.error` →
+  error branch of `_result_from_findings`; else
+  `Finding(key=f"{m.file}|{m.code}|{m.message}", message=m.message, path=m.file, rule=m.code, severity=m.severity)`
   for each `m` in `result.messages`.
-- `_run_pylint`: `result = get_pylint_results(...)`; `result.error` → error;
-  else `Finding(key=f"{m.path}|{m.message_id}|{m.message}", message=m.message, path=m.path, rule=m.message_id)`
+- `_run_pylint`: `dirs = resolve_target_directories(project_dir, None)`;
+  `isinstance(dirs, str)` → `error`; else
+  `result = get_pylint_results(..., target_directories=dirs)`; `result.error`
+  → error; else
+  `Finding(key=f"{m.path}|{m.message_id}|{m.message}", message=m.message, path=m.path, rule=m.message_id)`
   for each `m` in `result.messages`.
 - Both reuse `_result_from_findings` from step 1 for the final
   `ActionResult` assembly.

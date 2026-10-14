@@ -57,7 +57,12 @@ worst-status-wins merge already generalize.
   `BanditResult.error`/`.messages`).
 - All five resolve target directories via `resolve_target_directories`
   (step 3's import) where the underlying runner needs them (vulture, ruff,
-  bandit); tach and lint-imports take none.
+  bandit); tach and lint-imports take none. Same as step 3's `_run_mypy`/
+  `_run_pylint`: `resolve_target_directories` returns `list[str] | str`, and
+  `_run_vulture`/`_run_ruff`/`_run_bandit` must each check
+  `isinstance(dirs, str)` and return that string as an `error`
+  `ActionResult` before calling their runner, same as `vulture_tool.py`/
+  `bandit_tool.py`'s `if isinstance(resolved, str): return resolved`.
 
 ## ALGORITHM (degraded tools — single finding per tool+depth)
 
@@ -73,6 +78,8 @@ output = run_vulture_check(binary, project_dir, dirs, whitelist_path=..., timeou
 output starts with "vulture timed out" or "vulture failed to run:" -> error
 output == "vulture produced no output." -> ok
 else -> one Finding(key=f"vulture|{depth}", message=output)
+# (dirs resolution for vulture/ruff/bandit happens first, per HOW above:
+# isinstance(dirs, str) -> error, before any of the three runs)
 
 # lint-imports
 report = run_lint_imports_check_impl(binary, project_dir, ..., python_executable=...)
@@ -83,17 +90,29 @@ result = execute_command([tach_binary, "check", "--output", "json"], cwd=project
 result.timed_out or result.execution_error -> error
 result.return_code == 0 -> ok
 else -> one Finding(key=f"tach|{depth}", message=<tach's own output text>)
+
+# ruff
+result = execute_command([ruff_binary, "check", "--output-format", "json", *dirs], cwd=project_dir, timeout_seconds=...)
+result.timed_out or result.execution_error -> error   # same check as tach above, before parsing
+messages, parse_error = parse_ruff_json_output(result.stdout, project_dir)
+parse_error -> error
 ```
 
-`_run_ruff` and `_run_bandit` reuse `_result_from_findings` (step 1) exactly
-like `_run_mypy`/`_run_pylint` in step 3, since they expose structured
-per-location data.
+`_run_bandit` reuses `_result_from_findings` (step 1) exactly like
+`_run_mypy`/`_run_pylint` in step 3, since it exposes structured
+per-location data via `BanditResult.error`/`.messages`. `_run_ruff` builds
+its `ActionResult` directly from the `messages`/`parse_error` pair above
+(it has no `.error` attribute to delegate to `_result_from_findings`), but
+follows the same three-way error/findings/ok shape: `result.timed_out` or
+`result.execution_error` → error; else `parse_error` → error; else
+`messages` non-empty → findings; else ok.
 
 ## DATA
 
-- `_run_ruff`: `messages, parse_error = parse_ruff_json_output(stdout, project_dir)`;
-  `parse_error` → error; else `Finding(key=f"{m.filename}|{m.code}|{m.message}", message=m.message, path=m.filename, rule=m.code)`
-  for each `m`.
+- `_run_ruff`: see the `# ruff` block above for the execution-failure and
+  parse-error checks that must run before building findings; on success,
+  `Finding(key=f"{m.filename}|{m.code}|{m.message}", message=m.message, path=m.filename, rule=m.code)`
+  for each `m` in `messages`.
 - `_run_bandit`: `result = run_bandit_check_impl(...)`; `result.error` → error;
   else `Finding(key=f"{m.filename}|{m.test_id}|{m.issue_text}", message=m.issue_text, path=m.filename, rule=m.test_id, severity=m.issue_severity)`
   for each `m` in `result.messages`.
