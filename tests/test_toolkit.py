@@ -8,7 +8,8 @@ test_toolkit_verify.py.
 import pytest
 from mcp_coder_utils.toolkit import ActionResult, Finding
 
-from mcp_tools_py.toolkit import PythonToolkit, _merge, _result_from_findings
+from mcp_tools_py.toolkit import PythonToolkit
+from mcp_tools_py.toolkit_checks import _merge, _result_from_findings
 
 _EXPECTED_ACTIONS = {
     "format": ["apply", "check"],

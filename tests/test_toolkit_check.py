@@ -109,11 +109,11 @@ class TestRunCheck:
         _write_check_project(tmp_path, _CLEAN_SRC)
         calls: list[str] = []
         monkeypatch.setattr(
-            "mcp_tools_py.toolkit.run_mypy_check",
+            "mcp_tools_py.toolkit_checks.run_mypy_check",
             lambda *args, **kwargs: calls.append("mypy"),
         )
         monkeypatch.setattr(
-            "mcp_tools_py.toolkit.get_pylint_results",
+            "mcp_tools_py.toolkit_checks.get_pylint_results",
             lambda *args, **kwargs: calls.append("pylint"),
         )
         monkeypatch.setattr(
@@ -138,26 +138,28 @@ def _patch_execute_command_clean(monkeypatch: pytest.MonkeyPatch) -> None:
             return make_command_result(return_code=0, stdout="")
         return make_command_result(return_code=0, stdout="[]")  # ruff
 
-    monkeypatch.setattr("mcp_tools_py.toolkit.execute_command", fake_execute_command)
+    monkeypatch.setattr(
+        "mcp_tools_py.toolkit_checks.execute_command", fake_execute_command
+    )
 
 
 def _patch_full_depth_clean(monkeypatch: pytest.MonkeyPatch) -> None:
     """Make every `check@full` tool other than mypy/pylint report clean."""
     monkeypatch.setattr(
-        "mcp_tools_py.toolkit.run_vulture_check",
+        "mcp_tools_py.toolkit_checks.run_vulture_check",
         lambda *args, **kwargs: "vulture produced no output.",
     )
     monkeypatch.setattr(
-        "mcp_tools_py.toolkit.run_lint_imports_check_impl",
+        "mcp_tools_py.toolkit_checks.run_lint_imports_check_impl",
         lambda *args, **kwargs: "=== PASSED ===\nContracts: 0 kept, 0 broken",
     )
     _patch_execute_command_clean(monkeypatch)
     monkeypatch.setattr(
-        "mcp_tools_py.toolkit.parse_ruff_json_output",
+        "mcp_tools_py.toolkit_checks.parse_ruff_json_output",
         lambda *args, **kwargs: ([], None),
     )
     monkeypatch.setattr(
-        "mcp_tools_py.toolkit.run_bandit_check_impl",
+        "mcp_tools_py.toolkit_checks.run_bandit_check_impl",
         lambda *args, **kwargs: BanditResult(
             return_code=0, messages=[], errors=[], error=None
         ),
@@ -213,7 +215,7 @@ class TestRunCheckFull:
         _write_check_project(tmp_path, _CLEAN_SRC)
         _patch_full_depth_clean(monkeypatch)
         monkeypatch.setattr(
-            "mcp_tools_py.toolkit.run_vulture_check",
+            "mcp_tools_py.toolkit_checks.run_vulture_check",
             lambda *args, **kwargs: "mod.py:5: unused function '_x' (60% confidence)",
         )
         request = ActionRequest(
@@ -239,7 +241,7 @@ class TestRunCheckFull:
             return make_command_result(return_code=0, stdout="[]")
 
         monkeypatch.setattr(
-            "mcp_tools_py.toolkit.execute_command", fake_execute_command
+            "mcp_tools_py.toolkit_checks.execute_command", fake_execute_command
         )
         request = ActionRequest(
             action="check", depth="full", project_dir=tmp_path, params={}
@@ -264,7 +266,7 @@ class TestRunCheckFull:
             return make_command_result(return_code=0, stdout="[]")
 
         monkeypatch.setattr(
-            "mcp_tools_py.toolkit.execute_command", fake_execute_command
+            "mcp_tools_py.toolkit_checks.execute_command", fake_execute_command
         )
         request = ActionRequest(
             action="check", depth="full", project_dir=tmp_path, params={}
@@ -280,7 +282,7 @@ class TestRunCheckFull:
         _write_check_project(tmp_path, _CLEAN_SRC)
         _patch_full_depth_clean(monkeypatch)
         monkeypatch.setattr(
-            "mcp_tools_py.toolkit.run_lint_imports_check_impl",
+            "mcp_tools_py.toolkit_checks.run_lint_imports_check_impl",
             lambda *args, **kwargs: (
                 "=== BROKEN: 1 of 2 contracts failed ===\n"
                 "Contracts: 1 kept, 1 broken\n"
@@ -304,7 +306,7 @@ class TestRunCheckFull:
         _write_check_project(tmp_path, _CLEAN_SRC)
         _patch_full_depth_clean(monkeypatch)
         monkeypatch.setattr(
-            "mcp_tools_py.toolkit.run_lint_imports_check_impl",
+            "mcp_tools_py.toolkit_checks.run_lint_imports_check_impl",
             lambda *args, **kwargs: (
                 "=== ERROR: lint-imports output could not be parsed ==="
             ),
@@ -323,7 +325,7 @@ class TestRunCheckFull:
         _write_check_project(tmp_path, _CLEAN_SRC)
         _patch_full_depth_clean(monkeypatch)
         monkeypatch.setattr(
-            "mcp_tools_py.toolkit.parse_ruff_json_output",
+            "mcp_tools_py.toolkit_checks.parse_ruff_json_output",
             lambda *args, **kwargs: ([_RUFF_FINDING], None),
         )
         request = ActionRequest(
@@ -345,7 +347,7 @@ class TestRunCheckFull:
         _write_check_project(tmp_path, _CLEAN_SRC)
         _patch_full_depth_clean(monkeypatch)
         monkeypatch.setattr(
-            "mcp_tools_py.toolkit.run_bandit_check_impl",
+            "mcp_tools_py.toolkit_checks.run_bandit_check_impl",
             lambda *args, **kwargs: BanditResult(
                 return_code=1, messages=[_BANDIT_FINDING], errors=[], error=None
             ),
@@ -370,31 +372,31 @@ class TestRunCheckFull:
         _write_check_project(tmp_path, _CLEAN_SRC)
         calls: list[str] = []
         monkeypatch.setattr(
-            "mcp_tools_py.toolkit.run_mypy_check",
+            "mcp_tools_py.toolkit_checks.run_mypy_check",
             lambda *args, **kwargs: calls.append("mypy"),
         )
         monkeypatch.setattr(
-            "mcp_tools_py.toolkit.get_pylint_results",
+            "mcp_tools_py.toolkit_checks.get_pylint_results",
             lambda *args, **kwargs: calls.append("pylint"),
         )
         monkeypatch.setattr(
-            "mcp_tools_py.toolkit.run_vulture_check",
+            "mcp_tools_py.toolkit_checks.run_vulture_check",
             lambda *args, **kwargs: calls.append("vulture"),
         )
         monkeypatch.setattr(
-            "mcp_tools_py.toolkit.run_lint_imports_check_impl",
+            "mcp_tools_py.toolkit_checks.run_lint_imports_check_impl",
             lambda *args, **kwargs: calls.append("lint-imports"),
         )
         monkeypatch.setattr(
-            "mcp_tools_py.toolkit.execute_command",
+            "mcp_tools_py.toolkit_checks.execute_command",
             lambda *args, **kwargs: calls.append("execute_command"),
         )
         monkeypatch.setattr(
-            "mcp_tools_py.toolkit.parse_ruff_json_output",
+            "mcp_tools_py.toolkit_checks.parse_ruff_json_output",
             lambda *args, **kwargs: calls.append("parse_ruff"),
         )
         monkeypatch.setattr(
-            "mcp_tools_py.toolkit.run_bandit_check_impl",
+            "mcp_tools_py.toolkit_checks.run_bandit_check_impl",
             lambda *args, **kwargs: calls.append("bandit"),
         )
         monkeypatch.setattr(
@@ -417,7 +419,7 @@ class TestRunCheckFull:
         _write_check_project(tmp_path, _MYPY_ERROR_SRC)
         _patch_full_depth_clean(monkeypatch)
         monkeypatch.setattr(
-            "mcp_tools_py.toolkit.parse_ruff_json_output",
+            "mcp_tools_py.toolkit_checks.parse_ruff_json_output",
             lambda *args, **kwargs: ([_RUFF_FINDING], None),
         )
         request = ActionRequest(
