@@ -31,9 +31,9 @@ This tracks **Feature Implementation** consisting of multiple **Tasks**.
 
 ### Step 2: environment_info.py — EnvironmentInfo.stdlib + resolve_scope()
 
-- [ ] Implementation (tests + production code) — see [step_2.md](./steps/step_2.md)
-- [ ] Quality checks: pylint, pytest, mypy — fix all issues
-- [ ] Commit message prepared
+- [x] Implementation (tests + production code) — see [step_2.md](./steps/step_2.md)
+- [x] Quality checks: pylint, pytest, mypy — fix all issues
+- [x] Commit message prepared
 
 ### Step 3: library_search.py — directory search core
 
