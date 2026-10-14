@@ -4,6 +4,21 @@ Behaviour changes to check when upgrading. Newest first.
 
 ---
 
+## Toolkit interface for mcp-coder (#245)
+
+`src/mcp_tools_py/toolkit.py` adds `PythonToolkit`, registered under the
+`mcp_coder.toolkits` entry-point group as `mcp-tools-py`. It implements the
+`Toolkit` contract from `mcp-coder-utils` (`mcp_coder_utils.toolkit`),
+letting mcp-coder drive `format`/`check`/`test` actions through structured
+`ActionResult`s instead of parsing MCP tool prose. `mcp-coder-utils` remains
+an unpinned dependency in `pyproject.toml` for now (tracked as a separate
+follow-up).
+
+No existing MCP tool or CLI behaviour changes; this is a new, additive
+entry point.
+
+---
+
 ## `run_format_code`: ruff support, formatters from the tool env (#235)
 
 ### The first `run_format_code` after upgrading may reformat
