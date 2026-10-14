@@ -121,8 +121,6 @@ is mutable; this never changes `status`, per the decision that a
 
 ## Tests (write first, in `tests/test_toolkit.py`)
 
-- `PythonToolkit` is discoverable: `importlib.metadata.entry_points(group="mcp_coder.toolkits")`
-  contains `mcp-tools-py` resolving to `PythonToolkit`.
 - `describe({})` returns the exact `actions`/`params_schema`/`llm_permissions`
   shown above.
 - `prompt_fragments()` contains `language_context`, `check_instructions`,
@@ -134,13 +132,15 @@ is mutable; this never changes `status`, per the decision that a
   `raw` to a non-empty coverage digest without changing `status`.
 - `_result_from_findings` unit-tested directly for its three branches.
 
-## Precondition check
+## No automated test for entry-point discoverability
 
-After adding the entry point, reinstall the package editable
-(`pip install -e .` in the tool environment, or the project's existing dev
-install mechanism) so `importlib.metadata.entry_points()` picks it up. If the
-entry point is still not discoverable after reinstalling, write one line to
-`pr_info/.blocked.txt` and stop.
+`importlib.metadata.entry_points()` reads installed package metadata
+(`dist-info`), not source — asserting on it in `tests/test_toolkit.py` would
+be testing a build artifact, not the code this step writes, and would
+require a reinstall this plan does not otherwise need. Add the entry-point
+table in `pyproject.toml` as described under "WHERE"; a manual verification
+command (and reinstall remedy, if needed) is recorded on issue #245 for
+whoever finalizes the release.
 
 ---
 
@@ -154,6 +154,3 @@ first, confirm they fail for the right reason, then implement
 `src/mcp_tools_py/toolkit.py` and the `pyproject.toml` entry point to make
 them pass. Run pylint, pytest, and mypy via the MCP tools and fix all issues
 before finishing.
-
-If the entry point is not discoverable after reinstalling as described under
-"Precondition check", write one line to `pr_info/.blocked.txt` and stop.
