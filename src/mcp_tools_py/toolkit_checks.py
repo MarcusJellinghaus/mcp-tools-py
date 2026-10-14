@@ -1,3 +1,5 @@
+"""Check-tool runner implementations used by PythonToolkit's check action."""
+
 from collections.abc import Callable
 
 from mcp_coder_utils.toolkit import ActionResult, Finding
