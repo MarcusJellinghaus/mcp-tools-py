@@ -43,6 +43,9 @@ def search_library_files(scope, glob=None, pattern=None, context_lines=0,
     resolution = resolve_scope(interpreter, scope)
     if resolution.error is not None:
         return {"error": resolution.error}
+    # ScopeResolution guarantees exactly one of directory/error is set, so
+    # directory is non-None here; mypy cannot see that from the error check.
+    assert resolution.directory is not None
     try:
         return search_in_directory(Path(resolution.directory), glob, pattern,
                                     context_lines, max_results, max_result_lines)

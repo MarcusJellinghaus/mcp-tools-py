@@ -85,8 +85,11 @@ truncated), optional `skipped_files` (only when non-empty) — plus `scope_root`
   results.
 - neither `glob` nor `pattern` given → lists everything under `root` (confirms the
   dropped-validation decision; no `ValueError`).
-- an unreadable/binary file under `root` is skipped and listed in `skipped_files`
-  for a content search.
+- a binary (non-UTF-8) file under `root` is silently excluded from content-search
+  matches and does *not* appear in `skipped_files` — mirrors the precedent's
+  `UnicodeDecodeError` handling exactly.
+- a file that raises `OSError` on read (e.g. permission denied) is excluded from
+  matches and *does* appear in `skipped_files` for a content search.
 
 ## Commit
 
