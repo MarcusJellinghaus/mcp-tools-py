@@ -30,9 +30,16 @@ from mcp_tools_py.code_checker_pytest.coverage import (
 )
 from mcp_tools_py.code_checker_pytest.models import PytestReport, Test
 from mcp_tools_py.code_checker_pytest.runners import check_code_with_pytest
+from mcp_tools_py.formatter.runner import (
+    resolve_steps,
+    run_format_code,
+    step_tool,
+    validate_steps,
+)
 from mcp_tools_py.utils.project_config import (
     get_pytest_addopts,
     resolve_coverage_source,
+    resolve_target_directories,
 )
 from mcp_tools_py.utils.python_environment import PythonEnvironment
 from mcp_tools_py.utils.tool_context import ToolContext
@@ -208,6 +215,85 @@ def _run_test(context: ToolContext, depth: str) -> ActionResult:
             shutil.rmtree(temp_dir, ignore_errors=True)
 
 
+def _run_format(context: ToolContext, depth: str) -> ActionResult:
+    """Run the formatter at `depth` and map the outcome onto an ActionResult.
+
+    Returns:
+        "error" if the formatter cannot be resolved, a formatter tool is
+        unavailable, target directories cannot be resolved, or a step
+        failed outside check mode; "findings" with one Finding per path
+        that would be reformatted in check mode; else "ok".
+    """
+    check_only = depth == "check"
+    project_dir = context.project_dir
+
+    try:
+        steps = resolve_steps(project_dir)
+        validate_steps(steps)
+    except ValueError as exc:
+        return ActionResult(status="error", summary=str(exc))
+
+    for step in steps:
+        tool = step_tool(step)
+        if not context.is_tool_available(tool):
+            return ActionResult(
+                status="error", summary=context.unavailable_message(tool)
+            )
+
+    dirs = resolve_target_directories(str(project_dir), None)
+    if isinstance(dirs, str):
+        return ActionResult(status="error", summary=dirs)
+
+    timeouts = {step: context.resolve_timeout(step_tool(step)) for step in steps}
+    results = run_format_code(
+        str(context.environment.interpreter),
+        project_dir,
+        dirs,
+        steps,
+        check_only,
+        timeouts=timeouts,
+        environment=context.tool_environment,
+    )
+    raw = "\n\n".join(result.output for result in results.values())
+
+    broken = [
+        step
+        for step, result in results.items()
+        if result.unparsable_files or (not result.success and not check_only)
+    ]
+    if broken:
+        action_result = ActionResult(
+            status="error",
+            summary=f"Formatting failed in step(s): {', '.join(broken)}",
+        )
+        action_result.raw = raw
+        return action_result
+
+    changed = sorted(
+        {path for result in results.values() for path in result.files_changed}
+    )
+    findings = (
+        [
+            Finding(
+                key=f"format|check|{path}",
+                message=f"{path} needs reformatting",
+                path=path,
+            )
+            for path in changed
+        ]
+        if check_only
+        else []
+    )
+    action_result = _result_from_findings(
+        error=None,
+        findings=findings,
+        ok_summary="Formatting is up to date.",
+        findings_summary=f"{len(changed)} file(s) need reformatting.",
+    )
+    action_result.raw = raw
+    return action_result
+
+
 class PythonToolkit(Toolkit):
     """mcp-coder's Python toolkit: runs mcp-tools-py's checkers directly."""
 
@@ -268,12 +354,14 @@ class PythonToolkit(Toolkit):
             The action outcome.
 
         Raises:
-            NotImplementedError: For any action other than "test" (steps 2
-                and 3 add "format" and "check").
+            NotImplementedError: For any action other than "test" and
+                "format" (step 3 adds "check").
         """
         context = _build_context(request.project_dir)
         if request.action == "test":
             return _run_test(context, request.depth)
+        if request.action == "format":
+            return _run_format(context, request.depth)
         raise NotImplementedError(request.action)
 
     def prompt_fragments(self) -> dict[str, str]:
