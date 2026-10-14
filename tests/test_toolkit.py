@@ -3,9 +3,9 @@
 from pathlib import Path
 
 import pytest
-from mcp_coder_utils.toolkit import ActionRequest, Finding
+from mcp_coder_utils.toolkit import ActionRequest, ActionResult, Finding
 
-from mcp_tools_py.toolkit import PythonToolkit, _result_from_findings
+from mcp_tools_py.toolkit import PythonToolkit, _merge, _result_from_findings
 from mcp_tools_py.utils.tool_context import ToolContext
 
 _EXPECTED_ACTIONS = {
@@ -97,6 +97,46 @@ def _write_coverage_project(project_dir: Path) -> None:
         'testpaths = ["tests"]\n'
         'pythonpath = ["src"]\n'
     )
+
+
+_CLEAN_SRC = '''"""Module docstring."""
+
+
+def add(a: int, b: int) -> int:
+    """Add two numbers."""
+    return a + b
+'''
+_MYPY_ERROR_SRC = '''"""Module docstring."""
+
+
+def add(a: int, b: int) -> str:
+    """Add two numbers."""
+    return a + b
+'''
+_PYLINT_ISSUE_SRC = '''"""Module docstring."""
+
+import os
+
+
+def add(a: int, b: int) -> int:
+    """Add two numbers."""
+    return a + b
+'''
+_BOTH_ISSUES_SRC = '''"""Module docstring."""
+
+import os
+
+
+def add(a: int, b: int) -> str:
+    """Add two numbers."""
+    return a + b
+'''
+
+
+def _write_check_project(project_dir: Path, source: str) -> None:
+    src_dir = project_dir / "src"
+    src_dir.mkdir()
+    (src_dir / "mod.py").write_text(source)
 
 
 class TestDescribe:
@@ -229,7 +269,7 @@ class TestRunTest:
 
     def test_unknown_action_raises(self, tmp_path: Path) -> None:
         request = ActionRequest(
-            action="check", depth="quick", project_dir=tmp_path, params={}
+            action="bogus", depth="quick", project_dir=tmp_path, params={}
         )
 
         with pytest.raises(NotImplementedError):
@@ -290,3 +330,162 @@ class TestRunFormat:
 
         assert result.status == "error"
         assert result.findings == []
+
+
+class TestMerge:
+    """Unit tests for `_merge`'s worst-status-wins semantics."""
+
+    def test_ok_and_ok_is_ok(self) -> None:
+        merged = _merge(
+            [
+                ActionResult(status="ok", summary="a"),
+                ActionResult(status="ok", summary="b"),
+            ]
+        )
+
+        assert merged.status == "ok"
+        assert merged.findings == []
+
+    def test_ok_and_findings_is_findings_with_concatenated_findings(self) -> None:
+        finding = Finding(key="f1", message="broke", path="a.py")
+        merged = _merge(
+            [
+                ActionResult(status="ok", summary="a"),
+                ActionResult(status="findings", summary="b", findings=[finding]),
+            ]
+        )
+
+        assert merged.status == "findings"
+        assert merged.findings == [finding]
+        assert merged.fix_text
+
+    def test_findings_and_error_is_error(self) -> None:
+        finding = Finding(key="f1", message="broke", path="a.py")
+        merged = _merge(
+            [
+                ActionResult(status="findings", summary="a", findings=[finding]),
+                ActionResult(status="error", summary="boom"),
+            ]
+        )
+
+        assert merged.status == "error"
+
+    def test_skipped_with_nothing_worse_stays_at_the_worse_of_the_two(self) -> None:
+        merged_ok = _merge(
+            [
+                ActionResult(status="skipped", summary="a"),
+                ActionResult(status="ok", summary="b"),
+            ]
+        )
+        finding = Finding(key="f1", message="broke", path="a.py")
+        merged_findings = _merge(
+            [
+                ActionResult(status="skipped", summary="a"),
+                ActionResult(status="findings", summary="b", findings=[finding]),
+            ]
+        )
+
+        assert merged_ok.status == "ok"
+        assert merged_findings.status == "findings"
+
+
+class TestRunCheck:
+    """run() for the `check` action, at each depth."""
+
+    def test_quick_clean_project_is_ok(self, tmp_path: Path) -> None:
+        _write_check_project(tmp_path, _CLEAN_SRC)
+        request = ActionRequest(
+            action="check", depth="quick", project_dir=tmp_path, params={}
+        )
+
+        result = PythonToolkit().run(request)
+
+        assert result.status == "ok"
+        assert result.findings == []
+
+    def test_quick_type_error_is_findings(self, tmp_path: Path) -> None:
+        _write_check_project(tmp_path, _MYPY_ERROR_SRC)
+        request = ActionRequest(
+            action="check", depth="quick", project_dir=tmp_path, params={}
+        )
+
+        result = PythonToolkit().run(request)
+
+        assert result.status == "findings"
+        assert len(result.findings) == 1
+        finding = result.findings[0]
+        assert finding.key.count("|") == 2
+        assert finding.path is not None and finding.path.endswith("mod.py")
+
+    def test_standard_merges_mypy_clean_pylint_issue(self, tmp_path: Path) -> None:
+        _write_check_project(tmp_path, _PYLINT_ISSUE_SRC)
+        request = ActionRequest(
+            action="check", depth="standard", project_dir=tmp_path, params={}
+        )
+
+        result = PythonToolkit().run(request)
+
+        assert result.status == "findings"
+        assert len(result.findings) == 1
+
+    def test_standard_both_tools_failing_concatenates_findings(
+        self, tmp_path: Path
+    ) -> None:
+        _write_check_project(tmp_path, _BOTH_ISSUES_SRC)
+        request = ActionRequest(
+            action="check", depth="standard", project_dir=tmp_path, params={}
+        )
+
+        result = PythonToolkit().run(request)
+
+        assert result.status == "findings"
+        assert len(result.findings) == 2
+
+    def test_unavailable_tool_short_circuits_before_running_anything(
+        self, tmp_path: Path, monkeypatch: pytest.MonkeyPatch
+    ) -> None:
+        _write_check_project(tmp_path, _CLEAN_SRC)
+        calls: list[str] = []
+        monkeypatch.setattr(
+            "mcp_tools_py.toolkit.run_mypy_check",
+            lambda *args, **kwargs: calls.append("mypy"),
+        )
+        monkeypatch.setattr(
+            "mcp_tools_py.toolkit.get_pylint_results",
+            lambda *args, **kwargs: calls.append("pylint"),
+        )
+        monkeypatch.setattr(
+            ToolContext,
+            "is_tool_available",
+            lambda self, tool_name: tool_name != "pylint",
+        )
+        request = ActionRequest(
+            action="check", depth="standard", project_dir=tmp_path, params={}
+        )
+
+        result = PythonToolkit().run(request)
+
+        assert result.status == "error"
+        assert calls == []
+
+
+class TestActionResultValidation:
+    """ActionResult's own status-validation rules, exercised directly."""
+
+    def test_unknown_status_raises(self) -> None:
+        with pytest.raises(ValueError):
+            ActionResult(status="bogus", summary="x")  # type: ignore[arg-type]
+
+    def test_findings_status_with_no_findings_raises(self) -> None:
+        with pytest.raises(ValueError):
+            ActionResult(status="findings", summary="x", findings=[])
+
+    def test_ok_status_with_findings_raises(self) -> None:
+        finding = Finding(key="f1", message="broke")
+        with pytest.raises(ValueError):
+            ActionResult(status="ok", summary="x", findings=[finding])
+
+    def test_skipped_status_with_findings_raises(self) -> None:
+        finding = Finding(key="f1", message="broke")
+        with pytest.raises(ValueError):
+            ActionResult(status="skipped", summary="x", findings=[finding])

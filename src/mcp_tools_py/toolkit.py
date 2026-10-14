@@ -9,7 +9,7 @@ instead of returning structured data.
 
 import shutil
 import tempfile
-from collections.abc import Mapping
+from collections.abc import Callable, Mapping
 from pathlib import Path
 from typing import Any
 
@@ -21,6 +21,8 @@ from mcp_coder_utils.toolkit import (
     ToolkitInfo,
 )
 
+from mcp_tools_py.code_checker_mypy.runners import run_mypy_check
+from mcp_tools_py.code_checker_pylint.runners import get_pylint_results
 from mcp_tools_py.code_checker_pytest.coverage import (
     coverage_args,
     format_coverage_digest,
@@ -294,6 +296,133 @@ def _run_format(context: ToolContext, depth: str) -> ActionResult:
     return action_result
 
 
+_STATUS_RANK: dict[str, int] = {"skipped": 0, "ok": 1, "findings": 2, "error": 3}
+
+
+def _merge(results: list[ActionResult]) -> ActionResult:
+    """Combine check results with worst-status-wins semantics.
+
+    Returns:
+        One ActionResult: status is the worst across `results` ("error" >
+        "findings" > "ok" > "skipped"), findings and non-empty raw outputs
+        concatenated, fix_text rebuilt from the merged findings.
+    """
+    worst = max(results, key=lambda result: _STATUS_RANK[result.status])
+    findings = [finding for result in results for finding in result.findings]
+    summary = "; ".join(result.summary for result in results)
+    raw = "\n\n".join(result.raw for result in results if result.raw)
+    fix_text = (
+        "\n".join(_finding_line(finding) for finding in findings) if findings else ""
+    )
+    return ActionResult(
+        status=worst.status,
+        summary=summary,
+        findings=findings,
+        raw=raw,
+        fix_text=fix_text,
+    )
+
+
+def _run_mypy(context: ToolContext) -> ActionResult:
+    """Run mypy and map the outcome onto an ActionResult.
+
+    Returns:
+        "error" if target directories cannot be resolved or mypy itself
+        errored; "findings" with one Finding per message; else "ok".
+    """
+    project_dir = str(context.project_dir)
+    dirs = resolve_target_directories(project_dir, None)
+    if isinstance(dirs, str):
+        return ActionResult(status="error", summary=dirs)
+
+    result = run_mypy_check(
+        project_dir,
+        python_executable=str(context.environment.interpreter),
+        target_directories=dirs,
+        timeout_seconds=context.resolve_timeout("mypy"),
+    )
+    findings = [
+        Finding(
+            key=f"{message.file}|{message.code}|{message.message}",
+            message=message.message,
+            path=message.file,
+            rule=message.code,
+            severity=message.severity,
+        )
+        for message in result.messages
+    ]
+    return _result_from_findings(
+        error=result.error,
+        findings=findings,
+        ok_summary="mypy found no issues.",
+        findings_summary=f"mypy found {len(findings)} issue(s).",
+    )
+
+
+def _run_pylint(context: ToolContext) -> ActionResult:
+    """Run pylint and map the outcome onto an ActionResult.
+
+    Returns:
+        "error" if target directories cannot be resolved or pylint itself
+        errored; "findings" with one Finding per message; else "ok".
+    """
+    project_dir = str(context.project_dir)
+    dirs = resolve_target_directories(project_dir, None)
+    if isinstance(dirs, str):
+        return ActionResult(status="error", summary=dirs)
+
+    result = get_pylint_results(
+        project_dir,
+        python_executable=str(context.environment.interpreter),
+        target_directories=dirs,
+        timeout_seconds=context.resolve_timeout("pylint"),
+    )
+    findings = [
+        Finding(
+            key=f"{message.path}|{message.message_id}|{message.message}",
+            message=message.message,
+            path=message.path,
+            rule=message.message_id,
+        )
+        for message in result.messages
+    ]
+    return _result_from_findings(
+        error=result.error,
+        findings=findings,
+        ok_summary="pylint found no issues.",
+        findings_summary=f"pylint found {len(findings)} issue(s).",
+    )
+
+
+_CHECK_DEPTHS: dict[str, tuple[str, ...]] = {
+    "quick": ("mypy",),
+    "standard": ("mypy", "pylint"),
+}  # "full" added in step 4
+
+_CHECK_RUNNERS: dict[str, Callable[[ToolContext], ActionResult]] = {
+    "mypy": _run_mypy,
+    "pylint": _run_pylint,
+}  # extended in step 4
+
+
+def _run_check(context: ToolContext, depth: str) -> ActionResult:
+    """Run the check tools declared for `depth` and merge their outcomes.
+
+    Returns:
+        "error" immediately if any tool declared for `depth` is
+        unavailable, without running any of them; otherwise the
+        worst-status-wins merge of each tool's ActionResult.
+    """
+    tools = _CHECK_DEPTHS[depth]
+    for tool in tools:
+        if not context.is_tool_available(tool):
+            return ActionResult(
+                status="error", summary=context.unavailable_message(tool)
+            )
+    results = [_CHECK_RUNNERS[tool](context) for tool in tools]
+    return _merge(results)
+
+
 class PythonToolkit(Toolkit):
     """mcp-coder's Python toolkit: runs mcp-tools-py's checkers directly."""
 
@@ -354,14 +483,16 @@ class PythonToolkit(Toolkit):
             The action outcome.
 
         Raises:
-            NotImplementedError: For any action other than "test" and
-                "format" (step 3 adds "check").
+            NotImplementedError: For any action other than "test", "format",
+                and "check".
         """
         context = _build_context(request.project_dir)
         if request.action == "test":
             return _run_test(context, request.depth)
         if request.action == "format":
             return _run_format(context, request.depth)
+        if request.action == "check":
+            return _run_check(context, request.depth)
         raise NotImplementedError(request.action)
 
     def prompt_fragments(self) -> dict[str, str]:
