@@ -666,3 +666,24 @@ class TestProbeScript:
 
         assert result.return_code != 0
         assert "nosuchmodule_xyz123" in result.stderr
+
+    def test_real_child_resolves_a_non_ascii_scope_path(self, tmp_path: Path) -> None:
+        """A resolved directory containing non-ASCII characters is not mangled.
+
+        A venv or site-packages path can contain an accented username or
+        similar; the reported directory must survive stdout's default
+        encoding on Windows rather than raising UnicodeEncodeError.
+        """
+        root = tmp_path / "café"
+        package = root / "pkg"
+        package.mkdir(parents=True)
+        (package / "__init__.py").write_text("", encoding="utf-8")
+
+        result = execute_command(
+            [sys.executable, str(probe_script_path()), "scope", "pkg"],
+            timeout_seconds=60,
+            env={"PYTHONPATH": str(root)},
+        )
+
+        assert result.return_code == 0, result.stderr
+        assert Path(result.stdout.strip()) == package

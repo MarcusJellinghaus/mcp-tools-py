@@ -362,7 +362,12 @@ def main(argv: list[str]) -> int:
         return 0
     if len(argv) == 3 and argv[1] == "scope":
         try:
-            sys.stdout.write(_scope(argv[2]))
+            directory = _scope(argv[2])
+            if isinstance(sys.stdout, io.TextIOWrapper):
+                # A resolved directory can contain non-ASCII characters, and
+                # the default encoding is the locale's on Windows.
+                sys.stdout.reconfigure(encoding="utf-8", errors="replace")
+            sys.stdout.write(directory)
         except LookupError as exc:
             print(str(exc), file=sys.stderr)
             return 1
