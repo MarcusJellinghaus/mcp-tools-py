@@ -1,0 +1,186 @@
+"""Tests for the library_search directory-search core."""
+
+import os
+from pathlib import Path
+
+import pytest
+
+from mcp_tools_py.library_search import (
+    _collect_files,
+    _match_glob,
+    _search_content,
+    search_in_directory,
+)
+
+
+def _make_tree(tmp_path: Path) -> Path:
+    (tmp_path / "pkg").mkdir()
+    (tmp_path / "pkg" / "__init__.py").write_text("x = 1\n", encoding="utf-8")
+    (tmp_path / "pkg" / "mod.py").write_text("def foo():\n    pass\n", encoding="utf-8")
+    (tmp_path / "pkg" / "types.pyi").write_text("x: int\n", encoding="utf-8")
+    (tmp_path / "pkg" / "__pycache__").mkdir()
+    (tmp_path / "pkg" / "__pycache__" / "mod.cpython-311.pyc").write_bytes(b"\x00\x01")
+    (tmp_path / "some.dist-info").mkdir()
+    (tmp_path / "some.dist-info" / "METADATA").write_text(
+        "Name: some\n", encoding="utf-8"
+    )
+    return tmp_path
+
+
+class TestCollectFiles:
+    """_collect_files walks root, excluding __pycache__ and *.dist-info."""
+
+    def test_lists_py_and_pyi_excludes_pycache_and_dist_info(
+        self, tmp_path: Path
+    ) -> None:
+        root = _make_tree(tmp_path)
+        files = _collect_files(root)
+        assert files == ["pkg/__init__.py", "pkg/mod.py", "pkg/types.pyi"]
+
+
+class TestMatchGlob:
+    """_match_glob uses pathspec/wildmatch semantics (unanchored by depth)."""
+
+    def test_bare_py_glob_matches_at_any_depth(self, tmp_path: Path) -> None:
+        root = _make_tree(tmp_path)
+        files = _collect_files(root)
+        matched = _match_glob("*.py", files)
+        assert matched == ["pkg/__init__.py", "pkg/mod.py"]
+
+
+class TestSearchContent:
+    """_search_content finds regex matches with context and truncation."""
+
+    def test_basic_match(self, tmp_path: Path) -> None:
+        root = _make_tree(tmp_path)
+        files = _collect_files(root)
+        import re
+
+        result = _search_content(files, re.compile("def foo"), root, 0, 50, 200)
+        assert result["mode"] == "content_search"
+        assert result["total_matches"] == 1
+        assert result["details"][0]["file"] == "pkg/mod.py"
+        assert result["details"][0]["line"] == 1
+
+    def test_context_lines(self, tmp_path: Path) -> None:
+        root = _make_tree(tmp_path)
+        files = _collect_files(root)
+        import re
+
+        result = _search_content(files, re.compile("pass"), root, 1, 50, 200)
+        assert result["details"][0]["text"] == "def foo():\n    pass"
+
+    def test_max_results_truncation(self, tmp_path: Path) -> None:
+        root = tmp_path
+        for i in range(5):
+            (root / f"f{i}.py").write_text("needle\n", encoding="utf-8")
+        files = _collect_files(root)
+        import re
+
+        result = _search_content(files, re.compile("needle"), root, 0, 2, 200)
+        assert result["truncated"] is True
+        assert len(result["details"]) == 2
+        assert result["total_matches"] == 5
+        assert "matched_files" in result
+
+    def test_max_result_lines_truncation_respects_char_budget(
+        self, tmp_path: Path
+    ) -> None:
+        root = tmp_path
+        line = "needle " + ("x" * 50) + "\n"
+        for i in range(5):
+            (root / f"f{i}.py").write_text(line, encoding="utf-8")
+        files = _collect_files(root)
+        import re
+
+        max_result_lines = 1
+        char_budget = max_result_lines * 120
+        result = _search_content(
+            files, re.compile("needle"), root, 0, 50, max_result_lines
+        )
+        chars_used = sum(len(d["text"]) for d in result["details"])
+        assert chars_used <= char_budget
+        assert result["truncated"] is True
+
+    def test_binary_file_silently_excluded_not_in_skipped(self, tmp_path: Path) -> None:
+        root = tmp_path
+        (root / "binary.py").write_bytes(b"\x00\x01\x02needle\xff\xfe")
+        (root / "text.py").write_text("needle\n", encoding="utf-8")
+        files = _collect_files(root)
+        import re
+
+        result = _search_content(files, re.compile("needle"), root, 0, 50, 200)
+        matched_files = {d["file"] for d in result["details"]}
+        assert "binary.py" not in matched_files
+        assert "text.py" in matched_files
+        assert result.get("skipped_files", []) == []
+
+    @pytest.mark.skipif(
+        os.name == "nt", reason="chmod-based unreadable file not reliable on Windows"
+    )
+    def test_unreadable_file_in_skipped_files(self, tmp_path: Path) -> None:
+        root = tmp_path
+        unreadable = root / "secret.py"
+        unreadable.write_text("needle\n", encoding="utf-8")
+        unreadable.chmod(0o000)
+        try:
+            files = _collect_files(root)
+            import re
+
+            result = _search_content(files, re.compile("needle"), root, 0, 50, 200)
+            assert "secret.py" in result.get("skipped_files", [])
+        finally:
+            unreadable.chmod(0o644)
+
+
+class TestSearchInDirectory:
+    """search_in_directory orchestrates glob, content search and scope_root."""
+
+    def test_file_search_mode_lists_everything_by_default(self, tmp_path: Path) -> None:
+        root = _make_tree(tmp_path)
+        result = search_in_directory(root)
+        assert result["mode"] == "file_search"
+        assert result["files"] == ["pkg/__init__.py", "pkg/mod.py", "pkg/types.pyi"]
+        assert result["total_files"] == 3
+        assert result["truncated"] is False
+
+    def test_scope_root_present_and_absolute_in_file_search(
+        self, tmp_path: Path
+    ) -> None:
+        root = _make_tree(tmp_path)
+        result = search_in_directory(root)
+        assert result["scope_root"] == str(root.resolve())
+        assert Path(result["scope_root"]).is_absolute()
+
+    def test_scope_root_present_and_absolute_in_content_search(
+        self, tmp_path: Path
+    ) -> None:
+        root = _make_tree(tmp_path)
+        result = search_in_directory(root, pattern="foo")
+        assert result["scope_root"] == str(root.resolve())
+        assert Path(result["scope_root"]).is_absolute()
+
+    def test_glob_filters_file_search(self, tmp_path: Path) -> None:
+        root = _make_tree(tmp_path)
+        result = search_in_directory(root, glob="*.pyi")
+        assert result["files"] == ["pkg/types.pyi"]
+
+    def test_content_search_with_glob(self, tmp_path: Path) -> None:
+        root = _make_tree(tmp_path)
+        result = search_in_directory(root, glob="*.py", pattern="foo")
+        assert result["mode"] == "content_search"
+        assert result["total_matches"] == 1
+        assert result["details"][0]["file"] == "pkg/mod.py"
+
+    def test_invalid_regex_falls_back_to_literal_and_adds_note(
+        self, tmp_path: Path
+    ) -> None:
+        root = _make_tree(tmp_path)
+        (tmp_path / "pkg" / "literal.py").write_text("a(b\n", encoding="utf-8")
+        result = search_in_directory(root, pattern="a(b")
+        assert result["note"] == (
+            "Pattern treated as literal text (invalid regex). "
+            "Use Python re syntax for regex search."
+        )
+        assert result["total_matches"] == 1
+        assert result["details"][0]["file"] == "pkg/literal.py"
