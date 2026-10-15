@@ -9,9 +9,16 @@ import os
 import re
 import sys
 from pathlib import Path
-from typing import Any, Dict, List, Optional
+from typing import TYPE_CHECKING, Any, Dict, List, Optional
 
 from pathspec import GitIgnoreSpec, RegexPattern
+
+from mcp_tools_py.log_utils import log_function_call
+from mcp_tools_py.utils.environment_info import resolve_scope
+from mcp_tools_py.utils.tool_context import ToolContext
+
+if TYPE_CHECKING:
+    from mcp_tools_py.utils.mcp_protocols import FastMCPProtocol
 
 # Mirrors mcp_workspace.file_tools.search's truncation budget: a single
 # pathological line must not crowd out the rest of the result.
@@ -215,3 +222,66 @@ def search_in_directory(
 
     result["scope_root"] = str(root.resolve())
     return result
+
+
+class LibrarySearchTools:
+    """Registers the search_library_files tool on an MCP server."""
+
+    def __init__(self, context: ToolContext) -> None:
+        """Store the context whose environment scopes resolve in.
+
+        Args:
+            context: The project and environment the tool works in.
+        """
+        self._context = context
+
+    def register(self, mcp: "FastMCPProtocol") -> None:
+        """Register the search_library_files tool."""
+        interpreter = str(self._context.environment.interpreter)
+
+        @mcp.tool()
+        @log_function_call
+        def search_library_files(
+            scope: str,
+            glob: Optional[str] = None,
+            pattern: Optional[str] = None,
+            context_lines: int = 0,
+            max_results: int = 50,
+            max_result_lines: int = 200,
+        ) -> Dict[str, Any]:
+            """Search file contents and/or find files by glob in an installed scope.
+
+            Greps/globs inside an installed package's source files anywhere in
+            the project's configured Python environment, including the
+            standard library — the inverse of get_library_source ("show me
+            this symbol" vs. "which file mentions this string").
+
+            Args:
+                scope: "stdlib", or a module or package name to search within.
+                glob: Glob pattern with gitignore/wildmatch semantics. Omitting
+                    both glob and pattern lists everything under the scope.
+                pattern: Python regex to match file contents. Invalid regex
+                    falls back to literal-text search.
+                context_lines: Number of context lines around matches.
+                max_results: Maximum number of results to return.
+                max_result_lines: Maximum total lines in result output.
+
+            Returns:
+                Either `{"error": <str>}`, or the full search_in_directory
+                result dict (always carrying `scope_root`).
+            """
+            resolution = resolve_scope(interpreter, scope)
+            if resolution.error is not None:
+                return {"error": resolution.error}
+            assert resolution.directory is not None
+            try:
+                return search_in_directory(
+                    Path(resolution.directory),
+                    glob,
+                    pattern,
+                    context_lines,
+                    max_results,
+                    max_result_lines,
+                )
+            except ValueError as exc:
+                return {"error": str(exc)}

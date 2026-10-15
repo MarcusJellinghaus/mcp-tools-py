@@ -1,16 +1,20 @@
-"""Tests for the library_search directory-search core."""
+"""Tests for the library_search directory-search core and MCP tool."""
 
 import os
 from pathlib import Path
+from unittest.mock import MagicMock, patch
 
 import pytest
 
 from mcp_tools_py.library_search import (
+    LibrarySearchTools,
     _collect_files,
     _match_glob,
     _search_content,
     search_in_directory,
 )
+from mcp_tools_py.utils.environment_info import ScopeResolution
+from mcp_tools_py.utils.tool_context import ToolContext
 
 
 def _make_tree(tmp_path: Path) -> Path:
@@ -184,3 +188,100 @@ class TestSearchInDirectory:
         )
         assert result["total_matches"] == 1
         assert result["details"][0]["file"] == "pkg/literal.py"
+
+
+class TestLibrarySearchTools:
+    """LibrarySearchTools wires resolve_scope and search_in_directory together."""
+
+    def test_scope_resolution_error_short_circuits(
+        self, tool_context: ToolContext
+    ) -> None:
+        mcp = MagicMock()
+        captured = {}
+
+        def _capture(fn):  # type: ignore[no-untyped-def]
+            captured["fn"] = fn
+            return fn
+
+        mcp.tool.return_value = _capture
+        LibrarySearchTools(tool_context).register(mcp)
+        search_library_files = captured["fn"]
+
+        with (
+            patch(
+                "mcp_tools_py.library_search.resolve_scope",
+                return_value=ScopeResolution(error="boom"),
+            ),
+            patch("mcp_tools_py.library_search.search_in_directory") as mock_search,
+        ):
+            result = search_library_files("mypy")
+
+            assert result == {"error": "boom"}
+            mock_search.assert_not_called()
+
+    def test_wiring_matches_direct_call(
+        self, tool_context: ToolContext, tmp_path: Path
+    ) -> None:
+        root = tmp_path / "scope_root"
+        root.mkdir()
+        (root / "a.py").write_text("def foo():\n    pass\n", encoding="utf-8")
+        (root / "b.py").write_text("def bar():\n    pass\n", encoding="utf-8")
+
+        mcp = MagicMock()
+        captured = {}
+
+        def _capture(fn):  # type: ignore[no-untyped-def]
+            captured["fn"] = fn
+            return fn
+
+        mcp.tool.return_value = _capture
+        LibrarySearchTools(tool_context).register(mcp)
+        search_library_files = captured["fn"]
+
+        with patch(
+            "mcp_tools_py.library_search.resolve_scope",
+            return_value=ScopeResolution(directory=str(root)),
+        ):
+            result = search_library_files(
+                "mypy", glob="*.py", pattern="foo", context_lines=0
+            )
+
+        expected = search_in_directory(
+            root, glob="*.py", pattern="foo", context_lines=0
+        )
+        assert result == expected
+
+    def test_unparseable_glob_returns_error_dict(
+        self, tool_context: ToolContext, tmp_path: Path
+    ) -> None:
+        mcp = MagicMock()
+        captured = {}
+
+        def _capture(fn):  # type: ignore[no-untyped-def]
+            captured["fn"] = fn
+            return fn
+
+        mcp.tool.return_value = _capture
+        LibrarySearchTools(tool_context).register(mcp)
+        search_library_files = captured["fn"]
+
+        with patch(
+            "mcp_tools_py.library_search.resolve_scope",
+            return_value=ScopeResolution(directory=str(tmp_path)),
+        ):
+            result = search_library_files("mypy", glob="!")
+
+        assert "error" in result
+
+    def test_registers_exactly_one_tool_named_search_library_files(
+        self, tool_context: ToolContext
+    ) -> None:
+        mcp = MagicMock()
+        decorator = MagicMock(side_effect=lambda fn: fn)
+        mcp.tool.return_value = decorator
+
+        LibrarySearchTools(tool_context).register(mcp)
+
+        assert mcp.tool.call_count == 1
+        registered_fn = decorator.call_args.args[0]
+        assert registered_fn.__name__ == "search_library_files"

@@ -43,9 +43,9 @@ This tracks **Feature Implementation** consisting of multiple **Tasks**.
 
 ### Step 4: library_search.py — LibrarySearchTools registrar
 
-- [ ] Implementation (tests + production code) — see [step_4.md](./steps/step_4.md)
-- [ ] Quality checks: pylint, pytest, mypy — fix all issues
-- [ ] Commit message prepared
+- [x] Implementation (tests + production code) — see [step_4.md](./steps/step_4.md)
+- [x] Quality checks: pylint, pytest, mypy — fix all issues
+- [x] Commit message prepared
 
 ### Step 5: wire into server, architecture configs, and docs
 
