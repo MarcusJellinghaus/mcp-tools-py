@@ -71,7 +71,8 @@
       "Skill(rebase)",
       "WebFetch(domain:*)",
       "mcp__mcp-workspace__search_files",
-      "mcp__mcp-workspace__search_reference_files"
+      "mcp__mcp-workspace__search_reference_files",
+      "mcp__mcp-tools-py__run_tach_check"
     ]
   },
   "enableAllProjectMcpServers": true,
