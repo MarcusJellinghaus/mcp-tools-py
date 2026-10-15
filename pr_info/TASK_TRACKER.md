@@ -49,8 +49,8 @@ This tracks **Feature Implementation** consisting of multiple **Tasks**.
 
 ### Step 5: wire into server, architecture configs, and docs
 
-- [ ] Implementation (production code + updated tests/docs) — see [step_5.md](./steps/step_5.md)
-- [ ] Quality checks: tach, lint-imports, pylint, pytest, mypy — fix all issues
+- [x] Implementation (production code + updated tests/docs) — see [step_5.md](./steps/step_5.md)
+- [x] Quality checks: tach, lint-imports, pylint, pytest, mypy — fix all issues
 - [ ] Commit message prepared
 
 ## Pull Request
