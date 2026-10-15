@@ -7,6 +7,7 @@ from typing import Optional
 from mcp_tools_py.checker_tools import CheckerTools
 from mcp_tools_py.formatter import FormatterTools
 from mcp_tools_py.inspect_library import InspectTools
+from mcp_tools_py.library_search import LibrarySearchTools
 from mcp_tools_py.log_utils import log_function_call
 from mcp_tools_py.refactoring import RefactoringTools
 from mcp_tools_py.utility_tools import UtilityTools
@@ -65,6 +66,7 @@ class ToolServer:
         RefactoringTools(self.context, timeout=refactoring_timeout).register(self.mcp)
         UtilityTools(self.context).register(self.mcp)
         InspectTools(self.context).register(self.mcp)
+        LibrarySearchTools(self.context).register(self.mcp)
 
     def _warn_missing_console_scripts(self) -> None:
         """Warn at startup about console scripts missing from the tool env.

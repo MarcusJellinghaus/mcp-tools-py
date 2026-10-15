@@ -11,10 +11,13 @@ from unittest.mock import MagicMock, patch
 import pytest
 
 from mcp_tools_py.utils.environment_info import (
+    PROBE_TIMEOUT_SECONDS,
     PROBED_MODULES,
+    EnvironmentInfo,
     get_environment_info,
     locate_packages,
     probe_script_path,
+    resolve_scope,
 )
 from mcp_tools_py.utils.subprocess_runner import execute_command
 from tests.conftest import make_command_result
@@ -414,6 +417,106 @@ class TestLocatePackages:
             assert mock_exec.call_count == 2
 
 
+class TestResolveScope:
+    """Test turning a scope name into the one directory it names."""
+
+    def test_stdlib_uses_cached_info_no_subprocess(self) -> None:
+        """`scope="stdlib"` is answered from the cached probe, not a subprocess."""
+        info = EnvironmentInfo(
+            version="3.11.9",
+            sys_path=(),
+            distributions={},
+            importable={},
+            stdlib="/some/stdlib",
+        )
+        with (
+            patch(
+                "mcp_tools_py.utils.environment_info.get_environment_info",
+                return_value=info,
+            ),
+            patch("mcp_tools_py.utils.environment_info.execute_command") as mock_exec,
+        ):
+            resolution = resolve_scope("/stdlib/python", "stdlib")
+
+            assert resolution.directory == "/some/stdlib"
+            assert resolution.error is None
+            mock_exec.assert_not_called()
+
+    def test_stdlib_failure_when_probe_untrustworthy(self) -> None:
+        """A failed probe leaves `stdlib` unresolved, and says why."""
+        info = EnvironmentInfo(
+            version="",
+            sys_path=(),
+            distributions={},
+            importable={},
+            error="boom",
+        )
+        with (
+            patch(
+                "mcp_tools_py.utils.environment_info.get_environment_info",
+                return_value=info,
+            ),
+            patch("mcp_tools_py.utils.environment_info.execute_command") as mock_exec,
+        ):
+            resolution = resolve_scope("/stdlib-fail/python", "stdlib")
+
+            assert resolution.directory is None
+            assert resolution.error is not None
+            assert "boom" in resolution.error
+            mock_exec.assert_not_called()
+
+    def test_package_scope_runs_the_scope_subcommand(self) -> None:
+        """A non-stdlib scope runs `probe.py scope NAME` uncached."""
+        with patch("mcp_tools_py.utils.environment_info.execute_command") as mock_exec:
+            mock_exec.return_value = make_command_result(stdout="/some/dir\n")
+
+            resolution = resolve_scope("/scope-pkg/python", "mypy")
+
+            assert resolution.directory == "/some/dir"
+            assert resolution.error is None
+            mock_exec.assert_called_once_with(
+                ["/scope-pkg/python", str(probe_script_path()), "scope", "mypy"],
+                timeout_seconds=PROBE_TIMEOUT_SECONDS,
+            )
+
+    def test_timeout_is_reported(self) -> None:
+        """A probe that times out yields a reason naming the scope."""
+        with patch("mcp_tools_py.utils.environment_info.execute_command") as mock_exec:
+            mock_exec.return_value = make_command_result(
+                return_code=-1,
+                timed_out=True,
+                execution_error="Process timed out after 30 seconds",
+            )
+
+            resolution = resolve_scope("/scope-timeout/python", "mypy")
+
+            assert resolution.directory is None
+            assert resolution.error is not None
+            assert "timed out" in resolution.error
+            assert "mypy" in resolution.error
+
+    def test_nonzero_exit_is_reported(self) -> None:
+        """A non-zero exit yields a reason quoting the child's stderr."""
+        with patch("mcp_tools_py.utils.environment_info.execute_command") as mock_exec:
+            mock_exec.return_value = make_command_result(
+                return_code=1, stderr="no module"
+            )
+
+            resolution = resolve_scope("/scope-fail/python", "mypy")
+
+            assert resolution.directory is None
+            assert resolution.error is not None
+            assert "no module" in resolution.error
+
+    def test_real_child_resolves_stdlib_package_scope(self) -> None:
+        """Resolving `scope="json"` under the real interpreter finds its package."""
+        resolution = resolve_scope(sys.executable, "json")
+
+        assert resolution.error is None
+        assert resolution.directory is not None
+        assert (Path(resolution.directory) / "__init__.py").is_file()
+
+
 class TestProbeScript:
     """Test the script itself, run under the current interpreter."""
 
@@ -515,3 +618,72 @@ class TestProbeScript:
         blob = json.loads(result.stdout)
         directories = blob["packages"]["ns.pkg"]
         assert [Path(directory) for directory in directories] == [tmp_path]
+
+    def test_real_child_reports_the_stdlib_directory(self) -> None:
+        """The info blob names this interpreter's stdlib directory."""
+        result = execute_command(
+            [sys.executable, str(probe_script_path()), "info", "json"],
+            timeout_seconds=60,
+        )
+
+        assert result.return_code == 0, result.stderr
+        blob = json.loads(result.stdout)
+        stdlib = Path(blob["stdlib"])
+        assert stdlib.is_dir()
+        assert (stdlib / "os.py").is_file()
+
+    def test_real_child_resolves_a_package_scope(self) -> None:
+        """`scope NAME` resolves a package name to its own directory."""
+        result = execute_command(
+            [sys.executable, str(probe_script_path()), "scope", "json"],
+            timeout_seconds=60,
+        )
+
+        assert result.return_code == 0, result.stderr
+        assert (Path(result.stdout.strip()) / "__init__.py").is_file()
+
+    def test_real_child_resolves_a_dotted_module_scope(self) -> None:
+        """A dotted module name resolves to its root package's directory."""
+        package_result = execute_command(
+            [sys.executable, str(probe_script_path()), "scope", "json"],
+            timeout_seconds=60,
+        )
+        module_result = execute_command(
+            [sys.executable, str(probe_script_path()), "scope", "json.decoder"],
+            timeout_seconds=60,
+        )
+
+        assert package_result.return_code == 0, package_result.stderr
+        assert module_result.return_code == 0, module_result.stderr
+        assert Path(module_result.stdout.strip()) == Path(package_result.stdout.strip())
+
+    def test_real_child_scope_reports_unknown_name(self) -> None:
+        """An unresolvable name fails with a message naming it."""
+        result = execute_command(
+            [sys.executable, str(probe_script_path()), "scope", "nosuchmodule_xyz123"],
+            timeout_seconds=60,
+        )
+
+        assert result.return_code != 0
+        assert "nosuchmodule_xyz123" in result.stderr
+
+    def test_real_child_resolves_a_non_ascii_scope_path(self, tmp_path: Path) -> None:
+        """A resolved directory containing non-ASCII characters is not mangled.
+
+        A venv or site-packages path can contain an accented username or
+        similar; the reported directory must survive stdout's default
+        encoding on Windows rather than raising UnicodeEncodeError.
+        """
+        root = tmp_path / "café"
+        package = root / "pkg"
+        package.mkdir(parents=True)
+        (package / "__init__.py").write_text("", encoding="utf-8")
+
+        result = execute_command(
+            [sys.executable, str(probe_script_path()), "scope", "pkg"],
+            timeout_seconds=60,
+            env={"PYTHONPATH": str(root)},
+        )
+
+        assert result.return_code == 0, result.stderr
+        assert Path(result.stdout.strip()) == package

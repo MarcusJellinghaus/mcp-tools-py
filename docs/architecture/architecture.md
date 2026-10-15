@@ -66,11 +66,11 @@ See `pyproject.toml` for version constraints.
 │   MCP Client    │◄─────────────►│   mcp-tools-py   │────────────────►│ pylint  pytest  │
 │                 │               │                  │                 │ mypy    ruff    │
 │ • Claude Code   │               │  (MCP Server)    │                 │ bandit  vulture │
-│ • Claude Desktop│               │  17 MCP tools:   │                 │ tach    black   │
+│ • Claude Desktop│               │  18 MCP tools:   │                 │ tach    black   │
 │ • VSCode        │               │  9 checker +     │                 │ isort           │
 │ • mcp-coder     │               │  1 formatter +   │                 │ lint-imports    │
 │                 │               │  5 refactoring + │                 └─────────────────┘
-│                 │               │  2 other         │   in-process    ┌─────────────────┐
+│                 │               │  3 other         │   in-process    ┌─────────────────┐
 └─────────────────┘               │                  │◄───────────────►│    jedi/rope    │
                                   └──────────────────┘                 │  (refactoring   │
                                            │                           │    library)     │
@@ -121,7 +121,8 @@ See `pyproject.toml` for version constraints.
 ├─────────────────────────────────────────────────────┤
 │  Tool Implementation Layer                          │
 │  ├── Registrars: checker_tools, formatter,          │
-│  │   refactoring, utility_tools, inspect_library    │
+│  │   refactoring, utility_tools, inspect_library,   │
+│  │   library_search                                 │
 │  └── Checkers: code_checker_{pytest, pylint, mypy,  │
 │      ruff, bandit, vulture, tach, lint_imports}     │
 ├─────────────────────────────────────────────────────┤
@@ -133,9 +134,9 @@ See `pyproject.toml` for version constraints.
 
 **Dependency Rules** (enforced by `tach.toml` and `.importlinter`):
 - Each layer may only depend on layers below it
-- `checker_tools` depends on the `code_checker_*` packages, never the reverse; the other registrars (`formatter`, `refactoring`, `utility_tools`, `inspect_library`) depend on none of them
+- `checker_tools` depends on the `code_checker_*` packages, never the reverse; the other registrars (`formatter`, `refactoring`, `utility_tools`, `inspect_library`, `library_search`) depend on none of them
 - Checker modules may NOT depend on each other
-- `utils` may NOT depend on anything above it: the `code_checker_*` packages, the registrars (`checker_tools`, `formatter`, `refactoring`, `utility_tools`, `inspect_library`) or `server`
+- `utils` may NOT depend on anything above it: the `code_checker_*` packages, the registrars (`checker_tools`, `formatter`, `refactoring`, `utility_tools`, `inspect_library`, `library_search`) or `server`
 - `mcp_coder_utils` may only be imported by the three shim modules — `log_utils`, `utils/file_utils.py` and `utils/subprocess_runner.py`; every other module imports it through them (`mcp_coder_utils_isolation` contract in `.importlinter`)
 
 ### Checker Module Pattern
@@ -160,17 +161,18 @@ registrar modules: `code_checker_ruff` backs two of them, `ruff_check_tool.py` a
 ### Module Overview
 
 - **`main.py`** — CLI entry point: argument parsing (`argparse`), logging setup, server creation
-- **`server.py`** — `ToolServer`: creates the FastMCP instance, builds the one `ToolContext`, and delegates registration to five registrars that each take it — `CheckerTools`, `FormatterTools`, `RefactoringTools`, `UtilityTools`, `InspectTools`. Exposes 17 tools total (9 checker + 1 formatter + 5 refactoring + 1 utility + 1 inspection)
+- **`server.py`** — `ToolServer`: creates the FastMCP instance, builds the one `ToolContext`, and delegates registration to six registrars that each take it — `CheckerTools`, `FormatterTools`, `RefactoringTools`, `UtilityTools`, `InspectTools`, `LibrarySearchTools`. Exposes 18 tools total (9 checker + 1 formatter + 5 refactoring + 1 utility + 1 inspection + 1 library search)
 - **`checker_tools/`** — `CheckerTools`: registers the 9 checker MCP tools, one `<tool>_tool.py` module each
 - **`formatter/`** — `FormatterTools`: registers `run_format_code`; `black_runner.py`, `isort_runner.py` and `ruff_runner.py` (`ruff_format`, `ruff_imports`) sequenced by `runner.py`, which also resolves the default steps; shared binary lookup, output and version helpers in `common.py`
 - **`refactoring/`** — `RefactoringTools`: registers 5 refactoring MCP tools (`list_symbols`, `find_references`, `move_symbol`, `rename_symbol`, `move_module`) powered by jedi and rope
 - **`utility_tools.py`** — `UtilityTools`: registers `sleep`
 - **`inspect_library.py`** — `InspectTools`: registers `get_library_source`, resolving a dotted import path to its source
+- **`library_search.py`** — `LibrarySearchTools`: registers `search_library_files`, greping/globbing inside an installed package's source files anywhere in the project's configured Python environment, including the standard library
 - **`code_checker_*`** — eight checker packages, one per external tool (pytest, pylint, mypy, ruff, bandit, vulture, tach, lint_imports), each following the Checker Module Pattern above
 - **`code_checker_pytest`** — the most complex of them: JSON report parsing, `OutputBuilder`, `show_details` logic, `ProcessResult` adapter, and the coverage digest (`coverage.py`: pytest-cov flags, coverage JSON, selection echo)
 - **`utils/python_environment.py`** — `PythonEnvironment`: the target interpreter, its script directory, and existence-checked console scripts. Pure path work, no subprocess
 - **`utils/environment_info.py`** — `EnvironmentInfo` and the cached one-shot probe: Python version, `sys.path`, installed distributions, and which of the `python -m` tools import. Also `locate_packages`, which asks the target interpreter where named packages live and splits the answer into directories safe to put on `PYTHONPATH`, ones that are its own site-packages, and names it could not locate — uncached, because that answer can change while the server runs
-- **`utils/target_scripts/probe.py`** — the script that probe runs, with three subcommands: `info` (the cached environment probe), `source` (library source for `get_library_source`) and `locate` (where a package lives, for the lint-imports `PYTHONPATH` bridge). Executed under the *target* interpreter by absolute path and stdlib-only, so it works in an environment that has never heard of `mcp_tools_py` (enforced by the `target-scripts-stdlib-only` contract). Not interchangeable with `refactoring/rope_cli.py`, which runs under `sys.executable` with `-m` precisely because it must import `mcp_tools_py`
+- **`utils/target_scripts/probe.py`** — the script that probe runs, with four subcommands: `info` (the cached environment probe), `source` (library source for `get_library_source`), `locate` (where a package lives, for the lint-imports `PYTHONPATH` bridge) and `scope` (a package's own directory, for `search_library_files`). Executed under the *target* interpreter by absolute path and stdlib-only, so it works in an environment that has never heard of `mcp_tools_py` (enforced by the `target-scripts-stdlib-only` contract). Not interchangeable with `refactoring/rope_cli.py`, which runs under `sys.executable` with `-m` precisely because it must import `mcp_tools_py`
 - **`utils/tool_context.py`** — `ToolContext`: the single argument every registrar takes — project directory and both environments (`environment`, the configured project env used by pytest, pylint and mypy; `tool_environment`, where mcp-tools-py runs, used by the seven console-script tools), plus the two questions a tool asks about its environment: is this tool there, and what to say when it is not
 - **`utils/mcp_protocols.py`** — `FastMCPProtocol`: the structural type of the server object a registrar registers against, so no tool module imports FastMCP
 - **`utils/subprocess_runner.py`** — thin re-export shim over `mcp_coder_utils.subprocess_runner`: `execute_command()`, `CommandResult`, STDIO isolation for Python commands, cross-platform process termination
@@ -251,11 +253,12 @@ See [README.md](../../README.md) for installation, CLI parameters, and MCP clien
 > it through `ToolContext.environment`. Never through the ambient process, never through
 > `VIRTUAL_ENV`.
 
-All five registrars take one `ToolContext`, which carries that environment; `UtilityTools`
+All six registrars take one `ToolContext`, which carries that environment; `UtilityTools`
 accepts it without needing it, so the signature stays uniform. `get_library_source`
-resolves the name in a child process under that interpreter, `list_symbols` and
-`find_references` hand it to jedi as its `environment_path`, and the checkers run in it.
-Nothing resolves a project name in the server's own process.
+resolves the name in a child process under that interpreter, `search_library_files`
+resolves its scope the same way, `list_symbols` and `find_references` hand it to jedi
+as its `environment_path`, and the checkers run in it. Nothing resolves a project name
+in the server's own process.
 
 ### Architecture Enforcement
 
@@ -268,7 +271,7 @@ See [dependencies/readme.md](dependencies/readme.md) for tool comparison, curren
 | pycycle | — | Circular dependency detection |
 | vulture | `vulture_whitelist.py` | Dead code detection |
 
-`.importlinter` holds four contracts: the layer contract, a forbidden-imports contract keeping `utils` free of imports from the `code_checker_*` packages, the registrars (`checker_tools`, `formatter`, `refactoring`, `utility_tools`, `inspect_library`) and `server`, `mcp_coder_utils_isolation`, which confines `mcp_coder_utils` imports to the three shim modules, and `target-scripts-stdlib-only`, which keeps `utils/target_scripts/` free of every project import. Only the shim exemptions remain as `ignore_imports`.
+`.importlinter` holds four contracts: the layer contract, a forbidden-imports contract keeping `utils` free of imports from the `code_checker_*` packages, the registrars (`checker_tools`, `formatter`, `refactoring`, `utility_tools`, `inspect_library`, `library_search`) and `server`, `mcp_coder_utils_isolation`, which confines `mcp_coder_utils` imports to the three shim modules, and `target-scripts-stdlib-only`, which keeps `utils/target_scripts/` free of every project import. Only the shim exemptions remain as `ignore_imports`.
 
 ### CI Pipeline
 

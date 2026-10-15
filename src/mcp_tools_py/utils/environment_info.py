@@ -66,6 +66,7 @@ class EnvironmentInfo:
         sys_path: The interpreter's ``sys.path``.
         distributions: Lowercased distribution name -> installed version.
         importable: Module name -> whether the interpreter can import it.
+        stdlib: The interpreter's standard library directory.
         error: Why the probe could not be trusted, or None when it succeeded.
     """
 
@@ -73,6 +74,20 @@ class EnvironmentInfo:
     sys_path: tuple[str, ...]
     distributions: Mapping[str, str]
     importable: Mapping[str, bool]
+    stdlib: str = ""
+    error: Optional[str] = None
+
+
+@dataclass(frozen=True)
+class ScopeResolution:
+    """The one directory a `search_library_files` scope resolves to.
+
+    Attributes:
+        directory: The resolved directory, or None on failure.
+        error: Why the scope could not be resolved, or None on success.
+    """
+
+    directory: Optional[str] = None
     error: Optional[str] = None
 
 
@@ -141,6 +156,38 @@ def locate_packages(
             elif directory not in usable:
                 usable.append(directory)
     return usable, skipped, unresolved
+
+
+def resolve_scope(interpreter: str, scope: str) -> ScopeResolution:
+    """Ask `interpreter` for the one directory `scope` names.
+
+    Args:
+        interpreter: Path to the Python interpreter to ask.
+        scope: ``"stdlib"``, or a module or package name.
+
+    Returns:
+        The resolved directory, or why resolution failed.
+    """
+    if scope == "stdlib":
+        info = get_environment_info(interpreter)
+        if info.error:
+            return ScopeResolution(
+                error=f"could not resolve scope 'stdlib': {info.error}"
+            )
+        return ScopeResolution(directory=info.stdlib)
+
+    result = execute_command(
+        [interpreter, str(probe_script_path()), "scope", scope],
+        timeout_seconds=PROBE_TIMEOUT_SECONDS,
+    )
+    if result.timed_out:
+        return ScopeResolution(
+            error=f"resolving scope '{scope}' timed out after {PROBE_TIMEOUT_SECONDS} seconds"
+        )
+    if result.execution_error or result.return_code != 0:
+        detail = result.execution_error or result.stderr.strip()[:STDERR_SNIPPET]
+        return ScopeResolution(error=f"could not resolve scope '{scope}': {detail}")
+    return ScopeResolution(directory=result.stdout.strip())
 
 
 def _parse_locate_blob(
@@ -257,6 +304,7 @@ def get_environment_info(interpreter: str) -> EnvironmentInfo:
             sys_path=tuple(blob["sys_path"]),
             distributions=blob["distributions"],
             importable=blob["importable"],
+            stdlib=blob.get("stdlib", ""),
         )
     except (ValueError, KeyError, TypeError):
         return _failed(f"probe of {interpreter} returned unparsable output")
