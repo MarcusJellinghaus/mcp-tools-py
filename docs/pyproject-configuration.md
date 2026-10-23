@@ -31,7 +31,7 @@ per-tool CLI flags, so a per-project value always wins over it.
 
 ### Per-tool keys
 
-`mypy-timeout`, `pylint-timeout`, `pytest-timeout`, `ruff-timeout`,
+`mypy-timeout`, `pylint-timeout`, `pytest-timeout`, `deptry-timeout`, `ruff-timeout`,
 `bandit-timeout`, `vulture-timeout`, `tach-timeout`, `lint-imports-timeout`,
 `black-timeout`, `isort-timeout`. Unknown keys in the section are ignored.
 

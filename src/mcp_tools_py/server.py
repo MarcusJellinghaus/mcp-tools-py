@@ -72,7 +72,7 @@ class ToolServer:
         """Warn at startup about console scripts missing from the tool env.
 
         Stores nothing: availability is answered at use time by the context.
-        The three `python -m` tools are left to the lazy probe.
+        The four `python -m` tools are left to the lazy probe.
         """
         for key in sorted(CONSOLE_SCRIPT_TOOLS):
             if self.context.tool_environment.binary(key) is None:

@@ -43,7 +43,7 @@ def _build_parser() -> argparse.ArgumentParser:
         The configured parser
     """
     parser = argparse.ArgumentParser(
-        description="MCP Tools Py Server - Run pylint, pytest, and mypy checks on Python code",
+        description="MCP Tools Py Server - Run pylint, pytest, mypy and other Python code checks",
         formatter_class=argparse.RawDescriptionHelpFormatter,
         epilog=r"""
 Examples:
