@@ -35,6 +35,7 @@ _EXPECTED_PERMISSIONS = {
             "mcp__mcp-tools-py__run_tach_check",
             "mcp__mcp-tools-py__run_ruff_check",
             "mcp__mcp-tools-py__run_bandit_check",
+            "mcp__mcp-tools-py__run_deptry_check",
         ],
     },
     "test": {

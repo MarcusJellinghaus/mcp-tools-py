@@ -6,6 +6,7 @@ import pytest
 from mcp_coder_utils.toolkit import ActionRequest
 
 from mcp_tools_py.code_checker_bandit.models import BanditMessage, BanditResult
+from mcp_tools_py.code_checker_deptry.runners import DeptryMessage, DeptryResult
 from mcp_tools_py.toolkit import PythonToolkit
 from mcp_tools_py.utils.ruff_parsing import RuffMessage
 from mcp_tools_py.utils.tool_context import ToolContext
@@ -163,6 +164,21 @@ def _patch_full_depth_clean(monkeypatch: pytest.MonkeyPatch) -> None:
         lambda *args, **kwargs: BanditResult(
             return_code=0, messages=[], errors=[], error=None
         ),
+    )
+    monkeypatch.setattr(
+        "mcp_tools_py.toolkit_checks.run_deptry_check_impl",
+        lambda *args, **kwargs: DeptryResult(return_code=0, messages=[]),
+    )
+
+
+def _deptry_message(module: str) -> DeptryMessage:
+    return DeptryMessage(
+        code="DEP002",
+        message=f"'{module}' defined as a dependency but not used in the codebase",
+        module=module,
+        file="pyproject.toml",
+        line=None,
+        column=None,
     )
 
 
@@ -366,6 +382,125 @@ class TestRunCheckFull:
         assert finding.rule == "B102"
         assert finding.severity == "MEDIUM"
 
+    def test_deptry_findings_have_one_key_per_module(
+        self, tmp_path: Path, monkeypatch: pytest.MonkeyPatch
+    ) -> None:
+        _write_check_project(tmp_path, _CLEAN_SRC)
+        _patch_full_depth_clean(monkeypatch)
+        monkeypatch.setattr(
+            "mcp_tools_py.toolkit_checks.run_deptry_check_impl",
+            lambda *args, **kwargs: DeptryResult(
+                return_code=1,
+                messages=[_deptry_message("requests"), _deptry_message("click")],
+            ),
+        )
+        request = ActionRequest(
+            action="check", depth="full", project_dir=tmp_path, params={}
+        )
+
+        result = PythonToolkit().run(request)
+
+        assert result.status == "findings"
+        assert [finding.key for finding in result.findings] == [
+            "pyproject.toml|DEP002|requests",
+            "pyproject.toml|DEP002|click",
+        ]
+        assert result.findings[0].path == "pyproject.toml"
+        assert result.findings[0].rule == "DEP002"
+
+    def test_deptry_error_is_error(
+        self, tmp_path: Path, monkeypatch: pytest.MonkeyPatch
+    ) -> None:
+        _write_check_project(tmp_path, _CLEAN_SRC)
+        _patch_full_depth_clean(monkeypatch)
+        monkeypatch.setattr(
+            "mcp_tools_py.toolkit_checks.run_deptry_check_impl",
+            lambda *args, **kwargs: DeptryResult(
+                return_code=2, messages=[], error="deptry exited with code 2"
+            ),
+        )
+        request = ActionRequest(
+            action="check", depth="full", project_dir=tmp_path, params={}
+        )
+
+        result = PythonToolkit().run(request)
+
+        assert result.status == "error"
+
+    def test_deptry_targets_exclude_tests(
+        self, tmp_path: Path, monkeypatch: pytest.MonkeyPatch
+    ) -> None:
+        _write_check_project(tmp_path, _CLEAN_SRC)
+        (tmp_path / "tests").mkdir()
+        _patch_full_depth_clean(monkeypatch)
+        captured: list[list[str]] = []
+
+        def fake_deptry(
+            python_executable: str,
+            project_dir: str,
+            target_directories: list[str],
+            **kwargs: object,
+        ) -> DeptryResult:
+            del python_executable, project_dir, kwargs
+            captured.append(target_directories)
+            return DeptryResult(return_code=0, messages=[])
+
+        monkeypatch.setattr(
+            "mcp_tools_py.toolkit_checks.run_deptry_check_impl", fake_deptry
+        )
+        request = ActionRequest(
+            action="check", depth="full", project_dir=tmp_path, params={}
+        )
+
+        PythonToolkit().run(request)
+
+        assert captured == [["src"]]
+
+    def test_deptry_unavailable_is_error_and_runs_nothing(
+        self, tmp_path: Path, monkeypatch: pytest.MonkeyPatch
+    ) -> None:
+        _write_check_project(tmp_path, _CLEAN_SRC)
+        calls: list[str] = []
+        monkeypatch.setattr(
+            "mcp_tools_py.toolkit_checks.run_mypy_check",
+            lambda *args, **kwargs: calls.append("mypy"),
+        )
+        monkeypatch.setattr(
+            "mcp_tools_py.toolkit_checks.run_deptry_check_impl",
+            lambda *args, **kwargs: calls.append("deptry"),
+        )
+        monkeypatch.setattr(
+            ToolContext,
+            "is_tool_available",
+            lambda self, tool_name: tool_name != "deptry",
+        )
+        request = ActionRequest(
+            action="check", depth="full", project_dir=tmp_path, params={}
+        )
+
+        result = PythonToolkit().run(request)
+
+        assert result.status == "error"
+        assert calls == []
+
+    def test_deptry_not_run_at_standard_depth(
+        self, tmp_path: Path, monkeypatch: pytest.MonkeyPatch
+    ) -> None:
+        _write_check_project(tmp_path, _CLEAN_SRC)
+        calls: list[str] = []
+        monkeypatch.setattr(
+            "mcp_tools_py.toolkit_checks.run_deptry_check_impl",
+            lambda *args, **kwargs: calls.append("deptry"),
+        )
+        request = ActionRequest(
+            action="check", depth="standard", project_dir=tmp_path, params={}
+        )
+
+        result = PythonToolkit().run(request)
+
+        assert result.status == "ok"
+        assert calls == []
+
     def test_unavailable_tool_short_circuits_before_running_anything(
         self, tmp_path: Path, monkeypatch: pytest.MonkeyPatch
     ) -> None:
@@ -398,6 +533,10 @@ class TestRunCheckFull:
         monkeypatch.setattr(
             "mcp_tools_py.toolkit_checks.run_bandit_check_impl",
             lambda *args, **kwargs: calls.append("bandit"),
+        )
+        monkeypatch.setattr(
+            "mcp_tools_py.toolkit_checks.run_deptry_check_impl",
+            lambda *args, **kwargs: calls.append("deptry"),
         )
         monkeypatch.setattr(
             ToolContext,
