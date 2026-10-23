@@ -4,6 +4,10 @@
 
 > Read `pr_info/steps/summary.md`, then implement `pr_info/steps/step_5.md`. Write the tests first, then the code. Use `checker_tools/bandit_tool.py` (structure, error handling) and `checker_tools/mypy_tool.py` (availability, `timeout_seconds`) as models. Run the checks listed in the summary and commit once.
 
+## Precondition
+
+The integration test runs real deptry, so deptry must be installed in the project env. Check with `mcp__mcp-tools-py__get_library_source("deptry")`. If it is not found, write one line to `pr_info/.blocked.txt` (`deptry is not installed in the project env; reinstall with the new dependency`) and stop.
+
 ## WHERE
 
 - `src/mcp_tools_py/checker_tools/deptry_tool.py` (new)

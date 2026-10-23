@@ -4,10 +4,6 @@
 
 > Read `pr_info/steps/summary.md`, then implement `pr_info/steps/step_2.md`. Write the tests first, then the code. Run the checks listed in the summary and commit once.
 
-## Precondition
-
-deptry must be installed in the project env, because later steps and the existing toolkit `full` tests depend on it. Check it with `mcp__mcp-tools-py__get_library_source("deptry")` after adding the dependency. If the module is not found, write one line to `pr_info/.blocked.txt` (`deptry is not installed in the project env; reinstall with the new dependency`) and stop.
-
 ## WHERE
 
 - `pyproject.toml`
