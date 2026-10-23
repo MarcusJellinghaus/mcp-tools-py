@@ -16,6 +16,7 @@ from mcp_tools_py.utils.project_config import (
     get_target_directories,
     read_pyproject_tool_tables,
     resolve_coverage_source,
+    resolve_source_directories,
     resolve_target_directories,
     validate_timeout,
 )
@@ -666,3 +667,41 @@ class TestResolveCoverageSource:
         with caplog.at_level(logging.WARNING):
             assert resolve_coverage_source(path, None) == ["src"]
         assert "defaulting to ['src']" in caplog.text
+
+
+class TestResolveSourceDirectories:
+    """Tests for the resolve_source_directories function."""
+
+    def test_explicit_returned_unchanged(self, tmp_path: object) -> None:
+        """An explicit list is returned as-is without reading pyproject.toml."""
+        path = str(tmp_path)
+        with open(os.path.join(path, "pyproject.toml"), "w", encoding="utf-8") as f:
+            f.write("invalid toml {{{{")
+        assert resolve_source_directories(path, ["pkg"]) == ["pkg"]
+
+    def test_default_src_excludes_tests(self, tmp_path: object) -> None:
+        """Missing sections default to src, and the tests dir is not included."""
+        path = str(tmp_path)
+        os.makedirs(os.path.join(path, "src"))
+        os.makedirs(os.path.join(path, "tests"))
+        assert resolve_source_directories(path, None) == ["src"]
+
+    def test_source_containing_tests_is_error(self, tmp_path: object) -> None:
+        """A source dir that contains a testpath is dropped, giving an error."""
+        path = str(tmp_path)
+        _write_layout(path, '["."]', '["tests"]', ["tests"])
+        result = resolve_source_directories(path, None)
+        assert isinstance(result, str)
+        assert result.startswith("Error resolving source directories:")
+        assert "Pass target_directories explicitly." in result
+        assert "coverage" not in result
+
+    def test_malformed_pyproject_is_error(self, tmp_path: object) -> None:
+        """Invalid TOML yields an error string, not an exception."""
+        path = str(tmp_path)
+        with open(os.path.join(path, "pyproject.toml"), "w", encoding="utf-8") as f:
+            f.write("invalid toml {{{{")
+        result = resolve_source_directories(path, None)
+        assert isinstance(result, str)
+        assert result.startswith("Error resolving source directories:")
+        assert "coverage" not in result
