@@ -5,6 +5,7 @@ from typing import TYPE_CHECKING, Any, Optional
 
 from mcp_tools_py.checker_tools import (
     bandit_tool,
+    deptry_tool,
     lint_imports_tool,
     mypy_tool,
     pylint_tool,
@@ -31,7 +32,7 @@ logger = logging.getLogger(__name__)
 
 
 class CheckerTools:
-    """Registers pylint, pytest, mypy, lint-imports, vulture, ruff check, ruff fix, bandit, and tach checker tools on an MCP server."""
+    """Registers pylint, pytest, mypy, lint-imports, vulture, ruff check, ruff fix, bandit, deptry, and tach checker tools on an MCP server."""
 
     def __init__(self, context: "ToolContext") -> None:
         self.context = context
@@ -46,6 +47,7 @@ class CheckerTools:
         ruff_check_tool.register(mcp, self)
         ruff_fix_tool.register(mcp, self)
         bandit_tool.register(mcp, self)
+        deptry_tool.register(mcp, self)
         tach_tool.register(mcp, self)
 
     def _format_pylint_result(self, pylint_prompt: Optional[str]) -> str:

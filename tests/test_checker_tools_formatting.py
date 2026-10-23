@@ -22,8 +22,8 @@ def checker_tools(tool_context: ToolContext) -> CheckerTools:
 # --- Registration tests ---
 
 
-def test_checker_tools_registers_nine_tools(tool_context: ToolContext) -> None:
-    """Test that CheckerTools.register() registers exactly 9 tools on an MCP server."""
+def test_checker_tools_registers_ten_tools(tool_context: ToolContext) -> None:
+    """Test that CheckerTools.register() registers exactly 10 tools on an MCP server."""
     mock_mcp = MagicMock()
     mock_decorator = MagicMock(side_effect=lambda fn: fn)
     mock_mcp.tool.return_value = mock_decorator
@@ -31,10 +31,10 @@ def test_checker_tools_registers_nine_tools(tool_context: ToolContext) -> None:
     checker = CheckerTools(tool_context)
     checker.register(mock_mcp)
 
-    # 9 tools: run_pylint_check, run_pytest_check, run_mypy_check,
+    # 10 tools: run_pylint_check, run_pytest_check, run_mypy_check,
     # run_lint_imports_check, run_vulture_check, run_ruff_check, run_ruff_fix,
-    # run_bandit_check, run_tach_check
-    assert mock_mcp.tool.call_count == 9
+    # run_bandit_check, run_deptry_check, run_tach_check
+    assert mock_mcp.tool.call_count == 10
 
 
 # --- Pylint formatting tests ---
