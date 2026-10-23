@@ -21,6 +21,41 @@ This tracks **Feature Implementation** consisting of multiple **Tasks**.
 
 ## Tasks
 
-<!-- Tasks populated from pr_info/steps/ by prepare_task_tracker -->
+### Step 1: `resolve_source_directories` — [step_1.md](./steps/step_1.md)
+- [ ] Implementation (tests + production code)
+- [ ] Quality checks: pylint, pytest, mypy — fix all issues
+- [ ] Commit message prepared
+
+### Step 2: Register deptry as a `python -m` tool — [step_2.md](./steps/step_2.md)
+- [ ] Implementation (tests + production code)
+- [ ] Quality checks: pylint, pytest, mypy — fix all issues
+- [ ] Commit message prepared
+
+### Step 3: `code_checker_deptry/runners.py` — model, parser, runner — [step_3.md](./steps/step_3.md)
+- [ ] Implementation (tests + production code)
+- [ ] Quality checks: pylint, pytest, mypy — fix all issues
+- [ ] Commit message prepared
+
+### Step 4: `code_checker_deptry/reporting.py` — the digest — [step_4.md](./steps/step_4.md)
+- [ ] Implementation (tests + production code)
+- [ ] Quality checks: pylint, pytest, mypy — fix all issues
+- [ ] Commit message prepared
+
+### Step 5: MCP tool `run_deptry_check` — [step_5.md](./steps/step_5.md)
+- [ ] Implementation (tests + production code)
+- [ ] Quality checks: pylint, pytest, mypy — fix all issues
+- [ ] Commit message prepared
+
+### Step 6: Toolkit `check` → `full` runs deptry — [step_6.md](./steps/step_6.md)
+- [ ] Implementation (tests + production code)
+- [ ] Quality checks: pylint, pytest, mypy — fix all issues
+- [ ] Commit message prepared
+
+### Step 7: Docs and wording — [step_7.md](./steps/step_7.md)
+- [ ] Implementation (docstrings and docs)
+- [ ] Quality checks: pylint, pytest, mypy — fix all issues
+- [ ] Commit message prepared
 
 ## Pull Request
+- [ ] PR review: review the full branch diff against `main`
+- [ ] PR summary prepared
