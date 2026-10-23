@@ -13,6 +13,8 @@ import pytest
 from mcp_tools_py.utils.environment_info import (
     PROBE_TIMEOUT_SECONDS,
     PROBED_MODULES,
+    TOOL_DISTRIBUTIONS,
+    TOOL_MODULES,
     EnvironmentInfo,
     get_environment_info,
     locate_packages,
@@ -31,6 +33,16 @@ _BLOB = json.dumps(
         "importable": {"pylint": True, "pytest": True, "mypy": False},
     }
 )
+
+
+class TestToolTables:
+    """Test the derived module and distribution tables."""
+
+    def test_deptry_is_a_module_tool(self) -> None:
+        """deptry runs as `python -m deptry`, so the probe asks about it."""
+        assert TOOL_MODULES["deptry"] == "deptry"
+        assert "deptry" in PROBED_MODULES
+        assert "deptry" in TOOL_DISTRIBUTIONS
 
 
 class TestGetEnvironmentInfo:

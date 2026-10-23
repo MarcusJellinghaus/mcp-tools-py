@@ -5,11 +5,15 @@ from collections.abc import Callable
 from mcp_coder_utils.toolkit import ActionResult, Finding
 
 from mcp_tools_py.code_checker_bandit.runners import run_bandit_check_impl
+from mcp_tools_py.code_checker_deptry.runners import run_deptry_check_impl
 from mcp_tools_py.code_checker_lint_imports.runners import run_lint_imports_check_impl
 from mcp_tools_py.code_checker_mypy.runners import run_mypy_check
 from mcp_tools_py.code_checker_pylint.runners import get_pylint_results
 from mcp_tools_py.code_checker_vulture.runners import run_vulture_check
-from mcp_tools_py.utils.project_config import resolve_target_directories
+from mcp_tools_py.utils.project_config import (
+    resolve_source_directories,
+    resolve_target_directories,
+)
 from mcp_tools_py.utils.ruff_parsing import parse_ruff_json_output
 from mcp_tools_py.utils.subprocess_runner import execute_command
 from mcp_tools_py.utils.tool_context import ToolContext
@@ -401,6 +405,46 @@ def _run_bandit(context: ToolContext, depth: str) -> ActionResult:
     )
 
 
+def _run_deptry(context: ToolContext, depth: str) -> ActionResult:
+    """Run deptry and map the outcome onto an ActionResult.
+
+    `depth` is accepted but unused, so the signature matches every other
+    `_CHECK_RUNNERS` entry. Targets exclude test paths, so test-only imports
+    are not reported as DEP004.
+
+    Returns:
+        "error" if source directories cannot be resolved or deptry itself
+        errored; "findings" with one Finding per message; else "ok".
+    """
+    del depth
+    project_dir = str(context.project_dir)
+    dirs = resolve_source_directories(project_dir, None)
+    if isinstance(dirs, str):
+        return ActionResult(status="error", summary=dirs)
+
+    result = run_deptry_check_impl(
+        str(context.environment.interpreter),
+        project_dir,
+        dirs,
+        timeout_seconds=context.resolve_timeout("deptry"),
+    )
+    findings = [
+        Finding(
+            key=f"{message.file}|{message.code}|{message.module}",
+            message=message.message,
+            path=message.file,
+            rule=message.code,
+        )
+        for message in result.messages
+    ]
+    return _result_from_findings(
+        error=result.error,
+        findings=findings,
+        ok_summary="deptry found no issues.",
+        findings_summary=f"deptry found {len(findings)} issue(s).",
+    )
+
+
 _CHECK_DEPTHS: dict[str, tuple[str, ...]] = {
     "quick": ("mypy",),
     "standard": ("mypy", "pylint"),
@@ -412,6 +456,7 @@ _CHECK_DEPTHS: dict[str, tuple[str, ...]] = {
         "tach",
         "ruff",
         "bandit",
+        "deptry",
     ),
 }
 
@@ -424,6 +469,7 @@ _CHECK_RUNNERS: dict[str, Callable[[ToolContext, str], ActionResult]] = {
     "tach": _run_tach,
     "ruff": _run_ruff,
     "bandit": _run_bandit,
+    "deptry": _run_deptry,
 }
 
 

@@ -47,6 +47,8 @@ check, ruff fix, bandit, vulture, and `run_format_code`) auto-detect directories
 - **Source dirs** from `[tool.setuptools.packages.find] where` (fallback: `["src"]`)
 - **Test dirs** from `[tool.pytest.ini_options] testpaths` (fallback: `["tests"]`)
 
+`run_deptry_check` auto-detects source directories only, excluding test paths.
+
 Only directories that exist on disk are included. You can override auto-detection
 by passing an explicit list:
 
@@ -118,7 +120,7 @@ mcp-tools-py --project-dir /path/to/project [options]
 #### Python Configuration
 | Parameter | Type | Default | Description |
 |-----------|------|---------|-------------|
-| `--python-executable` | string | sys.executable | Path to the Python interpreter of the project's environment. pytest, pylint and mypy run in it and library/symbol lookups resolve against it, so it must be the environment holding the project's dependencies. black, isort, ruff, bandit, vulture, tach and lint-imports come from mcp-tools-py's own environment and need not be installed here. A bare name is looked up on PATH; a path that neither exists nor resolves fails at startup |
+| `--python-executable` | string | sys.executable | Path to the Python interpreter of the project's environment. pytest, pylint, mypy and deptry run in it and library/symbol lookups resolve against it, so it must be the environment holding the project's dependencies, with deptry installed. black, isort, ruff, bandit, vulture, tach and lint-imports come from mcp-tools-py's own environment and need not be installed here. A bare name is looked up on PATH; a path that neither exists nor resolves fails at startup |
 | `--venv-path` | string | None | **Deprecated**, hidden from `--help`. Still accepted, and still resolves the interpreter (taking precedence over `--python-executable`), but no longer used to locate tools. Use `--python-executable` instead |
 
 #### Test Configuration
@@ -152,7 +154,7 @@ mcp-tools-py --project-dir /path/to/project [options]
 
 Two environments are in play, and only one of them is configurable:
 
-- **project env** — named by `--python-executable`. It holds your project's dependencies, and pytest, pylint and mypy, which have to import those dependencies to do their work. Library and symbol resolution (`get_library_source`, `list_symbols`, `find_references`) follows the same interpreter, so pointing the flag at the wrong venv makes those tools resolve against the wrong packages.
+- **project env** — named by `--python-executable`. It holds your project's dependencies, and pytest, pylint, mypy and deptry, which have to import or inspect those dependencies to do their work. Library and symbol resolution (`get_library_source`, `list_symbols`, `find_references`) follows the same interpreter, so pointing the flag at the wrong venv makes those tools resolve against the wrong packages.
 - **tool env** — where `mcp_tools_py` itself is installed. It supplies black, isort, ruff, bandit, vulture, tach and lint-imports, which are mcp-tools-py's own dependencies. It is **not** configurable.
 
 Those seven therefore run at the tool env's versions, which may differ from what your project pins, so a project that cares about parity with its CI should keep compatible ranges in both places. lint-imports still checks your working tree: it runs from the tool env, but finds the project's root package, read from the import-linter config and located through the project interpreter. A custom `contract_types` entry inside that root package still resolves through the same bridge; one that lives in a separate distribution installed only in the project env does not, since only the root package's directory is handed over.
@@ -450,7 +452,7 @@ npx @modelcontextprotocol/inspector mcp-tools-py --project-dir /path/to/project
 
 ## Available Tools
 
-The server exposes 17 MCP tools.
+The server exposes 19 MCP tools.
 
 | Tool | What it does |
 |------|--------------|
@@ -460,6 +462,7 @@ The server exposes 17 MCP tools.
 | `run_ruff_check` | Ruff lint analysis, read-only |
 | `run_ruff_fix` | Applies ruff's safe fixes in place; unsafe fixes are opt-in |
 | `run_bandit_check` | Security lint |
+| `run_deptry_check` | Declared dependencies vs. imports (deptry) |
 | `run_vulture_check` | Dead-code detection against `vulture_whitelist.py` |
 | `run_tach_check` | Architectural boundary validation from `tach.toml` |
 | `run_lint_imports_check` | Import-contract validation from `.importlinter` |
@@ -470,6 +473,7 @@ The server exposes 17 MCP tools.
 | `rename_symbol` | Renames a module-level symbol project-wide |
 | `move_module` | Moves a module into another package, updating references |
 | `get_library_source` | Resolves a dotted import path in the configured project environment and returns its source |
+| `search_library_files` | Greps or globs inside an installed package's source files, including the standard library |
 | `sleep` | Pauses execution for a given number of seconds |
 
 Parameters for pylint, pytest and mypy are documented under [Features](#features).

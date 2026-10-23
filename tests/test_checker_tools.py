@@ -202,6 +202,23 @@ def test_bandit_passes_resolved_timeout(tool_context: ToolContext) -> None:
     assert mock_runner.call_args[1]["timeout_seconds"] == 120
 
 
+# --- Deptry handler tests ---
+
+
+def test_deptry_passes_resolved_timeout(tool_context: ToolContext) -> None:
+    """The resolved timeout is passed to run_deptry_check_impl."""
+    run_deptry = _capture_tool(tool_context, "run_deptry_check")
+
+    with patch(
+        "mcp_tools_py.checker_tools.deptry_tool.run_deptry_check_impl",
+    ) as mock_runner:
+        mock_runner.return_value.error = None
+        mock_runner.return_value.messages = []
+        run_deptry(target_directories=["src"], timeout_seconds=7)
+
+    assert mock_runner.call_args.kwargs["timeout_seconds"] == 7
+
+
 # --- Ruff handler tests ---
 
 

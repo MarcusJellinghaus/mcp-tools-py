@@ -6,7 +6,7 @@ its own environment — is this tool there, and what do I say when it is not.
 
 Which environment answers depends on the tool.  The seven console-script tools
 are mcp-tools-py's own dependencies and are answered from `tool_environment`;
-the three `python -m` tools must import the project's dependencies and are
+the four `python -m` tools must import the project's dependencies and are
 answered from `environment`, the interpreter `--python-executable` names.
 """
 
@@ -40,7 +40,7 @@ class ToolContext:
     Attributes:
         project_dir: Path to the project the tools run against.
         environment: The project's Python environment, named by
-            `--python-executable`.  pytest, pylint and mypy run in it, and
+            `--python-executable`.  pytest, pylint, mypy and deptry run in it, and
             Python names resolve against it.
         test_folder: Path to the test folder, relative to `project_dir`.
         keep_temp_files: Whether to keep temporary files after a test run.

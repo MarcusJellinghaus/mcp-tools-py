@@ -304,6 +304,7 @@ class PythonToolkit(Toolkit):
                         "mcp__mcp-tools-py__run_tach_check",
                         "mcp__mcp-tools-py__run_ruff_check",
                         "mcp__mcp-tools-py__run_bandit_check",
+                        "mcp__mcp-tools-py__run_deptry_check",
                     ],
                 },
                 "test": {
@@ -368,6 +369,9 @@ class PythonToolkit(Toolkit):
         """
         return {
             "language_context": "This is a Python project.",
-            "check_instructions": "Run pylint, mypy and pytest via the MCP tools.",
+            "check_instructions": (
+                "Run pylint, mypy and pytest via the MCP tools. At full depth, "
+                "also run the other checkers, including deptry."
+            ),
             "fix.check": _FIX_CHECK_PROMPT,
         }

@@ -8,14 +8,14 @@
 ## 1. Introduction & Goals
 
 ### System Purpose
-MCP server providing automated code quality checking (pylint, pytest, mypy, ruff, bandit, vulture, tach, import-linter), code formatting (isort and black, or ruff) and Python refactoring tools (powered by jedi and rope) for Python projects, with LLM-optimized output designed for AI-assisted development workflows.
+MCP server providing automated code quality checking (pylint, pytest, mypy, deptry, ruff, bandit, vulture, tach, import-linter), code formatting (isort and black, or ruff) and Python refactoring tools (powered by jedi and rope) for Python projects, with LLM-optimized output designed for AI-assisted development workflows.
 
 **Scope:** This server covers Python projects only. Support for other languages can be provided through separate, dedicated MCP servers with similar functionality.
 
 Compared to a general-purpose bash MCP tool, this server offers a more controlled approach: only a defined set of tools can be executed, all operations are sandboxed within `project_dir`, output is size-limited to reduce context load, and behavior is transparent via open source code and detailed structured logging.
 
 ### Key Features
-- **Checker Integrations**: Eight checkers exposed as nine tools — pylint, pytest, mypy, ruff (check and fix), bandit, vulture, tach, import-linter — each formatting findings as an LLM-actionable prompt
+- **Checker Integrations**: Nine checkers exposed as ten tools — pylint, pytest, mypy, deptry, ruff (check and fix), bandit, vulture, tach, import-linter — each formatting findings as an LLM-actionable prompt
 - **Formatting**: isort and black, or ruff's import sort and `ruff format`, behind a single `run_format_code` tool that picks the formatter from `pyproject.toml`
 - **Refactoring Tools**: Symbol listing, reference finding, symbol/module moving, and renaming via jedi and rope
 - **Library Inspection**: `get_library_source` resolves a dotted import path to its source
@@ -45,7 +45,7 @@ Compared to a general-purpose bash MCP tool, this server offers a more controlle
 
 ### Dependencies
 
-**Runtime**: `mcp`, `mcp[cli]`, `pylint`, `pytest` + `pytest-json-report` + `pytest-asyncio` + `pytest-xdist`, `mypy`, `ruff`, `bandit`, `vulture`, `tach`, `import-linter`, `black`, `isort`, `jedi`, `rope`, `structlog` + `python-json-logger`, `pathspec`, `igittigitt`, `mcp-coder-utils`
+**Runtime**: `mcp`, `mcp[cli]`, `pylint`, `pytest` + `pytest-json-report` + `pytest-asyncio` + `pytest-xdist`, `mypy`, `deptry`, `ruff`, `bandit`, `vulture`, `tach`, `import-linter`, `black`, `isort`, `jedi`, `rope`, `structlog` + `python-json-logger`, `pathspec`, `igittigitt`, `mcp-coder-utils`
 
 **Development**: `mcp-workspace`, `pycycle`, `pydeps`
 
@@ -66,8 +66,8 @@ See `pyproject.toml` for version constraints.
 │   MCP Client    │◄─────────────►│   mcp-tools-py   │────────────────►│ pylint  pytest  │
 │                 │               │                  │                 │ mypy    ruff    │
 │ • Claude Code   │               │  (MCP Server)    │                 │ bandit  vulture │
-│ • Claude Desktop│               │  18 MCP tools:   │                 │ tach    black   │
-│ • VSCode        │               │  9 checker +     │                 │ isort           │
+│ • Claude Desktop│               │  19 MCP tools:   │                 │ tach    black   │
+│ • VSCode        │               │  10 checker +    │                 │ isort   deptry  │
 │ • mcp-coder     │               │  1 formatter +   │                 │ lint-imports    │
 │                 │               │  5 refactoring + │                 └─────────────────┘
 │                 │               │  3 other         │   in-process    ┌─────────────────┐
@@ -124,7 +124,8 @@ See `pyproject.toml` for version constraints.
 │  │   refactoring, utility_tools, inspect_library,   │
 │  │   library_search                                 │
 │  └── Checkers: code_checker_{pytest, pylint, mypy,  │
-│      ruff, bandit, vulture, tach, lint_imports}     │
+│      deptry, ruff, bandit, vulture, tach,           │
+│      lint_imports}                                  │
 ├─────────────────────────────────────────────────────┤
 │  Utilities Layer                                    │
 │  ├── mcp_tools_py.utils                             │
@@ -154,26 +155,26 @@ when the tool needs them — simple checkers (`vulture`, `tach`, `lint_imports`)
 | `utils.py` | Module-specific helpers (optional; pytest and pylint only) |
 
 Checkers are exposed by registrar modules, `checker_tools/<tool>_tool.py`, each holding a
-single `register(mcp, checker_tools)` function. The eight checker packages have nine
+single `register(mcp, checker_tools)` function. The nine checker packages have ten
 registrar modules: `code_checker_ruff` backs two of them, `ruff_check_tool.py` and
 `ruff_fix_tool.py`. `checker_tools` was a single module until #202 split it per tool.
 
 ### Module Overview
 
 - **`main.py`** — CLI entry point: argument parsing (`argparse`), logging setup, server creation
-- **`server.py`** — `ToolServer`: creates the FastMCP instance, builds the one `ToolContext`, and delegates registration to six registrars that each take it — `CheckerTools`, `FormatterTools`, `RefactoringTools`, `UtilityTools`, `InspectTools`, `LibrarySearchTools`. Exposes 18 tools total (9 checker + 1 formatter + 5 refactoring + 1 utility + 1 inspection + 1 library search)
-- **`checker_tools/`** — `CheckerTools`: registers the 9 checker MCP tools, one `<tool>_tool.py` module each
+- **`server.py`** — `ToolServer`: creates the FastMCP instance, builds the one `ToolContext`, and delegates registration to six registrars that each take it — `CheckerTools`, `FormatterTools`, `RefactoringTools`, `UtilityTools`, `InspectTools`, `LibrarySearchTools`. Exposes 19 tools total (10 checker + 1 formatter + 5 refactoring + 1 utility + 1 inspection + 1 library search)
+- **`checker_tools/`** — `CheckerTools`: registers the 10 checker MCP tools, one `<tool>_tool.py` module each
 - **`formatter/`** — `FormatterTools`: registers `run_format_code`; `black_runner.py`, `isort_runner.py` and `ruff_runner.py` (`ruff_format`, `ruff_imports`) sequenced by `runner.py`, which also resolves the default steps; shared binary lookup, output and version helpers in `common.py`
 - **`refactoring/`** — `RefactoringTools`: registers 5 refactoring MCP tools (`list_symbols`, `find_references`, `move_symbol`, `rename_symbol`, `move_module`) powered by jedi and rope
 - **`utility_tools.py`** — `UtilityTools`: registers `sleep`
 - **`inspect_library.py`** — `InspectTools`: registers `get_library_source`, resolving a dotted import path to its source
 - **`library_search.py`** — `LibrarySearchTools`: registers `search_library_files`, greping/globbing inside an installed package's source files anywhere in the project's configured Python environment, including the standard library
-- **`code_checker_*`** — eight checker packages, one per external tool (pytest, pylint, mypy, ruff, bandit, vulture, tach, lint_imports), each following the Checker Module Pattern above
+- **`code_checker_*`** — nine checker packages, one per external tool (pytest, pylint, mypy, deptry, ruff, bandit, vulture, tach, lint_imports), each following the Checker Module Pattern above
 - **`code_checker_pytest`** — the most complex of them: JSON report parsing, `OutputBuilder`, `show_details` logic, `ProcessResult` adapter, and the coverage digest (`coverage.py`: pytest-cov flags, coverage JSON, selection echo)
 - **`utils/python_environment.py`** — `PythonEnvironment`: the target interpreter, its script directory, and existence-checked console scripts. Pure path work, no subprocess
 - **`utils/environment_info.py`** — `EnvironmentInfo` and the cached one-shot probe: Python version, `sys.path`, installed distributions, and which of the `python -m` tools import. Also `locate_packages`, which asks the target interpreter where named packages live and splits the answer into directories safe to put on `PYTHONPATH`, ones that are its own site-packages, and names it could not locate — uncached, because that answer can change while the server runs
 - **`utils/target_scripts/probe.py`** — the script that probe runs, with four subcommands: `info` (the cached environment probe), `source` (library source for `get_library_source`), `locate` (where a package lives, for the lint-imports `PYTHONPATH` bridge) and `scope` (a package's own directory, for `search_library_files`). Executed under the *target* interpreter by absolute path and stdlib-only, so it works in an environment that has never heard of `mcp_tools_py` (enforced by the `target-scripts-stdlib-only` contract). Not interchangeable with `refactoring/rope_cli.py`, which runs under `sys.executable` with `-m` precisely because it must import `mcp_tools_py`
-- **`utils/tool_context.py`** — `ToolContext`: the single argument every registrar takes — project directory and both environments (`environment`, the configured project env used by pytest, pylint and mypy; `tool_environment`, where mcp-tools-py runs, used by the seven console-script tools), plus the two questions a tool asks about its environment: is this tool there, and what to say when it is not
+- **`utils/tool_context.py`** — `ToolContext`: the single argument every registrar takes — project directory and both environments (`environment`, the configured project env used by pytest, pylint, mypy and deptry; `tool_environment`, where mcp-tools-py runs, used by the seven console-script tools), plus the two questions a tool asks about its environment: is this tool there, and what to say when it is not
 - **`utils/mcp_protocols.py`** — `FastMCPProtocol`: the structural type of the server object a registrar registers against, so no tool module imports FastMCP
 - **`utils/subprocess_runner.py`** — thin re-export shim over `mcp_coder_utils.subprocess_runner`: `execute_command()`, `CommandResult`, STDIO isolation for Python commands, cross-platform process termination
 - **`utils/file_utils.py`** — thin re-export shim over `mcp_coder_utils.fs`: `read_file()` with encoding fallback
@@ -211,7 +212,7 @@ MCP Client       pytest_tool.py            runners.py           subprocess_runne
     │◄──────────────────│                      │                        │
 ```
 
-All checker tools follow this same pattern, each entered through its own registrar module (`checker_tools/<tool>_tool.py`). Only pylint, pytest and mypy use the shared result formatters on `CheckerTools`; the other six return a string their own package produced — from its `reporting.py`, or straight from `runners.py` for the simple checkers that have none. Pytest and bandit write a JSON report to a temporary file and parse that; the rest work from the command's stdout.
+All checker tools follow this same pattern, each entered through its own registrar module (`checker_tools/<tool>_tool.py`). Only pylint, pytest and mypy use the shared result formatters on `CheckerTools`; the other seven return a string their own package produced — from its `reporting.py`, or straight from `runners.py` for the simple checkers that have none. Pytest, bandit and deptry write a JSON report to a temporary file and parse that; the rest work from the command's stdout.
 
 ### STDIO Isolation (Python Subprocess)
 
@@ -231,10 +232,10 @@ See [README.md](../../README.md) for installation, CLI parameters, and MCP clien
 - Runs as STDIO-based MCP server, launched by the MCP client
 - Requires `--project-dir` pointing to the target codebase
 - Optional: `--python-executable` to select the environment the tools work against (the deprecated `--venv-path` still resolves the interpreter from a venv). Two environments are in play, and the phrase "tool venv" has been used for both:
-  - **project env** — holds the project's dependencies, and pytest, pylint and mypy. This is what the flags configure.
+  - **project env** — holds the project's dependencies, and pytest, pylint, mypy and deptry. This is what the flags configure.
   - **tool env** — holds `mcp_tools_py` itself, launched by the MCP client. Not configurable through the flags.
 
-  Only pytest, pylint and mypy need the configurable environment, because they must import the project's dependencies in order to check them; the same interpreter therefore resolves library and symbol lookups. The console-script tools — black, isort, ruff, bandit, vulture, tach and lint-imports — only read source text, are mcp-tools-py's own dependencies and resolve in the tool env.
+  Only pytest, pylint, mypy and deptry need the configurable environment: the first three must import the project's dependencies in order to check them, and deptry reads the project env's installed distributions; the same interpreter therefore resolves library and symbol lookups. The console-script tools — black, isort, ruff, bandit, vulture, tach and lint-imports — only read source text, are mcp-tools-py's own dependencies and resolve in the tool env.
 
 ---
 

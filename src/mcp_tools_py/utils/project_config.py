@@ -24,6 +24,7 @@ ToolName = Literal[
     "lint-imports",
     "black",
     "isort",
+    "deptry",
 ]
 
 DEFAULT_CHECK_TIMEOUT = 120
@@ -170,26 +171,28 @@ def resolve_target_directories(
         return f"Error resolving target directories: {exc}"
 
 
-def resolve_coverage_source(
-    project_dir: str, coverage_source: list[str] | None
+def _resolve_source_dirs(
+    project_dir: str, explicit: list[str] | None, label: str, arg_name: str
 ) -> list[str] | str:
-    """Resolve the directories to measure coverage for.
+    """Resolve source directories that exist on disk and contain no test path.
 
     Args:
         project_dir: Path to project root.
-        coverage_source: Explicit directories, or None to auto-detect.
+        explicit: Explicit directories, or None to auto-detect.
+        label: What is being resolved, used in error messages.
+        arg_name: Argument name the error tells the caller to pass.
 
     Returns:
-        *coverage_source* as-is when given; otherwise the source directories
-        from pyproject.toml that exist on disk and contain no test path.  An
-        error message string naming ``coverage_source`` when none remain.
+        *explicit* as-is when given; otherwise the source directories from
+        pyproject.toml that exist on disk and contain no test path.  An error
+        message string naming *arg_name* when none remain.
     """
-    if coverage_source is not None:
-        return coverage_source
+    if explicit is not None:
+        return explicit
     try:
         toml_data = _load_pyproject(project_dir)
     except ValueError as exc:
-        return f"Error resolving coverage source: {exc}"
+        return f"Error resolving {label}: {exc}"
 
     warnings: list[str] = []
     src_dirs = _read_source_dirs(toml_data, warnings)
@@ -208,9 +211,47 @@ def resolve_coverage_source(
     if keep:
         return keep
     return (
-        "Error resolving coverage source: no source directory outside the test "
+        f"Error resolving {label}: no source directory outside the test "
         f"paths (source: {src_dirs}, tests: {test_dirs}). "
-        "Pass coverage_source explicitly."
+        f"Pass {arg_name} explicitly."
+    )
+
+
+def resolve_source_directories(
+    project_dir: str, target_directories: list[str] | None
+) -> list[str] | str:
+    """Resolve the source directories, excluding test paths.
+
+    Args:
+        project_dir: Path to project root.
+        target_directories: Explicit directories, or None to auto-detect.
+
+    Returns:
+        *target_directories* as-is when given; otherwise the source directories
+        from pyproject.toml that exist on disk and contain no test path.  An
+        error message string naming ``target_directories`` when none remain.
+    """
+    return _resolve_source_dirs(
+        project_dir, target_directories, "source directories", "target_directories"
+    )
+
+
+def resolve_coverage_source(
+    project_dir: str, coverage_source: list[str] | None
+) -> list[str] | str:
+    """Resolve the directories to measure coverage for.
+
+    Args:
+        project_dir: Path to project root.
+        coverage_source: Explicit directories, or None to auto-detect.
+
+    Returns:
+        *coverage_source* as-is when given; otherwise the source directories
+        from pyproject.toml that exist on disk and contain no test path.  An
+        error message string naming ``coverage_source`` when none remain.
+    """
+    return _resolve_source_dirs(
+        project_dir, coverage_source, "coverage source", "coverage_source"
     )
 
 

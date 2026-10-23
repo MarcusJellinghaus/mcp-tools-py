@@ -32,6 +32,7 @@ TOOL_MODULES: dict[str, Optional[str]] = {
     "pytest": "pytest",
     "pylint": "pylint",
     "mypy": "mypy",
+    "deptry": "deptry",
     "black": None,
     "isort": None,
     "lint-imports": None,
@@ -236,7 +237,7 @@ def _failed(reason: str) -> EnvironmentInfo:
     """Build the fail-open result used when the probe cannot be trusted.
 
     Every probed module reads as importable, so a failed probe lets the call
-    proceed and surface the real error instead of making all three module
+    proceed and surface the real error instead of making all four module
     tools vanish at once.
 
     Args:
