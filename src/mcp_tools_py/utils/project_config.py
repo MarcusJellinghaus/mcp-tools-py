@@ -24,6 +24,7 @@ ToolName = Literal[
     "lint-imports",
     "black",
     "isort",
+    "deptry",
 ]
 
 DEFAULT_CHECK_TIMEOUT = 120

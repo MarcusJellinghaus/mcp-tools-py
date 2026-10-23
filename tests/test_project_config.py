@@ -418,6 +418,22 @@ class TestGetCheckTimeout:
         )
         assert get_check_timeout(path, "lint-imports") == 30
 
+    def test_deptry_timeout_key_resolves(self, tmp_path: object) -> None:
+        """deptry-timeout is found for tool name 'deptry'."""
+        path = str(tmp_path)
+        _write_pyproject(
+            path,
+            """\
+            [tool.mcp-tools-py]
+            deptry-timeout = 75
+            """,
+        )
+        assert get_check_timeout(path, "deptry") == 75
+
+    def test_deptry_uses_builtin_default(self, tmp_path: object) -> None:
+        """deptry falls back to the 120-second default when unset."""
+        assert get_check_timeout(str(tmp_path), "deptry") == DEFAULT_CHECK_TIMEOUT
+
     def test_unknown_key_ignored(self, tmp_path: object) -> None:
         """An unrecognised key in the section does not affect resolution."""
         path = str(tmp_path)
