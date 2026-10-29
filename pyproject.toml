@@ -146,6 +146,9 @@ ignore_missing_imports = true
 #        as documentation: f-strings in logging calls are acceptable for readability
 disable = ["W", "C", "R", "W1203"]
 
+[tool.mcp-tools-py]
+formatter = "black"   # isort + black
+
 [tool.mcp-coder.install-from-github]
 # All installed together WITH deps — uv resolves siblings in one pass
 packages = [
