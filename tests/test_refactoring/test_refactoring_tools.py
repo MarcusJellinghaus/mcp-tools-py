@@ -73,6 +73,32 @@ def test_refactoring_tools_registers_expected_names(
     assert names == expected
 
 
+def test_move_symbol_timeout_seconds_is_plumbed(
+    tmp_path: Path, mock_mcp: MagicMock, monkeypatch: pytest.MonkeyPatch
+) -> None:
+    """move_symbol passes timeout_seconds to rope, else the server default."""
+    recorded: list[object] = []
+
+    def fake_move_symbol(*args: object, timeout: object = None) -> str:
+        recorded.append(timeout)
+        return "ok"
+
+    monkeypatch.setattr("mcp_tools_py.refactoring.rope_move_symbol", fake_move_symbol)
+
+    tools = RefactoringTools(_context(tmp_path), timeout=60)
+    tools.register(mock_mcp)
+    move_symbol_fn = next(
+        fn for fn in mock_mcp._registered_functions if fn.__name__ == "move_symbol"
+    )
+
+    move_symbol_fn(
+        source_file="a.py", symbol_names=["X"], dest_file="b.py", timeout_seconds=7
+    )
+    move_symbol_fn(source_file="a.py", symbol_names=["X"], dest_file="b.py")
+
+    assert recorded == [7, 60]
+
+
 # --- Relative-path tests ---
 
 

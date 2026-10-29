@@ -29,9 +29,9 @@ This tracks **Feature Implementation** consisting of multiple **Tasks**.
 
 ### Step 2: Per-call `timeout_seconds` on the `move_symbol` tool — [step_2.md](./steps/step_2.md)
 
-- [ ] Implementation: plumbing test and `timeout_seconds` parameter
-- [ ] Quality checks: pylint, pytest, mypy — fix all issues
-- [ ] Commit message prepared
+- [x] Implementation: plumbing test and `timeout_seconds` parameter
+- [x] Quality checks: pylint, pytest, mypy — fix all issues
+- [x] Commit message prepared
 
 ### Step 3: Parent-side snapshot cleanup for dry runs — [step_3.md](./steps/step_3.md)
 
