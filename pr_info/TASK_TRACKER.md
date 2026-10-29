@@ -42,9 +42,9 @@ This tracks **Feature Implementation** consisting of multiple **Tasks**.
 - [x] Commit message prepared
 
 ### Step 5: `pytest_tool` sets `tests_failed` and logging from the verdict — [step_5.md](./steps/step_5.md)
-- [ ] Implementation: coverage and logging tests in `test_server_params.py`, `pytest_tool.py`
-- [ ] Quality checks: pylint, pytest, mypy — fix all issues
-- [ ] Commit message prepared
+- [x] Implementation: coverage and logging tests in `test_server_params.py`, `pytest_tool.py`
+- [x] Quality checks: pylint, pytest, mypy — fix all issues
+- [x] Commit message prepared
 
 ### Step 6: xdist integration test and README — [step_6.md](./steps/step_6.md)
 - [ ] Implementation: `test_integration_xdist_collection.py`, README notes

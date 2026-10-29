@@ -10,8 +10,9 @@ from unittest.mock import MagicMock, patch
 
 import pytest
 
+from mcp_tools_py.code_checker_pytest.models import PytestReport, Summary
 from mcp_tools_py.code_checker_pytest.utils import SHOW_OUTPUT_NOTE
-from mcp_tools_py.code_checker_pytest.verdict import RunStatus
+from mcp_tools_py.code_checker_pytest.verdict import RunStatus, RunVerdict
 from mcp_tools_py.utils.environment_info import EnvironmentInfo
 from mcp_tools_py.utils.tool_context import CONSOLE_SCRIPT_TOOLS
 from tests._pytest_results import make_pytest_results
@@ -837,6 +838,23 @@ def _pytest_results(failed: int = 0) -> Dict[str, Any]:
     )
 
 
+def _error_results_with_report() -> Dict[str, Any]:
+    """ERROR result carrying a real report whose summary shows no failures."""
+    report = PytestReport(
+        created=0.0,
+        duration=1.0,
+        exitcode=1,
+        root="/project",
+        environment={},
+        summary=Summary(collected=5, total=5, passed=5),
+    )
+    return make_pytest_results(
+        summary={"passed": 5, "collected": 5},
+        test_results=report,
+        verdict=RunVerdict(RunStatus.ERROR, ["something broke"], 1),
+    )
+
+
 class TestPytestCoverage:
     """Tests for the run_pytest_check coverage parameters."""
 
@@ -994,6 +1012,30 @@ class TestPytestCoverage:
 
         assert "Warning: tests failed" in result
 
+    def test_error_with_report_carries_the_warning(self, run_pytest_check: Any) -> None:
+        """An ERROR run with a report and no failures still carries the warning."""
+        with (
+            patch(f"{_PYTEST_TOOL}.check_code_with_pytest") as mock_check,
+            patch(f"{_PYTEST_TOOL}.read_coverage_report", return_value=_COVERAGE_DATA),
+        ):
+            mock_check.return_value = _error_results_with_report()
+            result = run_pytest_check(coverage=True, coverage_source=["src"])
+
+        assert "Warning: tests failed" in result
+
+    def test_suspicious_run_has_no_warning(self, run_pytest_check: Any) -> None:
+        """A SUSPICIOUS run is not reported as failed."""
+        with (
+            patch(f"{_PYTEST_TOOL}.check_code_with_pytest") as mock_check,
+            patch(f"{_PYTEST_TOOL}.read_coverage_report", return_value=_COVERAGE_DATA),
+        ):
+            mock_check.return_value = make_pytest_results(
+                RunStatus.SUSPICIOUS, summary={"collected": 3}, test_results=None
+            )
+            result = run_pytest_check(coverage=True, coverage_source=["src"])
+
+        assert "Warning: tests failed" not in result
+
     def test_missing_report_is_stated(self, run_pytest_check: Any) -> None:
         """No coverage JSON gives a one-line note instead of a digest."""
         with (
@@ -1004,6 +1046,77 @@ class TestPytestCoverage:
             result = run_pytest_check(coverage=True, coverage_source=["src"])
 
         assert result.endswith("Coverage report was not produced.")
+
+
+class TestPytestVerdictLogging:
+    """run_pytest_check logs at a level that follows the verdict status."""
+
+    @pytest.mark.parametrize(
+        ("results", "level", "message"),
+        [
+            (
+                make_pytest_results(summary={"passed": 1}, test_results=None),
+                logging.INFO,
+                "Pytest execution completed",
+            ),
+            (
+                make_pytest_results(
+                    RunStatus.FAILED, summary={"failed": 1}, test_results=None
+                ),
+                logging.INFO,
+                "Pytest execution completed",
+            ),
+            (
+                make_pytest_results(
+                    RunStatus.SUSPICIOUS, summary={"collected": 3}, test_results=None
+                ),
+                logging.WARNING,
+                "Pytest run reported no outcomes",
+            ),
+        ],
+        ids=["passed", "failed", "suspicious"],
+    )
+    def test_log_level_follows_status(
+        self,
+        results: Dict[str, Any],
+        level: int,
+        message: str,
+        caplog: pytest.LogCaptureFixture,
+        all_modules_importable: Any,
+    ) -> None:
+        """PASSED and FAILED log at INFO, SUSPICIOUS at WARNING."""
+        run_pytest_check = _capture_pytest_tool()
+        with (
+            patch(f"{_PYTEST_TOOL}.check_code_with_pytest", return_value=results),
+            caplog.at_level(logging.DEBUG, logger=_PYTEST_TOOL),
+        ):
+            run_pytest_check()
+
+        records = [r for r in caplog.records if r.getMessage() == message]
+        assert len(records) == 1
+        assert records[0].levelno == level
+
+    def test_error_logs_problems_and_exit_code(
+        self, caplog: pytest.LogCaptureFixture, all_modules_importable: Any
+    ) -> None:
+        """ERROR logs at ERROR with the problems and the exit code."""
+        run_pytest_check = _capture_pytest_tool()
+        with (
+            patch(
+                f"{_PYTEST_TOOL}.check_code_with_pytest",
+                return_value=_error_results_with_report(),
+            ),
+            caplog.at_level(logging.DEBUG, logger=_PYTEST_TOOL),
+        ):
+            run_pytest_check()
+
+        records = [
+            r for r in caplog.records if r.getMessage() == "Pytest execution failed"
+        ]
+        assert len(records) == 1
+        assert records[0].levelno == logging.ERROR
+        assert getattr(records[0], "problems") == ["something broke"]
+        assert getattr(records[0], "exit_code") == 1
 
 
 class TestStartupConsoleScriptWarnings:

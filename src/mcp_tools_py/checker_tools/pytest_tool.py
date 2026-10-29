@@ -14,6 +14,7 @@ from mcp_tools_py.code_checker_pytest.coverage import (
 )
 from mcp_tools_py.code_checker_pytest.runners import check_code_with_pytest
 from mcp_tools_py.code_checker_pytest.utils import sanitize_extra_args
+from mcp_tools_py.code_checker_pytest.verdict import RunStatus
 from mcp_tools_py.log_utils import log_function_call
 from mcp_tools_py.utils.environment_info import get_environment_info
 from mcp_tools_py.utils.project_config import (
@@ -174,6 +175,8 @@ def register(mcp: "FastMCPProtocol", checker_tools: "CheckerTools") -> None:
                 result = f"{notes_text}\n\n{result}"
 
             summary = test_results.get("summary", {})
+            verdict = test_results["verdict"]
+            tests_failed = verdict.status in (RunStatus.FAILED, RunStatus.ERROR)
             if temp_dir is not None:
                 data = read_coverage_report(temp_dir)
                 if data is None:
@@ -190,14 +193,11 @@ def register(mcp: "FastMCPProtocol", checker_tools: "CheckerTools") -> None:
                         selection,
                         max_modules=max_modules,
                         fail_under=fail_under,
-                        tests_failed="test_results" not in test_results
-                        or bool(
-                            (summary.get("failed") or 0) or (summary.get("error") or 0)
-                        ),
+                        tests_failed=tests_failed,
                     )
                 result = f"{result}\n\n{digest}"
 
-            if "test_results" in test_results:
+            if verdict.status in (RunStatus.PASSED, RunStatus.FAILED):
                 logger.info(
                     "Pytest execution completed",
                     extra={
@@ -205,13 +205,20 @@ def register(mcp: "FastMCPProtocol", checker_tools: "CheckerTools") -> None:
                         "failed": summary.get("failed", 0) or 0,
                         "errors": summary.get("error", 0) or 0,
                         "duration": summary.get("duration", 0) or 0,
+                        "status": verdict.status.value,
                     },
+                )
+            elif verdict.status is RunStatus.SUSPICIOUS:
+                logger.warning(
+                    "Pytest run reported no outcomes",
+                    extra={"collected": summary.get("collected", 0) or 0},
                 )
             else:
                 logger.error(
                     "Pytest execution failed",
                     extra={
-                        "error": "; ".join(test_results["verdict"].problems),
+                        "problems": verdict.problems,
+                        "exit_code": verdict.exit_code,
                     },
                 )
 
