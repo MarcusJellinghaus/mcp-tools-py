@@ -21,6 +21,36 @@ This tracks **Feature Implementation** consisting of multiple **Tasks**.
 
 ## Tasks
 
-<!-- Tasks populated from pr_info/steps/ by prepare_task_tracker -->
+### Step 1: `verdict.py`: classifier and shared text helpers — [step_1.md](./steps/step_1.md)
+- [ ] Implementation: `test_verdict.py`, `verdict.py`, package exports
+- [ ] Quality checks: pylint, pytest, mypy, lint-imports, tach — fix all issues
+- [ ] Commit message prepared
+
+### Step 2: `check_code_with_pytest` returns `verdict`; test dicts migrated — [step_2.md](./steps/step_2.md)
+- [ ] Implementation: runner tests, `runners.py`, `tests/_pytest_results.py`, test dict migration, minimal consumer reads
+- [ ] Quality checks: pylint, pytest, mypy — fix all issues
+- [ ] Commit message prepared
+
+### Step 3: Formatter branches on `verdict.status` — [step_3.md](./steps/step_3.md)
+- [ ] Implementation: formatter tests, `_format_pytest_result_with_details`, updated wording assertions
+- [ ] Quality checks: pylint, pytest, mypy — fix all issues
+- [ ] Commit message prepared
+
+### Step 4: Toolkit maps `verdict.status` to `ActionResult` — [step_4.md](./steps/step_4.md)
+- [ ] Implementation: mapping tests in `test_toolkit_test.py`, `toolkit._run_test`
+- [ ] Quality checks: pylint, pytest, mypy, lint-imports, tach — fix all issues
+- [ ] Commit message prepared
+
+### Step 5: `pytest_tool` sets `tests_failed` and logging from the verdict — [step_5.md](./steps/step_5.md)
+- [ ] Implementation: coverage and logging tests in `test_server_params.py`, `pytest_tool.py`
+- [ ] Quality checks: pylint, pytest, mypy — fix all issues
+- [ ] Commit message prepared
+
+### Step 6: xdist integration test and README — [step_6.md](./steps/step_6.md)
+- [ ] Implementation: `test_integration_xdist_collection.py`, README notes
+- [ ] Quality checks: pylint, pytest (incl. integration), mypy — fix all issues
+- [ ] Commit message prepared
 
 ## Pull Request
+- [ ] PR review: review all changes against `summary.md`
+- [ ] PR summary prepared
