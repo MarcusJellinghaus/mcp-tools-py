@@ -47,7 +47,9 @@ Problems are merged from three sources, in this order:
 
 1. The failed collectors' `longrepr`.
 2. `ErrorContext.collection_errors`, joined into one entry.
-3. Only when both are empty: the last 50 lines of `ErrorContext.error_message`.
+3. Only for `ERROR`, and only when both are empty: the last 50 lines of `ErrorContext.error_message`. `ErrorContext` holds the full output on every non-zero exit, so a normal `FAILED` run must not pick it up.
+
+The FAILED-path "Collection problems" block shows only `collection_errors` and the xdist hint.
 
 De-duplication uses one key: `"Different tests were collected"` when the text contains it, and otherwise the text's first line. This also covers exact duplicates.
 

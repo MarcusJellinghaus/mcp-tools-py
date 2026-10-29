@@ -2,7 +2,7 @@
 
 ## LLM prompt
 
-> Read `pr_info/steps/summary.md`, then implement `pr_info/steps/step_3.md`. Write the formatter tests in `tests/test_checker_tools_formatting.py` first, then rewrite `_format_pytest_result_with_details` in `src/mcp_tools_py/checker_tools/__init__.py`. Update the existing formatter tests in `tests/test_final_validation.py` that assert the old error wording. Run pylint, mypy and pytest (`-n auto`), make sure all of them pass, run `run_format_code`, then make one commit.
+> Read `pr_info/steps/summary.md`, then implement `pr_info/steps/step_3.md`. Write the formatter tests in `tests/test_checker_tools_formatting.py` first, then rewrite `_format_pytest_result_with_details` in `src/mcp_tools_py/checker_tools/__init__.py`. Update the existing formatter tests that assert the old "Error running pytest" wording: `tests/test_checker_tools_formatting.py:226` and `tests/test_final_validation.py`. Run pylint, mypy and pytest (`-n auto`), make sure all of them pass, run `run_format_code`, then make one commit.
 
 ## WHERE
 
@@ -49,6 +49,7 @@ The method returns a `str`. Only the `PASSED` branch contains "completed".
 1. `PASSED` gives `Pytest check completed. …`. The existing tests stay, including `show_output`.
 2. `FAILED` with a report gives "Pytest found issues". This uses the existing mocked `create_prompt_for_failed_tests`.
 3. `FAILED` with a report whose `error_context.collection_errors` is set, plus `verdict.problems` containing that text: the output starts with `Collection problems:` and the failure prompt follows. Use a real `PytestReport`.
+3a. A plain `FAILED` run, with a real `PytestReport` (exit 1, `error_context` with only `error_message`, no failed collectors, no `collection_errors`) and `verdict` from `classify_run`: the output has no `Collection problems:` block.
 4. `FAILED` with `test_results=None` gives `Pytest found failures. {summary_text}`, and the output contains no "completed".
 5. `FAILED` with `show_details=False` gives the same output as test 4.
 6. `FAILED` with `show_output=True` adds no passing-test output. This is the existing test, migrated.
@@ -56,6 +57,8 @@ The method returns a `str`. Only the `PASSED` branch contains "completed".
 8. `ERROR` with a report (exit 1, passed 5): the output contains "reported an error", the counts and "Exit code 1", and no "completed".
 9. `ERROR` without a report, for example `make_pytest_results(RunStatus.ERROR, ["No module named 'pytest'"])`: the output contains "did not complete" and the message.
 10. An unknown status, `MagicMock(status="bogus", problems=["x"], exit_code=1)`, renders the error text and no "completed".
+
+In `tests/test_checker_tools_formatting.py`, the test at line 226 asserts "Pytest run" in place of "Error running pytest".
 
 In `tests/test_final_validation.py`:
 

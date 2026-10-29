@@ -49,7 +49,7 @@ def format_error_text(report: PytestReport | None, verdict: RunVerdict) -> str
 def format_suspicious_text(collected: int) -> str
 def format_collection_problems(report: PytestReport | None, verdict: RunVerdict) -> str
 
-def _merge_problems(report: PytestReport) -> list[str]
+def _merge_problems(report: PytestReport, with_tail: bool) -> list[str]
 def _dedup_key(text: str) -> str
 def _cap_lines(problems: list[str]) -> str
 def _xdist_hint(problems: list[str]) -> str
@@ -65,17 +65,17 @@ def _has_collection_problems(report: PytestReport) -> bool
 classify_run(report):
   s, ctx = report.summary, report.error_context
   exit_code = ctx.exit_code if ctx else 0
-  problems = _merge_problems(report)
   if (s.failed or 0) > 0 or (s.error or 0) > 0: status = FAILED
   elif exit_code != 0: status = ERROR
   elif s.collected > 0 and not _has_outcomes(s): status = SUSPICIOUS
   else: status = PASSED
-  return RunVerdict(status, problems, exit_code)
+  return RunVerdict(status, _merge_problems(report, with_tail=status is ERROR), exit_code)
 
-_merge_problems(report):
+_merge_problems(report, with_tail):
   items = [c.longrepr for c in report.collectors or [] if c.outcome in FAILED_OUTCOMES and c.longrepr]
   if ctx and ctx.collection_errors: items.append("\n".join(ctx.collection_errors))
-  if not items and ctx and ctx.error_message.strip(): items.append(last _ERROR_TAIL_LINES lines of it)
+  # ErrorContext holds the full output on every non-zero exit, so the tail is only used for ERROR
+  if with_tail and not items and ctx and ctx.error_message.strip(): items.append(last _ERROR_TAIL_LINES lines of it)
   keep the first item for each _dedup_key(item)
 
 _dedup_key(text):
@@ -91,8 +91,10 @@ format_error_text(report, verdict):
 
 format_collection_problems(report, verdict):
   if not verdict.problems: return ""          # never reads report, so MagicMock reports are safe
-  shown = {c.longrepr for c in report.collectors or [] if c.outcome in FAILED_OUTCOMES} if report else set()
-  body = _cap_lines([p for p in verdict.problems if p not in shown]); hint = _xdist_hint(verdict.problems)
+  # Only what the failure prompt does not print: collection_errors and the xdist hint
+  ctx = report.error_context if report else None
+  body = _cap_lines(["\n".join(ctx.collection_errors)]) if ctx and ctx.collection_errors else ""
+  hint = _xdist_hint(verdict.problems)
   return f"Collection problems:\n{body}{hint}".rstrip() if body or hint else ""
 ```
 
@@ -123,7 +125,8 @@ Build `PytestReport` objects by hand, using a small local `_report(summary=..., 
    - No `ErrorContext` gives `exit_code == 0`.
 2. Problem merging:
    - Collector `longrepr` comes before `collection_errors`.
-   - The `error_message` tail is used only when both are empty, and is capped at 50 lines.
+   - The `error_message` tail is used only for `ERROR` and only when both are empty, and is capped at 50 lines.
+   - A `FAILED` run (exit 1, `error_context` with only `error_message`) has empty `problems`.
 3. De-duplication:
    - Three collectors whose texts differ but all contain "Different tests were collected …" yield one problem.
    - Two problems with the same first line yield one problem.
@@ -134,7 +137,7 @@ Build `PytestReport` objects by hand, using a small local `_report(summary=..., 
    - `format_error_text(None, RunVerdict(ERROR, ["Usage Error: x"], 0))` contains "did not complete" and "Usage Error: x", and has no "Exit code" line.
    - A report with outcomes includes the `get_test_summary` counts.
 5. `format_collection_problems`:
-   - It excludes collector `longrepr` and includes `collection_errors`.
+   - It includes `collection_errors` and excludes everything else (collector `longrepr`, the `error_message` tail).
    - It returns `""` for empty problems.
    - It includes the xdist hint even when the xdist text came only from a collector.
 6. `format_suspicious_text(3)` contains "Collected 3 tests" and "Not verified".
