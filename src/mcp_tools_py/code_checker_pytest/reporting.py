@@ -474,10 +474,13 @@ def get_test_summary(test_session_result: PytestReport) -> str:
     """
     summary = test_session_result.summary
 
-    parts = []
-    parts.append(
-        f"Collected {summary.collected} tests in {test_session_result.duration:.2f} seconds"
-    )
+    deselected = summary.deselected or 0
+    header = f"Collected {summary.collected - deselected} tests"
+    if deselected > 0:
+        header += f" ({deselected} deselected)"
+    header += f" in {test_session_result.duration:.2f} seconds"
+
+    parts = [header]
 
     if summary.passed is not None and summary.passed > 0:
         parts.append(f"✅ Passed: {summary.passed}")
