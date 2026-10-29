@@ -18,12 +18,16 @@ from mcp_tools_py.checker_tools import (
 from mcp_tools_py.code_checker_pytest.reporting import (
     MAX_FAILURES,
     MAX_OUTPUT_LINES,
-    SMALL_TEST_RUN_THRESHOLD,
     create_prompt_for_failed_tests,
     create_prompt_for_passing_output,
     should_show_details,
 )
-from mcp_tools_py.code_checker_pytest.verdict import RunStatus
+from mcp_tools_py.code_checker_pytest.verdict import (
+    RunStatus,
+    format_collection_problems,
+    format_error_text,
+    format_suspicious_text,
+)
 
 if TYPE_CHECKING:
     from mcp_tools_py.utils.mcp_protocols import FastMCPProtocol
@@ -67,72 +71,46 @@ class CheckerTools:
         show_details: bool,
         show_output: bool = False,
     ) -> str:
-        """Enhanced formatting that respects show_details parameter.
+        """Format a pytest run by its verdict status; only PASSED reads as completed.
 
         With show_output, a passing run also lists the captured output of passing tests.
+        ERROR and unknown statuses fail closed and render the shared error text.
 
         Returns:
             User-facing summary of the pytest outcome.
         """
         verdict = test_results["verdict"]
-        if (
-            test_results.get("test_results") is None
-            and verdict.status is RunStatus.ERROR
-        ):
-            return f"Error running pytest: {'; '.join(verdict.problems) or 'Unknown error'}"
+        report = test_results.get("test_results")
 
         summary = test_results.get("summary", {})
         if not isinstance(summary, dict):
             return "Error: Invalid test summary format"
 
-        # Handle None values properly
-        failed_count = summary.get("failed") or 0
-        error_count = summary.get("error") or 0
-        passed_count = summary.get("passed") or 0
-        collected = summary.get("collected") or 0
-
-        # Determine if we have failures that need attention
-        failures_exist = (failed_count > 0 or error_count > 0) and test_results.get(
-            "test_results"
-        )
-
-        if failures_exist:
-            should_show = should_show_details(test_results, show_details)
-
-            if should_show:
-                # Use enhanced create_prompt_for_failed_tests with new parameters
-                failed_tests_prompt = create_prompt_for_failed_tests(
-                    test_results["test_results"],
-                    max_number_of_tests_reported=MAX_FAILURES,  # Use constant
-                    include_print_output=True,
-                    max_failures=MAX_FAILURES,
-                    max_output_lines=MAX_OUTPUT_LINES,  # Use constant
-                )
-                return (
-                    f"Pytest found issues that need attention:\n\n{failed_tests_prompt}"
-                )
-            else:
-                # NOTE: This branch is currently dead code -- show_details is
-                # always passed as True from run_pytest_check().  Retained for
-                # possible future use.  The hint below references the removed
-                # show_details parameter and would need updating if re-enabled.
-                hint = (
-                    " Try show_details=True for more information."
-                    if collected <= SMALL_TEST_RUN_THRESHOLD
-                    else ""
-                )
-                return f"Pytest completed with failures.{hint}"
-        else:
-            # Success case - use existing logic
+        if verdict.status is RunStatus.PASSED:
             if test_results.get("summary_text"):
                 result = f"Pytest check completed. {test_results['summary_text']}"
             else:
+                passed_count = summary.get("passed") or 0
                 result = f"Pytest check completed. All {passed_count} tests passed successfully."
-            if show_output and test_results.get("test_results"):
-                result += "\n\n" + create_prompt_for_passing_output(
-                    test_results["test_results"]
-                )
+            if show_output and report:
+                result += "\n\n" + create_prompt_for_passing_output(report)
             return result
+        if verdict.status is RunStatus.FAILED:
+            if report is None or not should_show_details(test_results, show_details):
+                return f"Pytest found failures. {test_results.get('summary_text') or ''}".rstrip()
+            block = format_collection_problems(report, verdict)
+            failed_tests_prompt = create_prompt_for_failed_tests(
+                report,
+                max_number_of_tests_reported=MAX_FAILURES,
+                include_print_output=True,
+                max_failures=MAX_FAILURES,
+                max_output_lines=MAX_OUTPUT_LINES,
+            )
+            text = f"Pytest found issues that need attention:\n\n{failed_tests_prompt}"
+            return f"{block}\n\n{text}" if block else text
+        if verdict.status is RunStatus.SUSPICIOUS:
+            return format_suspicious_text(summary.get("collected") or 0)
+        return format_error_text(report, verdict)
 
     def _format_mypy_result(self, mypy_prompt: str | None) -> str:
         """Format mypy check result.

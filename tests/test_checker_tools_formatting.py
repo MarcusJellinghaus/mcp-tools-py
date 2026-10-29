@@ -8,9 +8,13 @@ import pytest
 
 from mcp_tools_py.checker_tools import CheckerTools
 from mcp_tools_py.code_checker_mypy.reporting import MYPY_FAILURE_PREFIX
-from mcp_tools_py.code_checker_pytest.models import PytestReport
+from mcp_tools_py.code_checker_pytest.models import ErrorContext, PytestReport, Summary
 from mcp_tools_py.code_checker_pytest.parsers import parse_pytest_report
-from mcp_tools_py.code_checker_pytest.verdict import RunStatus
+from mcp_tools_py.code_checker_pytest.verdict import (
+    RunStatus,
+    RunVerdict,
+    classify_run,
+)
 from mcp_tools_py.utils.tool_context import ToolContext
 from tests._pytest_results import make_pytest_results
 
@@ -220,5 +224,159 @@ def test_format_pytest_result_execution_error(checker_tools: CheckerTools) -> No
     result = checker_tools._format_pytest_result_with_details(
         test_results, show_details=True
     )
-    assert "Error running pytest" in result
+    assert "Pytest run" in result
+    assert "did not complete" in result
     assert "No module named 'pytest'" in result
+    assert "completed" not in result
+
+
+def _failed_report(collection_errors: list[str] | None = None) -> PytestReport:
+    """Build a real FAILED report (exit 1) with only error_message unless given."""
+    return PytestReport(
+        created=0.0,
+        duration=1.0,
+        exitcode=1,
+        root="/project",
+        environment={},
+        summary=Summary(collected=2, total=2, passed=1, failed=1),
+        collectors=[],
+        tests=[],
+        error_context=ErrorContext(
+            exit_code=1,
+            exit_code_meaning="Tests failed",
+            error_message="full pytest output\n1 failed, 1 passed",
+            suggestion="",
+            collection_errors=collection_errors,
+        ),
+    )
+
+
+def test_format_pytest_result_failed_with_collection_errors(
+    checker_tools: CheckerTools,
+) -> None:
+    """Collection errors precede the failure prompt in a FAILED run."""
+    report = _failed_report(["ERROR tests/test_x.py - ImportError: boom"])
+    test_results = make_pytest_results(
+        summary={"passed": 1, "failed": 1, "collected": 2},
+        test_results=report,
+        verdict=classify_run(report),
+    )
+    with patch(
+        "mcp_tools_py.checker_tools.create_prompt_for_failed_tests"
+    ) as mock_prompt:
+        mock_prompt.return_value = "Detailed failure info..."
+        result = checker_tools._format_pytest_result_with_details(
+            test_results, show_details=True
+        )
+    assert result.startswith("Collection problems:\n")
+    assert "ImportError: boom" in result
+    assert result.index("ImportError: boom") < result.index(
+        "Pytest found issues that need attention:"
+    )
+    assert result.endswith("Detailed failure info...")
+
+
+def test_format_pytest_result_plain_failed_has_no_collection_block(
+    checker_tools: CheckerTools,
+) -> None:
+    """A plain FAILED run does not turn its error_message into a problems block."""
+    report = _failed_report()
+    test_results = make_pytest_results(
+        summary={"passed": 1, "failed": 1, "collected": 2},
+        test_results=report,
+        verdict=classify_run(report),
+    )
+    result = checker_tools._format_pytest_result_with_details(
+        test_results, show_details=True
+    )
+    assert "Collection problems:" not in result
+    assert result.startswith("Pytest found issues that need attention:")
+
+
+def test_format_pytest_result_failed_without_report(
+    checker_tools: CheckerTools,
+) -> None:
+    """Without a report, FAILED gives the short failure line."""
+    test_results = make_pytest_results(
+        RunStatus.FAILED,
+        summary={"passed": 1, "failed": 1, "collected": 2},
+        test_results=None,
+        summary_text="1 failed, 1 passed",
+    )
+    result = checker_tools._format_pytest_result_with_details(
+        test_results, show_details=True
+    )
+    assert result == "Pytest found failures. 1 failed, 1 passed"
+    assert "completed" not in result
+
+
+def test_format_pytest_result_failed_show_details_false(
+    checker_tools: CheckerTools,
+) -> None:
+    """show_details=False gives the same short line as a missing report."""
+    test_results = make_pytest_results(
+        RunStatus.FAILED,
+        summary={"passed": 1, "failed": 1, "collected": 2},
+        test_results=_failed_report(),
+        summary_text="1 failed, 1 passed",
+    )
+    result = checker_tools._format_pytest_result_with_details(
+        test_results, show_details=False
+    )
+    assert result == "Pytest found failures. 1 failed, 1 passed"
+
+
+def test_format_pytest_result_suspicious(checker_tools: CheckerTools) -> None:
+    """SUSPICIOUS is reported as not verified, never completed."""
+    test_results = make_pytest_results(
+        RunStatus.SUSPICIOUS,
+        summary={"collected": 5},
+        test_results=None,
+        summary_text="Collected 5 tests",
+    )
+    result = checker_tools._format_pytest_result_with_details(
+        test_results, show_details=True
+    )
+    assert "Not verified" in result
+    assert "completed" not in result
+
+
+def test_format_pytest_result_error_with_report(checker_tools: CheckerTools) -> None:
+    """ERROR with a report shows the headline, counts and exit-code line."""
+    report = PytestReport(
+        created=0.0,
+        duration=1.0,
+        exitcode=1,
+        root="/project",
+        environment={},
+        summary=Summary(collected=5, total=5, passed=5),
+    )
+    test_results = make_pytest_results(
+        summary={"passed": 5, "collected": 5},
+        test_results=report,
+        verdict=RunVerdict(RunStatus.ERROR, ["something broke"], 1),
+    )
+    result = checker_tools._format_pytest_result_with_details(
+        test_results, show_details=True
+    )
+    assert "reported an error" in result
+    assert "5" in result
+    assert "Exit code 1" in result
+    assert "completed" not in result
+
+
+def test_format_pytest_result_unknown_status_fails_closed(
+    checker_tools: CheckerTools,
+) -> None:
+    """An unrecognised status renders the error text, never completed."""
+    test_results = make_pytest_results(
+        summary={"passed": 3, "collected": 3},
+        test_results=None,
+        verdict=MagicMock(status="bogus", problems=["x"], exit_code=1),
+    )
+    result = checker_tools._format_pytest_result_with_details(
+        test_results, show_details=True
+    )
+    assert "Pytest run reported an error." in result
+    assert "Exit code 1" in result
+    assert "completed" not in result

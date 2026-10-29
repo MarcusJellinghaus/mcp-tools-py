@@ -147,17 +147,17 @@ class TestParameterCombinationsValidation:
             show_details=False,
         )
 
-        # Should provide summary without suggestion for large test runs
+        # Should provide a failure summary, never a completed message
         assert "show_details=True" not in result
-        assert "completed" in result
+        assert "Pytest found failures" in result
+        assert "completed" not in result
 
-    def test_show_details_false_with_few_tests_provides_hint(
+    def test_show_details_false_with_few_tests_gives_short_failure(
         self, temp_project: Path
     ) -> None:
-        """Test that small test runs provide hint to use show_details=True."""
+        """Test that show_details=False gives the short failure line, without the old hint."""
         server = ToolServer(temp_project)
 
-        # Need test_results to be present for failures to trigger hint logic
         from mcp_tools_py.code_checker_pytest.models import PytestReport, Summary
 
         mock_test_results = PytestReport(
@@ -182,8 +182,7 @@ class TestParameterCombinationsValidation:
             show_details=False,
         )
 
-        # Should suggest show_details=True for small test runs with failures
-        assert "show_details=True" in result
+        assert result == "Pytest found failures."
 
     def test_collection_errors_always_shown(self, temp_project: Path) -> None:
         """Test that collection errors are shown regardless of show_details setting."""
@@ -204,9 +203,9 @@ class TestParameterCombinationsValidation:
             test_result, show_details=True
         )
 
-        # Both should complete without error
-        assert "completed" in result_false or "Error" in result_false
-        assert "completed" in result_true or "Error" in result_true
+        # Both should report failures, never completion
+        assert "Pytest found failures" in result_false
+        assert "Pytest found failures" in result_true
 
 
 class TestOutputFormatConsistency:
@@ -250,8 +249,8 @@ class TestOutputFormatConsistency:
         )
 
         # Both should show error message
-        assert "Error running pytest" in result_false
-        assert "Error running pytest" in result_true
+        assert "Pytest run" in result_false
+        assert "Pytest run" in result_true
         assert "pytest execution failed" in result_false
         assert "pytest execution failed" in result_true
 

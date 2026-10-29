@@ -32,9 +32,9 @@ This tracks **Feature Implementation** consisting of multiple **Tasks**.
 - [x] Commit message prepared
 
 ### Step 3: Formatter branches on `verdict.status` — [step_3.md](./steps/step_3.md)
-- [ ] Implementation: formatter tests, `_format_pytest_result_with_details`, updated wording assertions
-- [ ] Quality checks: pylint, pytest, mypy — fix all issues
-- [ ] Commit message prepared
+- [x] Implementation: formatter tests, `_format_pytest_result_with_details`, updated wording assertions
+- [x] Quality checks: pylint, pytest, mypy — fix all issues
+- [x] Commit message prepared
 
 ### Step 4: Toolkit maps `verdict.status` to `ActionResult` — [step_4.md](./steps/step_4.md)
 - [ ] Implementation: mapping tests in `test_toolkit_test.py`, `toolkit._run_test`
