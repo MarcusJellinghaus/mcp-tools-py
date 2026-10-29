@@ -47,9 +47,9 @@ This tracks **Feature Implementation** consisting of multiple **Tasks**.
 - [x] Commit message prepared
 
 ### Step 6: xdist integration test and README — [step_6.md](./steps/step_6.md)
-- [ ] Implementation: `test_integration_xdist_collection.py`, README notes
-- [ ] Quality checks: pylint, pytest (incl. integration), mypy — fix all issues
-- [ ] Commit message prepared
+- [x] Implementation: `test_integration_xdist_collection.py`, README notes
+- [x] Quality checks: pylint, pytest (incl. integration), mypy — fix all issues
+- [x] Commit message prepared
 
 ## Pull Request
 - [ ] PR review: review all changes against `summary.md`
