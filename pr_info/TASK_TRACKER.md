@@ -35,9 +35,9 @@ This tracks **Feature Implementation** consisting of multiple **Tasks**.
 
 ### Step 3: Parent-side snapshot cleanup for dry runs — [step_3.md](./steps/step_3.md)
 
-- [ ] Implementation: tests, `_missing_paths`, `_remove_new_paths`, child-side dry-run cleanup removed
-- [ ] Quality checks: pylint, pytest, mypy — fix all issues
-- [ ] Commit message prepared
+- [x] Implementation: tests, `_missing_paths`, `_remove_new_paths`, child-side dry-run cleanup removed
+- [x] Quality checks: pylint, pytest, mypy — fix all issues
+- [x] Commit message prepared
 
 ### Step 4: Real-run failure reporting and cleanup — [step_4.md](./steps/step_4.md)
 

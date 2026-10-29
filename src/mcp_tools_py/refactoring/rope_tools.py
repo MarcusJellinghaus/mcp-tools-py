@@ -14,6 +14,7 @@ import logging
 import os
 import subprocess as _subprocess
 import sys
+import time
 from collections.abc import Callable, Iterator
 from contextlib import contextmanager
 from pathlib import Path
@@ -47,6 +48,10 @@ _DEFAULT_IGNORED = [
     ".eggs",
     "*.egg-info",
 ]
+
+# A just-killed child may still hold file handles on Windows.
+_CLEANUP_RETRIES = 5
+_CLEANUP_RETRY_DELAY = 0.2
 
 
 # Gitignore utilities copied from p_workspace (directory_utils.py).
@@ -326,8 +331,8 @@ def _move_symbol_impl(
                 )
 
     # --- Create destination if needed (once) ---
+    # Dry-run leftovers are removed by the parent process (move_symbol).
     created_dest = False
-    created_for_dry_run = False
 
     if not dry_run:
         _ensure_parents(abs_dest, project_dir)
@@ -338,7 +343,6 @@ def _move_symbol_impl(
         if not abs_dest.exists():
             _ensure_parents(abs_dest, project_dir)
             abs_dest.write_text("", encoding="utf-8")
-            created_for_dry_run = True
 
     # --- Move each symbol in reverse order ---
     all_change_lines: list[str] = []
@@ -369,7 +373,6 @@ def _move_symbol_impl(
             moved_names.append(name)
 
         if dry_run:
-            _cleanup_created_files(abs_dest, created_for_dry_run, project_dir)
             symbols_str = ", ".join(reversed(moved_names))
             combined = "\n".join(line for line in all_change_lines if line)
             dry_lines = [
@@ -405,9 +408,7 @@ def _move_symbol_impl(
         return "\n".join(line for line in result_lines if line)
 
     except Exception as exc:  # pylint: disable=broad-exception-caught
-        if dry_run:
-            _cleanup_created_files(abs_dest, created_for_dry_run, project_dir)
-        else:
+        if not dry_run:
             _cleanup_created_files(abs_dest, created_dest, project_dir)
         msg = f"Error moving symbol: {exc}"
         if isinstance(exc, AttributeError):
@@ -503,7 +504,10 @@ def move_symbol(
     if not abs_source.exists():
         return f"Error: file not found: {source_file}"
 
-    return _run_rope_subprocess(
+    # Snapshot before the child runs: cleanup must happen here, since a
+    # killed child cannot clean up after itself.
+    snapshot = _missing_paths(project_dir, dest_file)
+    result = _run_rope_subprocess(
         "move_symbol",
         {
             "project_dir": str(project_dir),
@@ -514,6 +518,49 @@ def move_symbol(
         },
         timeout=timeout,
     )
+    if dry_run:
+        _remove_new_paths(snapshot)
+    return result
+
+
+def _missing_paths(project_dir: Path, dest_file: str) -> list[Path]:
+    """Return the destination and its missing parents/__init__.py files.
+
+    Returns:
+        Absolute paths that don't exist yet, deepest first, each dir's
+        __init__.py before the dir itself.
+    """
+    abs_dest = project_dir / dest_file
+    paths = [abs_dest] if not abs_dest.exists() else []
+    current = abs_dest.parent
+    while current != project_dir and current.is_relative_to(project_dir):
+        for path in (current / "__init__.py", current):
+            if not path.exists():
+                paths.append(path)
+        current = current.parent
+    return paths
+
+
+def _retry_on_permission_error(action: Callable[[], None], path: Path) -> None:
+    """Run action, retrying briefly while Windows still holds a handle."""
+    for attempt in range(_CLEANUP_RETRIES):
+        try:
+            action()
+            return
+        except PermissionError as exc:
+            if attempt == _CLEANUP_RETRIES - 1:
+                logger.warning("Could not remove %s: %s", path, exc)
+                return
+            time.sleep(_CLEANUP_RETRY_DELAY)
+
+
+def _remove_new_paths(paths: list[Path]) -> None:
+    """Remove snapshotted paths that now exist: files, then empty dirs."""
+    for path in paths:
+        if path.is_file():
+            _retry_on_permission_error(path.unlink, path)
+        elif path.is_dir() and not any(path.iterdir()):
+            _retry_on_permission_error(path.rmdir, path)
 
 
 def _collect_existing_paths(changes: ChangeSet) -> set[str]:

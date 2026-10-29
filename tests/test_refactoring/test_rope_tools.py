@@ -1,6 +1,7 @@
 """Tests for rope-based refactoring operations (move, rename)."""
 
 import json
+from collections.abc import Callable
 from pathlib import Path
 
 import pytest
@@ -11,6 +12,7 @@ from mcp_tools_py.refactoring.rope_tools import (
     move_symbol,
     rename_symbol,
 )
+from mcp_tools_py.utils.subprocess_runner import CommandResult
 
 # --- Shared fixture ---
 
@@ -382,8 +384,64 @@ def test_move_symbol_attribute_error_hint(sample_project: Path) -> None:
     assert "is_folder" in result
     # Actionable hint appended
     assert "Hint:" in result
-    # The dry-run dest stub was cleaned up
-    assert not (sample_project / "src" / "baz.py").exists()
+
+
+# --- parent-side cleanup tests ---
+
+
+def fake_execute_command(
+    side_effect: Callable[[], None],
+    result: CommandResult | None = None,
+) -> Callable[..., CommandResult]:
+    """Build a fake execute_command that runs side_effect, then returns result.
+
+    Returns:
+        A replacement for rope_tools.execute_command; defaults to a timeout.
+    """
+    if result is None:
+        result = CommandResult(return_code=-1, stdout="", stderr="", timed_out=True)
+
+    def _fake(*_args: object, **_kwargs: object) -> CommandResult:
+        side_effect()
+        return result
+
+    return _fake
+
+
+def test_move_symbol_dry_run_timeout_leaves_no_files(
+    sample_project: Path, monkeypatch: pytest.MonkeyPatch
+) -> None:
+    """A dry run whose child is killed still removes what the child created."""
+    sub = sample_project / "src" / "sub"
+
+    def create_files() -> None:
+        sub.mkdir()
+        (sub / "__init__.py").write_text("")
+        (sub / "new.py").write_text("")
+
+    monkeypatch.setattr(
+        "mcp_tools_py.refactoring.rope_tools.execute_command",
+        fake_execute_command(create_files),
+    )
+    result = move_symbol(
+        sample_project, "src/foo.py", ["my_func"], "src/sub/new.py", dry_run=True
+    )
+    assert "timed out" in result
+    assert not sub.exists()
+
+
+def test_move_symbol_dry_run_existing_dir_no_stray_init(sample_project: Path) -> None:
+    """A dry run into an existing non-package dir leaves no __init__.py behind."""
+    plain = sample_project / "src" / "plain"
+    plain.mkdir()
+    (plain / "other.txt").write_text("keep")
+    result = move_symbol(
+        sample_project, "src/foo.py", ["my_func"], "src/plain/new.py", dry_run=True
+    )
+    assert "[DRY RUN]" in result
+    assert not (plain / "__init__.py").exists()
+    assert not (plain / "new.py").exists()
+    assert (plain / "other.txt").exists()
 
 
 # --- ropefolder=None and gitignore filtering tests ---
