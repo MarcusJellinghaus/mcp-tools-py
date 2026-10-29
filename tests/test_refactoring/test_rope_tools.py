@@ -234,6 +234,19 @@ def test_move_symbol_dry_run_includes_review_notes(sample_project: Path) -> None
     assert "Note: Review symbol order and imports in all affected files." in result
 
 
+def test_move_symbol_dry_run_shows_diff(sample_project: Path) -> None:
+    """Dry-run output includes rope's unified diff for each symbol."""
+    result = move_symbol(
+        sample_project, "src/foo.py", ["my_func"], "src/baz.py", dry_run=True
+    )
+    assert "Diff for my_func:" in result
+    assert "--- a/src/foo.py" in result
+    assert "+++ b/src/baz.py" in result
+    assert "-def my_func():" in result
+    assert "Self-referencing imports" in result
+    assert not (sample_project / "src" / "baz.py").exists()
+
+
 # --- self-import removal tests ---
 
 

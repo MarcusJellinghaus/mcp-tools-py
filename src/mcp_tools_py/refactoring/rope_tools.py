@@ -346,6 +346,7 @@ def _move_symbol_impl(
     # --- Move each symbol in reverse order ---
     all_change_lines: list[str] = []
     moved_names: list[str] = []
+    diffs: list[str] = []
 
     try:
         for name in reversed(symbol_names):
@@ -361,6 +362,7 @@ def _move_symbol_impl(
 
                 if dry_run:
                     all_change_lines.append(_format_changes(changes, dry_run=True))
+                    diffs.append(f"Diff for {name}:\n{changes.get_description()}")
                 else:
                     pre_existing = _collect_existing_paths(changes)
                     project.do(changes)
@@ -378,6 +380,11 @@ def _move_symbol_impl(
                 "[DRY RUN] move_symbol preview:",
                 f"  Symbols: {symbols_str}",
                 combined,
+                "Diffs (each computed against the unmodified source;"
+                " diffs touching the same file can overlap):",
+                *diffs,
+                "Note: Self-referencing imports of the destination module"
+                " shown in a diff are removed in the real run.",
                 "Note: Imports are absolute \u2014 review and convert to relative where applicable.",
                 "Note: Review symbol order and imports in all affected files.",
             ]

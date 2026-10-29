@@ -47,9 +47,9 @@ This tracks **Feature Implementation** consisting of multiple **Tasks**.
 
 ### Step 5: Dry run shows rope's unified diff per symbol — [step_5.md](./steps/step_5.md)
 
-- [ ] Implementation: test and per-symbol diffs in dry-run output
-- [ ] Quality checks: pylint, pytest, mypy — fix all issues
-- [ ] Commit message prepared
+- [x] Implementation: test and per-symbol diffs in dry-run output
+- [x] Quality checks: pylint, pytest, mypy — fix all issues
+- [x] Commit message prepared
 
 ### Step 6: String-reference report (not rewritten) — [step_6.md](./steps/step_6.md)
 
