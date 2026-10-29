@@ -9,3 +9,13 @@ pr_info/steps/step_3.md:5 — low — The prompt says only `tests/test_final_val
 Verdict(decision='tasks', tasks=["In pr_info/steps/step_1.md, restrict the 'Collection problems:' block to collection_errors entries and the xdist hint. Do not fall back to the last 50 lines of error_message for ordinary failing runs. Apply that tail fallback only when the status is ERROR (no tests ran), so a normal FAILED run (exit 1) gets no 'Collection problems:' block.", "In pr_info/steps/step_3.md, add a formatter test for a plain FAILED run (exit 1, error_context with only error_message, no failed collectors or collection_errors) asserting the output has no 'Collection problems:' block.", "In pr_info/steps/step_3.md, also list tests/test_checker_tools_formatting.py:226 as a test that asserts the old 'Error running pytest' wording and needs updating in this step."], escalate_reason=None)
 **Changes**:
 applied
+
+## Round 2 — 2026-10-29
+**Findings**:
+Now verify the plan against the actual code.Checking two remaining details (the coverage digest wording and the test that checks that `success` was removed), then I'll write the report.pr_info/steps/step_4.md:29 — low — For a "No Tests Found" result, the `skipped` summary uses `format_error_text`, so a skip reads "Pytest run reported an error. / Pytest run did not complete." Today the summary is the raw message. Using `"\n".join(verdict.problems)` for the skipped summary would avoid calling a skip an error.
+pr_info/steps/step_4.md:33 — low — The summary for `FAILED` with no findings joins `verdict.problems` without a size cap. Collector `longrepr` text can be long, so it should go through the same `_cap_lines` cap that the ERROR text uses.
+pr_info/steps/step_1.md:101 — low — `_cap_lines` relies on `OutputBuilder.add` to add the truncation marker. Per `reporting.py:64-73`, `add` adds no marker when the earlier problems fill exactly `MAX_OUTPUT_LINES` (`remaining_lines == 0`). The cap test at step_1.md:134 should use problems that overflow partway through an item, or `_cap_lines` should append the marker itself when `add` returns False.
+**Decisions**:
+Verdict(decision='tasks', tasks=['In pr_info/steps/step_4.md:29, build the \'No Tests Found\' skipped summary from "\\n".join(verdict.problems) instead of format_error_text, so a skip is not described as an error.', 'In pr_info/steps/step_4.md:33, cap the joined verdict.problems summary for FAILED-with-no-findings with _cap_lines, the same cap used for the ERROR text.'], escalate_reason=None)
+**Changes**:
+applied
