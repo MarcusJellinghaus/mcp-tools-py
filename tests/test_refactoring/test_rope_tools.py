@@ -444,6 +444,82 @@ def test_move_symbol_dry_run_existing_dir_no_stray_init(sample_project: Path) ->
     assert (plain / "other.txt").exists()
 
 
+def test_move_symbol_real_timeout_lists_moved(
+    sample_project: Path, monkeypatch: pytest.MonkeyPatch
+) -> None:
+    """A real run killed mid-batch reports which symbols moved."""
+    src = sample_project / "src"
+
+    def move_one() -> None:
+        (src / "foo.py").write_text('class MyClass:\n    pass\n\n\nMY_VAR = "hello"\n')
+        (src / "baz.py").write_text("def my_func(): ...\n")
+
+    monkeypatch.setattr(
+        "mcp_tools_py.refactoring.rope_tools.execute_command",
+        fake_execute_command(move_one),
+    )
+    result = move_symbol(
+        sample_project, "src/foo.py", ["my_func", "MyClass"], "src/baz.py"
+    )
+    assert "timed out" in result
+    assert "Moved: my_func" in result
+    assert "Not moved: MyClass" in result
+    assert "git diff" in result
+    assert (src / "baz.py").exists()
+
+
+def _create_sub_package(sub: Path) -> Callable[[], None]:
+    """Build a side effect that creates sub/__init__.py and sub/new.py.
+
+    Returns:
+        A callable for fake_execute_command.
+    """
+
+    def create_files() -> None:
+        sub.mkdir()
+        (sub / "__init__.py").write_text("")
+        (sub / "new.py").write_text("")
+
+    return create_files
+
+
+def test_move_symbol_real_failure_nothing_moved_cleans_up(
+    sample_project: Path, monkeypatch: pytest.MonkeyPatch
+) -> None:
+    """A real run that times out before moving anything leaves no files."""
+    sub = sample_project / "src" / "sub"
+    monkeypatch.setattr(
+        "mcp_tools_py.refactoring.rope_tools.execute_command",
+        fake_execute_command(_create_sub_package(sub)),
+    )
+    result = move_symbol(sample_project, "src/foo.py", ["my_func"], "src/sub/new.py")
+    assert not sub.exists()
+    assert "Moved: (none)" in result
+
+
+def test_move_symbol_real_rope_error_nothing_moved_cleans_up(
+    sample_project: Path, monkeypatch: pytest.MonkeyPatch
+) -> None:
+    """A rope error before anything moved is reported and cleaned up."""
+    sub = sample_project / "src" / "sub"
+    rope_error = CommandResult(
+        return_code=0,
+        stdout='{"result": "Error moving symbol: boom"}',
+        stderr="",
+        timed_out=False,
+    )
+    monkeypatch.setattr(
+        "mcp_tools_py.refactoring.rope_tools.execute_command",
+        fake_execute_command(_create_sub_package(sub), rope_error),
+    )
+    result = move_symbol(sample_project, "src/foo.py", ["my_func"], "src/sub/new.py")
+    assert "Error moving symbol: boom" in result
+    assert "Moved: (none)" in result
+    assert "Not moved: my_func" in result
+    assert "git diff" in result
+    assert not sub.exists()
+
+
 # --- ropefolder=None and gitignore filtering tests ---
 
 

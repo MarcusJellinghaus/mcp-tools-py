@@ -41,9 +41,9 @@ This tracks **Feature Implementation** consisting of multiple **Tasks**.
 
 ### Step 4: Real-run failure reporting and cleanup — [step_4.md](./steps/step_4.md)
 
-- [ ] Implementation: tests, `_split_moved`, `_MOVE_SUCCESS_PREFIX`, `_cleanup_created_files` removed
-- [ ] Quality checks: pylint, pytest, mypy — fix all issues
-- [ ] Commit message prepared
+- [x] Implementation: tests, `_split_moved`, `_MOVE_SUCCESS_PREFIX`, `_cleanup_created_files` removed
+- [x] Quality checks: pylint, pytest, mypy — fix all issues
+- [x] Commit message prepared
 
 ### Step 5: Dry run shows rope's unified diff per symbol — [step_5.md](./steps/step_5.md)
 

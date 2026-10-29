@@ -53,6 +53,8 @@ _DEFAULT_IGNORED = [
 _CLEANUP_RETRIES = 5
 _CLEANUP_RETRY_DELAY = 0.2
 
+_MOVE_SUCCESS_PREFIX = "move_symbol completed successfully."
+
 
 # Gitignore utilities copied from p_workspace (directory_utils.py).
 # TODO: Refactor into shared mcp_utils package later.
@@ -331,14 +333,11 @@ def _move_symbol_impl(
                 )
 
     # --- Create destination if needed (once) ---
-    # Dry-run leftovers are removed by the parent process (move_symbol).
-    created_dest = False
-
+    # Leftovers are removed by the parent process (move_symbol).
     if not dry_run:
         _ensure_parents(abs_dest, project_dir)
         if not abs_dest.exists():
             abs_dest.write_text("", encoding="utf-8")
-            created_dest = True
     else:
         if not abs_dest.exists():
             _ensure_parents(abs_dest, project_dir)
@@ -391,7 +390,7 @@ def _move_symbol_impl(
         moved_str = ", ".join(reversed(moved_names))
         combined = "\n".join(line for line in all_change_lines if line)
         result_lines = [
-            "move_symbol completed successfully.",
+            _MOVE_SUCCESS_PREFIX,
             f"  Moved: {moved_str} (from {source_file} \u2192 {dest_file})",
             combined,
         ]
@@ -408,8 +407,6 @@ def _move_symbol_impl(
         return "\n".join(line for line in result_lines if line)
 
     except Exception as exc:  # pylint: disable=broad-exception-caught
-        if not dry_run:
-            _cleanup_created_files(abs_dest, created_dest, project_dir)
         msg = f"Error moving symbol: {exc}"
         if isinstance(exc, AttributeError):
             msg += (
@@ -520,7 +517,48 @@ def move_symbol(
     )
     if dry_run:
         _remove_new_paths(snapshot)
+        return result
+    if result.startswith(_MOVE_SUCCESS_PREFIX):
+        return result
+
+    moved, not_moved = _split_moved(project_dir, source_file, dest_file, symbol_names)
+    if not moved:
+        _remove_new_paths(snapshot)
+    if result.startswith("Error"):
+        result += (
+            "\nRope changes cannot be rolled back."
+            f"\n  Moved: {', '.join(moved) or '(none)'}"
+            f"\n  Not moved: {', '.join(not_moved) or '(none)'}"
+            "\nThe state of the symbol in flight is uncertain; check `git diff`."
+        )
     return result
+
+
+def _read_symbols(path: Path) -> list[str]:
+    """Return top-level symbol names of path, or [] if it can't be read.
+
+    Returns:
+        Names of top-level functions, classes, and assigned variables.
+    """
+    try:
+        return _get_top_level_symbols(path.read_text(encoding="utf-8"))
+    except (OSError, UnicodeDecodeError):
+        return []
+
+
+def _split_moved(
+    project_dir: Path, source_file: str, dest_file: str, names: list[str]
+) -> tuple[list[str], list[str]]:
+    """Split names into those now in dest (and gone from source) and the rest.
+
+    Returns:
+        (moved, not_moved), each in the order of `names`.
+    """
+    src_syms = _read_symbols(project_dir / source_file)
+    dst_syms = _read_symbols(project_dir / dest_file)
+    moved = [n for n in names if n not in src_syms and n in dst_syms]
+    not_moved = [n for n in names if n not in moved]
+    return moved, not_moved
 
 
 def _missing_paths(project_dir: Path, dest_file: str) -> list[Path]:
@@ -602,19 +640,6 @@ def _remove_self_imports(dest_path: Path, dest_module_dotted: str) -> list[str]:
     if removed:
         dest_path.write_text("".join(kept), encoding="utf-8")
     return removed
-
-
-def _cleanup_created_files(
-    abs_dest: Path, created_for_dry_run: bool, project_dir: Path
-) -> None:
-    """Remove temporary files created during a dry-run move_symbol."""
-    if (
-        created_for_dry_run
-        and abs_dest.exists()
-        and abs_dest.read_text(encoding="utf-8") == ""
-    ):
-        abs_dest.unlink()
-        _cleanup_empty_dirs(abs_dest.parent, project_dir)
 
 
 def _cleanup_empty_dirs(directory: Path, stop_at: Path) -> None:
