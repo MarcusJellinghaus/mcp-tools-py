@@ -464,15 +464,9 @@ def test_move_symbol_dry_run_timeout_leaves_no_files(
 ) -> None:
     """A dry run whose child is killed still removes what the child created."""
     sub = sample_project / "src" / "sub"
-
-    def create_files() -> None:
-        sub.mkdir()
-        (sub / "__init__.py").write_text("")
-        (sub / "new.py").write_text("")
-
     monkeypatch.setattr(
         "mcp_tools_py.refactoring.rope_tools.execute_command",
-        fake_execute_command(create_files),
+        fake_execute_command(_create_sub_package(sub)),
     )
     result = move_symbol(
         sample_project, "src/foo.py", ["my_func"], "src/sub/new.py", dry_run=True
