@@ -21,6 +21,43 @@ This tracks **Feature Implementation** consisting of multiple **Tasks**.
 
 ## Tasks
 
-<!-- Tasks populated from pr_info/steps/ by prepare_task_tracker -->
+### Step 1: Collect count excludes deselected tests — [step_1.md](./steps/step_1.md)
+
+- [ ] Implementation: tests and `get_test_summary` header change
+- [ ] Quality checks: pylint, pytest, mypy — fix all issues
+- [ ] Commit message prepared
+
+### Step 2: Per-call `timeout_seconds` on the `move_symbol` tool — [step_2.md](./steps/step_2.md)
+
+- [ ] Implementation: plumbing test and `timeout_seconds` parameter
+- [ ] Quality checks: pylint, pytest, mypy — fix all issues
+- [ ] Commit message prepared
+
+### Step 3: Parent-side snapshot cleanup for dry runs — [step_3.md](./steps/step_3.md)
+
+- [ ] Implementation: tests, `_missing_paths`, `_remove_new_paths`, child-side dry-run cleanup removed
+- [ ] Quality checks: pylint, pytest, mypy — fix all issues
+- [ ] Commit message prepared
+
+### Step 4: Real-run failure reporting and cleanup — [step_4.md](./steps/step_4.md)
+
+- [ ] Implementation: tests, `_split_moved`, `_MOVE_SUCCESS_PREFIX`, `_cleanup_created_files` removed
+- [ ] Quality checks: pylint, pytest, mypy — fix all issues
+- [ ] Commit message prepared
+
+### Step 5: Dry run shows rope's unified diff per symbol — [step_5.md](./steps/step_5.md)
+
+- [ ] Implementation: test and per-symbol diffs in dry-run output
+- [ ] Quality checks: pylint, pytest, mypy — fix all issues
+- [ ] Commit message prepared
+
+### Step 6: String-reference report (not rewritten) — [step_6.md](./steps/step_6.md)
+
+- [ ] Implementation: tests, `_module_dotted`, `_string_ref_lines`, tool docstring update
+- [ ] Quality checks: pylint, pytest, mypy — fix all issues
+- [ ] Commit message prepared
 
 ## Pull Request
+
+- [ ] PR review: review the full branch diff against `main` and address findings
+- [ ] PR summary prepared
