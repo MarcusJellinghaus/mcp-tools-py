@@ -16,6 +16,7 @@ from mcp_tools_py.code_checker_pytest import (
     check_code_with_pytest,
     run_tests,
 )
+from mcp_tools_py.code_checker_pytest.verdict import RunStatus, RunVerdict
 from tests.conftest import make_command_result
 
 from .test_code_checker_pytest_common import _cleanup_test_project, _create_test_project
@@ -175,7 +176,8 @@ def test_check_code_with_pytest(mock_run_tests: MagicMock) -> None:
     result = check_code_with_pytest("/test/project", python_executable=sys.executable)
 
     # Verify the results
-    assert result["success"] is True
+    assert result["verdict"].status is RunStatus.PASSED
+    assert "success" not in result
     assert "summary" in result
     assert isinstance(result["summary"], dict)
     assert result["summary"]["collected"] == 2
@@ -253,7 +255,7 @@ def test_check_code_with_pytest_with_custom_parameters(
     )
 
     # Verify result is correct
-    assert result["success"] is True
+    assert result["verdict"].status is RunStatus.PASSED
 
 
 @patch("mcp_tools_py.code_checker_pytest.runners.run_tests")
@@ -303,7 +305,7 @@ def test_check_code_with_pytest_with_failed_tests(mock_run_tests: MagicMock) -> 
     result = check_code_with_pytest("/test/project", python_executable=sys.executable)
 
     # Verify the results
-    assert result["success"] is True
+    assert result["verdict"].status is RunStatus.FAILED
     assert "summary" in result
     assert isinstance(result["summary"], dict)
     assert result["summary"]["collected"] == 4
@@ -329,9 +331,9 @@ def test_check_code_with_pytest_with_error(mock_run_tests: MagicMock) -> None:
     result = check_code_with_pytest("/test/project", python_executable=sys.executable)
 
     # Verify the results
-    assert result["success"] is False
-    assert "error" in result
-    assert result["error"] == "Test execution error"
+    assert result == {
+        "verdict": RunVerdict(RunStatus.ERROR, ["Test execution error"], 0)
+    }
 
 
 @patch("mcp_tools_py.code_checker_pytest.runners.execute_command")
@@ -647,8 +649,9 @@ def test_path_args_skip_default_folder_integration(mock_execute: MagicMock) -> N
     )
 
     # check_code_with_pytest catches exceptions and returns an error dict
-    assert result["success"] is False
-    assert "No Tests Found" in result["error"]
+    verdict = result["verdict"]
+    assert verdict.status is RunStatus.ERROR
+    assert "No Tests Found" in verdict.problems[0]
 
     called_command = mock_execute.call_args[1].get(
         "command", mock_execute.call_args[0][0] if mock_execute.call_args[0] else []

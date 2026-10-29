@@ -11,7 +11,9 @@ from mcp_tools_py.code_checker_pytest.reporting import (
     NO_CAPTURED_OUTPUT_NOTE,
     create_prompt_for_passing_output,
 )
+from mcp_tools_py.code_checker_pytest.verdict import classify_run
 from mcp_tools_py.server import ToolServer
+from tests._pytest_results import make_pytest_results
 from tests.test_code_checker_pytest._helpers import (
     _create_edge_case_project,
     _create_focused_project,
@@ -64,11 +66,11 @@ class TestReporting:
         pytest_report = parse_pytest_report(json.dumps(json_report))
 
         # Create test results dict that server expects
-        test_results = {
-            "success": True,
-            "summary": json_report["summary"],
-            "test_results": pytest_report,
-        }
+        test_results = make_pytest_results(
+            classify_run(pytest_report).status,
+            summary=json_report["summary"],
+            test_results=pytest_report,
+        )
 
         # Run with show_details=True
         result = CheckerTools(server.context)._format_pytest_result_with_details(
@@ -130,11 +132,11 @@ class TestReporting:
 
         pytest_report = parse_pytest_report(json.dumps(json_report))
 
-        test_results = {
-            "success": True,
-            "summary": json_report["summary"],
-            "test_results": pytest_report,
-        }
+        test_results = make_pytest_results(
+            classify_run(pytest_report).status,
+            summary=json_report["summary"],
+            test_results=pytest_report,
+        )
 
         result = CheckerTools(server.context)._format_pytest_result_with_details(
             test_results, show_details=True
@@ -184,11 +186,11 @@ class TestReporting:
 
         pytest_report = parse_pytest_report(json.dumps(json_report))
 
-        test_results = {
-            "success": True,
-            "summary": json_report["summary"],
-            "test_results": pytest_report,
-        }
+        test_results = make_pytest_results(
+            classify_run(pytest_report).status,
+            summary=json_report["summary"],
+            test_results=pytest_report,
+        )
 
         # Test with show_details=True (which would add -s automatically)
         result = CheckerTools(server.context)._format_pytest_result_with_details(
@@ -238,11 +240,11 @@ class TestReporting:
 
         pytest_report = parse_pytest_report(json.dumps(json_report))
 
-        test_results = {
-            "success": True,
-            "summary": json_report["summary"],
-            "test_results": pytest_report,
-        }
+        test_results = make_pytest_results(
+            classify_run(pytest_report).status,
+            summary=json_report["summary"],
+            test_results=pytest_report,
+        )
 
         # Both verbosity and show_details should work together
         result = CheckerTools(server.context)._format_pytest_result_with_details(
@@ -271,11 +273,11 @@ class TestReporting:
 
         pytest_report = parse_pytest_report(json.dumps(json_report))
 
-        test_results = {
-            "success": True,
-            "summary": json_report["summary"],
-            "test_results": pytest_report,
-        }
+        test_results = make_pytest_results(
+            classify_run(pytest_report).status,
+            summary=json_report["summary"],
+            test_results=pytest_report,
+        )
 
         result = CheckerTools(server.context)._format_pytest_result_with_details(
             test_results, show_details=True
@@ -304,11 +306,11 @@ class TestReporting:
 
         pytest_report = parse_pytest_report(json.dumps(json_report))
 
-        test_results = {
-            "success": True,
-            "summary": json_report["summary"],
-            "test_results": pytest_report,
-        }
+        test_results = make_pytest_results(
+            classify_run(pytest_report).status,
+            summary=json_report["summary"],
+            test_results=pytest_report,
+        )
 
         result = CheckerTools(server.context)._format_pytest_result_with_details(
             test_results, show_details=True
@@ -355,11 +357,11 @@ class TestReporting:
 
         pytest_report = parse_pytest_report(json.dumps(json_report))
 
-        test_results = {
-            "success": True,
-            "summary": json_report["summary"],
-            "test_results": pytest_report,
-        }
+        test_results = make_pytest_results(
+            classify_run(pytest_report).status,
+            summary=json_report["summary"],
+            test_results=pytest_report,
+        )
 
         result = CheckerTools(server.context)._format_pytest_result_with_details(
             test_results, show_details=True
@@ -408,11 +410,11 @@ class TestReporting:
 
         pytest_report = parse_pytest_report(json.dumps(json_report))
 
-        test_results = {
-            "success": True,
-            "summary": json_report["summary"],
-            "test_results": pytest_report,
-        }
+        test_results = make_pytest_results(
+            classify_run(pytest_report).status,
+            summary=json_report["summary"],
+            test_results=pytest_report,
+        )
 
         result = CheckerTools(server.context)._format_pytest_result_with_details(
             test_results, show_details=True
@@ -463,11 +465,11 @@ class TestReporting:
 
         pytest_report = parse_pytest_report(json.dumps(json_report))
 
-        test_results = {
-            "success": True,
-            "summary": json_report["summary"],
-            "test_results": pytest_report,
-        }
+        test_results = make_pytest_results(
+            classify_run(pytest_report).status,
+            summary=json_report["summary"],
+            test_results=pytest_report,
+        )
 
         # Run several formatting operations
         for _ in range(3):

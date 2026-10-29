@@ -4,6 +4,7 @@ from pathlib import Path
 from typing import Any
 from unittest.mock import patch
 
+from tests._pytest_results import make_pytest_results
 from tests.conftest import make_environment_info
 from tests.test_tool_availability._helpers import (
     _capture_tools,
@@ -79,11 +80,10 @@ class TestToolHandlerShortCircuit:
         _, tools = self._server_with(tmp_path)
 
         with patch(_PYTEST_RUNNER) as mock_check:
-            mock_check.return_value = {
-                "success": True,
-                "summary": {"passed": 5, "failed": 0, "error": 0, "collected": 5},
-                "test_results": None,
-            }
+            mock_check.return_value = make_pytest_results(
+                summary={"passed": 5, "failed": 0, "error": 0, "collected": 5},
+                test_results=None,
+            )
             result = tools["run_pytest_check"]()
 
         assert "not available" not in result
@@ -102,11 +102,10 @@ class TestToolHandlerShortCircuit:
             ),
         ):
             registered_tools = _capture_tools(mock_fastmcp)
-            mock_check.return_value = {
-                "success": True,
-                "summary": {"passed": 1, "failed": 0, "error": 0, "collected": 1},
-                "test_results": None,
-            }
+            mock_check.return_value = make_pytest_results(
+                summary={"passed": 1, "failed": 0, "error": 0, "collected": 1},
+                test_results=None,
+            )
 
             server = _create_server(
                 project_dir=Path("/project"),
@@ -137,11 +136,10 @@ class TestToolHandlerShortCircuit:
             ),
         ):
             registered_tools = _capture_tools(mock_fastmcp)
-            mock_check.return_value = {
-                "success": True,
-                "summary": {"passed": 1, "failed": 0, "error": 0, "collected": 1},
-                "test_results": None,
-            }
+            mock_check.return_value = make_pytest_results(
+                summary={"passed": 1, "failed": 0, "error": 0, "collected": 1},
+                test_results=None,
+            )
 
             server = _create_server(
                 project_dir=Path("/project"),

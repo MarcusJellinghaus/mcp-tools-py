@@ -13,6 +13,11 @@ from mcp_tools_py.code_checker_pytest.reporting import (
     get_test_summary,
 )
 from mcp_tools_py.code_checker_pytest.utils import create_error_context, read_file
+from mcp_tools_py.code_checker_pytest.verdict import (
+    RunStatus,
+    RunVerdict,
+    classify_run,
+)
 from mcp_tools_py.log_utils import log_function_call
 from mcp_tools_py.utils.subprocess_runner import (
     check_tool_missing_error,
@@ -494,11 +499,10 @@ def check_code_with_pytest(
 
     Returns:
         Dictionary with test results containing the following keys:
-        - success: Boolean indicating if the test execution was successful
+        - verdict: RunVerdict (status, problems, exit_code); ERROR on any exception, with the message in problems
         - summary: Summary of test results as a formatted string
         - failed_tests_prompt: Formatted prompt for failed tests (if any)
         - test_results: Complete PytestReport object with detailed test information
-        - error_info: Details about any errors that occurred during test execution
     """
     logger.info(
         "Starting pytest code check",
@@ -555,23 +559,13 @@ def check_code_with_pytest(
         if failed_count > 0 or error_count > 0:
             failed_tests_prompt = create_prompt_for_failed_tests(test_results)
 
-        error_info = None
-        if test_results.error_context:
-            error_info = {
-                "exit_code": test_results.error_context.exit_code,
-                "meaning": test_results.error_context.exit_code_meaning,
-                "suggestion": test_results.error_context.suggestion,
-                "collection_errors": test_results.error_context.collection_errors,
-            }
-
         # Return both summary dict and formatted text
         return {
-            "success": True,
+            "verdict": classify_run(test_results),
             "summary": summary_dict,  # Dictionary for server.py compatibility
             "summary_text": summary_text,  # Formatted string for display
             "failed_tests_prompt": failed_tests_prompt,
             "test_results": test_results,
-            "error_info": error_info,
         }
 
     except Exception as e:
@@ -584,4 +578,4 @@ def check_code_with_pytest(
                 "test_folder": test_folder,
             },
         )
-        return {"success": False, "error": str(e)}
+        return {"verdict": RunVerdict(RunStatus.ERROR, [str(e)], 0)}

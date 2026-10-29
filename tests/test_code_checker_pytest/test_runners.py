@@ -6,7 +6,9 @@ from pathlib import Path
 
 from mcp_tools_py.checker_tools import CheckerTools
 from mcp_tools_py.code_checker_pytest.parsers import parse_pytest_report
+from mcp_tools_py.code_checker_pytest.verdict import RunStatus
 from mcp_tools_py.server import ToolServer
+from tests._pytest_results import make_pytest_results
 from tests.test_code_checker_pytest._helpers import _create_large_project
 
 
@@ -68,11 +70,11 @@ def test_fast_operation():
 
         pytest_report = parse_pytest_report(json.dumps(json_report))
 
-        test_results = {
-            "success": True,
-            "summary": json_report["summary"],
-            "test_results": pytest_report,
-        }
+        test_results = make_pytest_results(
+            RunStatus.FAILED,
+            summary=json_report["summary"],
+            test_results=pytest_report,
+        )
 
         result = CheckerTools(server.context)._format_pytest_result_with_details(
             test_results, show_details=True
@@ -126,11 +128,11 @@ def test_fast_operation():
 
         pytest_report = parse_pytest_report(json.dumps(json_report))
 
-        test_results = {
-            "success": True,
-            "summary": json_report["summary"],
-            "test_results": pytest_report,
-        }
+        test_results = make_pytest_results(
+            RunStatus.FAILED,
+            summary=json_report["summary"],
+            test_results=pytest_report,
+        )
 
         start_time = time.time()
         result = CheckerTools(server.context)._format_pytest_result_with_details(

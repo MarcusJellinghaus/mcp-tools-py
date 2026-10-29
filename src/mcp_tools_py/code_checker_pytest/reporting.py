@@ -10,7 +10,6 @@ logger = logging.getLogger(__name__)
 # Constants to avoid magic numbers
 MAX_OUTPUT_LINES = 300
 MAX_FAILURES = 10
-SMALL_TEST_RUN_THRESHOLD = 3
 FAILED_OUTCOMES = ["failed", "error"]
 NO_CAPTURED_OUTPUT_NOTE = "Note: no passing test produced captured output."
 
