@@ -31,6 +31,13 @@ from mcp_tools_py.code_checker_pytest.coverage import (
 )
 from mcp_tools_py.code_checker_pytest.models import PytestReport, Test
 from mcp_tools_py.code_checker_pytest.runners import check_code_with_pytest
+from mcp_tools_py.code_checker_pytest.verdict import (
+    RunStatus,
+    RunVerdict,
+    cap_problems,
+    format_error_text,
+    format_suspicious_text,
+)
 from mcp_tools_py.formatter.runner import (
     resolve_steps,
     run_format_code,
@@ -99,9 +106,11 @@ def _run_test(context: ToolContext, depth: str) -> ActionResult:
     informational only and never changes `status`.
 
     Returns:
-        "error" if pytest is unavailable, or the run failed for a reason
-        other than "no tests found"; "skipped" for no tests found;
-        "findings" with one Finding per failing/erroring test; else "ok".
+        "error" if pytest is unavailable, the verdict is ERROR (other than
+        "no tests found"), or FAILED without any failing/erroring test;
+        "skipped" for no tests found; "findings" with one Finding per
+        failing/erroring test; "ok" for PASSED, and for SUSPICIOUS with a
+        "Not verified" summary.
     """
     if not context.is_tool_available("pytest"):
         return ActionResult(
@@ -139,15 +148,18 @@ def _run_test(context: ToolContext, depth: str) -> ActionResult:
             timeout_seconds=context.resolve_timeout("pytest"),
         )
 
-        verdict = result["verdict"]
-        if "test_results" not in result:
-            message = "\n".join(verdict.problems)
+        verdict: RunVerdict = result["verdict"]
+        report: PytestReport | None = result.get("test_results")
+        known = (RunStatus.PASSED, RunStatus.FAILED, RunStatus.SUSPICIOUS)
+        if report is None or verdict.status not in known:
+            if any("No Tests Found" in p for p in verdict.problems):
+                return ActionResult(
+                    status="skipped", summary="\n".join(verdict.problems)
+                )
             return ActionResult(
-                status="skipped" if "No Tests Found" in message else "error",
-                summary=message,
+                status="error", summary=format_error_text(report, verdict)
             )
 
-        report: PytestReport = result["test_results"]
         summary_text: str = result["summary_text"]
         findings = [
             Finding(
@@ -158,10 +170,20 @@ def _run_test(context: ToolContext, depth: str) -> ActionResult:
             for test in report.tests or []
             if test.outcome in _FAILED_OUTCOMES
         ]
+        if verdict.status is RunStatus.FAILED and not findings:
+            return ActionResult(
+                status="error",
+                summary=f"{summary_text}\n\n{cap_problems(verdict.problems)}",
+            )
+        ok_summary = (
+            format_suspicious_text(report.summary.collected)
+            if verdict.status is RunStatus.SUSPICIOUS
+            else summary_text
+        )
         action_result = _result_from_findings(
             error=None,
             findings=findings,
-            ok_summary=summary_text,
+            ok_summary=ok_summary,
             findings_summary=summary_text,
         )
 

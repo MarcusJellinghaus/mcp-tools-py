@@ -37,9 +37,9 @@ This tracks **Feature Implementation** consisting of multiple **Tasks**.
 - [x] Commit message prepared
 
 ### Step 4: Toolkit maps `verdict.status` to `ActionResult` — [step_4.md](./steps/step_4.md)
-- [ ] Implementation: mapping tests in `test_toolkit_test.py`, `toolkit._run_test`
-- [ ] Quality checks: pylint, pytest, mypy, lint-imports, tach — fix all issues
-- [ ] Commit message prepared
+- [x] Implementation: mapping tests in `test_toolkit_test.py`, `toolkit._run_test`
+- [x] Quality checks: pylint, pytest, mypy, lint-imports, tach — fix all issues
+- [x] Commit message prepared
 
 ### Step 5: `pytest_tool` sets `tests_failed` and logging from the verdict — [step_5.md](./steps/step_5.md)
 - [ ] Implementation: coverage and logging tests in `test_server_params.py`, `pytest_tool.py`
