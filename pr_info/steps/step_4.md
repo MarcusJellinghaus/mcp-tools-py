@@ -13,9 +13,11 @@
 
 ```python
 from mcp_tools_py.code_checker_pytest.verdict import (
-    RunStatus, format_error_text, format_suspicious_text,
+    RunStatus, cap_problems, format_error_text, format_suspicious_text,
 )
 ```
+
+`cap_problems` is the same cap that `format_error_text` uses for its problem lines.
 
 The toolkit must not import `checker_tools`.
 
@@ -26,11 +28,11 @@ This logic goes inside the existing `try`, right after `check_code_with_pytest(.
 ```text
 verdict, report = result["verdict"], result.get("test_results")
 if verdict.status not in (PASSED, FAILED, SUSPICIOUS):          # ERROR and unknown statuses
-    if any("No Tests Found" in p for p in verdict.problems): return ActionResult("skipped", summary=format_error_text(report, verdict))
+    if any("No Tests Found" in p for p in verdict.problems): return ActionResult("skipped", summary="\n".join(verdict.problems))
     return ActionResult("error", summary=format_error_text(report, verdict))
 findings = [...unchanged...]
 if verdict.status is FAILED and not findings:
-    return ActionResult("error", summary="\n\n".join([summary_text, *verdict.problems]))
+    return ActionResult("error", summary=f"{summary_text}\n\n{cap_problems(verdict.problems)}")
 ok_summary = format_suspicious_text(report.summary.collected) if verdict.status is SUSPICIOUS else summary_text
 action_result = _result_from_findings(error=None, findings=findings, ok_summary=ok_summary, findings_summary=summary_text)
 # coverage digest unchanged: tests_failed=bool(findings)
@@ -47,7 +49,7 @@ Update the `_run_test` docstring's Returns block so it lists the new mapping.
 Patch `mcp_tools_py.toolkit.check_code_with_pytest` and use `make_pytest_results` together with small hand-built `PytestReport` objects.
 
 1. `ERROR` with a report (exit 1, passed 3) gives `status == "error"`, and the summary contains "reported an error".
-2. `ERROR` from the exception path, with problems `["No Tests Found: …"]` and no report, gives `status == "skipped"`.
+2. `ERROR` from the exception path, with problems `["No Tests Found: …"]` and no report, gives `status == "skipped"`, and the summary is the problem text without "reported an error".
 3. `SUSPICIOUS` gives `status == "ok"`, and the summary contains "Not verified".
 4. `FAILED` with a failing test gives `status == "findings"`, as today.
 5. `FAILED` with no failing tests but a problem, for example a failed collector, gives `status == "error"`, and the summary contains both `summary_text` and the problem.

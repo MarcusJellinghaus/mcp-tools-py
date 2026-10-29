@@ -40,6 +40,7 @@ The toolkit must not depend on the `checker_tools` formatter, so the shared text
 - `format_error_text(report | None, verdict)` builds the ERROR text, used by both the formatter and the toolkit.
 - `format_suspicious_text(collected)` builds the SUSPICIOUS text, used by both the formatter and the toolkit.
 - `format_collection_problems(report, verdict)` builds the "Collection problems" block for the FAILED path in the formatter.
+- `cap_problems(problems)` applies the shared line cap. The toolkit also uses it for the problems of a FAILED run with no findings.
 
 ### Problem messages
 
@@ -78,8 +79,8 @@ De-duplication uses one key: `"Different tests were collected"` when the text co
 |---|---|
 | `PASSED` | `ok` |
 | `SUSPICIOUS` | `ok`, with the summary set to `format_suspicious_text(...)` |
-| `FAILED` | `findings`, as today. When there are no findings: `error`, with `summary_text` plus the problems. |
-| `ERROR` / unknown | `skipped` if any problem contains `"No Tests Found"`, otherwise `error` with `format_error_text(...)` |
+| `FAILED` | `findings`, as today. When there are no findings: `error`, with `summary_text` plus the capped problems. |
+| `ERROR` / unknown | `skipped` with the problem text if any problem contains `"No Tests Found"`, otherwise `error` with `format_error_text(...)` |
 
 ## Files
 

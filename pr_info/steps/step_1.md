@@ -48,10 +48,10 @@ def classify_run(report: PytestReport) -> RunVerdict
 def format_error_text(report: PytestReport | None, verdict: RunVerdict) -> str
 def format_suspicious_text(collected: int) -> str
 def format_collection_problems(report: PytestReport | None, verdict: RunVerdict) -> str
+def cap_problems(problems: list[str]) -> str   # public: toolkit.py reuses it in step 4
 
 def _merge_problems(report: PytestReport, with_tail: bool) -> list[str]
 def _dedup_key(text: str) -> str
-def _cap_lines(problems: list[str]) -> str
 def _xdist_hint(problems: list[str]) -> str
 def _has_outcomes(summary: Summary) -> bool
 def _has_collection_problems(report: PytestReport) -> bool
@@ -86,19 +86,19 @@ format_error_text(report, verdict):
   lines += [get_test_summary(report)] if report and _has_outcomes(report.summary) else ["Pytest run did not complete."]
   if verdict.exit_code != 0 and not (verdict.exit_code == 2 and report and _has_collection_problems(report)):
       lines += [f"Exit code {code}: {get_pytest_exit_code_info(code)[0]}"]
-  if verdict.problems: lines += ["Problems:", _cap_lines(verdict.problems) + _xdist_hint(verdict.problems)]
+  if verdict.problems: lines += ["Problems:", cap_problems(verdict.problems) + _xdist_hint(verdict.problems)]
   return "\n".join(lines)
 
 format_collection_problems(report, verdict):
   if not verdict.problems: return ""          # never reads report, so MagicMock reports are safe
   # Only what the failure prompt does not print: collection_errors and the xdist hint
   ctx = report.error_context if report else None
-  body = _cap_lines(["\n".join(ctx.collection_errors)]) if ctx and ctx.collection_errors else ""
+  body = cap_problems(["\n".join(ctx.collection_errors)]) if ctx and ctx.collection_errors else ""
   hint = _xdist_hint(verdict.problems)
   return f"Collection problems:\n{body}{hint}".rstrip() if body or hint else ""
 ```
 
-- `_cap_lines` creates an `OutputBuilder(MAX_OUTPUT_LINES)`, calls `add(p + "\n")` for each problem until `add` returns False, and returns `get_result()`.
+- `cap_problems` creates an `OutputBuilder(MAX_OUTPUT_LINES)`, calls `add(p + "\n")` for each problem until `add` returns False, and returns `get_result()`.
 - `_xdist_hint` returns `"\n" + XDIST_HINT` when any problem contains `XDIST_MARKER`, and `""` otherwise.
 - `_has_outcomes` is True when any of passed, failed, error, skipped, xfailed or xpassed is greater than 0.
 - `_has_collection_problems` is True when the report has failed collectors or `error_context.collection_errors`.
