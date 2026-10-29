@@ -31,6 +31,11 @@ from mcp_tools_py.code_checker_pytest.runners import (
     check_code_with_pytest,
     run_tests,
 )
+from mcp_tools_py.code_checker_pytest.verdict import (
+    RunStatus,
+    RunVerdict,
+    classify_run,
+)
 
 # Define the public API explicitly
 __all__ = [
@@ -53,4 +58,8 @@ __all__ = [
     "check_code_with_pytest",
     "create_prompt_for_failed_tests",
     "get_test_summary",
+    # Run verdict
+    "RunStatus",
+    "RunVerdict",
+    "classify_run",
 ]

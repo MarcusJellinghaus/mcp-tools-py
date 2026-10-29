@@ -22,9 +22,9 @@ This tracks **Feature Implementation** consisting of multiple **Tasks**.
 ## Tasks
 
 ### Step 1: `verdict.py`: classifier and shared text helpers — [step_1.md](./steps/step_1.md)
-- [ ] Implementation: `test_verdict.py`, `verdict.py`, package exports
-- [ ] Quality checks: pylint, pytest, mypy, lint-imports, tach — fix all issues
-- [ ] Commit message prepared
+- [x] Implementation: `test_verdict.py`, `verdict.py`, package exports
+- [x] Quality checks: pylint, pytest, mypy, lint-imports, tach — fix all issues
+- [x] Commit message prepared
 
 ### Step 2: `check_code_with_pytest` returns `verdict`; test dicts migrated — [step_2.md](./steps/step_2.md)
 - [ ] Implementation: runner tests, `runners.py`, `tests/_pytest_results.py`, test dict migration, minimal consumer reads
