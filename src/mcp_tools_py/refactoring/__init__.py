@@ -88,7 +88,10 @@ class RefactoringTools:
             """Move top-level functions, classes, or variables to another module.
 
             Updates all imports project-wide. Auto-creates destination file and
-            missing __init__.py files if needed.
+            missing __init__.py files if needed. String literals that refer to
+            moved names, such as `@patch("pkg.mod.name")`, are listed but not
+            rewritten. `patch.object(mod, "name")` and strings that go through
+            a re-exporting module aren't detected.
 
             Args:
                 source_file: Source file path relative to project root.

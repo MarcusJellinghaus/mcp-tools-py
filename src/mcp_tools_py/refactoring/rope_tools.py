@@ -278,6 +278,50 @@ def _ensure_parents(dest_path: Path, project_dir: Path) -> None:
         current = current.parent
 
 
+def _module_dotted(project_dir: Path, rel_file: str) -> str:
+    """Return the dotted module name of rel_file, from its package root.
+
+    Returns:
+        E.g. `mcp_tools_py.x` for `src/mcp_tools_py/x.py`.
+    """
+    path = project_dir / rel_file
+    parts = [] if path.name == "__init__.py" else [path.stem]
+    current = path.parent
+    while current != project_dir and (current / "__init__.py").exists():
+        parts.insert(0, current.name)
+        current = current.parent
+    return ".".join(parts)
+
+
+def _string_ref_lines(
+    project_dir: Path, source_file: str, names: list[str]
+) -> list[str]:
+    """List string literals that refer to moved names; nothing is rewritten.
+
+    Returns:
+        Report lines, or [] when there are no hits.
+    """
+    module = _module_dotted(project_dir, source_file)
+    targets = [f"{module}.{name}" for name in names]
+    with _with_rope_project(project_dir) as project:
+        rels = sorted(r.path for r in project.get_python_files())
+    hits: list[str] = []
+    for rel in rels:
+        try:
+            tree = ast.parse((project_dir / rel).read_text(encoding="utf-8"))
+        except (SyntaxError, ValueError, UnicodeDecodeError, OSError):
+            continue
+        for node in ast.walk(tree):
+            if not (isinstance(node, ast.Constant) and isinstance(node.value, str)):
+                continue
+            s = node.value
+            if any(s == t or s.startswith(t + ".") for t in targets):
+                hits.append(f"  {rel}:{node.lineno}: {s!r} (not rewritten)")
+    if not hits:
+        return []
+    return ["String references to moved names (not rewritten):", *hits]
+
+
 def _move_symbol_impl(
     project_dir: Path,
     source_file: str,
@@ -383,6 +427,7 @@ def _move_symbol_impl(
                 "Diffs (each computed against the unmodified source;"
                 " diffs touching the same file can overlap):",
                 *diffs,
+                *_string_ref_lines(project_dir, source_file, symbol_names),
                 "Note: Self-referencing imports of the destination module"
                 " shown in a diff are removed in the real run.",
                 "Note: Imports are absolute \u2014 review and convert to relative where applicable.",
@@ -405,6 +450,7 @@ def _move_symbol_impl(
             result_lines.append(
                 f"  Self-referencing import removed from {dest_file}: {imp}"
             )
+        result_lines.extend(_string_ref_lines(project_dir, source_file, symbol_names))
         result_lines.append(
             "Note: Imports are absolute \u2014 review and convert to relative where applicable."
         )

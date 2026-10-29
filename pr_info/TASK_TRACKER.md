@@ -53,9 +53,9 @@ This tracks **Feature Implementation** consisting of multiple **Tasks**.
 
 ### Step 6: String-reference report (not rewritten) — [step_6.md](./steps/step_6.md)
 
-- [ ] Implementation: tests, `_module_dotted`, `_string_ref_lines`, tool docstring update
-- [ ] Quality checks: pylint, pytest, mypy — fix all issues
-- [ ] Commit message prepared
+- [x] Implementation: tests, `_module_dotted`, `_string_ref_lines`, tool docstring update
+- [x] Quality checks: pylint, pytest, mypy — fix all issues
+- [x] Commit message prepared
 
 ## Pull Request
 

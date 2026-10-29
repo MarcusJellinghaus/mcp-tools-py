@@ -8,6 +8,7 @@ import pytest
 
 from mcp_tools_py.refactoring.rope_tools import (
     _build_ignored_resources,
+    _module_dotted,
     move_module,
     move_symbol,
     rename_symbol,
@@ -40,6 +41,9 @@ def sample_project(tmp_path: Path) -> Path:
         "\n"
         "def use_it():\n"
         "    return my_func()\n"
+    )
+    (tmp_path / "test_x.py").write_text(
+        'TARGET = "src.foo.my_func"\nOTHER = "src.foo.my_func_other"\n'
     )
     return tmp_path
 
@@ -245,6 +249,40 @@ def test_move_symbol_dry_run_shows_diff(sample_project: Path) -> None:
     assert "-def my_func():" in result
     assert "Self-referencing imports" in result
     assert not (sample_project / "src" / "baz.py").exists()
+
+
+# --- string-reference report tests ---
+
+
+def test_move_symbol_dry_run_reports_string_refs(sample_project: Path) -> None:
+    """Dry run lists string literals that refer to the moved name."""
+    result = move_symbol(
+        sample_project, "src/foo.py", ["my_func"], "src/baz.py", dry_run=True
+    )
+    assert "String references to moved names (not rewritten):" in result
+    assert "test_x.py:1: 'src.foo.my_func'" in result
+    assert "my_func_other" not in result
+
+
+def test_move_symbol_real_run_reports_string_refs(sample_project: Path) -> None:
+    """Real run lists string references and leaves them untouched."""
+    test_x = sample_project / "test_x.py"
+    before = test_x.read_text()
+    result = move_symbol(sample_project, "src/foo.py", ["my_func"], "src/baz.py")
+    assert "String references to moved names (not rewritten):" in result
+    assert "test_x.py:1: 'src.foo.my_func'" in result
+    assert "my_func_other" not in result
+    assert test_x.read_text() == before
+
+
+def test_module_dotted(tmp_path: Path) -> None:
+    """Dotted module names follow the package root."""
+    (tmp_path / "src").mkdir()
+    (tmp_path / "src" / "__init__.py").write_text("")
+    (tmp_path / "plain").mkdir()
+    assert _module_dotted(tmp_path, "src/foo.py") == "src.foo"
+    assert _module_dotted(tmp_path, "src/__init__.py") == "src"
+    assert _module_dotted(tmp_path, "plain/mod.py") == "mod"
 
 
 # --- self-import removal tests ---
