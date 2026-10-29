@@ -190,14 +190,14 @@ def register(mcp: "FastMCPProtocol", checker_tools: "CheckerTools") -> None:
                         selection,
                         max_modules=max_modules,
                         fail_under=fail_under,
-                        tests_failed=not test_results.get("success")
+                        tests_failed="test_results" not in test_results
                         or bool(
                             (summary.get("failed") or 0) or (summary.get("error") or 0)
                         ),
                     )
                 result = f"{result}\n\n{digest}"
 
-            if test_results.get("success"):
+            if "test_results" in test_results:
                 logger.info(
                     "Pytest execution completed",
                     extra={
@@ -211,7 +211,7 @@ def register(mcp: "FastMCPProtocol", checker_tools: "CheckerTools") -> None:
                 logger.error(
                     "Pytest execution failed",
                     extra={
-                        "error": test_results.get("error", "Unknown error"),
+                        "error": "; ".join(test_results["verdict"].problems),
                     },
                 )
 

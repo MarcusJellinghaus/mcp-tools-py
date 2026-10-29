@@ -13,7 +13,9 @@ from typing import Generator
 import pytest
 
 from mcp_tools_py.checker_tools import CheckerTools
+from mcp_tools_py.code_checker_pytest.verdict import RunStatus
 from mcp_tools_py.server import ToolServer
+from tests._pytest_results import make_pytest_results
 
 
 class TestParameterCombinationsValidation:
@@ -121,11 +123,11 @@ class TestParameterCombinationsValidation:
         )
 
         result = CheckerTools(server.context)._format_pytest_result_with_details(
-            {
-                "success": True,
-                "summary": {"failed": 1, "collected": 1, "passed": 0},
-                "test_results": mock_test_results,
-            },
+            make_pytest_results(
+                RunStatus.FAILED,
+                summary={"failed": 1, "collected": 1, "passed": 0},
+                test_results=mock_test_results,
+            ),
             show_details=True,
         )
 
@@ -137,11 +139,11 @@ class TestParameterCombinationsValidation:
         server = ToolServer(temp_project)
 
         result = CheckerTools(server.context)._format_pytest_result_with_details(
-            {
-                "success": True,
-                "summary": {"failed": 2, "collected": 10, "passed": 8},
-                "test_results": None,
-            },
+            make_pytest_results(
+                RunStatus.FAILED,
+                summary={"failed": 2, "collected": 10, "passed": 8},
+                test_results=None,
+            ),
             show_details=False,
         )
 
@@ -172,11 +174,11 @@ class TestParameterCombinationsValidation:
         )
 
         result = CheckerTools(server.context)._format_pytest_result_with_details(
-            {
-                "success": True,
-                "summary": {"failed": 1, "collected": 2, "passed": 1},
-                "test_results": mock_test_results,
-            },
+            make_pytest_results(
+                RunStatus.FAILED,
+                summary={"failed": 1, "collected": 2, "passed": 1},
+                test_results=mock_test_results,
+            ),
             show_details=False,
         )
 
@@ -188,11 +190,11 @@ class TestParameterCombinationsValidation:
         server = ToolServer(temp_project)
 
         # Simulate collection error result
-        test_result = {
-            "success": True,
-            "summary": {"failed": 0, "collected": 0, "passed": 0, "error": 1},
-            "test_results": None,
-        }
+        test_result = make_pytest_results(
+            RunStatus.FAILED,
+            summary={"failed": 0, "collected": 0, "passed": 0, "error": 1},
+            test_results=None,
+        )
 
         # Both should handle collection errors
         result_false = CheckerTools(server.context)._format_pytest_result_with_details(
@@ -214,11 +216,10 @@ class TestOutputFormatConsistency:
         """Test that success messages are consistent."""
         server = ToolServer(Path("/tmp"))
 
-        success_result = {
-            "success": True,
-            "summary": {"failed": 0, "collected": 5, "passed": 5},
-            "summary_text": "All tests passed",
-        }
+        success_result = make_pytest_results(
+            summary={"failed": 0, "collected": 5, "passed": 5},
+            summary_text="All tests passed",
+        )
 
         result_false = CheckerTools(server.context)._format_pytest_result_with_details(
             success_result, show_details=False
@@ -239,7 +240,7 @@ class TestOutputFormatConsistency:
         """Test that error messages are consistent."""
         server = ToolServer(Path("/tmp"))
 
-        error_result = {"success": False, "error": "pytest execution failed"}
+        error_result = make_pytest_results(RunStatus.ERROR, ["pytest execution failed"])
 
         result_false = CheckerTools(server.context)._format_pytest_result_with_details(
             error_result, show_details=False
@@ -258,10 +259,9 @@ class TestOutputFormatConsistency:
         """Test handling of invalid summary data."""
         server = ToolServer(Path("/tmp"))
 
-        invalid_result = {
-            "success": True,
-            "summary": "invalid_summary_format",  # Should be dict
-        }
+        invalid_result = make_pytest_results(
+            summary="invalid_summary_format",  # Should be dict
+        )
 
         result_false = CheckerTools(server.context)._format_pytest_result_with_details(
             invalid_result, show_details=False
@@ -284,11 +284,10 @@ class TestPerformanceBenchmarks:
         server = ToolServer(Path("/tmp"))
 
         # Create test data
-        test_result = {
-            "success": True,
-            "summary": {"failed": 0, "collected": 100, "passed": 100},
-            "summary_text": "All 100 tests passed",
-        }
+        test_result = make_pytest_results(
+            summary={"failed": 0, "collected": 100, "passed": 100},
+            summary_text="All 100 tests passed",
+        )
 
         # Both code paths should complete successfully and return valid strings
         result_false = CheckerTools(server.context)._format_pytest_result_with_details(
@@ -309,11 +308,11 @@ class TestPerformanceBenchmarks:
         server = ToolServer(Path("/tmp"))
 
         # Create large test result data
-        large_summary = {
-            "success": True,
-            "summary": {"failed": 10, "collected": 1000, "passed": 990},
-            "test_results": None,
-        }
+        large_summary = make_pytest_results(
+            RunStatus.FAILED,
+            summary={"failed": 10, "collected": 1000, "passed": 990},
+            test_results=None,
+        )
 
         # Should complete without memory issues
         result = CheckerTools(server.context)._format_pytest_result_with_details(
@@ -337,20 +336,19 @@ class TestDocumentationAccuracy:
         try:
             # Standard CI run example
             result = CheckerTools(server.context)._format_pytest_result_with_details(
-                {
-                    "success": True,
-                    "summary": {"failed": 0, "passed": 5, "collected": 5},
-                },
+                make_pytest_results(
+                    summary={"failed": 0, "passed": 5, "collected": 5},
+                ),
                 show_details=False,
             )
             assert isinstance(result, str)
 
             # Debug specific test example
             result = CheckerTools(server.context)._format_pytest_result_with_details(
-                {
-                    "success": True,
-                    "summary": {"failed": 1, "passed": 0, "collected": 1},
-                },
+                make_pytest_results(
+                    RunStatus.FAILED,
+                    summary={"failed": 1, "passed": 0, "collected": 1},
+                ),
                 show_details=True,
             )
             assert isinstance(result, str)
@@ -364,12 +362,12 @@ class TestDocumentationAccuracy:
 
         # show_details should accept boolean
         assert CheckerTools(server.context)._format_pytest_result_with_details(
-            {"success": True, "summary": {"passed": 1, "collected": 1}},
+            make_pytest_results(summary={"passed": 1, "collected": 1}),
             show_details=True,
         )
 
         assert CheckerTools(server.context)._format_pytest_result_with_details(
-            {"success": True, "summary": {"passed": 1, "collected": 1}},
+            make_pytest_results(summary={"passed": 1, "collected": 1}),
             show_details=False,
         )
 
@@ -378,9 +376,11 @@ class TestDocumentationAccuracy:
         server = ToolServer(Path("/tmp"))
 
         test_cases = [
-            {"success": True, "summary": {"passed": 1, "collected": 1}},
-            {"success": False, "error": "test error"},
-            {"success": True, "summary": {"failed": 1, "collected": 1}},
+            make_pytest_results(summary={"passed": 1, "collected": 1}),
+            make_pytest_results(RunStatus.ERROR, ["test error"]),
+            make_pytest_results(
+                RunStatus.FAILED, summary={"failed": 1, "collected": 1}
+            ),
         ]
 
         for test_case in test_cases:
@@ -397,7 +397,7 @@ def test_parameter_combinations_backward_compatible() -> None:
     server = ToolServer(Path("/tmp"))
 
     # Should work with minimal parameters (existing usage)
-    test_result = {"success": True, "summary": {"passed": 1, "collected": 1}}
+    test_result = make_pytest_results(summary={"passed": 1, "collected": 1})
 
     result = CheckerTools(server.context)._format_pytest_result_with_details(
         test_result, show_details=False
@@ -412,15 +412,14 @@ class TestEdgeCases:
         """Test handling of None values in summary."""
         server = ToolServer(Path("/tmp"))
 
-        result_with_nones = {
-            "success": True,
-            "summary": {
+        result_with_nones = make_pytest_results(
+            summary={
                 "failed": None,
                 "passed": None,
                 "collected": None,
                 "error": None,
             },
-        }
+        )
 
         # Should handle None values gracefully
         result = CheckerTools(server.context)._format_pytest_result_with_details(
@@ -438,7 +437,7 @@ class TestEdgeCases:
         """Test handling of empty summary dict."""
         server = ToolServer(Path("/tmp"))
 
-        empty_result = {"success": True, "summary": {}}
+        empty_result = make_pytest_results(summary={})
 
         result = CheckerTools(server.context)._format_pytest_result_with_details(
             empty_result, show_details=True
@@ -449,7 +448,7 @@ class TestEdgeCases:
         """Test handling when summary is missing."""
         server = ToolServer(Path("/tmp"))
 
-        no_summary_result = {"success": True}
+        no_summary_result = make_pytest_results()
 
         result = CheckerTools(server.context)._format_pytest_result_with_details(
             no_summary_result, show_details=True

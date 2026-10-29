@@ -11,8 +11,10 @@ from unittest.mock import MagicMock, patch
 import pytest
 
 from mcp_tools_py.code_checker_pytest.utils import SHOW_OUTPUT_NOTE
+from mcp_tools_py.code_checker_pytest.verdict import RunStatus
 from mcp_tools_py.utils.environment_info import EnvironmentInfo
 from mcp_tools_py.utils.tool_context import CONSOLE_SCRIPT_TOOLS
+from tests._pytest_results import make_pytest_results
 from tests.conftest import make_environment_info
 from tests.test_tool_availability._helpers import _dummy_python, _patched_tool_env
 
@@ -45,11 +47,10 @@ async def test_run_pytest_check_parameters(
         mock_fastmcp.return_value.tool.return_value = mock_tool
 
         # Setup mock result that check_code_with_pytest will return
-        mock_check_pytest.return_value = {
-            "success": True,
-            "summary": {"passed": 5, "failed": 0, "error": 0},
-            "test_results": MagicMock(),
-        }
+        mock_check_pytest.return_value = make_pytest_results(
+            summary={"passed": 5, "failed": 0, "error": 0},
+            test_results=MagicMock(),
+        )
 
         # Import after patching to ensure mocks are in place
         from mcp_tools_py.server import ToolServer
@@ -156,49 +157,48 @@ def mock_server(all_modules_importable: Any) -> Tuple[Any, MagicMock]:
 @pytest.fixture
 def mock_pytest_results_few_tests() -> Dict[str, Any]:
     """Mock results for ≤3 tests scenario."""
-    return {
-        "success": True,
-        "summary": {
+    return make_pytest_results(
+        RunStatus.FAILED,
+        summary={
             "passed": 2,
             "failed": 1,
             "error": 0,
             "collected": 3,
             "duration": 1.5,
         },
-        "test_results": MagicMock(),
-    }
+        test_results=MagicMock(),
+    )
 
 
 @pytest.fixture
 def mock_pytest_results_many_failures() -> Dict[str, Any]:
     """Mock results for >10 failures scenario."""
-    return {
-        "success": True,
-        "summary": {
+    return make_pytest_results(
+        RunStatus.FAILED,
+        summary={
             "passed": 5,
             "failed": 15,
             "error": 2,
             "collected": 22,
             "duration": 5.2,
         },
-        "test_results": MagicMock(),
-    }
+        test_results=MagicMock(),
+    )
 
 
 @pytest.fixture
 def mock_pytest_results_success() -> Dict[str, Any]:
     """Mock results for successful test run."""
-    return {
-        "success": True,
-        "summary": {
+    return make_pytest_results(
+        summary={
             "passed": 10,
             "failed": 0,
             "error": 0,
             "collected": 10,
             "duration": 2.3,
         },
-        "test_results": None,
-    }
+        test_results=None,
+    )
 
 
 # Parameter Integration Tests
@@ -214,11 +214,10 @@ async def test_run_pytest_check_with_show_details_true(
     with patch(
         "mcp_tools_py.checker_tools.pytest_tool.check_code_with_pytest"
     ) as mock_check:
-        mock_check.return_value = {
-            "success": True,
-            "summary": {"passed": 3, "failed": 0, "error": 0, "collected": 3},
-            "test_results": None,
-        }
+        mock_check.return_value = make_pytest_results(
+            summary={"passed": 3, "failed": 0, "error": 0, "collected": 3},
+            test_results=None,
+        )
 
         # Get the run_pytest_check function
         run_pytest_check = _get_tool(mock_tool, "run_pytest_check")
@@ -249,11 +248,10 @@ async def test_run_pytest_check_with_show_details_false(
     with patch(
         "mcp_tools_py.checker_tools.pytest_tool.check_code_with_pytest"
     ) as mock_check:
-        mock_check.return_value = {
-            "success": True,
-            "summary": {"passed": 5, "failed": 0, "error": 0, "collected": 5},
-            "test_results": None,
-        }
+        mock_check.return_value = make_pytest_results(
+            summary={"passed": 5, "failed": 0, "error": 0, "collected": 5},
+            test_results=None,
+        )
 
         # Get the run_pytest_check function
         run_pytest_check = _get_tool(mock_tool, "run_pytest_check")
@@ -280,11 +278,10 @@ async def test_run_pytest_check_backward_compatibility(
     with patch(
         "mcp_tools_py.checker_tools.pytest_tool.check_code_with_pytest"
     ) as mock_check:
-        mock_check.return_value = {
-            "success": True,
-            "summary": {"passed": 8, "failed": 0, "error": 0, "collected": 8},
-            "test_results": None,
-        }
+        mock_check.return_value = make_pytest_results(
+            summary={"passed": 8, "failed": 0, "error": 0, "collected": 8},
+            test_results=None,
+        )
 
         # Get the run_pytest_check function
         run_pytest_check = _get_tool(mock_tool, "run_pytest_check")
@@ -367,11 +364,11 @@ async def test_show_details_output_length_limits(
     server, mock_tool = mock_server
 
     # Create mock results with potential for long output
-    long_output_results = {
-        "success": True,
-        "summary": {"passed": 0, "failed": 5, "error": 0, "collected": 5},
-        "test_results": MagicMock(),
-    }
+    long_output_results = make_pytest_results(
+        RunStatus.FAILED,
+        summary={"passed": 0, "failed": 5, "error": 0, "collected": 5},
+        test_results=MagicMock(),
+    )
 
     with (
         patch(
@@ -449,11 +446,11 @@ async def test_enhanced_reporting_integration_preparation(
         ) as mock_create_prompt,
     ):
         # Setup mocks
-        mock_check.return_value = {
-            "success": True,
-            "summary": {"passed": 2, "failed": 1, "error": 0, "collected": 3},
-            "test_results": MagicMock(),
-        }
+        mock_check.return_value = make_pytest_results(
+            RunStatus.FAILED,
+            summary={"passed": 2, "failed": 1, "error": 0, "collected": 3},
+            test_results=MagicMock(),
+        )
         mock_create_prompt.return_value = "Enhanced failure details..."
 
         # Get the run_pytest_check function
@@ -594,11 +591,10 @@ async def test_integration_with_existing_server_parameters(
     with patch(
         "mcp_tools_py.checker_tools.pytest_tool.check_code_with_pytest"
     ) as mock_check:
-        mock_check.return_value = {
-            "success": True,
-            "summary": {"passed": 3, "failed": 0, "error": 0, "collected": 3},
-            "test_results": None,
-        }
+        mock_check.return_value = make_pytest_results(
+            summary={"passed": 3, "failed": 0, "error": 0, "collected": 3},
+            test_results=None,
+        )
 
         # Get the run_pytest_check function
         run_pytest_check = _get_tool(mock_tool, "run_pytest_check")
@@ -672,11 +668,10 @@ async def test_run_pytest_check_prepends_dedup_notes(
     with patch(
         "mcp_tools_py.checker_tools.pytest_tool.check_code_with_pytest"
     ) as mock_check:
-        mock_check.return_value = {
-            "success": True,
-            "summary": {"passed": 5, "failed": 0, "error": 0, "collected": 5},
-            "test_results": None,
-        }
+        mock_check.return_value = make_pytest_results(
+            summary={"passed": 5, "failed": 0, "error": 0, "collected": 5},
+            test_results=None,
+        )
 
         run_pytest_check = _get_tool(mock_tool, "run_pytest_check")
 
@@ -702,11 +697,10 @@ async def test_run_pytest_check_turns_s_into_show_output(
     with patch(
         "mcp_tools_py.checker_tools.pytest_tool.check_code_with_pytest"
     ) as mock_check:
-        mock_check.return_value = {
-            "success": True,
-            "summary": {"passed": 1, "failed": 0, "error": 0, "collected": 1},
-            "test_results": None,
-        }
+        mock_check.return_value = make_pytest_results(
+            summary={"passed": 1, "failed": 0, "error": 0, "collected": 1},
+            test_results=None,
+        )
 
         run_pytest_check = _get_tool(mock_tool, "run_pytest_check")
         result = run_pytest_check(extra_args=["-s", "-n", "auto"])
@@ -795,11 +789,10 @@ class TestPytestTimeoutArgument:
         with patch(
             "mcp_tools_py.checker_tools.pytest_tool.check_code_with_pytest"
         ) as mock_check_pytest:
-            mock_check_pytest.return_value = {
-                "success": True,
-                "summary": {"passed": 1, "failed": 0, "error": 0},
-                "test_results": MagicMock(),
-            }
+            mock_check_pytest.return_value = make_pytest_results(
+                summary={"passed": 1, "failed": 0, "error": 0},
+                test_results=MagicMock(),
+            )
             run_pytest_check(timeout_seconds=900)
 
         assert mock_check_pytest.call_args[1]["timeout_seconds"] == 900
@@ -837,11 +830,11 @@ _COVERAGE_DATA: Dict[str, Any] = {
 
 
 def _pytest_results(failed: int = 0) -> Dict[str, Any]:
-    return {
-        "success": True,
-        "summary": {"passed": 1, "failed": failed, "error": 0, "collected": 1},
-        "test_results": None,
-    }
+    return make_pytest_results(
+        RunStatus.FAILED if failed else RunStatus.PASSED,
+        summary={"passed": 1, "failed": failed, "error": 0, "collected": 1},
+        test_results=None,
+    )
 
 
 class TestPytestCoverage:
@@ -996,7 +989,7 @@ class TestPytestCoverage:
             patch(f"{_PYTEST_TOOL}.check_code_with_pytest") as mock_check,
             patch(f"{_PYTEST_TOOL}.read_coverage_report", return_value=_COVERAGE_DATA),
         ):
-            mock_check.return_value = {"success": False, "error": "boom"}
+            mock_check.return_value = make_pytest_results(RunStatus.ERROR, ["boom"])
             result = run_pytest_check(coverage=True, coverage_source=["src"])
 
         assert "Warning: tests failed" in result

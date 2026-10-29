@@ -139,11 +139,13 @@ def _run_test(context: ToolContext, depth: str) -> ActionResult:
             timeout_seconds=context.resolve_timeout("pytest"),
         )
 
-        if not result["success"]:
-            error_message: str = result["error"]
-            if "No Tests Found" in error_message:
-                return ActionResult(status="skipped", summary=error_message)
-            return ActionResult(status="error", summary=error_message)
+        verdict = result["verdict"]
+        if "test_results" not in result:
+            message = "\n".join(verdict.problems)
+            return ActionResult(
+                status="skipped" if "No Tests Found" in message else "error",
+                summary=message,
+            )
 
         report: PytestReport = result["test_results"]
         summary_text: str = result["summary_text"]

@@ -27,9 +27,9 @@ This tracks **Feature Implementation** consisting of multiple **Tasks**.
 - [x] Commit message prepared
 
 ### Step 2: `check_code_with_pytest` returns `verdict`; test dicts migrated — [step_2.md](./steps/step_2.md)
-- [ ] Implementation: runner tests, `runners.py`, `tests/_pytest_results.py`, test dict migration, minimal consumer reads
-- [ ] Quality checks: pylint, pytest, mypy — fix all issues
-- [ ] Commit message prepared
+- [x] Implementation: runner tests, `runners.py`, `tests/_pytest_results.py`, test dict migration, minimal consumer reads
+- [x] Quality checks: pylint, pytest, mypy — fix all issues
+- [x] Commit message prepared
 
 ### Step 3: Formatter branches on `verdict.status` — [step_3.md](./steps/step_3.md)
 - [ ] Implementation: formatter tests, `_format_pytest_result_with_details`, updated wording assertions

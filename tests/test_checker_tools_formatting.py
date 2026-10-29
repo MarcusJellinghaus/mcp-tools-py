@@ -10,7 +10,9 @@ from mcp_tools_py.checker_tools import CheckerTools
 from mcp_tools_py.code_checker_mypy.reporting import MYPY_FAILURE_PREFIX
 from mcp_tools_py.code_checker_pytest.models import PytestReport
 from mcp_tools_py.code_checker_pytest.parsers import parse_pytest_report
+from mcp_tools_py.code_checker_pytest.verdict import RunStatus
 from mcp_tools_py.utils.tool_context import ToolContext
+from tests._pytest_results import make_pytest_results
 
 
 @pytest.fixture
@@ -87,18 +89,17 @@ def test_format_mypy_result_failure_keeps_its_own_headline(
 
 def test_format_pytest_result_success(checker_tools: CheckerTools) -> None:
     """Test formatting for a successful pytest run."""
-    test_results: dict[str, Any] = {
-        "success": True,
-        "summary": {
+    test_results = make_pytest_results(
+        summary={
             "passed": 10,
             "failed": 0,
             "error": 0,
             "collected": 10,
             "duration": 2.3,
         },
-        "test_results": None,
-        "summary_text": "10 passed in 2.30s",
-    }
+        test_results=None,
+        summary_text="10 passed in 2.30s",
+    )
     result = checker_tools._format_pytest_result_with_details(
         test_results, show_details=True
     )
@@ -108,17 +109,17 @@ def test_format_pytest_result_success(checker_tools: CheckerTools) -> None:
 
 def test_format_pytest_result_failure(checker_tools: CheckerTools) -> None:
     """Test formatting for a failed pytest run."""
-    test_results: dict[str, Any] = {
-        "success": True,
-        "summary": {
+    test_results = make_pytest_results(
+        RunStatus.FAILED,
+        summary={
             "passed": 5,
             "failed": 2,
             "error": 0,
             "collected": 7,
             "duration": 1.5,
         },
-        "test_results": MagicMock(),
-    }
+        test_results=MagicMock(),
+    )
     with patch(
         "mcp_tools_py.checker_tools.create_prompt_for_failed_tests"
     ) as mock_prompt:
@@ -163,12 +164,11 @@ def _passing_report_with_output() -> PytestReport:
 
 def _passing_results() -> dict[str, Any]:
     """Build the results dict of a passing run whose test printed."""
-    return {
-        "success": True,
-        "summary": {"passed": 1, "failed": 0, "error": 0, "collected": 1},
-        "test_results": _passing_report_with_output(),
-        "summary_text": "1 passed in 0.10s",
-    }
+    return make_pytest_results(
+        summary={"passed": 1, "failed": 0, "error": 0, "collected": 1},
+        test_results=_passing_report_with_output(),
+        summary_text="1 passed in 0.10s",
+    )
 
 
 def test_format_pytest_result_success_with_show_output(
@@ -197,11 +197,11 @@ def test_format_pytest_result_failure_ignores_show_output(
     checker_tools: CheckerTools,
 ) -> None:
     """A failing run keeps the failed-tests prompt and adds no passing output."""
-    test_results: dict[str, Any] = {
-        "success": True,
-        "summary": {"passed": 1, "failed": 1, "error": 0, "collected": 2},
-        "test_results": _passing_report_with_output(),
-    }
+    test_results = make_pytest_results(
+        RunStatus.FAILED,
+        summary={"passed": 1, "failed": 1, "error": 0, "collected": 2},
+        test_results=_passing_report_with_output(),
+    )
     with patch(
         "mcp_tools_py.checker_tools.create_prompt_for_failed_tests"
     ) as mock_prompt:
@@ -216,10 +216,7 @@ def test_format_pytest_result_failure_ignores_show_output(
 
 def test_format_pytest_result_execution_error(checker_tools: CheckerTools) -> None:
     """Test formatting when pytest fails to execute."""
-    test_results: dict[str, Any] = {
-        "success": False,
-        "error": "No module named 'pytest'",
-    }
+    test_results = make_pytest_results(RunStatus.ERROR, ["No module named 'pytest'"])
     result = checker_tools._format_pytest_result_with_details(
         test_results, show_details=True
     )

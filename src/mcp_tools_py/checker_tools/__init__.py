@@ -23,6 +23,7 @@ from mcp_tools_py.code_checker_pytest.reporting import (
     create_prompt_for_passing_output,
     should_show_details,
 )
+from mcp_tools_py.code_checker_pytest.verdict import RunStatus
 
 if TYPE_CHECKING:
     from mcp_tools_py.utils.mcp_protocols import FastMCPProtocol
@@ -73,8 +74,12 @@ class CheckerTools:
         Returns:
             User-facing summary of the pytest outcome.
         """
-        if not test_results["success"]:
-            return f"Error running pytest: {test_results.get('error', 'Unknown error')}"
+        verdict = test_results["verdict"]
+        if (
+            test_results.get("test_results") is None
+            and verdict.status is RunStatus.ERROR
+        ):
+            return f"Error running pytest: {'; '.join(verdict.problems) or 'Unknown error'}"
 
         summary = test_results.get("summary", {})
         if not isinstance(summary, dict):
