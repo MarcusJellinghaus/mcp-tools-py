@@ -83,28 +83,36 @@ class RefactoringTools:
             symbol_names: list[str],
             dest_file: str,
             dry_run: bool = False,
+            timeout_seconds: int | None = None,
         ) -> str:
             """Move top-level functions, classes, or variables to another module.
 
             Updates all imports project-wide. Auto-creates destination file and
-            missing __init__.py files if needed.
+            missing __init__.py files if needed. String literals that refer to
+            moved names, such as `@patch("pkg.mod.name")`, are listed but not
+            rewritten. `patch.object(mod, "name")` and strings that go through
+            a re-exporting module aren't detected.
 
             Args:
                 source_file: Source file path relative to project root.
                 symbol_names: Names of top-level symbols to move.
                 dest_file: Destination file path relative to project root.
                 dry_run: Preview changes without applying (default: False).
+                timeout_seconds: Maximum seconds to wait for rope. Overrides
+                    the server default for this call. MCP clients may time
+                    out earlier than the server.
 
             Returns:
                 Formatted summary of changes (or planned changes for dry-run).
             """
+            resolved = timeout_seconds if timeout_seconds is not None else timeout
             return rope_move_symbol(
                 project_dir,
                 source_file,
                 symbol_names,
                 dest_file,
                 dry_run,
-                timeout=timeout,
+                timeout=resolved,
             )
 
         @mcp.tool()

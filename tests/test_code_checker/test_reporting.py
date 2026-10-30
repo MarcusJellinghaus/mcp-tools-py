@@ -202,6 +202,31 @@ def test_get_test_summary_minimal() -> None:
     assert "✅ Passed: 5" in summary
     assert "❌ Failed:" not in summary
     assert "⚠️ Error:" not in summary
+    assert "deselected" not in summary
+
+
+def test_get_test_summary_with_deselected() -> None:
+    """Test that the collect count excludes deselected tests."""
+    json_deselected = """
+    {
+        "created": 1518371686.7981803,
+        "duration": 0.1235666275024414,
+        "exitcode": 0,
+        "root": "/path/to/tests",
+        "environment": {},
+        "summary": {
+            "collected": 10,
+            "deselected": 4,
+            "passed": 6,
+            "total": 6
+        }
+    }
+    """
+    report = parse_pytest_report(json_deselected)
+    summary = get_test_summary(report)
+
+    assert "Collected 6 tests (4 deselected) in" in summary
+    assert "✅ Passed: 6" in summary
 
 
 # ===================== Tests for Enhanced Reporting Logic =====================

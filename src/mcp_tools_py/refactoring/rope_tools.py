@@ -14,6 +14,7 @@ import logging
 import os
 import subprocess as _subprocess
 import sys
+import time
 from collections.abc import Callable, Iterator
 from contextlib import contextmanager
 from pathlib import Path
@@ -47,6 +48,12 @@ _DEFAULT_IGNORED = [
     ".eggs",
     "*.egg-info",
 ]
+
+# A just-killed child may still hold file handles on Windows.
+_CLEANUP_RETRIES = 5
+_CLEANUP_RETRY_DELAY = 0.2
+
+_MOVE_SUCCESS_PREFIX = "move_symbol completed successfully."
 
 
 # Gitignore utilities copied from p_workspace (directory_utils.py).
@@ -271,6 +278,50 @@ def _ensure_parents(dest_path: Path, project_dir: Path) -> None:
         current = current.parent
 
 
+def _module_dotted(project_dir: Path, rel_file: str) -> str:
+    """Return the dotted module name of rel_file, from its package root.
+
+    Returns:
+        E.g. `mcp_tools_py.x` for `src/mcp_tools_py/x.py`.
+    """
+    path = project_dir / rel_file
+    parts = [] if path.name == "__init__.py" else [path.stem]
+    current = path.parent
+    while current != project_dir and (current / "__init__.py").exists():
+        parts.insert(0, current.name)
+        current = current.parent
+    return ".".join(parts)
+
+
+def _string_ref_lines(
+    project_dir: Path, source_file: str, names: list[str]
+) -> list[str]:
+    """List string literals that refer to moved names; nothing is rewritten.
+
+    Returns:
+        Report lines, or [] when there are no hits.
+    """
+    module = _module_dotted(project_dir, source_file)
+    targets = [f"{module}.{name}" for name in names]
+    with _with_rope_project(project_dir) as project:
+        rels = sorted(r.path for r in project.get_python_files())
+    hits: list[str] = []
+    for rel in rels:
+        try:
+            tree = ast.parse((project_dir / rel).read_text(encoding="utf-8"))
+        except (SyntaxError, ValueError, UnicodeDecodeError, OSError):
+            continue
+        for node in ast.walk(tree):
+            if not (isinstance(node, ast.Constant) and isinstance(node.value, str)):
+                continue
+            s = node.value
+            if any(s == t or s.startswith(t + ".") for t in targets):
+                hits.append(f"  {rel}:{node.lineno}: {s!r} (not rewritten)")
+    if not hits:
+        return []
+    return ["String references to moved names (not rewritten):", *hits]
+
+
 def _move_symbol_impl(
     project_dir: Path,
     source_file: str,
@@ -326,23 +377,20 @@ def _move_symbol_impl(
                 )
 
     # --- Create destination if needed (once) ---
-    created_dest = False
-    created_for_dry_run = False
-
+    # Leftovers are removed by the parent process (move_symbol).
     if not dry_run:
         _ensure_parents(abs_dest, project_dir)
         if not abs_dest.exists():
             abs_dest.write_text("", encoding="utf-8")
-            created_dest = True
     else:
         if not abs_dest.exists():
             _ensure_parents(abs_dest, project_dir)
             abs_dest.write_text("", encoding="utf-8")
-            created_for_dry_run = True
 
     # --- Move each symbol in reverse order ---
     all_change_lines: list[str] = []
     moved_names: list[str] = []
+    diffs: list[str] = []
 
     try:
         for name in reversed(symbol_names):
@@ -358,6 +406,7 @@ def _move_symbol_impl(
 
                 if dry_run:
                     all_change_lines.append(_format_changes(changes, dry_run=True))
+                    diffs.append(f"Diff for {name}:\n{changes.get_description()}")
                 else:
                     pre_existing = _collect_existing_paths(changes)
                     project.do(changes)
@@ -369,13 +418,18 @@ def _move_symbol_impl(
             moved_names.append(name)
 
         if dry_run:
-            _cleanup_created_files(abs_dest, created_for_dry_run, project_dir)
             symbols_str = ", ".join(reversed(moved_names))
             combined = "\n".join(line for line in all_change_lines if line)
             dry_lines = [
                 "[DRY RUN] move_symbol preview:",
                 f"  Symbols: {symbols_str}",
                 combined,
+                "Diffs (each computed against the unmodified source;"
+                " diffs touching the same file can overlap):",
+                *diffs,
+                *_string_ref_lines(project_dir, source_file, symbol_names),
+                "Note: Self-referencing imports of the destination module"
+                " shown in a diff are removed in the real run.",
                 "Note: Imports are absolute \u2014 review and convert to relative where applicable.",
                 "Note: Review symbol order and imports in all affected files.",
             ]
@@ -388,7 +442,7 @@ def _move_symbol_impl(
         moved_str = ", ".join(reversed(moved_names))
         combined = "\n".join(line for line in all_change_lines if line)
         result_lines = [
-            "move_symbol completed successfully.",
+            _MOVE_SUCCESS_PREFIX,
             f"  Moved: {moved_str} (from {source_file} \u2192 {dest_file})",
             combined,
         ]
@@ -396,6 +450,7 @@ def _move_symbol_impl(
             result_lines.append(
                 f"  Self-referencing import removed from {dest_file}: {imp}"
             )
+        result_lines.extend(_string_ref_lines(project_dir, source_file, symbol_names))
         result_lines.append(
             "Note: Imports are absolute \u2014 review and convert to relative where applicable."
         )
@@ -405,10 +460,6 @@ def _move_symbol_impl(
         return "\n".join(line for line in result_lines if line)
 
     except Exception as exc:  # pylint: disable=broad-exception-caught
-        if dry_run:
-            _cleanup_created_files(abs_dest, created_for_dry_run, project_dir)
-        else:
-            _cleanup_created_files(abs_dest, created_dest, project_dir)
         msg = f"Error moving symbol: {exc}"
         if isinstance(exc, AttributeError):
             msg += (
@@ -503,7 +554,10 @@ def move_symbol(
     if not abs_source.exists():
         return f"Error: file not found: {source_file}"
 
-    return _run_rope_subprocess(
+    # Snapshot before the child runs: cleanup must happen here, since a
+    # killed child cannot clean up after itself.
+    snapshot = _missing_paths(project_dir, dest_file)
+    result = _run_rope_subprocess(
         "move_symbol",
         {
             "project_dir": str(project_dir),
@@ -514,6 +568,90 @@ def move_symbol(
         },
         timeout=timeout,
     )
+    if dry_run:
+        _remove_new_paths(snapshot)
+        return result
+    if result.startswith(_MOVE_SUCCESS_PREFIX):
+        return result
+
+    moved, not_moved = _split_moved(project_dir, source_file, dest_file, symbol_names)
+    if not moved:
+        _remove_new_paths(snapshot)
+    if result.startswith("Error"):
+        result += (
+            "\nRope changes cannot be rolled back."
+            f"\n  Moved: {', '.join(moved) or '(none)'}"
+            f"\n  Not moved: {', '.join(not_moved) or '(none)'}"
+            "\nThe state of the symbol in flight is uncertain; check `git diff`."
+        )
+    return result
+
+
+def _read_symbols(path: Path) -> list[str]:
+    """Return top-level symbol names of path, or [] if it can't be read.
+
+    Returns:
+        Names of top-level functions, classes, and assigned variables.
+    """
+    try:
+        return _get_top_level_symbols(path.read_text(encoding="utf-8"))
+    except (OSError, UnicodeDecodeError):
+        return []
+
+
+def _split_moved(
+    project_dir: Path, source_file: str, dest_file: str, names: list[str]
+) -> tuple[list[str], list[str]]:
+    """Split names into those now in dest (and gone from source) and the rest.
+
+    Returns:
+        (moved, not_moved), each in the order of `names`.
+    """
+    src_syms = _read_symbols(project_dir / source_file)
+    dst_syms = _read_symbols(project_dir / dest_file)
+    moved = [n for n in names if n not in src_syms and n in dst_syms]
+    not_moved = [n for n in names if n not in moved]
+    return moved, not_moved
+
+
+def _missing_paths(project_dir: Path, dest_file: str) -> list[Path]:
+    """Return the destination and its missing parents/__init__.py files.
+
+    Returns:
+        Absolute paths that don't exist yet, deepest first, each dir's
+        __init__.py before the dir itself.
+    """
+    abs_dest = project_dir / dest_file
+    paths = [abs_dest] if not abs_dest.exists() else []
+    current = abs_dest.parent
+    while current != project_dir and current.is_relative_to(project_dir):
+        for path in (current / "__init__.py", current):
+            if not path.exists():
+                paths.append(path)
+        current = current.parent
+    return paths
+
+
+def _retry_on_permission_error(action: Callable[[], None], path: Path) -> None:
+    """Run action, retrying briefly while Windows still holds a handle."""
+    for attempt in range(_CLEANUP_RETRIES):
+        try:
+            action()
+            return
+        except PermissionError as exc:
+            if attempt == _CLEANUP_RETRIES - 1:
+                logger.warning("Could not remove %s: %s", path, exc)
+                return
+            time.sleep(_CLEANUP_RETRY_DELAY)
+
+
+def _remove_new_paths(paths: list[Path]) -> None:
+    """Remove snapshotted paths that now exist: files, then empty dirs."""
+    for path in paths:
+        if path.is_file():
+            _retry_on_permission_error(path.unlink, path)
+        elif path.is_dir() and not any(path.iterdir()):
+            _retry_on_permission_error(path.rmdir, path)
 
 
 def _collect_existing_paths(changes: ChangeSet) -> set[str]:
@@ -555,19 +693,6 @@ def _remove_self_imports(dest_path: Path, dest_module_dotted: str) -> list[str]:
     if removed:
         dest_path.write_text("".join(kept), encoding="utf-8")
     return removed
-
-
-def _cleanup_created_files(
-    abs_dest: Path, created_for_dry_run: bool, project_dir: Path
-) -> None:
-    """Remove temporary files created during a dry-run move_symbol."""
-    if (
-        created_for_dry_run
-        and abs_dest.exists()
-        and abs_dest.read_text(encoding="utf-8") == ""
-    ):
-        abs_dest.unlink()
-        _cleanup_empty_dirs(abs_dest.parent, project_dir)
 
 
 def _cleanup_empty_dirs(directory: Path, stop_at: Path) -> None:

@@ -1,16 +1,19 @@
 """Tests for rope-based refactoring operations (move, rename)."""
 
 import json
+from collections.abc import Callable
 from pathlib import Path
 
 import pytest
 
 from mcp_tools_py.refactoring.rope_tools import (
     _build_ignored_resources,
+    _module_dotted,
     move_module,
     move_symbol,
     rename_symbol,
 )
+from mcp_tools_py.utils.subprocess_runner import CommandResult
 
 # --- Shared fixture ---
 
@@ -38,6 +41,9 @@ def sample_project(tmp_path: Path) -> Path:
         "\n"
         "def use_it():\n"
         "    return my_func()\n"
+    )
+    (tmp_path / "test_x.py").write_text(
+        'TARGET = "src.foo.my_func"\nOTHER = "src.foo.my_func_other"\n'
     )
     return tmp_path
 
@@ -232,6 +238,53 @@ def test_move_symbol_dry_run_includes_review_notes(sample_project: Path) -> None
     assert "Note: Review symbol order and imports in all affected files." in result
 
 
+def test_move_symbol_dry_run_shows_diff(sample_project: Path) -> None:
+    """Dry-run output includes rope's unified diff for each symbol."""
+    result = move_symbol(
+        sample_project, "src/foo.py", ["my_func"], "src/baz.py", dry_run=True
+    )
+    assert "Diff for my_func:" in result
+    assert "--- a/src/foo.py" in result
+    assert "+++ b/src/baz.py" in result
+    assert "-def my_func():" in result
+    assert "Self-referencing imports" in result
+    assert not (sample_project / "src" / "baz.py").exists()
+
+
+# --- string-reference report tests ---
+
+
+def test_move_symbol_dry_run_reports_string_refs(sample_project: Path) -> None:
+    """Dry run lists string literals that refer to the moved name."""
+    result = move_symbol(
+        sample_project, "src/foo.py", ["my_func"], "src/baz.py", dry_run=True
+    )
+    assert "String references to moved names (not rewritten):" in result
+    assert "test_x.py:1: 'src.foo.my_func'" in result
+    assert "my_func_other" not in result
+
+
+def test_move_symbol_real_run_reports_string_refs(sample_project: Path) -> None:
+    """Real run lists string references and leaves them untouched."""
+    test_x = sample_project / "test_x.py"
+    before = test_x.read_text()
+    result = move_symbol(sample_project, "src/foo.py", ["my_func"], "src/baz.py")
+    assert "String references to moved names (not rewritten):" in result
+    assert "test_x.py:1: 'src.foo.my_func'" in result
+    assert "my_func_other" not in result
+    assert test_x.read_text() == before
+
+
+def test_module_dotted(tmp_path: Path) -> None:
+    """Dotted module names follow the package root."""
+    (tmp_path / "src").mkdir()
+    (tmp_path / "src" / "__init__.py").write_text("")
+    (tmp_path / "plain").mkdir()
+    assert _module_dotted(tmp_path, "src/foo.py") == "src.foo"
+    assert _module_dotted(tmp_path, "src/__init__.py") == "src"
+    assert _module_dotted(tmp_path, "plain/mod.py") == "mod"
+
+
 # --- self-import removal tests ---
 
 
@@ -382,8 +435,134 @@ def test_move_symbol_attribute_error_hint(sample_project: Path) -> None:
     assert "is_folder" in result
     # Actionable hint appended
     assert "Hint:" in result
-    # The dry-run dest stub was cleaned up
-    assert not (sample_project / "src" / "baz.py").exists()
+
+
+# --- parent-side cleanup tests ---
+
+
+def fake_execute_command(
+    side_effect: Callable[[], None],
+    result: CommandResult | None = None,
+) -> Callable[..., CommandResult]:
+    """Build a fake execute_command that runs side_effect, then returns result.
+
+    Returns:
+        A replacement for rope_tools.execute_command; defaults to a timeout.
+    """
+    if result is None:
+        result = CommandResult(return_code=-1, stdout="", stderr="", timed_out=True)
+
+    def _fake(*_args: object, **_kwargs: object) -> CommandResult:
+        side_effect()
+        return result
+
+    return _fake
+
+
+def test_move_symbol_dry_run_timeout_leaves_no_files(
+    sample_project: Path, monkeypatch: pytest.MonkeyPatch
+) -> None:
+    """A dry run whose child is killed still removes what the child created."""
+    sub = sample_project / "src" / "sub"
+    monkeypatch.setattr(
+        "mcp_tools_py.refactoring.rope_tools.execute_command",
+        fake_execute_command(_create_sub_package(sub)),
+    )
+    result = move_symbol(
+        sample_project, "src/foo.py", ["my_func"], "src/sub/new.py", dry_run=True
+    )
+    assert "timed out" in result
+    assert not sub.exists()
+
+
+def test_move_symbol_dry_run_existing_dir_no_stray_init(sample_project: Path) -> None:
+    """A dry run into an existing non-package dir leaves no __init__.py behind."""
+    plain = sample_project / "src" / "plain"
+    plain.mkdir()
+    (plain / "other.txt").write_text("keep")
+    result = move_symbol(
+        sample_project, "src/foo.py", ["my_func"], "src/plain/new.py", dry_run=True
+    )
+    assert "[DRY RUN]" in result
+    assert not (plain / "__init__.py").exists()
+    assert not (plain / "new.py").exists()
+    assert (plain / "other.txt").exists()
+
+
+def test_move_symbol_real_timeout_lists_moved(
+    sample_project: Path, monkeypatch: pytest.MonkeyPatch
+) -> None:
+    """A real run killed mid-batch reports which symbols moved."""
+    src = sample_project / "src"
+
+    def move_one() -> None:
+        (src / "foo.py").write_text('class MyClass:\n    pass\n\n\nMY_VAR = "hello"\n')
+        (src / "baz.py").write_text("def my_func(): ...\n")
+
+    monkeypatch.setattr(
+        "mcp_tools_py.refactoring.rope_tools.execute_command",
+        fake_execute_command(move_one),
+    )
+    result = move_symbol(
+        sample_project, "src/foo.py", ["my_func", "MyClass"], "src/baz.py"
+    )
+    assert "timed out" in result
+    assert "Moved: my_func" in result
+    assert "Not moved: MyClass" in result
+    assert "git diff" in result
+    assert (src / "baz.py").exists()
+
+
+def _create_sub_package(sub: Path) -> Callable[[], None]:
+    """Build a side effect that creates sub/__init__.py and sub/new.py.
+
+    Returns:
+        A callable for fake_execute_command.
+    """
+
+    def create_files() -> None:
+        sub.mkdir()
+        (sub / "__init__.py").write_text("")
+        (sub / "new.py").write_text("")
+
+    return create_files
+
+
+def test_move_symbol_real_failure_nothing_moved_cleans_up(
+    sample_project: Path, monkeypatch: pytest.MonkeyPatch
+) -> None:
+    """A real run that times out before moving anything leaves no files."""
+    sub = sample_project / "src" / "sub"
+    monkeypatch.setattr(
+        "mcp_tools_py.refactoring.rope_tools.execute_command",
+        fake_execute_command(_create_sub_package(sub)),
+    )
+    result = move_symbol(sample_project, "src/foo.py", ["my_func"], "src/sub/new.py")
+    assert not sub.exists()
+    assert "Moved: (none)" in result
+
+
+def test_move_symbol_real_rope_error_nothing_moved_cleans_up(
+    sample_project: Path, monkeypatch: pytest.MonkeyPatch
+) -> None:
+    """A rope error before anything moved is reported and cleaned up."""
+    sub = sample_project / "src" / "sub"
+    rope_error = CommandResult(
+        return_code=0,
+        stdout='{"result": "Error moving symbol: boom"}',
+        stderr="",
+        timed_out=False,
+    )
+    monkeypatch.setattr(
+        "mcp_tools_py.refactoring.rope_tools.execute_command",
+        fake_execute_command(_create_sub_package(sub), rope_error),
+    )
+    result = move_symbol(sample_project, "src/foo.py", ["my_func"], "src/sub/new.py")
+    assert "Error moving symbol: boom" in result
+    assert "Moved: (none)" in result
+    assert "Not moved: my_func" in result
+    assert "git diff" in result
+    assert not sub.exists()
 
 
 # --- ropefolder=None and gitignore filtering tests ---
