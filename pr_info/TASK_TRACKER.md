@@ -38,9 +38,9 @@ This tracks **Feature Implementation** consisting of multiple **Tasks**.
 ### Step 3: Treat only exit code 5 as No Tests Found
 [Details](./steps/step_3.md)
 
-- [ ] Implementation (tests + production code)
-- [ ] Quality checks: pylint, pytest, mypy — fix all issues
-- [ ] Commit message prepared
+- [x] Implementation (tests + production code)
+- [x] Quality checks: pylint, pytest, mypy — fix all issues
+- [x] Commit message prepared
 
 ### Step 4: Replace `tests_failed` with counts and warning lines; handle no-report runs
 [Details](./steps/step_4.md)

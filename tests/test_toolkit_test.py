@@ -96,6 +96,21 @@ class TestRunTest:
         assert result.status == "skipped"
         assert result.findings == []
 
+    @pytest.mark.integration
+    def test_every_module_failing_to_import_is_error(self, tmp_path: Path) -> None:
+        (tmp_path / "tests").mkdir()
+        for name in ("test_a.py", "test_b.py"):
+            (tmp_path / "tests" / name).write_text(
+                "import module_that_does_not_exist\n"
+            )
+        request = ActionRequest(
+            action="test", depth="standard", project_dir=tmp_path, params={}
+        )
+
+        result = PythonToolkit().run(request)
+
+        assert result.status == "error"
+
     def test_full_depth_sets_raw_coverage_digest(self, tmp_path: Path) -> None:
         pytest.importorskip("pytest_cov")
         _write_coverage_project(tmp_path)
