@@ -26,3 +26,11 @@ Cross-checking the plan against the code. I still need to look at the mypy re-ex
 Verdict(decision='tasks', tasks=["pr_info/steps/step_1.md:35: remove the compatibility re-export of `XDIST_MARKER` from `verdict.py` and the 'keeps working' claim. Add a change to step 1 so `tests/test_code_checker_pytest/test_verdict.py:16` imports `XDIST_MARKER` from `reporting`, which satisfies `no_implicit_reexport` and `refactoring_principles.md`.", "pr_info/steps/step_10.md:52: add `os.makedirs(merge_dir, exist_ok=True)` to the algorithm before `coverage combine` runs with `COVERAGE_FILE` set to `merge_dir/.coverage`. Make the step's real-merge integration test confirm the merge succeeds and does not fall back to 'Saved runs discarded: merging failed'.", "pr_info/steps/step_8.md:95: fix the two toolkit early-return test cases. State that 'under `-n 2`' comes from `addopts` in the test project, because `_run_test` accepts no `extra_args`. State that the mocked `FAILED` verdict case must also patch `toolkit.read_coverage_report`, so `data` is not `None` and the store is saved, not cleared.", 'pr_info/steps/step_8.md:102: rewrite the clean-project check to compare whole porcelain lines, for example asserting `?? .coverage` is not in `splitlines()`, in place of the `.coverage ` trailing-space substring check, which can never fail.', 'pr_info/steps/step_6.md:30: add documentation updates to the steps that change the behaviour. Add the package table to the digest contents in the `coverage` docstring and at `README.md:78`, and correct `README.md:76`, which says an errored run shows the exit code, because that is false for collection-only runs after step 2.'], escalate_reason=None)
 **Changes**:
 applied
+
+## Round 3 — 2026-11-05
+**Findings**:
+Plan review is nearly done. I'm making one last check for existing tests that pin the old collector text, which step 1 would break.NO FINDINGS
+**Decisions**:
+Verdict(decision='dismiss', tasks=[], escalate_reason=None)
+**Changes**:
+dismiss
