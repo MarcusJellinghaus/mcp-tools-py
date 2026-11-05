@@ -228,7 +228,7 @@ When a Python command is detected (`is_python_command()`):
 
 See [README.md](../../README.md) for installation, CLI parameters, and MCP client configuration (Claude Desktop, VSCode, Claude Code).
 
-- Installed via `pip install` (end user) or `pip install -e ".[dev]"` (development)
+- Installed into a virtual environment via `pip install` (end user) or `pip install -e ".[dev]"` (development)
 - Runs as STDIO-based MCP server, launched by the MCP client
 - Requires `--project-dir` pointing to the target codebase
 - Optional: `--python-executable` to select the environment the tools work against (the deprecated `--venv-path` still resolves the interpreter from a venv). Two environments are in play, and the phrase "tool venv" has been used for both:

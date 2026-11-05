@@ -11,6 +11,10 @@
 ### Method 1: Install from PyPI (When Available)
 
 ```bash
+# Create and activate a virtual environment
+python -m venv .venv
+source .venv/bin/activate  # On Windows: .venv\Scripts\activate
+
 # Install the latest release
 pip install mcp-tools-py
 
@@ -22,6 +26,10 @@ mcp-tools-py --help
 ### Method 2: Install from GitHub (Recommended)
 
 ```bash
+# Create and activate a virtual environment
+python -m venv .venv
+source .venv/bin/activate  # On Windows: .venv\Scripts\activate
+
 # Install directly from the main branch
 pip install git+https://github.com/MarcusJellinghaus/mcp-tools-py.git
 
@@ -41,7 +49,7 @@ For contributors or when you need to modify the code:
 git clone https://github.com/MarcusJellinghaus/mcp-tools-py.git
 cd mcp-tools-py
 
-# Create a virtual environment (recommended)
+# Create a virtual environment (required)
 python -m venv .venv
 
 # Activate the virtual environment
@@ -137,79 +145,64 @@ mcp-tools-py --help
 
 1. **Command Prompt (cmd.exe)**
    ```batch
+   python -m venv .venv
+   .venv\Scripts\activate
    pip install mcp-tools-py
    mcp-tools-py --help
    ```
 
 2. **PowerShell**
    ```powershell
+   python -m venv .venv
+   .venv\Scripts\Activate.ps1
+
+   # If Activate.ps1 is blocked by the execution policy, skip activation and
+   # use the venv's interpreter directly, instead of the two commands below:
+   #   .venv\Scripts\python.exe -m pip install mcp-tools-py
+   #   .venv\Scripts\python.exe -m mcp_tools_py --help
+
    pip install mcp-tools-py
    mcp-tools-py --help
-   
-   # If you get execution policy errors:
-   python -m mcp_tools_py --help
-   ```
-
-3. **Adding to PATH**
-   If the command isn't found after installation:
-   ```batch
-   REM Find Python Scripts directory
-   python -c "import site; print(site.USER_BASE)"
-   
-   REM Add Scripts folder to PATH
-   REM Replace USERNAME with your actual username
-   setx PATH "%PATH%;C:\Users\USERNAME\AppData\Roaming\Python\Python311\Scripts"
-   
-   REM Restart terminal and try again
    ```
 
 ### macOS
 
-1. **With Homebrew Python**
-   ```bash
-   # Ensure you're using Homebrew Python
-   which python3
-   # Should show: /opt/homebrew/bin/python3 or /usr/local/bin/python3
-   
-   python3 -m pip install mcp-tools-py
-   ```
+```bash
+# With Homebrew Python, check that it is the one in use
+which python3
+# Should show: /opt/homebrew/bin/python3 or /usr/local/bin/python3
 
-2. **With System Python**
-   ```bash
-   # Use --user flag to avoid permission issues
-   pip install --user mcp-tools-py
-   
-   # Add user bin to PATH if needed
-   export PATH="$HOME/.local/bin:$PATH"
-   echo 'export PATH="$HOME/.local/bin:$PATH"' >> ~/.zshrc
-   ```
+python3 -m venv .venv
+source .venv/bin/activate
+pip install mcp-tools-py
+```
 
 ### Linux
 
 1. **Ubuntu/Debian**
    ```bash
-   # Install pip if needed
+   # Install venv support if needed
    sudo apt update
-   sudo apt install python3-pip
-   
-   # Install MCP Tools Py
-   pip install --user mcp-tools-py
-   
-   # Add to PATH if needed
-   export PATH="$HOME/.local/bin:$PATH"
-   echo 'export PATH="$HOME/.local/bin:$PATH"' >> ~/.bashrc
+   sudo apt install python3-venv
    ```
 
 2. **Fedora/RHEL**
    ```bash
    # Install pip if needed
    sudo dnf install python3-pip
-   
-   # Install MCP Tools Py
-   pip install --user mcp-tools-py
    ```
 
+Then, on either distribution:
+
+```bash
+python3 -m venv .venv
+source .venv/bin/activate
+pip install mcp-tools-py
+```
+
 ## Configuration
+
+MCP clients do not activate a virtual environment, so replace `mcp-tools-py` in the examples below with the script's full path and add `--python-executable` where needed. See the client config note under `## Installation` in [README.md](README.md).
 
 After installation, you need to configure MCP Tools Py for your preferred client.
 
@@ -305,8 +298,8 @@ If `mcp-tools-py` command is not found after installation:
 
 2. **Check if scripts were installed:**
    ```bash
-   ls $(python -m site --user-base)/bin/  # Unix/macOS
-   dir $(python -m site --user-base)\Scripts\  # Windows
+   ls .venv/bin/mcp-tools-py  # Unix/macOS
+   dir .venv\Scripts\mcp-tools-py.exe  # Windows
    ```
 
 3. **Use Python module as fallback:**
@@ -316,19 +309,12 @@ If `mcp-tools-py` command is not found after installation:
 
 ### Permission Errors
 
-If you get permission errors during installation:
+If you get permission errors during installation, install into a virtual environment:
 
 ```bash
-# Option 1: Use --user flag
-pip install --user mcp-tools-py
-
-# Option 2: Use virtual environment (recommended)
 python -m venv .venv
 source .venv/bin/activate  # or .venv\Scripts\activate on Windows
 pip install mcp-tools-py
-
-# Option 3: Use pipx for isolated installation
-pipx install mcp-tools-py
 ```
 
 ### Import Errors

@@ -31,9 +31,9 @@ See [step_1.md](./steps/step_1.md)
 ### Step 2: Document the venv requirement
 See [step_2.md](./steps/step_2.md)
 
-- [ ] Implementation: edit `README.md`, `INSTALL.md` and `docs/architecture/architecture.md`, run the search and `git diff` checks
-- [ ] Quality checks: pylint, pytest, mypy — fix all issues
-- [ ] Commit message prepared
+- [x] Implementation: edit `README.md`, `INSTALL.md` and `docs/architecture/architecture.md`, run the search and `git diff` checks
+- [x] Quality checks: pylint, pytest, mypy — fix all issues
+- [x] Commit message prepared
 
 ## Pull Request
 

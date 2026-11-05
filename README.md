@@ -157,7 +157,7 @@ mcp-tools-py --project-dir /path/to/project [options]
 Two environments are in play, and only one of them is configurable:
 
 - **project env** — named by `--python-executable`. It holds your project's dependencies, and pytest, pylint, mypy and deptry, which have to import or inspect those dependencies to do their work. Library and symbol resolution (`get_library_source`, `list_symbols`, `find_references`) follows the same interpreter, so pointing the flag at the wrong venv makes those tools resolve against the wrong packages.
-- **tool env** — where `mcp_tools_py` itself is installed. It supplies black, isort, ruff, bandit, vulture, tach and lint-imports, which are mcp-tools-py's own dependencies. It is **not** configurable.
+- **tool env** — where `mcp_tools_py` itself is installed. It supplies black, isort, ruff, bandit, vulture, tach and lint-imports, which are mcp-tools-py's own dependencies. It is **not** configurable. It must be a virtual environment; see [Installation](#installation).
 
 Those seven therefore run at the tool env's versions, which may differ from what your project pins, so a project that cares about parity with its CI should keep compatible ranges in both places. lint-imports still checks your working tree: it runs from the tool env, but finds the project's root package, read from the import-linter config and located through the project interpreter. A custom `contract_types` entry inside that root package still resolves through the same bridge; one that lives in a separate distribution installed only in the project env does not, since only the root package's directory is handed over.
 
@@ -165,7 +165,7 @@ The first example below builds that path by interpolating an environment variabl
 
 ### Correct Configuration
 
-Point to the project's venv, with pytest, pylint and mypy installed in it, here on Windows:
+Point to the project's venv, with pytest, pylint, mypy and deptry installed in it, here on Windows:
 
 ```json
 {
@@ -205,22 +205,29 @@ Do **not** point to an interpreter that is not the project's:
 }
 ```
 
-A system interpreter, or any venv that is not the project's, reports pytest, pylint and mypy as missing and resolves library and symbol lookups against the wrong packages. Your project's own `.venv` fails the same way if those three are not installed in it — install them there rather than pointing the flag elsewhere.
+A system interpreter, or any venv that is not the project's, reports pytest, pylint, mypy and deptry as missing and resolves library and symbol lookups against the wrong packages. Your project's own `.venv` fails the same way if those four are not installed in it — install them there rather than pointing the flag elsewhere.
 
 ### Troubleshooting
 
 - **"Python interpreter not found"** at startup: `--python-executable` points at a path that doesn't exist — usually because the environment variable it interpolates is unset. The message names the flag that supplied the path.
-- **"No module named pytest"** (or pylint/mypy): Your `--python-executable` points to an environment that doesn't have the required tools installed. Point it at the project's environment and install them there.
-- **"ruff is not available"** (or black/isort/bandit/vulture/tach/lint-imports): these console scripts come from the tool env, not from `--python-executable`, so the flag is not the problem. They are dependencies of mcp-tools-py, and the message names the tool env directory searched: reinstall mcp-tools-py with its dependencies and restart the server.
-- **After installing missing tools**: pytest, pylint and mypy are answered by a probe of the configured interpreter that runs once and is cached for the process lifetime, so restart the MCP server after installing one of those three.
+- **"No module named pytest"** (or pylint/mypy/deptry): Your `--python-executable` points to an environment that doesn't have the required tools installed. Point it at the project's environment and install them there.
+- **"ruff is not available"** (or black/isort/bandit/vulture/tach/lint-imports): these console scripts come from the tool env, not from `--python-executable`, so the flag is not the problem. They are dependencies of mcp-tools-py, and the message names the tool env directory searched: reinstall mcp-tools-py with its dependencies and restart the server. If mcp-tools-py was installed outside a virtual environment, redo the install inside one.
+- **After installing missing tools**: pytest, pylint, mypy and deptry are answered by a probe of the configured interpreter that runs once and is cached for the process lifetime, so restart the MCP server after installing one of those four.
 
 ## Installation
+
+**Install mcp-tools-py in a virtual environment** (venv, virtualenv or uv). Its console-script tools are looked up only next to the interpreter it runs on, so installs that put scripts elsewhere are not supported: `pip install --user`, global installs on Windows, conda on Windows. This applies to mcp-tools-py's own environment. `--python-executable` names your project's environment separately.
+
+MCP clients do not activate a virtual environment. In client configs, set `command` to the script's full path (`<venv>\Scripts\mcp-tools-py.exe` on Windows, `<venv>/bin/mcp-tools-py` elsewhere). Pass `--python-executable` unless mcp-tools-py is installed in the project's own environment.
 
 See [INSTALL.md](INSTALL.md) for detailed installation instructions.
 
 **Quick install:**
 
 ```bash
+python -m venv .venv
+source .venv/bin/activate  # On Windows: .venv\Scripts\activate
+
 # Install from GitHub (recommended)
 pip install git+https://github.com/MarcusJellinghaus/mcp-tools-py.git
 
@@ -368,6 +375,8 @@ Use `--console-only` to disable file logging for simple development scenarios.
 
 1. **First install the server:**
    ```bash
+   python -m venv .venv
+   source .venv/bin/activate  # On Windows: .venv\Scripts\activate
    pip install git+https://github.com/MarcusJellinghaus/mcp-tools-py.git
    ```
 
