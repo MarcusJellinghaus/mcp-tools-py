@@ -76,7 +76,7 @@ Use the singular for a count of 1. The old `Warning: tests failed` line goes. `n
 
 ## TESTS
 
-`test_coverage.py`:
+`test_coverage.py` (later steps put their new test classes in their own modules, so the file stays under the 750-line gate):
 
 - Replace the `Warning: tests failed` test at `:423-430` with a parametrized test: collector line, test line, both in that order, generic line, and none. The first warning is the digest's first line.
 - A collection-only digest doesn't contain `tests failed`.

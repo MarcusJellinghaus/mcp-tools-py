@@ -9,7 +9,9 @@
 ## WHERE
 
 - `src/mcp_tools_py/code_checker_pytest/coverage.py`
-- `tests/test_code_checker_pytest/test_coverage.py`
+- `tests/test_code_checker_pytest/_coverage_report.py` (new: `_file`, `_report` and `_SELECTION` moved out of `test_coverage.py`)
+- `tests/test_code_checker_pytest/test_coverage.py` (imports those helpers)
+- `tests/test_code_checker_pytest/test_coverage_package_table.py` (new)
 
 ## WHAT
 
@@ -49,7 +51,7 @@ Pad names to the longest name. The header line itself keeps its format.
 
 ## TESTS
 
-In `test_coverage.py`, in a new `TestPackageTable` class:
+In `test_coverage_package_table.py`, in a `TestPackageTable` class:
 
 - A src layout gets one row per subpackage, sorted by missing statements.
 - A `src/__init__.py` with statements doesn't collapse the table to one row, and its statements land in `(root)`.

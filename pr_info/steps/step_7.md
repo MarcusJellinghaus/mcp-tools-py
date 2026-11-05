@@ -59,7 +59,7 @@ write_saved: makedirs; write .gitignore ("*") if absent
 
 ## DATA
 
-- `load_saved` returns the dict, or `None` when the file is absent, not valid JSON, not a dict, has a different `version`, or lacks any of `report`, `hashes`, `roots`, `sources`, `fail_under`, `runs`.
+- `load_saved` returns the dict, or `None` when the file is absent, not valid JSON, not a dict, has a different `version`, lacks any of `report`, `hashes`, `roots`, `sources`, `fail_under`, `runs`, or has the wrong shape. The right shape is: `report` is a dict with a dict under `files`; `hashes` is a dict; `roots` and `sources` are lists; `runs` is a list of dicts, each with `selection`, `data_file`, `failed_collectors`, `failed_tests` and `generic_warning`. This is the only guard against corrupt metadata, because the reuse branch (step 9) sits outside the tool's `try`.
 - `clear_saved` does `shutil.rmtree` on the store directory when it exists and creates nothing otherwise. Its `OSError` propagates to the caller.
 - `write_saved` lets `OSError` propagate too. Step 8 turns that into a one-line note.
 
@@ -75,7 +75,7 @@ write_saved: makedirs; write .gitignore ("*") if absent
 - `.gitignore` containing `*` exists after a save and is recreated if deleted.
 - A missing `new_data_file` is tolerated (`data_file` is `None`).
 - The data file gets a unique name, and an unreferenced `run-*.coverage` is deleted after the replace, while a referenced one stays.
-- Parametrized `load_saved` → `None`: no file, corrupt JSON, a JSON list, a wrong version, a missing key.
+- Parametrized `load_saved` → `None`: no file, corrupt JSON, a JSON list, a wrong version, a missing key, `report` not a dict, `report` with no `files`, `files` not a dict, `runs` not a list, a run entry that isn't a dict, a run entry missing a key.
 - `clear_saved` removes the data; on a project with no store it creates nothing.
 
 `test_project_config.py`: `get_test_directories` returns `testpaths`, falls back to `["tests"]`, and raises `ValueError` on invalid TOML.

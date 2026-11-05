@@ -10,7 +10,7 @@
 
 - `src/mcp_tools_py/code_checker_pytest/coverage.py`
 - `src/mcp_tools_py/code_checker_pytest/coverage_store.py`
-- `tests/test_code_checker_pytest/test_coverage.py`
+- `tests/test_code_checker_pytest/test_coverage_selection_identity.py` (new)
 - `tests/test_code_checker_pytest/test_coverage_merge.py` (new)
 
 ## WHAT
@@ -64,7 +64,7 @@ merge: any input missing -> None
 
 ## TESTS
 
-`test_coverage.py`, new `TestSelectionIdentity`:
+`test_coverage_selection_identity.py`, a `TestSelectionIdentity` class:
 
 - Same args in a different order give the same identity; markers in a different order too.
 - `-m a -k b` differs from `-m b -k a`.

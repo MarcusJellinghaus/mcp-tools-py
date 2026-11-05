@@ -12,6 +12,7 @@
 - `src/mcp_tools_py/checker_tools/pytest_tool.py` (docstring)
 - `README.md`
 - `tests/test_code_checker_pytest/test_coverage.py`
+- `tests/test_code_checker_pytest/test_coverage_zero_list.py` (new)
 
 ## WHAT
 
@@ -53,7 +54,7 @@ sum missing per label; sort by (-missing, label)
 
 ## TESTS
 
-In `test_coverage.py`, in a new `TestZeroCoverageList` class:
+In `test_coverage_zero_list.py`, in a `TestZeroCoverageList` class, using the helpers from `_coverage_report.py`:
 
 - A fully uncovered directory is one row, with summed missing statements.
 - A directory with one covered file doesn't collapse; its zero files are listed individually.
@@ -66,6 +67,6 @@ In `test_coverage.py`, in a new `TestZeroCoverageList` class:
 - A synthetic 250-module project over 12 packages at `max_modules=0` has at most 40 lines in total.
 - `max_modules=0` shows the package table and the zero-coverage list, and no gap ranking.
 
-Update `test_max_modules_zero` (`:362`): `z.py` now appears, `a.py` doesn't, `… and 1 more` is gone, and `1 further modules have gaps` stays.
+In `test_coverage.py`, update `test_max_modules_zero` (`:362`): `z.py` now appears, `a.py` doesn't, `… and 1 more` is gone, and `1 further modules have gaps` stays.
 
 The existing test at `:346` (`    probe.py (150 missing statements)`) keeps passing, because a file at the project root gets its own row.

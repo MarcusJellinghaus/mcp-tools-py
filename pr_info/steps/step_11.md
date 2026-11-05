@@ -17,7 +17,7 @@
 
 ## WHAT
 
-`CoverageRun` gains `identity: str`, `interpreter: str`, `env_vars: dict[str, str] | None`, `timeout_seconds: int` and `combine: bool = False`. `start_coverage_run` takes them. Run entries gain `"identity"`, and `load_saved` still treats a missing top-level key as no saved run.
+`CoverageRun` gains `identity: str`, `interpreter: str`, `env_vars: dict[str, str] | None`, `timeout_seconds: int` and `combine: bool = False`. `start_coverage_run` takes them. Run entries gain `"identity"`, `load_saved` adds it to the keys each run entry must have, and it still treats a missing top-level key as no saved run.
 
 `run_pytest_check` gains `combine_with_previous: bool = False`, documented in the docstring.
 
@@ -48,7 +48,8 @@ finish, in order:
   if saved: reason = _mismatch_reason(saved, run)
     reason -> note "Saved runs discarded: {reason}."
     else previous = saved runs with a different identity
-      previous -> merged = merge_coverage_data(previous data files + temp_dir/.coverage)
+      any previous with data_file None -> missing input: no merge call, note "Saved runs discarded: merging failed."
+      else previous -> merged = merge_coverage_data(previous data files, joined to the store directory, + temp_dir/.coverage)
         None -> note "Saved runs discarded: merging failed."
         else final = merged; runs = previous + [entry]
   write_saved(final, runs); selection, outcome = view_of_runs(runs)
@@ -70,6 +71,7 @@ With no saved set, or when the only saved run has the same identity, it behaves 
 - `_mismatch_reason`, parametrized: same inputs give `None`; sources differ; saved hashes differ; hashes differ now (an edit during the run).
 - `None` and an equivalent explicit list compare equal, since `sources` is resolved, normalized and sorted.
 - A failed merge saves only the new run, with a note, and the old data files are deleted.
+- A saved run with `data_file: None` counts as a failed merge: `merge_coverage_data` isn't called, only the new run is saved, the note is added, and nothing raises.
 - No report with `combine=True` leaves the metadata byte-identical and adds the note; with `combine=False` it clears.
 - A rerun of an identical selection replaces its entry, without merging when it was the only one.
 - A replaced selection's counts drop out of the sum, and the same collector count in two selections adds up.

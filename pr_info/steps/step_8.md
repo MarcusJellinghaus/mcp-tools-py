@@ -57,7 +57,8 @@ def view_of_runs(runs: list[dict[str, Any]]) -> tuple[str, RunOutcome]: ...
 
 `toolkit.py`:
 
-- Move `verdict` and `report` reading up. Call `finish_coverage_run` immediately after `check_code_with_pytest`, before the three early returns, when `temp_dir` is set.
+- At `full` depth, build `selection` and call `start_coverage_run` right before `check_code_with_pytest`.
+- Move `verdict` and `report` reading up. After the run, as in `pytest_tool.py`: `data = read_coverage_report(temp_dir) if report is not None else None` (decision 21). Call `finish_coverage_run` immediately after `check_code_with_pytest`, before the three early returns, when `temp_dir` is set.
 - Use `finished` in the digest at the end. Append notes to `raw` only on that path; `finish_coverage_run` logs failures, which covers the early returns.
 
 `architecture.md`: add `coverage_store.py` under `code_checker_pytest` in the Module Overview, and `.mcp-tools-py/coverage/` as the storage location.
@@ -101,3 +102,4 @@ One run entry: `{"selection": ..., "data_file": None, **outcome}`. `write_saved`
 - Rewrite `test_coverage_leaves_the_project_clean`: `git init` in the project (skip when `shutil.which("git")` is `None`), run with `coverage=True`, assert `.mcp-tools-py/coverage/last_run.json` exists and `git status --porcelain --untracked-files=all` mentions neither `.mcp-tools-py` nor `coverage.json` nor `.coverage ` at the root.
 - A run without coverage leaves the saved data untouched.
 - A run with `extra_args=["-k", "nomatch"]` says `Coverage report was not produced.` and clears the saved data.
+- `coverage=True` with `extra_args=["-n", "2"]`, on the project plus a test module that fails to import and a passing one: the digest's first line, which follows the blank line after the pytest reply, is `⚠ 1 collector failed — coverage below reflects a partial run`, and `tests failed` appears nowhere in the reply, digest included.

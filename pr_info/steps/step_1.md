@@ -10,9 +10,11 @@
 
 - `src/mcp_tools_py/code_checker_pytest/reporting.py`
 - `src/mcp_tools_py/code_checker_pytest/verdict.py`
+- `src/mcp_tools_py/toolkit.py`
 - `tests/test_code_checker_pytest/test_collector_groups.py` (new)
 - `tests/test_code_checker_pytest/test_verdict.py`
 - `tests/test_code_checker/test_reporting.py`
+- `tests/test_toolkit_test.py`
 
 ## WHAT
 
@@ -33,6 +35,7 @@ def _collector_key(longrepr: str) -> str: ...
 - `verdict.py` imports `XDIST_MARKER` and the helpers from `reporting`, so `from ...verdict import XDIST_MARKER` in tests keeps working.
 - `_merge_problems`: `items = group_failed_collectors(report)`, then the existing `collection_errors` branch (removed in step 2) and tail fallback. Remove `_dedup_key` and the `seen` loop.
 - `format_error_text`: when `collectors_failed_line(report)` is not empty, add it and a blank line right after `Problems:`.
+- `toolkit.py`, the FAILED-with-no-findings return (`:176`), which renders `cap_problems(verdict.problems)` directly: when `collectors_failed_line(report)` is not empty, add it and a blank line before the capped problems. With no failed collector the summary stays as it is.
 - `_process_failed_collectors(report, output)` takes the report and returns `True` when no collector failed. Otherwise it adds the line, a blank line, then each group followed by a blank line. Stop on truncation, as now.
 - `create_prompt_for_failed_tests`: pass the report to it and keep the early return on truncation.
 - Remove `_format_collector_info`.
@@ -68,6 +71,8 @@ render: if the first longrepr has E lines, the joined E lines, then the longrepr
 - A collector without `longrepr` is counted but forms no group.
 - ERROR path: `format_error_text` contains the count line, on a report with collectors.
 - FAILED path: `create_prompt_for_failed_tests` contains the count line.
+
+`test_toolkit_test.py`, using `_run_with`: a FAILED verdict with a failed collector and no failing test returns `status == "error"`, and the summary contains `1 collector failed (1 distinct error)` before the problem text.
 
 `test_verdict.py`: rewrite `test_dedup_same_first_line` (`:163`) so the two collectors, whose last lines differ, stay separate.
 

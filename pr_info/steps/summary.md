@@ -79,6 +79,7 @@ run-<uuid>.coverage        one per merged selection, referenced from last_run.js
 | Package table | Rows with 0 statements are skipped, so an empty `__init__.py` adds no `(root)` row |
 | Absolute `coverage_source` on reuse | Not converted; it matches nothing and is refused |
 | Save failure in the toolkit | Logged, and appended to `raw` only when a digest exists |
+| `coverage < 7.6` | Not probed, accepted. Reading the code found nothing merge-specific, and the digest degrades to file-level ranges at `coverage.py:215` as it does today |
 
 ## Files
 
@@ -87,13 +88,18 @@ run-<uuid>.coverage        one per merged selection, referenced from last_run.js
 ```
 src/mcp_tools_py/code_checker_pytest/coverage_store.py
 tests/_coverage_project.py
+tests/test_code_checker_pytest/_coverage_report.py
 tests/test_code_checker_pytest/test_collector_groups.py
+tests/test_code_checker_pytest/test_coverage_package_table.py
+tests/test_code_checker_pytest/test_coverage_zero_list.py
+tests/test_code_checker_pytest/test_coverage_selection_identity.py
 tests/test_code_checker_pytest/test_coverage_store.py
 tests/test_code_checker_pytest/test_coverage_merge.py
 tests/test_code_checker_pytest/test_integration_collection_errors.py
 tests/test_pytest_tool_reuse.py
 tests/test_pytest_tool_combine.py
 tests/test_toolkit_saved_coverage.py
+tests/test_subprocess_tracing.py
 ```
 
 **Modified**
