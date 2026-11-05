@@ -17,3 +17,11 @@ Checking the last candidates (Python floor, import contracts, dead code), then w
 Verdict(decision='tasks', tasks=['At src/mcp_tools_py/toolkit.py:148, move the `start_coverage_run` and `context.resolve_timeout("pytest")` setup inside the `try`/`finally` that follows `tempfile.mkdtemp`, so a `ValueError` from a malformed `[tool.mcp-tools-py]` timeout no longer leaks the `pytest_cov_*` temp dir. Add a test that a malformed timeout raises `ValueError` and leaves no temp dir behind.'], escalate_reason=None)
 **Changes**:
 applied
+
+## Round 3 — 2026-11-05
+**Findings**:
+Source review is done, and the unit tests, mypy and pylint pass. I'm now running the integration tests for the coverage paths, since they exercise real merges and collection failures.NO FINDINGS
+**Decisions**:
+Verdict(decision='dismiss', tasks=[], escalate_reason=None)
+**Changes**:
+dismiss
