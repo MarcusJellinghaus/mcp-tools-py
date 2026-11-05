@@ -16,6 +16,7 @@ from mcp_tools_py.code_checker_pytest.coverage import (
 from mcp_tools_py.code_checker_pytest.coverage_store import (
     CoverageRun,
     finish_coverage_run,
+    format_last_run,
     start_coverage_run,
 )
 from mcp_tools_py.code_checker_pytest.runners import check_code_with_pytest
@@ -49,6 +50,7 @@ def register(mcp: "FastMCPProtocol", checker_tools: "CheckerTools") -> None:
         coverage: bool = False,
         coverage_source: Optional[List[str]] = None,
         max_modules: int = 10,
+        use_last_coverage_run: bool = False,
     ) -> str:
         """Run pytest on the project code and generate smart prompts for LLMs.
 
@@ -72,8 +74,14 @@ def register(mcp: "FastMCPProtocol", checker_tools: "CheckerTools") -> None:
                 `# pragma: no cover`.
             coverage_source: Directories to measure. Defaults to the project's
                 source directories from pyproject.toml, excluding test paths.
+                With use_last_coverage_run, directories to narrow the digest to;
+                anything outside what was measured is refused.
             max_modules: How many modules the coverage digest's gap ranking
                 details; 0 shows only the overview (default: 10).
+            use_last_coverage_run: Run no tests and return the digest of the last
+                coverage run, or "stale — rerun" when a Python file in scope has
+                changed since. Only coverage_source and max_modules can be combined
+                with it; other arguments are refused.
 
         Returns:
             A string containing either pytest results or a prompt for an LLM to interpret
@@ -108,7 +116,31 @@ def register(mcp: "FastMCPProtocol", checker_tools: "CheckerTools") -> None:
 
             # Coverage digest for the full suite
             run_pytest_check(coverage=True)
+
+            # Drill into the last coverage run without rerunning tests
+            run_pytest_check(use_last_coverage_run=True, coverage_source=["src/pkg"])
         """
+        if use_last_coverage_run:
+            conflicts = [
+                name
+                for name, given in (
+                    ("markers", bool(markers)),
+                    ("extra_args", bool(extra_args)),
+                    ("env_vars", bool(env_vars)),
+                    ("timeout_seconds", timeout_seconds is not None),
+                    ("coverage", coverage),
+                )
+                if given
+            ]
+            if conflicts:
+                return (
+                    "Error: use_last_coverage_run=True cannot be used with: "
+                    f"{', '.join(conflicts)}."
+                )
+            return format_last_run(
+                str(context.project_dir), coverage_source, max_modules
+            )
+
         if not context.is_tool_available("pytest"):
             return context.unavailable_message("pytest")
 

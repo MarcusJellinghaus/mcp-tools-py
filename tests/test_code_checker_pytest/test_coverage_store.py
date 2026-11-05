@@ -26,6 +26,12 @@ from mcp_tools_py.code_checker_pytest.coverage_store import (
 )
 from mcp_tools_py.code_checker_pytest.models import PytestReport, Summary
 from mcp_tools_py.code_checker_pytest.verdict import RunStatus, RunVerdict
+from tests.test_code_checker_pytest._coverage_report import (
+    _run,
+    _saved,
+    _write_metadata,
+    _write_source,
+)
 
 
 def _make_dirs(project: Path, *names: str) -> None:
@@ -41,39 +47,6 @@ def _write_layout(project: Path, where: str, testpaths: str) -> None:
         f"[tool.pytest.ini_options]\ntestpaths = {testpaths}\n",
         encoding="utf-8",
     )
-
-
-def _write_source(project: Path, relative: str, content: str = "x = 1\n") -> Path:
-    """Write one file below the project, with its parent directories."""
-    path = project / relative
-    path.parent.mkdir(parents=True, exist_ok=True)
-    path.write_text(content, encoding="utf-8")
-    return path
-
-
-def _run(**changes: Any) -> dict[str, Any]:
-    """One run entry, as the callers build it."""
-    return {
-        "selection": "selection: full suite (no markers, -k or path arguments)",
-        "data_file": None,
-        "failed_collectors": 0,
-        "failed_tests": 0,
-        "generic_warning": False,
-        **changes,
-    }
-
-
-def _saved(**changes: Any) -> dict[str, Any]:
-    """The dict a caller passes to write_saved."""
-    return {
-        "report": {"files": {"src/a.py": {"summary": {"num_statements": 1}}}},
-        "hashes": {"src/a.py": "abc"},
-        "roots": ["src", "tests"],
-        "sources": ["src"],
-        "fail_under": 0.0,
-        "runs": [_run()],
-        **changes,
-    }
 
 
 def _metadata(**changes: Any) -> bytes:
@@ -93,13 +66,6 @@ def _run_without(key: str) -> dict[str, Any]:
     run = _run()
     del run[key]
     return run
-
-
-def _write_metadata(project: Path, content: bytes) -> None:
-    """Put raw content where load_saved reads the metadata."""
-    store = project / STORE_DIR
-    store.mkdir(parents=True)
-    (store / METADATA_FILE).write_bytes(content)
 
 
 class TestFreshnessRoots:

@@ -70,12 +70,15 @@ by passing an explicit list:
 | `coverage` | boolean | False | Measure coverage with pytest-cov and append a coverage digest to the reply |
 | `coverage_source` | list | None (auto-detected) | Directories to measure. Auto-detected from `[tool.setuptools.packages.find] where`, excluding test paths |
 | `max_modules` | integer | 10 | How many modules the coverage digest's gap ranking details; `0` shows only the overview |
+| `use_last_coverage_run` | boolean | False | Run no tests and return the digest of the last coverage run. Only `coverage_source` (to narrow it) and `max_modules` can be combined with it |
 
 **Note:** The tool never adds `-n`. Tests run in parallel only when you pass `-n` or the project's `addopts` sets it. `-n 0` disables pytest-xdist.
 
 **Run outcomes:** Only a verified pass reads "Pytest check completed." Test failures show the failure details. A run that errored, including a non-zero exit with no failing tests or an xdist collection mismatch, reads "Pytest run reported an error." with the problems, plus the exit code unless collection failures explain it and no test failed. A run that collected tests but reported no outcomes reads "Collected N tests but none reported an outcome. Not verified."
 
 **Coverage:** `coverage=True` needs `pytest-cov` installed in the project's environment. The digest gives the total, a per-package table, the modules with the most missing statements and their per-function line ranges, the modules with nothing covered, and the test selection the numbers come from. The project's `fail_under` is reported but not applied, so pass/fail reflects the tests only. To exclude code, use coverage's own `[tool.coverage.run] omit` or `# pragma: no cover`.
+
+**Reusing the last run:** Each coverage run saves its data in `.mcp-tools-py/coverage/` in the project; the directory ignores itself, so the project needs no `.gitignore` entry. `use_last_coverage_run=True` then returns that run's digest without running tests, repeating its selection line and warnings. `coverage_source` narrows the digest to directories below what was measured, and anything else is refused. Any edited, new or deleted `.py` file in the source, explicit `coverage_source` or test directories returns `stale — rerun`, with no numbers. Limits of that check: config changes aren't detected, and a root `conftest.py`, path arguments outside the test directories and package-name sources are outside its scope.
 
 ### Mypy Parameters
 

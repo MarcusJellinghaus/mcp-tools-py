@@ -20,10 +20,12 @@ from typing import Any
 from mcp_tools_py.code_checker_pytest.coverage import (
     COVERAGE_DATA,
     RunOutcome,
+    format_coverage_digest,
     norm_path,
     run_outcome,
 )
 from mcp_tools_py.code_checker_pytest.models import PytestReport
+from mcp_tools_py.code_checker_pytest.reporting import plural
 from mcp_tools_py.code_checker_pytest.verdict import RunVerdict
 from mcp_tools_py.utils.file_utils import read_file
 from mcp_tools_py.utils.project_config import (
@@ -171,6 +173,106 @@ def view_of_runs(runs: list[dict[str, Any]]) -> tuple[str, RunOutcome]:
         failed_tests=sum(run["failed_tests"] for run in runs),
         generic_warning=any(run["generic_warning"] for run in runs),
     )
+
+
+def format_last_run(
+    project_dir: str, coverage_source: list[str] | None, max_modules: int
+) -> str:
+    """Render the digest of the saved run, if it still describes the project.
+
+    Args:
+        project_dir: Path to the target project.
+        coverage_source: Directories to narrow the digest to, if any.
+        max_modules: How many modules the digest's gap ranking details.
+
+    Returns:
+        The digest; or a message with no numbers when nothing is saved, a
+        Python file in scope changed, or the narrowing was refused.
+    """
+    saved = load_saved(project_dir)
+    if saved is None:
+        return "No saved coverage run. Run with coverage=True first."
+
+    hashes = saved["hashes"]
+    current = hash_python_files(project_dir, saved["roots"])
+    changed = sum(
+        hashes.get(path) != current.get(path) for path in hashes.keys() | current.keys()
+    )
+    if changed:
+        return (
+            f"stale — rerun: {changed} {plural(changed, 'file')} changed since the "
+            "last coverage run. Run with coverage=True."
+        )
+
+    files = saved["report"]["files"]
+    if coverage_source:
+        narrowed = narrow_files(files, saved["sources"], coverage_source)
+        if isinstance(narrowed, str):
+            return narrowed
+        files = narrowed
+
+    selection, outcome = view_of_runs(saved["runs"])
+    return format_coverage_digest(
+        {"files": files},
+        selection,
+        max_modules=max_modules,
+        fail_under=saved["fail_under"],
+        **outcome,
+    )
+
+
+def narrow_files(
+    files: dict[str, Any], measured: list[str], paths: list[str]
+) -> dict[str, Any] | str:
+    """Keep the files of a report that are below the given directories.
+
+    Paths compare by whole components. They aren't converted, so an absolute
+    path or a package name matches nothing and is refused.
+
+    Args:
+        files: The ``files`` entry of the coverage JSON.
+        measured: The measured sources of the run.
+        paths: The directories to keep.
+
+    Returns:
+        The kept entries under their original keys; or the refusal, when a path
+        strictly contains a measured source or has no files below it.
+    """
+    hint = f"Use a directory under the measured sources: {', '.join(measured)}."
+    sources = [_components(source) for source in measured]
+    keys = {key: _components(key) for key in files}
+    kept: set[str] = set()
+    for path in paths:
+        directory = _components(path)
+        if any(
+            len(source) > len(directory) and _is_below(source, directory)
+            for source in sources
+        ):
+            return f"Error: coverage_source '{path}' is wider than what was measured. {hint}"
+        matching = {key for key, parts in keys.items() if _is_below(parts, directory)}
+        if not matching:
+            return f"Error: coverage_source '{path}' matches no measured file. {hint}"
+        kept |= matching
+    return {key: entry for key, entry in files.items() if key in kept}
+
+
+def _components(path: str) -> tuple[str, ...]:
+    """Split a path for comparing, with ``.`` as no components at all.
+
+    Returns:
+        The components of the normalized path.
+    """
+    normalized = norm_path(path)
+    return () if normalized == "." else tuple(normalized.split("/"))
+
+
+def _is_below(parts: tuple[str, ...], directory: tuple[str, ...]) -> bool:
+    """Tell whether split path components start with those of a directory.
+
+    Returns:
+        True when *parts* is *directory* or below it.
+    """
+    return parts[: len(directory)] == directory
 
 
 def freshness_roots(
