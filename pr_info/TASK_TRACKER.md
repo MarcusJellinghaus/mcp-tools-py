@@ -87,9 +87,9 @@ This tracks **Feature Implementation** consisting of multiple **Tasks**.
 ### Step 10: Add selection identity and the merge command
 [Details](./steps/step_10.md)
 
-- [ ] Implementation (tests + production code)
-- [ ] Quality checks: pylint, pytest, mypy — fix all issues
-- [ ] Commit message prepared
+- [x] Implementation (tests + production code)
+- [x] Quality checks: pylint, pytest, mypy — fix all issues
+- [x] Commit message prepared
 
 ### Step 11: Add `combine_with_previous`
 [Details](./steps/step_11.md)

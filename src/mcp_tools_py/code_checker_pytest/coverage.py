@@ -5,6 +5,7 @@ the trailing ``--cov-fail-under=0`` wins over any threshold the target project
 configures or the user passes: coverage is reported, never enforced.
 """
 
+import hashlib
 import json
 import os
 import posixpath
@@ -159,25 +160,18 @@ def selection_line(
     Returns:
         A line starting with ``selection: ``.
     """
-    try:
-        add = shlex.split(addopts or "")
-    except ValueError:
-        add = []
-
     parts = []
-    # runners.py puts the markers -m before extra_args, so an -m there wins.
-    cmd_m = _option_value(cleaned_args, "-m") or (
-        " and ".join(markers) if markers else None
+    m_value, m_from_addopts = _effective_option(
+        "-m", cleaned_args, addopts, " and ".join(markers or [])
     )
-    if cmd_m:
-        parts.append(f"markers '{cmd_m}'")
-    elif add_m := _option_value(add, "-m"):
-        parts.append(f"addopts -m '{add_m}'")
+    if m_value:
+        parts.append(
+            f"addopts -m '{m_value}'" if m_from_addopts else f"markers '{m_value}'"
+        )
 
-    if cmd_k := _option_value(cleaned_args, "-k"):
-        parts.append(f"-k '{cmd_k}'")
-    elif add_k := _option_value(add, "-k"):
-        parts.append(f"addopts -k '{add_k}'")
+    k_value, k_from_addopts = _effective_option("-k", cleaned_args, addopts)
+    if k_value:
+        parts.append(f"addopts -k '{k_value}'" if k_from_addopts else f"-k '{k_value}'")
 
     if path_args:
         parts.append("paths " + ", ".join(path_args))
@@ -185,6 +179,76 @@ def selection_line(
     if not parts:
         return "selection: full suite (no markers, -k or path arguments)"
     return "selection: " + "; ".join(parts)
+
+
+def selection_identity(
+    markers: list[str] | None,
+    cleaned_args: list[str],
+    path_args: list[str],
+    addopts: str | None,
+    env_vars: dict[str, str] | None,
+) -> str:
+    """Build the value that tells whether two runs selected the same tests.
+
+    Order doesn't matter and ``--cov*`` args don't count. The env is hashed,
+    because the identity is saved to disk.
+
+    Args:
+        markers: The ``markers`` parameter of run_pytest_check.
+        cleaned_args: The sanitized extra_args.
+        path_args: The path arguments among cleaned_args.
+        addopts: The target project's pytest ``addopts``, if any.
+        env_vars: The caller's env vars, if any.
+
+    Returns:
+        A JSON string, to compare with ``==``.
+    """
+    m_value, _ = _effective_option(
+        "-m", cleaned_args, addopts, " and ".join(sorted(markers or []))
+    )
+    k_value, _ = _effective_option("-k", cleaned_args, addopts)
+
+    rest = []
+    tokens = iter(cleaned_args)
+    for token in tokens:
+        if token in ("-m", "-k"):
+            next(tokens, None)
+        elif not token.startswith(("-m", "-k", "--cov")) and token not in path_args:
+            rest.append(token)
+
+    env = ""
+    if env_vars:
+        env = hashlib.sha256(
+            json.dumps(sorted(env_vars.items())).encode("utf-8")
+        ).hexdigest()
+    return json.dumps([m_value, k_value, sorted(path_args), sorted(rest), env])
+
+
+def _effective_option(
+    flag: str, cleaned_args: list[str], addopts: str | None, default: str = ""
+) -> tuple[str | None, bool]:
+    """Find the value of ``-m`` or ``-k`` that pytest ends up using.
+
+    Args:
+        flag: The short option to look up.
+        cleaned_args: The sanitized extra_args.
+        addopts: The target project's pytest ``addopts``, if any.
+        default: The value the command line has when cleaned_args has none.
+
+    Returns:
+        The value, or None when there is none, and whether it comes from
+        addopts.
+    """
+    # runners.py puts the markers -m before extra_args, so an -m there wins.
+    if value := _option_value(cleaned_args, flag) or default:
+        return value, False
+    try:
+        add = shlex.split(addopts or "")
+    except ValueError:
+        add = []
+    if add_value := _option_value(add, flag):
+        return add_value, True
+    return None, False
 
 
 def _option_value(tokens: list[str], flag: str) -> str | None:

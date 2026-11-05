@@ -19,9 +19,11 @@ from typing import Any
 
 from mcp_tools_py.code_checker_pytest.coverage import (
     COVERAGE_DATA,
+    COVERAGE_JSON,
     RunOutcome,
     format_coverage_digest,
     norm_path,
+    read_coverage_report,
     run_outcome,
 )
 from mcp_tools_py.code_checker_pytest.models import PytestReport
@@ -32,6 +34,7 @@ from mcp_tools_py.utils.project_config import (
     get_test_directories,
     resolve_coverage_source,
 )
+from mcp_tools_py.utils.subprocess_runner import execute_command
 
 logger = logging.getLogger(__name__)
 
@@ -41,6 +44,7 @@ STORE_VERSION = 1
 
 _UNREADABLE = "unreadable"
 _SELECTION_PREFIX = "selection: "
+_MERGE_DIR = "merge"
 _METADATA_KEYS = ("report", "hashes", "roots", "sources", "fail_under", "runs")
 _RUN_KEYS = (
     "selection",
@@ -484,3 +488,48 @@ def clear_saved(project_dir: str) -> None:
     store = _store_dir(project_dir)
     if os.path.isdir(store):
         shutil.rmtree(store)
+
+
+def merge_coverage_data(  # pylint: disable=too-many-arguments,too-many-positional-arguments
+    interpreter: str,
+    project_dir: str,
+    inputs: list[str],
+    temp_dir: str,
+    env_vars: dict[str, str] | None,
+    timeout_seconds: int,
+) -> dict[str, Any] | None:
+    """Combine coverage data files into one report, keeping the files.
+
+    Runs with ``cwd=project_dir`` so the report's keys stay relative. The
+    project's ``fail_under`` isn't applied.
+
+    Args:
+        interpreter: The target project's Python interpreter.
+        project_dir: Path to the target project.
+        inputs: The data files to combine.
+        temp_dir: Directory of the run; the merge works in a subdirectory.
+        env_vars: The caller's env vars, if any.
+        timeout_seconds: Maximum seconds to wait for each coverage command.
+
+    Returns:
+        The merged report; None when an input is missing or a command failed.
+    """
+    if not all(os.path.isfile(path) for path in inputs):
+        return None
+
+    merge_dir = os.path.join(temp_dir, _MERGE_DIR)
+    # sqlite3 doesn't create the data file's parent directory.
+    os.makedirs(merge_dir, exist_ok=True)
+    env = {**(env_vars or {}), "COVERAGE_FILE": os.path.join(merge_dir, COVERAGE_DATA)}
+    coverage = [interpreter, "-m", "coverage"]
+    report = os.path.join(merge_dir, COVERAGE_JSON)
+    for command in (
+        [*coverage, "combine", "--keep", *inputs],
+        [*coverage, "json", "-o", report, "--fail-under=0"],
+    ):
+        result = execute_command(
+            command, cwd=project_dir, timeout_seconds=timeout_seconds, env=env
+        )
+        if result.timed_out or result.execution_error or result.return_code != 0:
+            return None
+    return read_coverage_report(merge_dir)
