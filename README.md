@@ -73,7 +73,7 @@ by passing an explicit list:
 
 **Note:** The tool never adds `-n`. Tests run in parallel only when you pass `-n` or the project's `addopts` sets it. `-n 0` disables pytest-xdist.
 
-**Run outcomes:** Only a verified pass reads "Pytest check completed." Test failures show the failure details. A run that errored, including a non-zero exit with no failing tests or an xdist collection mismatch, reads "Pytest run reported an error." with the exit code and problems. A run that collected tests but reported no outcomes reads "Collected N tests but none reported an outcome. Not verified."
+**Run outcomes:** Only a verified pass reads "Pytest check completed." Test failures show the failure details. A run that errored, including a non-zero exit with no failing tests or an xdist collection mismatch, reads "Pytest run reported an error." with the problems, plus the exit code unless collection failures explain it and no test failed. A run that collected tests but reported no outcomes reads "Collected N tests but none reported an outcome. Not verified."
 
 **Coverage:** `coverage=True` needs `pytest-cov` installed in the project's environment. The digest gives the total, the modules with the most missing statements and their per-function line ranges, the modules with nothing covered, and the test selection the numbers come from. The project's `fail_under` is reported but not applied, so pass/fail reflects the tests only. To exclude code, use coverage's own `[tool.coverage.run] omit` or `# pragma: no cover`.
 
