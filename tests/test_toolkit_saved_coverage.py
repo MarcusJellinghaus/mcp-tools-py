@@ -50,6 +50,7 @@ def _seed(project: Path) -> None:
             "fail_under": None,
             "runs": [
                 {
+                    "identity": "seeded",
                     "selection": "selection: seeded",
                     "data_file": None,
                     "failed_collectors": 0,

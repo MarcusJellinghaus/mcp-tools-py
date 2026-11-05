@@ -11,6 +11,7 @@ from mcp_tools_py.code_checker_pytest.coverage import (
     no_report_message,
     read_coverage_report,
     read_fail_under,
+    selection_identity,
     selection_line,
 )
 from mcp_tools_py.code_checker_pytest.coverage_store import (
@@ -51,6 +52,7 @@ def register(mcp: "FastMCPProtocol", checker_tools: "CheckerTools") -> None:
         coverage_source: Optional[List[str]] = None,
         max_modules: int = 10,
         use_last_coverage_run: bool = False,
+        combine_with_previous: bool = False,
     ) -> str:
         """Run pytest on the project code and generate smart prompts for LLMs.
 
@@ -82,6 +84,12 @@ def register(mcp: "FastMCPProtocol", checker_tools: "CheckerTools") -> None:
                 coverage run, or "stale — rerun" when a Python file in scope has
                 changed since. Only coverage_source and max_modules can be combined
                 with it; other arguments are refused.
+            combine_with_previous: Merge this coverage run with the saved runs, so
+                the digest covers every selection; requires coverage=True. A rerun
+                of an identical selection replaces its earlier data. When a Python
+                file in scope or coverage_source changed, or the merge fails, the
+                saved runs are discarded and the reply says so. A run with no
+                report leaves them unchanged.
 
         Returns:
             A string containing either pytest results or a prompt for an LLM to interpret
@@ -119,6 +127,13 @@ def register(mcp: "FastMCPProtocol", checker_tools: "CheckerTools") -> None:
 
             # Drill into the last coverage run without rerunning tests
             run_pytest_check(use_last_coverage_run=True, coverage_source=["src/pkg"])
+
+            # Add a second selection to the last coverage run
+            run_pytest_check(
+                coverage=True,
+                combine_with_previous=True,
+                extra_args=["tests/test_other.py"],
+            )
         """
         if use_last_coverage_run:
             conflicts = [
@@ -128,6 +143,7 @@ def register(mcp: "FastMCPProtocol", checker_tools: "CheckerTools") -> None:
                     ("extra_args", bool(extra_args)),
                     ("env_vars", bool(env_vars)),
                     ("timeout_seconds", timeout_seconds is not None),
+                    ("combine_with_previous", combine_with_previous),
                     ("coverage", coverage),
                 )
                 if given
@@ -140,6 +156,9 @@ def register(mcp: "FastMCPProtocol", checker_tools: "CheckerTools") -> None:
             return format_last_run(
                 str(context.project_dir), coverage_source, max_modules
             )
+
+        if combine_with_previous and not coverage:
+            return "Error: combine_with_previous=True requires coverage=True."
 
         if not context.is_tool_available("pytest"):
             return context.unavailable_message("pytest")
@@ -181,12 +200,14 @@ def register(mcp: "FastMCPProtocol", checker_tools: "CheckerTools") -> None:
             run_env = env_vars
             fail_under: Optional[float] = None
             coverage_run: Optional[CoverageRun] = None
+            run_timeout = context.resolve_timeout("pytest", timeout_seconds)
             if coverage:
                 temp_dir = tempfile.mkdtemp(prefix="pytest_cov_")
                 cov_args, cov_env = coverage_args(sources, temp_dir)
                 run_args = sanitized.cleaned_args + cov_args
                 run_env = {**(env_vars or {}), **cov_env}
                 fail_under = read_fail_under(interpreter, project_dir)
+                addopts = get_pytest_addopts(project_dir)
                 coverage_run = start_coverage_run(
                     project_dir,
                     temp_dir,
@@ -198,8 +219,19 @@ def register(mcp: "FastMCPProtocol", checker_tools: "CheckerTools") -> None:
                         markers,
                         sanitized.cleaned_args,
                         sanitized.path_args,
-                        get_pytest_addopts(project_dir),
+                        addopts,
                     ),
+                    selection_identity(
+                        markers,
+                        sanitized.cleaned_args,
+                        sanitized.path_args,
+                        addopts,
+                        env_vars,
+                    ),
+                    interpreter,
+                    env_vars,
+                    run_timeout,
+                    combine_with_previous,
                 )
 
             # Run pytest
@@ -214,7 +246,7 @@ def register(mcp: "FastMCPProtocol", checker_tools: "CheckerTools") -> None:
                 venv_bin=str(context.environment.bin_dir),
                 keep_temp_files=context.keep_temp_files,
                 skip_default_test_folder=sanitized.has_path_args,
-                timeout_seconds=context.resolve_timeout("pytest", timeout_seconds),
+                timeout_seconds=run_timeout,
             )
 
             # Always show detailed failure output

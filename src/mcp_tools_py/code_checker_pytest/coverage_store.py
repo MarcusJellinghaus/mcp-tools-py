@@ -45,8 +45,10 @@ STORE_VERSION = 1
 _UNREADABLE = "unreadable"
 _SELECTION_PREFIX = "selection: "
 _MERGE_DIR = "merge"
+_DISCARDED = "Saved runs discarded: "
 _METADATA_KEYS = ("report", "hashes", "roots", "sources", "fail_under", "runs")
 _RUN_KEYS = (
+    "identity",
     "selection",
     "data_file",
     "failed_collectors",
@@ -66,6 +68,11 @@ class CoverageRun:
     hashes: dict[str, str]
     fail_under: float | None
     selection: str
+    identity: str
+    interpreter: str
+    env_vars: dict[str, str] | None
+    timeout_seconds: int
+    combine: bool = False
 
 
 @dataclass
@@ -86,6 +93,11 @@ def start_coverage_run(  # pylint: disable=too-many-arguments,too-many-positiona
     sources: list[str],
     fail_under: float | None,
     selection: str,
+    identity: str,
+    interpreter: str,
+    env_vars: dict[str, str] | None,
+    timeout_seconds: int,
+    combine: bool = False,
 ) -> CoverageRun:
     """Record the state of the project right before a coverage run.
 
@@ -97,6 +109,11 @@ def start_coverage_run(  # pylint: disable=too-many-arguments,too-many-positiona
         sources: The resolved directories to measure.
         fail_under: The project's ``fail_under``, if it could be read.
         selection: The selection line of the run.
+        identity: The selection identity of the run.
+        interpreter: The target project's Python interpreter, for a merge.
+        env_vars: The caller's env vars, if any, for a merge.
+        timeout_seconds: The run's resolved timeout, for a merge.
+        combine: Whether to merge the run with the saved runs.
 
     Returns:
         The run, with its freshness roots and their hashes at this moment.
@@ -110,6 +127,11 @@ def start_coverage_run(  # pylint: disable=too-many-arguments,too-many-positiona
         hashes=hash_python_files(project_dir, roots),
         fail_under=fail_under,
         selection=selection,
+        identity=identity,
+        interpreter=interpreter,
+        env_vars=env_vars,
+        timeout_seconds=timeout_seconds,
+        combine=combine,
     )
 
 
@@ -119,9 +141,11 @@ def finish_coverage_run(
     report: PytestReport | None,
     verdict: RunVerdict,
 ) -> FinishedRun:
-    """Save the data of a finished run, or clear saved data when it has none.
+    """Save or merge the data of a finished run, or handle a run with none.
 
-    A failed update is logged and becomes a note; it never fails the run.
+    A run with no data clears the saved data, unless it was to be merged: then
+    the saved set stays. A failed update is logged and becomes a note; it never
+    fails the run.
 
     Args:
         run: The value returned by :func:`start_coverage_run`.
@@ -133,30 +157,107 @@ def finish_coverage_run(
         The report, selection and outcome to render, and any notes to show.
     """
     outcome = run_outcome(report, verdict)
-    notes = []
+    finished = FinishedRun(data, run.selection, outcome, [])
     try:
-        if data is None:
-            clear_saved(run.project_dir)
-        else:
+        if data is not None:
+            entry = {
+                "identity": run.identity,
+                "selection": run.selection,
+                "data_file": None,
+                **outcome,
+            }
+            final, runs, notes = _merge_with_saved(run, data, entry)
             write_saved(
                 run.project_dir,
                 {
-                    "report": data,
+                    "report": final,
                     "hashes": run.hashes,
                     "roots": run.roots,
                     "sources": run.sources,
                     "fail_under": run.fail_under,
-                    "runs": [
-                        {"selection": run.selection, "data_file": None, **outcome}
-                    ],
+                    "runs": runs,
                 },
                 os.path.join(run.temp_dir, COVERAGE_DATA),
             )
+            finished.data = final
+            finished.selection, finished.outcome = view_of_runs(runs)
+            finished.notes = notes
+        elif run.combine:
+            finished.notes = ["Saved coverage data was not changed."]
+        else:
+            clear_saved(run.project_dir)
     except OSError as exc:
         note = f"Could not update saved coverage data: {exc}"
         logger.warning(note)
-        notes.append(note)
-    return FinishedRun(data, run.selection, outcome, notes)
+        finished.notes = [note]
+    return finished
+
+
+def _merge_with_saved(
+    run: CoverageRun, data: dict[str, Any], entry: dict[str, Any]
+) -> tuple[dict[str, Any], list[dict[str, Any]], list[str]]:
+    """Merge a finished run with the saved runs, when it asked for that.
+
+    Any problem falls back to the new run alone, with a note. A saved run of the
+    same selection is replaced rather than merged.
+
+    Args:
+        run: The finished run.
+        data: The coverage JSON of the run.
+        entry: The run entry of the run.
+
+    Returns:
+        The report to save, the run entries with the new one last, and notes.
+    """
+    saved = load_saved(run.project_dir) if run.combine else None
+    if saved is None:
+        return data, [entry], []
+    reason = _mismatch_reason(saved, run)
+    if reason:
+        return data, [entry], [f"{_DISCARDED}{reason}."]
+    previous = [item for item in saved["runs"] if item["identity"] != run.identity]
+    if not previous:
+        return data, [entry], []
+
+    merged = None
+    if all(item["data_file"] is not None for item in previous):
+        store = _store_dir(run.project_dir)
+        merged = merge_coverage_data(
+            run.interpreter,
+            run.project_dir,
+            [
+                *(os.path.join(store, item["data_file"]) for item in previous),
+                os.path.join(run.temp_dir, COVERAGE_DATA),
+            ],
+            run.temp_dir,
+            run.env_vars,
+            run.timeout_seconds,
+        )
+    if merged is None:
+        return data, [entry], [f"{_DISCARDED}merging failed."]
+    return merged, [*previous, entry], []
+
+
+def _mismatch_reason(saved: dict[str, Any], run: CoverageRun) -> str | None:
+    """Tell why saved runs must not be merged with a finished run.
+
+    Coverage reports wrong numbers without any warning when it merges data of
+    different versions of a file, so this re-hashes right before the merge.
+
+    Args:
+        saved: The saved metadata.
+        run: The finished run.
+
+    Returns:
+        The reason, or None when the runs can be merged.
+    """
+    if saved["sources"] != run.sources:
+        return "coverage_source changed"
+    if saved["hashes"] != run.hashes:
+        return "files changed since the saved runs"
+    if hash_python_files(run.project_dir, run.roots) != run.hashes:
+        return "files changed during this run"
+    return None
 
 
 def view_of_runs(runs: list[dict[str, Any]]) -> tuple[str, RunOutcome]:

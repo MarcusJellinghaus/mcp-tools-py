@@ -27,6 +27,7 @@ from mcp_tools_py.code_checker_pytest.coverage import (
     format_coverage_digest,
     read_coverage_report,
     read_fail_under,
+    selection_identity,
     selection_line,
 )
 from mcp_tools_py.code_checker_pytest.coverage_store import (
@@ -143,6 +144,7 @@ def _run_test(context: ToolContext, depth: str) -> ActionResult:
         extra_args = cov_args
         env_vars = cov_env
         fail_under = read_fail_under(interpreter, project_dir)
+        addopts = get_pytest_addopts(project_dir)
         coverage_run = start_coverage_run(
             project_dir,
             temp_dir,
@@ -150,7 +152,11 @@ def _run_test(context: ToolContext, depth: str) -> ActionResult:
             None,
             sources,
             fail_under,
-            selection_line(markers, [], [], get_pytest_addopts(project_dir)),
+            selection_line(markers, [], [], addopts),
+            selection_identity(markers, [], [], addopts, None),
+            interpreter,
+            None,
+            context.resolve_timeout("pytest"),
         )
 
     try:

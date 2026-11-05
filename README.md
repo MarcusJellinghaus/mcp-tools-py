@@ -71,6 +71,7 @@ by passing an explicit list:
 | `coverage_source` | list | None (auto-detected) | Directories to measure. Auto-detected from `[tool.setuptools.packages.find] where`, excluding test paths |
 | `max_modules` | integer | 10 | How many modules the coverage digest's gap ranking details; `0` shows only the overview |
 | `use_last_coverage_run` | boolean | False | Run no tests and return the digest of the last coverage run. Only `coverage_source` (to narrow it) and `max_modules` can be combined with it |
+| `combine_with_previous` | boolean | False | Merge this coverage run with the saved runs. Requires `coverage=True` |
 
 **Note:** The tool never adds `-n`. Tests run in parallel only when you pass `-n` or the project's `addopts` sets it. `-n 0` disables pytest-xdist.
 
@@ -79,6 +80,8 @@ by passing an explicit list:
 **Coverage:** `coverage=True` needs `pytest-cov` installed in the project's environment. The digest gives the total, a per-package table, the modules with the most missing statements and their per-function line ranges, the modules with nothing covered, and the test selection the numbers come from. The project's `fail_under` is reported but not applied, so pass/fail reflects the tests only. To exclude code, use coverage's own `[tool.coverage.run] omit` or `# pragma: no cover`.
 
 **Reusing the last run:** Each coverage run saves its data in `.mcp-tools-py/coverage/` in the project; the directory ignores itself, so the project needs no `.gitignore` entry. `use_last_coverage_run=True` then returns that run's digest without running tests, repeating its selection line and warnings. `coverage_source` narrows the digest to directories below what was measured, and anything else is refused. Any edited, new or deleted `.py` file in the source, explicit `coverage_source` or test directories returns `stale — rerun`, with no numbers. Limits of that check: config changes aren't detected, and a root `conftest.py`, path arguments outside the test directories and package-name sources are outside its scope.
+
+**Combining partial runs:** Merging is opt-in: a plain coverage run replaces the saved data, so its numbers mean exactly that run. `combine_with_previous=True` merges the new run with the saved runs, so code exercised only by another selection counts as covered. The selection line lists every merged selection, the warning lines add up the counts of every merged run, and `use_last_coverage_run=True` returns the merged set. A rerun of an identical selection replaces its earlier data. Selections differ by their markers, `-k`, paths, other arguments and `env_vars`, regardless of order. Saved runs are discarded, keeping only the new run and saying so in the reply, when `coverage_source` changed, a `.py` file in scope changed since the saved runs or during this run, or the merge failed, such as after a change of the branch setting. A run with no report leaves the saved runs unchanged and says so. The first run with no saved data behaves like a plain run. The toolkit's `full` depth never merges; it always replaces the saved data.
 
 ### Mypy Parameters
 

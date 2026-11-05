@@ -1,9 +1,17 @@
 """Builders for coverage JSON reports and saved data, shared by the coverage tests."""
 
+import json
 from pathlib import Path
 from typing import Any
 
-from mcp_tools_py.code_checker_pytest.coverage_store import METADATA_FILE, STORE_DIR
+from mcp_tools_py.code_checker_pytest.coverage_store import (
+    METADATA_FILE,
+    STORE_DIR,
+    STORE_VERSION,
+    CoverageRun,
+    start_coverage_run,
+)
+from mcp_tools_py.code_checker_pytest.verdict import RunStatus, RunVerdict
 
 _SELECTION = "selection: full suite (no markers, -k or path arguments)"
 
@@ -49,6 +57,7 @@ def _report(files: dict[str, dict[str, Any]]) -> dict[str, Any]:
 def _run(**changes: Any) -> dict[str, Any]:
     """One run entry, as the callers build it."""
     return {
+        "identity": "identity-saved",
         "selection": _SELECTION,
         "data_file": None,
         "failed_collectors": 0,
@@ -84,3 +93,32 @@ def _write_metadata(project: Path, content: bytes) -> None:
     store = project / STORE_DIR
     store.mkdir(parents=True)
     (store / METADATA_FILE).write_bytes(content)
+
+
+def _metadata(**changes: Any) -> bytes:
+    """The content of a valid metadata file, with some keys replaced."""
+    return json.dumps({"version": STORE_VERSION, **_saved(), **changes}).encode()
+
+
+def _coverage_run(project: Path, temp_dir: Path, combine: bool = False) -> CoverageRun:
+    """A run of a project with one source file."""
+    _write_source(project, "src/a.py")
+    return start_coverage_run(
+        str(project),
+        str(temp_dir),
+        "tests",
+        None,
+        ["./src"],
+        0.0,
+        "selection: markers 'x'",
+        "identity-new",
+        "python",
+        {"A": "1"},
+        30,
+        combine,
+    )
+
+
+def _verdict(status: RunStatus = RunStatus.PASSED) -> RunVerdict:
+    """A verdict with nothing else to it."""
+    return RunVerdict(status=status, problems=[], exit_code=0)

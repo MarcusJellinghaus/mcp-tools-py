@@ -14,7 +14,6 @@ from mcp_tools_py.code_checker_pytest.coverage_store import (
     METADATA_FILE,
     STORE_DIR,
     STORE_VERSION,
-    CoverageRun,
     clear_saved,
     finish_coverage_run,
     freshness_roots,
@@ -25,10 +24,13 @@ from mcp_tools_py.code_checker_pytest.coverage_store import (
     write_saved,
 )
 from mcp_tools_py.code_checker_pytest.models import PytestReport, Summary
-from mcp_tools_py.code_checker_pytest.verdict import RunStatus, RunVerdict
+from mcp_tools_py.code_checker_pytest.verdict import RunStatus
 from tests.test_code_checker_pytest._coverage_report import (
+    _coverage_run,
+    _metadata,
     _run,
     _saved,
+    _verdict,
     _write_metadata,
     _write_source,
 )
@@ -47,11 +49,6 @@ def _write_layout(project: Path, where: str, testpaths: str) -> None:
         f"[tool.pytest.ini_options]\ntestpaths = {testpaths}\n",
         encoding="utf-8",
     )
-
-
-def _metadata(**changes: Any) -> bytes:
-    """The content of a valid metadata file, with some keys replaced."""
-    return json.dumps({"version": STORE_VERSION, **_saved(), **changes}).encode()
 
 
 def _metadata_without(key: str) -> bytes:
@@ -375,25 +372,6 @@ class TestClearSaved:
             clear_saved(str(tmp_path))
 
 
-def _coverage_run(project: Path, temp_dir: Path) -> CoverageRun:
-    """A run of a project with one source file."""
-    _write_source(project, "src/a.py")
-    return start_coverage_run(
-        str(project),
-        str(temp_dir),
-        "tests",
-        None,
-        ["./src"],
-        0.0,
-        "selection: markers 'x'",
-    )
-
-
-def _verdict(status: RunStatus = RunStatus.PASSED) -> RunVerdict:
-    """A verdict with nothing else to it."""
-    return RunVerdict(status=status, problems=[], exit_code=0)
-
-
 class TestStartCoverageRun:
     """Test what is recorded before pytest starts."""
 
@@ -411,6 +389,10 @@ class TestStartCoverageRun:
             ["./src", "lib\\sub"],
             1.0,
             "selection: x",
+            "identity",
+            "python",
+            {"A": "1"},
+            30,
         )
 
         assert run.sources == ["lib/sub", "src"]
@@ -418,6 +400,11 @@ class TestStartCoverageRun:
         assert list(run.hashes) == ["src/a.py", "tests/test_a.py"]
         assert run.fail_under == 1.0
         assert run.selection == "selection: x"
+        assert run.identity == "identity"
+        assert run.interpreter == "python"
+        assert run.env_vars == {"A": "1"}
+        assert run.timeout_seconds == 30
+        assert run.combine is False
 
     def test_raw_coverage_source_adds_a_root(self, tmp_path: Path) -> None:
         """The roots use the caller's coverage_source, not the sources."""
@@ -425,7 +412,17 @@ class TestStartCoverageRun:
         _make_dirs(tmp_path, "src", "tests", "lib", "other")
 
         run = start_coverage_run(
-            str(tmp_path), "temp", "tests", ["lib"], ["other"], None, "selection: x"
+            str(tmp_path),
+            "temp",
+            "tests",
+            ["lib"],
+            ["other"],
+            None,
+            "selection: x",
+            "identity",
+            "python",
+            None,
+            30,
         )
 
         assert run.roots == ["src", "lib", "tests"]
@@ -453,6 +450,7 @@ class TestFinishCoverageRun:
         assert saved["sources"] == ["src"]
         assert saved["fail_under"] == 0.0
         entry = saved["runs"][0]
+        assert entry["identity"] == "identity-new"
         assert entry["selection"] == "selection: markers 'x'"
         assert (project / STORE_DIR / entry["data_file"]).read_bytes() == b"data"
         assert finished.data == data
