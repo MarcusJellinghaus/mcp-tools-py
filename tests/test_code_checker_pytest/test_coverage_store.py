@@ -14,12 +14,18 @@ from mcp_tools_py.code_checker_pytest.coverage_store import (
     METADATA_FILE,
     STORE_DIR,
     STORE_VERSION,
+    CoverageRun,
     clear_saved,
+    finish_coverage_run,
     freshness_roots,
     hash_python_files,
     load_saved,
+    start_coverage_run,
+    view_of_runs,
     write_saved,
 )
+from mcp_tools_py.code_checker_pytest.models import PytestReport, Summary
+from mcp_tools_py.code_checker_pytest.verdict import RunStatus, RunVerdict
 
 
 def _make_dirs(project: Path, *names: str) -> None:
@@ -401,3 +407,195 @@ class TestClearSaved:
 
         with pytest.raises(OSError, match="locked"):
             clear_saved(str(tmp_path))
+
+
+def _coverage_run(project: Path, temp_dir: Path) -> CoverageRun:
+    """A run of a project with one source file."""
+    _write_source(project, "src/a.py")
+    return start_coverage_run(
+        str(project),
+        str(temp_dir),
+        "tests",
+        None,
+        ["./src"],
+        0.0,
+        "selection: markers 'x'",
+    )
+
+
+def _verdict(status: RunStatus = RunStatus.PASSED) -> RunVerdict:
+    """A verdict with nothing else to it."""
+    return RunVerdict(status=status, problems=[], exit_code=0)
+
+
+class TestStartCoverageRun:
+    """Test what is recorded before pytest starts."""
+
+    def test_records_the_project_state(self, tmp_path: Path) -> None:
+        """Sources are normalized and sorted; hashes cover the roots."""
+        _write_layout(tmp_path, '["src"]', '["tests"]')
+        _write_source(tmp_path, "src/a.py")
+        _write_source(tmp_path, "tests/test_a.py")
+
+        run = start_coverage_run(
+            str(tmp_path),
+            "temp",
+            "tests",
+            None,
+            ["./src", "lib\\sub"],
+            1.0,
+            "selection: x",
+        )
+
+        assert run.sources == ["lib/sub", "src"]
+        assert run.roots == ["src", "tests"]
+        assert list(run.hashes) == ["src/a.py", "tests/test_a.py"]
+        assert run.fail_under == 1.0
+        assert run.selection == "selection: x"
+
+    def test_raw_coverage_source_adds_a_root(self, tmp_path: Path) -> None:
+        """The roots use the caller's coverage_source, not the sources."""
+        _write_layout(tmp_path, '["src"]', '["tests"]')
+        _make_dirs(tmp_path, "src", "tests", "lib", "other")
+
+        run = start_coverage_run(
+            str(tmp_path), "temp", "tests", ["lib"], ["other"], None, "selection: x"
+        )
+
+        assert run.roots == ["src", "lib", "tests"]
+
+
+class TestFinishCoverageRun:
+    """Test saving or clearing the data of a finished run."""
+
+    def test_data_is_saved_with_the_run_state(self, tmp_path: Path) -> None:
+        """The metadata holds the report, the start state and the data file."""
+        project = tmp_path / "project"
+        temp_dir = tmp_path / "temp"
+        temp_dir.mkdir()
+        (temp_dir / ".coverage").write_bytes(b"data")
+        run = _coverage_run(project, temp_dir)
+        data: dict[str, Any] = {"files": {"src/a.py": {}}}
+
+        finished = finish_coverage_run(run, data, None, _verdict())
+
+        saved = load_saved(str(project))
+        assert saved is not None
+        assert saved["report"] == data
+        assert saved["hashes"] == run.hashes
+        assert saved["roots"] == run.roots
+        assert saved["sources"] == ["src"]
+        assert saved["fail_under"] == 0.0
+        entry = saved["runs"][0]
+        assert entry["selection"] == "selection: markers 'x'"
+        assert (project / STORE_DIR / entry["data_file"]).read_bytes() == b"data"
+        assert finished.data == data
+        assert finished.selection == "selection: markers 'x'"
+        assert not finished.notes
+
+    def test_outcome_is_stored_and_returned(self, tmp_path: Path) -> None:
+        """The run entry and the returned value hold the same counts."""
+        report = PytestReport(
+            created=0.0,
+            duration=0.0,
+            exitcode=1,
+            root="",
+            environment={},
+            summary=Summary(collected=2, total=2, failed=2),
+        )
+        run = _coverage_run(tmp_path, tmp_path)
+
+        finished = finish_coverage_run(
+            run, {"files": {}}, report, _verdict(RunStatus.FAILED)
+        )
+
+        assert finished.outcome == {
+            "failed_collectors": 0,
+            "failed_tests": 2,
+            "generic_warning": False,
+        }
+        saved = load_saved(str(tmp_path))
+        assert saved is not None
+        assert saved["runs"][0]["failed_tests"] == 2
+
+    def test_no_data_clears_and_returns_the_outcome(self, tmp_path: Path) -> None:
+        """A run without a report removes what an earlier run saved."""
+        write_saved(str(tmp_path), _saved(), None)
+        run = _coverage_run(tmp_path, tmp_path)
+
+        finished = finish_coverage_run(run, None, None, _verdict(RunStatus.ERROR))
+
+        assert not (tmp_path / STORE_DIR).exists()
+        assert finished.data is None
+        assert finished.outcome == {
+            "failed_collectors": 0,
+            "failed_tests": 0,
+            "generic_warning": False,
+        }
+        assert not finished.notes
+
+    @pytest.mark.parametrize(
+        ("data", "target"),
+        [
+            pytest.param({"files": {}}, os, id="write"),
+            pytest.param(None, shutil, id="clear"),
+        ],
+    )
+    def test_oserror_gives_one_note(
+        self,
+        tmp_path: Path,
+        monkeypatch: pytest.MonkeyPatch,
+        data: dict[str, Any] | None,
+        target: Any,
+    ) -> None:
+        """A failed write or clear doesn't raise."""
+        write_saved(str(tmp_path), _saved(), None)
+        run = _coverage_run(tmp_path, tmp_path)
+
+        def refuse(*_args: Any, **_kwargs: Any) -> None:
+            raise OSError("locked")
+
+        name = "replace" if target is os else "rmtree"
+        monkeypatch.setattr(target, name, refuse)
+
+        finished = finish_coverage_run(run, data, None, _verdict())
+
+        assert finished.notes == ["Could not update saved coverage data: locked"]
+        assert finished.data == data
+
+
+class TestViewOfRuns:
+    """Test the view of several saved runs as one."""
+
+    def test_one_run(self) -> None:
+        """A single run is shown as it is."""
+        runs = [_run(selection="selection: a", failed_tests=1)]
+
+        assert view_of_runs(runs) == (
+            "selection: a",
+            {"failed_collectors": 0, "failed_tests": 1, "generic_warning": False},
+        )
+
+    def test_two_runs_sum_counts(self) -> None:
+        """Selections join with one prefix, and both counts add up."""
+        runs = [
+            _run(selection="selection: a", failed_collectors=1, failed_tests=2),
+            _run(selection="selection: b", failed_collectors=3, failed_tests=4),
+        ]
+
+        assert view_of_runs(runs) == (
+            "selection: a + b",
+            {"failed_collectors": 4, "failed_tests": 6, "generic_warning": False},
+        )
+
+    def test_identical_selections_dedupe(self) -> None:
+        """The same selection twice is listed once."""
+        runs = [_run(selection="selection: a"), _run(selection="selection: a")]
+
+        assert view_of_runs(runs)[0] == "selection: a"
+
+    def test_generic_warning_is_any(self) -> None:
+        """One run with the warning is enough."""
+        runs = [_run(generic_warning=False), _run(generic_warning=True)]
+
+        assert view_of_runs(runs)[1]["generic_warning"] is True

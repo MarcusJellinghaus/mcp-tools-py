@@ -8,25 +8,37 @@ readable, and one ``run-<uuid>.coverage`` data file per run it references.
 import contextlib
 import hashlib
 import json
+import logging
 import os
 import shutil
 import tempfile
 import uuid
+from dataclasses import dataclass
 from pathlib import Path
 from typing import Any
 
-from mcp_tools_py.code_checker_pytest.coverage import norm_path
+from mcp_tools_py.code_checker_pytest.coverage import (
+    COVERAGE_DATA,
+    RunOutcome,
+    norm_path,
+    run_outcome,
+)
+from mcp_tools_py.code_checker_pytest.models import PytestReport
+from mcp_tools_py.code_checker_pytest.verdict import RunVerdict
 from mcp_tools_py.utils.file_utils import read_file
 from mcp_tools_py.utils.project_config import (
     get_test_directories,
     resolve_coverage_source,
 )
 
+logger = logging.getLogger(__name__)
+
 STORE_DIR = os.path.join(".mcp-tools-py", "coverage")
 METADATA_FILE = "last_run.json"
 STORE_VERSION = 1
 
 _UNREADABLE = "unreadable"
+_SELECTION_PREFIX = "selection: "
 _METADATA_KEYS = ("report", "hashes", "roots", "sources", "fail_under", "runs")
 _RUN_KEYS = (
     "selection",
@@ -35,6 +47,130 @@ _RUN_KEYS = (
     "failed_tests",
     "generic_warning",
 )
+
+
+@dataclass
+class CoverageRun:
+    """What is known about a coverage run before pytest starts."""
+
+    project_dir: str
+    temp_dir: str
+    sources: list[str]
+    roots: list[str]
+    hashes: dict[str, str]
+    fail_under: float | None
+    selection: str
+
+
+@dataclass
+class FinishedRun:
+    """What the digest of a finished coverage run is rendered from."""
+
+    data: dict[str, Any] | None
+    selection: str
+    outcome: RunOutcome
+    notes: list[str]
+
+
+def start_coverage_run(  # pylint: disable=too-many-arguments,too-many-positional-arguments
+    project_dir: str,
+    temp_dir: str,
+    test_folder: str,
+    coverage_source: list[str] | None,
+    sources: list[str],
+    fail_under: float | None,
+    selection: str,
+) -> CoverageRun:
+    """Record the state of the project right before a coverage run.
+
+    Args:
+        project_dir: Path to the target project.
+        temp_dir: Directory the run writes its report and data file into.
+        test_folder: The test folder of the run.
+        coverage_source: The caller's raw ``coverage_source``, for the roots.
+        sources: The resolved directories to measure.
+        fail_under: The project's ``fail_under``, if it could be read.
+        selection: The selection line of the run.
+
+    Returns:
+        The run, with its freshness roots and their hashes at this moment.
+    """
+    roots = freshness_roots(project_dir, coverage_source, test_folder)
+    return CoverageRun(
+        project_dir=project_dir,
+        temp_dir=temp_dir,
+        sources=sorted(norm_path(source) for source in sources),
+        roots=roots,
+        hashes=hash_python_files(project_dir, roots),
+        fail_under=fail_under,
+        selection=selection,
+    )
+
+
+def finish_coverage_run(
+    run: CoverageRun,
+    data: dict[str, Any] | None,
+    report: PytestReport | None,
+    verdict: RunVerdict,
+) -> FinishedRun:
+    """Save the data of a finished run, or clear saved data when it has none.
+
+    A failed update is logged and becomes a note; it never fails the run.
+
+    Args:
+        run: The value returned by :func:`start_coverage_run`.
+        data: The coverage JSON, or None when the run left no usable report.
+        report: The parsed pytest report, if any.
+        verdict: The verdict of the run.
+
+    Returns:
+        The report, selection and outcome to render, and any notes to show.
+    """
+    outcome = run_outcome(report, verdict)
+    notes = []
+    try:
+        if data is None:
+            clear_saved(run.project_dir)
+        else:
+            write_saved(
+                run.project_dir,
+                {
+                    "report": data,
+                    "hashes": run.hashes,
+                    "roots": run.roots,
+                    "sources": run.sources,
+                    "fail_under": run.fail_under,
+                    "runs": [
+                        {"selection": run.selection, "data_file": None, **outcome}
+                    ],
+                },
+                os.path.join(run.temp_dir, COVERAGE_DATA),
+            )
+    except OSError as exc:
+        note = f"Could not update saved coverage data: {exc}"
+        logger.warning(note)
+        notes.append(note)
+    return FinishedRun(data, run.selection, outcome, notes)
+
+
+def view_of_runs(runs: list[dict[str, Any]]) -> tuple[str, RunOutcome]:
+    """Reduce saved run entries to what a digest shows for them together.
+
+    Args:
+        runs: The ``runs`` entries of the metadata.
+
+    Returns:
+        One selection line, with identical selections listed once, and the
+        summed outcome.
+    """
+    selections = dict.fromkeys(
+        run["selection"].removeprefix(_SELECTION_PREFIX) for run in runs
+    )
+    return _SELECTION_PREFIX + " + ".join(selections), RunOutcome(
+        failed_collectors=sum(run["failed_collectors"] for run in runs),
+        failed_tests=sum(run["failed_tests"] for run in runs),
+        generic_warning=any(run["generic_warning"] for run in runs),
+    )
 
 
 def freshness_roots(

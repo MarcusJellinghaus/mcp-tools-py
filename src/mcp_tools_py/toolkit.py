@@ -27,8 +27,13 @@ from mcp_tools_py.code_checker_pytest.coverage import (
     format_coverage_digest,
     read_coverage_report,
     read_fail_under,
-    run_outcome,
     selection_line,
+)
+from mcp_tools_py.code_checker_pytest.coverage_store import (
+    CoverageRun,
+    FinishedRun,
+    finish_coverage_run,
+    start_coverage_run,
 )
 from mcp_tools_py.code_checker_pytest.models import PytestReport, Test
 from mcp_tools_py.code_checker_pytest.reporting import collectors_failed_line
@@ -103,9 +108,10 @@ def _test_failure_summary(test: Test) -> str:
 def _run_test(context: ToolContext, depth: str) -> ActionResult:
     """Run pytest at `depth` and map the outcome onto an ActionResult.
 
-    `full` additionally measures coverage and sets `raw` to the digest
-    (mirroring `run_pytest_check(coverage=True)`); a `fail_under` miss is
-    informational only and never changes `status`.
+    `full` additionally measures coverage, saves or clears the saved coverage
+    data, and sets `raw` to the digest (mirroring
+    `run_pytest_check(coverage=True)`); a `fail_under` miss is informational
+    only and never changes `status`.
 
     Returns:
         "error" if pytest is unavailable, the verdict is ERROR (other than
@@ -127,6 +133,7 @@ def _run_test(context: ToolContext, depth: str) -> ActionResult:
     env_vars: dict[str, str] = {}
     fail_under: float | None = None
     temp_dir: str | None = None
+    coverage_run: CoverageRun | None = None
     if depth == "full":
         sources = resolve_coverage_source(project_dir, None)
         if isinstance(sources, str):
@@ -136,6 +143,15 @@ def _run_test(context: ToolContext, depth: str) -> ActionResult:
         extra_args = cov_args
         env_vars = cov_env
         fail_under = read_fail_under(interpreter, project_dir)
+        coverage_run = start_coverage_run(
+            project_dir,
+            temp_dir,
+            context.test_folder,
+            None,
+            sources,
+            fail_under,
+            selection_line(markers, [], [], get_pytest_addopts(project_dir)),
+        )
 
     try:
         result = check_code_with_pytest(
@@ -152,6 +168,16 @@ def _run_test(context: ToolContext, depth: str) -> ActionResult:
 
         verdict: RunVerdict = result["verdict"]
         report: PytestReport | None = result.get("test_results")
+        finished: FinishedRun | None = None
+        if coverage_run is not None:
+            # Without a parsed report, JSON from import-time lines proves nothing.
+            data = (
+                read_coverage_report(coverage_run.temp_dir)
+                if report is not None
+                else None
+            )
+            finished = finish_coverage_run(coverage_run, data, report, verdict)
+
         known = (RunStatus.PASSED, RunStatus.FAILED, RunStatus.SUSPICIOUS)
         if report is None or verdict.status not in known:
             if any("No Tests Found" in p for p in verdict.problems):
@@ -193,18 +219,14 @@ def _run_test(context: ToolContext, depth: str) -> ActionResult:
             findings_summary=summary_text,
         )
 
-        if depth == "full" and temp_dir is not None:
-            data = read_coverage_report(temp_dir)
-            if data is not None:
-                selection = selection_line(
-                    markers, [], [], get_pytest_addopts(project_dir)
-                )
-                action_result.raw = format_coverage_digest(
-                    data,
-                    selection,
-                    fail_under=fail_under,
-                    **run_outcome(report, verdict),
-                )
+        if finished is not None and finished.data is not None:
+            digest = format_coverage_digest(
+                finished.data,
+                finished.selection,
+                fail_under=fail_under,
+                **finished.outcome,
+            )
+            action_result.raw = "\n".join([digest, *finished.notes])
         return action_result
     finally:
         if temp_dir is not None and not context.keep_temp_files:

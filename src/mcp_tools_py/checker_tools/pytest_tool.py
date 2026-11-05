@@ -11,8 +11,12 @@ from mcp_tools_py.code_checker_pytest.coverage import (
     no_report_message,
     read_coverage_report,
     read_fail_under,
-    run_outcome,
     selection_line,
+)
+from mcp_tools_py.code_checker_pytest.coverage_store import (
+    CoverageRun,
+    finish_coverage_run,
+    start_coverage_run,
 )
 from mcp_tools_py.code_checker_pytest.runners import check_code_with_pytest
 from mcp_tools_py.code_checker_pytest.utils import sanitize_extra_args
@@ -144,12 +148,27 @@ def register(mcp: "FastMCPProtocol", checker_tools: "CheckerTools") -> None:
             run_args = sanitized.cleaned_args
             run_env = env_vars
             fail_under: Optional[float] = None
+            coverage_run: Optional[CoverageRun] = None
             if coverage:
                 temp_dir = tempfile.mkdtemp(prefix="pytest_cov_")
                 cov_args, cov_env = coverage_args(sources, temp_dir)
                 run_args = sanitized.cleaned_args + cov_args
                 run_env = {**(env_vars or {}), **cov_env}
                 fail_under = read_fail_under(interpreter, project_dir)
+                coverage_run = start_coverage_run(
+                    project_dir,
+                    temp_dir,
+                    context.test_folder,
+                    coverage_source,
+                    sources,
+                    fail_under,
+                    selection_line(
+                        markers,
+                        sanitized.cleaned_args,
+                        sanitized.path_args,
+                        get_pytest_addopts(project_dir),
+                    ),
+                )
 
             # Run pytest
             test_results = check_code_with_pytest(
@@ -178,27 +197,26 @@ def register(mcp: "FastMCPProtocol", checker_tools: "CheckerTools") -> None:
 
             summary = test_results.get("summary", {})
             verdict = test_results["verdict"]
-            if temp_dir is not None:
+            if coverage_run is not None:
                 report = test_results.get("test_results")
-                outcome = run_outcome(report, verdict)
                 # Without a parsed report, JSON from import-time lines proves nothing.
-                data = read_coverage_report(temp_dir) if report is not None else None
-                if data is None:
-                    digest = no_report_message(outcome["failed_collectors"])
+                data = (
+                    read_coverage_report(coverage_run.temp_dir)
+                    if report is not None
+                    else None
+                )
+                finished = finish_coverage_run(coverage_run, data, report, verdict)
+                if finished.data is None:
+                    digest = no_report_message(finished.outcome["failed_collectors"])
                 else:
-                    selection = selection_line(
-                        markers,
-                        sanitized.cleaned_args,
-                        sanitized.path_args,
-                        get_pytest_addopts(project_dir),
-                    )
                     digest = format_coverage_digest(
-                        data,
-                        selection,
+                        finished.data,
+                        finished.selection,
                         max_modules=max_modules,
                         fail_under=fail_under,
-                        **outcome,
+                        **finished.outcome,
                     )
+                digest = "\n".join([digest, *finished.notes])
                 result = f"{result}\n\n{digest}"
 
             if verdict.status in (RunStatus.PASSED, RunStatus.FAILED):
