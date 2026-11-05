@@ -20,7 +20,7 @@ from typing import Any, Callable, Union, cast
 
 _USAGE = (
     "usage: probe.py info [MODULE ...] | probe.py source IMPORT_PATH MAX_LINES"
-    " | probe.py locate NAME [NAME ...] | probe.py scope NAME"
+    " | probe.py locate NAME [NAME ...] | probe.py scope stdlib|NAME"
 )
 
 
@@ -315,15 +315,18 @@ def _scope(name: str) -> str:
     """Resolve `name` to the directory its own source lives in.
 
     Args:
-        name: Module or package name to resolve.
+        name: ``"stdlib"``, or a module or package name to resolve.
 
     Returns:
-        The package's own directory, or the containing directory of a plain
-        module.
+        This interpreter's standard library directory for ``"stdlib"``.
+        Otherwise the package's own directory, or the containing directory of
+        a plain module.
 
     Raises:
         LookupError: `name` does not resolve to an importable file location.
     """
+    if name == "stdlib":
+        return sysconfig.get_paths()["stdlib"]
     try:
         spec = importlib.util.find_spec(name)
     except Exception as exc:  # pylint: disable=broad-exception-caught
