@@ -147,6 +147,20 @@ def _read_test_dirs(toml_data: dict[str, object], warnings: list[str]) -> list[s
     return test_dirs
 
 
+def get_test_directories(project_dir: str) -> list[str]:
+    """Read the test directories from pyproject.toml, on disk or not.
+
+    Args:
+        project_dir: Path to project root containing pyproject.toml.
+
+    Returns:
+        ``[tool.pytest.ini_options] testpaths``, or ``["tests"]`` when missing.
+        A ``ValueError`` from :func:`_load_pyproject` propagates when
+        pyproject.toml is not valid TOML.
+    """
+    return _read_test_dirs(_load_pyproject(project_dir), [])
+
+
 def resolve_target_directories(
     project_dir: str,
     target_directories: list[str] | None,

@@ -66,9 +66,9 @@ This tracks **Feature Implementation** consisting of multiple **Tasks**.
 ### Step 7: Add the coverage store: hashes, save, load, clear
 [Details](./steps/step_7.md)
 
-- [ ] Implementation (tests + production code)
-- [ ] Quality checks: pylint, pytest, mypy — fix all issues
-- [ ] Commit message prepared
+- [x] Implementation (tests + production code)
+- [x] Quality checks: pylint, pytest, mypy — fix all issues
+- [x] Commit message prepared
 
 ### Step 8: Save or clear data from both callers
 [Details](./steps/step_8.md)

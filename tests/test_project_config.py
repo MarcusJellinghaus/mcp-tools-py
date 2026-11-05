@@ -14,6 +14,7 @@ from mcp_tools_py.utils.project_config import (
     get_check_timeout,
     get_pytest_addopts,
     get_target_directories,
+    get_test_directories,
     read_pyproject_tool_tables,
     resolve_coverage_source,
     resolve_source_directories,
@@ -618,6 +619,29 @@ def _write_layout(path: str, where: str, testpaths: str, dirs: list[str]) -> Non
     )
     for d in dirs:
         os.makedirs(os.path.join(path, d), exist_ok=True)
+
+
+class TestGetTestDirectories:
+    """Tests for the get_test_directories function."""
+
+    def test_returns_testpaths(self, tmp_path: object) -> None:
+        """Configured testpaths are returned, whether or not they exist."""
+        path = str(tmp_path)
+        _write_layout(path, '["src"]', '["tests", "integration"]', [])
+        assert get_test_directories(path) == ["tests", "integration"]
+
+    def test_falls_back_to_tests(self, tmp_path: object) -> None:
+        """A missing pyproject.toml yields the default."""
+        assert get_test_directories(str(tmp_path)) == ["tests"]
+
+    def test_invalid_toml_raises(self, tmp_path: object) -> None:
+        """Invalid TOML raises ValueError, not TOMLDecodeError."""
+        path = str(tmp_path)
+        with open(os.path.join(path, "pyproject.toml"), "w", encoding="utf-8") as f:
+            f.write("invalid toml {{{{")
+
+        with pytest.raises(ValueError, match="Invalid pyproject.toml"):
+            get_test_directories(path)
 
 
 class TestResolveCoverageSource:
