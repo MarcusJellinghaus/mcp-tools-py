@@ -21,6 +21,21 @@ This tracks **Feature Implementation** consisting of multiple **Tasks**.
 
 ## Tasks
 
-<!-- Tasks populated from pr_info/steps/ by prepare_task_tracker -->
+### Step 1: Remove `--venv-path` from the MCP configs
+See [step_1.md](./steps/step_1.md)
+
+- [ ] Implementation: probe fails first, remove `--venv-path` from `.mcp.json` and `.mcp.macos.json`, probe passes, delete `.scratch/`
+- [ ] Quality checks: pylint, pytest, mypy — fix all issues
+- [ ] Commit message prepared
+
+### Step 2: Document the venv requirement
+See [step_2.md](./steps/step_2.md)
+
+- [ ] Implementation: edit `README.md`, `INSTALL.md` and `docs/architecture/architecture.md`, run the search and `git diff` checks
+- [ ] Quality checks: pylint, pytest, mypy — fix all issues
+- [ ] Commit message prepared
 
 ## Pull Request
+
+- [ ] PR review: review the full branch diff against the base branch
+- [ ] PR summary prepared
