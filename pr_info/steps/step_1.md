@@ -137,9 +137,10 @@ mcp__mcp-tools-py__run_mypy_check()
 
 Do not use `-m "not integration"`: the full run is what covers `tests/test_startup_time.py`.
 
-### 8. Commit
+### 8. Write the commit message
 
-Run `mcp__mcp-tools-py__run_format_code`, then stage and commit the two modified files:
+Write this message to `pr_info/.commit_message.txt`. Do not format, stage or commit: the
+implement workflow does that:
 
 ```
 chore(deps): remove redundant bare mcp dependency (#204)
@@ -153,7 +154,7 @@ remove the bare mcp line; add the cap comment; update the docs list
 after = the same compile command
 require after == baseline, and mcp pinned to 1.x
 require exactly one mcp requirement, and a non-empty tool list
-delete .scratch/; run pylint, pytest and mypy; format; commit
+delete .scratch/; run pylint, pytest and mypy; write the commit message file
 ```
 
 ## DATA
