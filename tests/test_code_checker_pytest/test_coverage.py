@@ -21,6 +21,7 @@ from mcp_tools_py.code_checker_pytest.coverage import (
 from mcp_tools_py.code_checker_pytest.models import Collector, PytestReport, Summary
 from mcp_tools_py.code_checker_pytest.verdict import RunStatus, RunVerdict
 from tests.conftest import make_command_result
+from tests.test_code_checker_pytest._coverage_report import _SELECTION, _file, _report
 
 _EXECUTE = "mcp_tools_py.code_checker_pytest.coverage.execute_command"
 
@@ -217,47 +218,6 @@ class TestSelectionLine:
         assert selection_line(None, [], [], "-m 'not integration") == (
             "selection: full suite (no markers, -k or path arguments)"
         )
-
-
-_SELECTION = "selection: full suite (no markers, -k or path arguments)"
-
-
-def _file(
-    stmts: int,
-    missing: list[int],
-    functions: dict[str, list[int]] | None = None,
-) -> dict[str, Any]:
-    """One file entry of the coverage JSON."""
-    covered = stmts - len(missing)
-    entry: dict[str, Any] = {
-        "summary": {
-            "num_statements": stmts,
-            "covered_lines": covered,
-            "missing_lines": len(missing),
-            "percent_covered": 100.0 * covered / stmts if stmts else 100.0,
-        },
-        "missing_lines": missing,
-    }
-    if functions is not None:
-        entry["functions"] = {
-            name: {"missing_lines": lines} for name, lines in functions.items()
-        }
-    return entry
-
-
-def _report(files: dict[str, dict[str, Any]]) -> dict[str, Any]:
-    """A coverage JSON with totals summed from files."""
-    stmts = sum(f["summary"]["num_statements"] for f in files.values())
-    missed = sum(f["summary"]["missing_lines"] for f in files.values())
-    return {
-        "totals": {
-            "num_statements": stmts,
-            "missing_lines": missed,
-            "covered_lines": stmts - missed,
-            "percent_covered": 100.0 * (stmts - missed) / stmts if stmts else 100.0,
-        },
-        "files": files,
-    }
 
 
 class TestRanges:

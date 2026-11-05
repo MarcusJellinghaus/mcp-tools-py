@@ -7,7 +7,9 @@ configures or the user passes: coverage is reported, never enforced.
 
 import json
 import os
+import posixpath
 import shlex
+from collections.abc import Iterable
 from typing import Any, TypedDict
 
 from mcp_tools_py.code_checker_pytest.models import PytestReport
@@ -25,6 +27,7 @@ _FAIL_UNDER_SCRIPT = "import coverage; print(coverage.Coverage().config.fail_und
 MAX_FUNCTIONS_PER_MODULE = 3
 MAX_RANGES_PER_FUNCTION = 5
 MODULE_LEVEL = "<module level>"
+ROOT_ROW = "(root)"
 
 
 class RunOutcome(TypedDict):
@@ -227,6 +230,90 @@ def _warning_lines(
     return lines
 
 
+def norm_path(path: str) -> str:
+    """Normalize a path for comparing, as coverage keys use backslashes on Windows.
+
+    Returns:
+        The path with forward slashes and no redundant components.
+    """
+    return posixpath.normpath(path.replace("\\", "/"))
+
+
+def percent_covered(summaries: Iterable[dict[str, Any]]) -> float:
+    """Compute the covered percentage of file summaries the way coverage does.
+
+    Args:
+        summaries: The ``summary`` entries of a coverage JSON's files. The
+            branch keys are absent without ``branch = true``.
+
+    Returns:
+        The percentage over lines and branches; 100.0 when there are none.
+    """
+    covered = total = 0
+    for summary in summaries:
+        covered += summary.get("covered_lines", 0) + summary.get("covered_branches", 0)
+        total += summary.get("num_statements", 0) + summary.get("num_branches", 0)
+    return 100.0 * covered / total if total else 100.0
+
+
+def _common_prefix(files: dict[str, Any]) -> tuple[str, ...]:
+    """Find the leading directories shared by all files except __init__.py.
+
+    Ignoring __init__.py gives a layout with ``src/__init__.py`` one table row
+    per subpackage instead of a single row.
+
+    Returns:
+        The shared directory names; empty when there are none.
+    """
+    directories = [
+        parts[:-1]
+        for parts in (norm_path(path).split("/") for path in files)
+        if parts[-1] != "__init__.py"
+    ]
+    prefix = []
+    for names in zip(*directories):
+        if len(set(names)) > 1:
+            break
+        prefix.append(names[0])
+    return tuple(prefix)
+
+
+def _package_table(files: dict[str, Any]) -> list[str]:
+    """Render one row per top-level package, sorted by missing statements.
+
+    Args:
+        files: The ``files`` entry of the coverage JSON.
+
+    Returns:
+        The table's header and rows; empty when no row has statements.
+    """
+    prefix = _common_prefix(files)
+    packages: dict[str, list[dict[str, Any]]] = {}
+    for path, entry in files.items():
+        parts = tuple(norm_path(path).split("/"))
+        rest = parts[len(prefix) :] if parts[: len(prefix)] == prefix else ()
+        name = rest[0] if len(rest) > 1 else ROOT_ROW
+        packages.setdefault(name, []).append(entry.get("summary", {}))
+
+    rows = []
+    for name, summaries in packages.items():
+        statements = sum(summary.get("num_statements", 0) for summary in summaries)
+        if statements:
+            missing = sum(summary.get("missing_lines", 0) for summary in summaries)
+            rows.append((-missing, name, statements, percent_covered(summaries)))
+    if not rows:
+        return []
+
+    width = max(len(row[1]) for row in rows)
+    return [
+        "by package (statements, covered %):",
+        *(
+            f"    {name.ljust(width)}  {statements:>6} {percent:>3.0f}%"
+            for _, name, statements, percent in sorted(rows)
+        ),
+    ]
+
+
 def format_coverage_digest(
     data: dict[str, Any],
     selection: str,
@@ -238,8 +325,10 @@ def format_coverage_digest(
 ) -> str:
     """Render the coverage JSON as the digest appended to the pytest reply.
 
-    Modules with gaps are ranked by absolute missing statements; modules with
-    nothing covered are listed separately, with no cause attributed.
+    The totals are summed from ``files``, never read from the report's
+    ``totals``. Modules with gaps are ranked by absolute missing statements;
+    modules with nothing covered are listed separately, with no cause
+    attributed.
 
     Args:
         data: The coverage JSON report.
@@ -254,14 +343,14 @@ def format_coverage_digest(
         The multi-line digest.
     """
     max_modules = max(0, max_modules)
-    totals = data.get("totals", {})
     files: dict[str, Any] = data.get("files", {})
+    summaries = [entry.get("summary", {}) for entry in files.values()]
 
     lines = [
         *_warning_lines(failed_collectors, failed_tests, generic_warning),
-        f"{totals.get('percent_covered', 0.0):.1f}%  "
-        f"{totals.get('num_statements', 0)} stmts  "
-        f"{totals.get('missing_lines', 0)} missed  |  "
+        f"{percent_covered(summaries):.1f}%  "
+        f"{sum(summary.get('num_statements', 0) for summary in summaries)} stmts  "
+        f"{sum(summary.get('missing_lines', 0) for summary in summaries)} missed  |  "
         f"{len(files)} modules measured",
         selection,
     ]
@@ -271,6 +360,9 @@ def format_coverage_digest(
         lines.append(
             f"fail_under={fail_under:g} is configured; not applied to this run"
         )
+
+    if table := _package_table(files):
+        lines += ["", *table]
 
     zero = []
     gaps = []

@@ -61,9 +61,9 @@ def register(mcp: "FastMCPProtocol", checker_tools: "CheckerTools") -> None:
                 then 300.
             coverage: Measure coverage with pytest-cov (must be installed in the
                 project's environment) and append a digest to the reply: total,
-                modules ranked by missing statements with per-function line
-                ranges, modules with nothing covered, and the test selection
-                the numbers come from. The project's `fail_under` is not
+                a per-package table, modules ranked by missing statements with
+                per-function line ranges, modules with nothing covered, and the
+                test selection the numbers come from. The project's `fail_under` is not
                 applied. Exclude code with coverage's own `omit` setting or
                 `# pragma: no cover`.
             coverage_source: Directories to measure. Defaults to the project's
