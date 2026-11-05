@@ -30,6 +30,7 @@ from mcp_tools_py.code_checker_pytest.coverage import (
     selection_line,
 )
 from mcp_tools_py.code_checker_pytest.models import PytestReport, Test
+from mcp_tools_py.code_checker_pytest.reporting import collectors_failed_line
 from mcp_tools_py.code_checker_pytest.runners import check_code_with_pytest
 from mcp_tools_py.code_checker_pytest.verdict import (
     RunStatus,
@@ -171,9 +172,13 @@ def _run_test(context: ToolContext, depth: str) -> ActionResult:
             if test.outcome in _FAILED_OUTCOMES
         ]
         if verdict.status is RunStatus.FAILED and not findings:
+            count_line = collectors_failed_line(report)
+            count_text = f"{count_line}\n\n" if count_line else ""
             return ActionResult(
                 status="error",
-                summary=f"{summary_text}\n\n{cap_problems(verdict.problems)}",
+                summary=(
+                    f"{summary_text}\n\n{count_text}{cap_problems(verdict.problems)}"
+                ),
             )
         ok_summary = (
             format_suspicious_text(report.summary.collected)

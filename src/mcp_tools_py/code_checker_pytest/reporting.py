@@ -12,6 +12,8 @@ MAX_OUTPUT_LINES = 300
 MAX_FAILURES = 10
 FAILED_OUTCOMES = ["failed", "error"]
 NO_CAPTURED_OUTPUT_NOTE = "Note: no passing test produced captured output."
+XDIST_MARKER = "Different tests were collected"
+MAX_COLLECTOR_IDS = 10
 
 
 class OutputBuilder:
@@ -95,6 +97,107 @@ def _get_failed_collectors(test_session_result: PytestReport) -> List[Collector]
     ]
 
 
+def _plural(count: int, noun: str) -> str:
+    """Return `noun`, with an "s" unless `count` is 1."""
+    return noun if count == 1 else f"{noun}s"
+
+
+def _e_lines(longrepr: str) -> list[str]:
+    """Return the `E   ` lines of a longrepr."""
+    return [line for line in longrepr.splitlines() if line.startswith("E   ")]
+
+
+def _collector_key(longrepr: str) -> str:
+    """Return the key that decides which collector errors share a cause.
+
+    Returns:
+        The xdist marker if present, else all `E   ` lines joined, else the
+        last non-empty line, or "" when there is none.
+    """
+    if XDIST_MARKER in longrepr:
+        return XDIST_MARKER
+    e_lines = _e_lines(longrepr)
+    if e_lines:
+        return "\n".join(e_lines)
+    non_empty = [line for line in longrepr.splitlines() if line.strip()]
+    return non_empty[-1] if non_empty else ""
+
+
+def _render_collector_group(longrepr: str, node_ids: list[str]) -> str:
+    """Render one distinct collector error with the other collectors it hit.
+
+    Args:
+        longrepr: The first longrepr seen for this error
+        node_ids: Unique node IDs with this error, first occurrence first
+
+    Returns:
+        The `E   ` lines as a headline if any, the longrepr, and a "same error"
+        line if more than one collector is affected.
+    """
+    e_lines = _e_lines(longrepr)
+    parts = ["\n".join(e_lines), longrepr] if e_lines else [longrepr]
+    others = node_ids[1:]
+    if others:
+        listed = ", ".join(others[:MAX_COLLECTOR_IDS])
+        hidden = len(others) - MAX_COLLECTOR_IDS
+        if hidden > 0:
+            listed += f", … and {hidden} more"
+        noun = _plural(len(others), "collector")
+        parts.append(f"same error in {len(others)} more {noun}: {listed}")
+    return "\n".join(parts)
+
+
+def failed_collector_count(report: PytestReport) -> int:
+    """Count the failed collectors, with or without a longrepr.
+
+    Returns:
+        The number of distinct node IDs among the failed collectors.
+    """
+    return len({collector.nodeid for collector in _get_failed_collectors(report)})
+
+
+def group_failed_collectors(report: PytestReport) -> list[str]:
+    """Group the failed collectors that have a longrepr by cause.
+
+    Args:
+        report: The parsed pytest report
+
+    Returns:
+        One rendered text per distinct error, in order of first occurrence.
+    """
+    groups: dict[str, tuple[str, list[str]]] = {}
+    for collector in _get_failed_collectors(report):
+        if not collector.longrepr:
+            continue
+        key = _collector_key(collector.longrepr)
+        _, node_ids = groups.setdefault(key, (collector.longrepr, []))
+        if collector.nodeid not in node_ids:
+            node_ids.append(collector.nodeid)
+    return [
+        _render_collector_group(longrepr, node_ids)
+        for longrepr, node_ids in groups.values()
+    ]
+
+
+def collectors_failed_line(report: PytestReport) -> str:
+    """Render the count of failed collectors and distinct errors.
+
+    Args:
+        report: The parsed pytest report
+
+    Returns:
+        The count line, or "" when no collector failed.
+    """
+    count = failed_collector_count(report)
+    if not count:
+        return ""
+    distinct = len(group_failed_collectors(report))
+    return (
+        f"{count} {_plural(count, 'collector')} failed "
+        f"({distinct} distinct {_plural(distinct, 'error')})"
+    )
+
+
 def _get_failed_tests(
     test_session_result: PytestReport, max_failures: int
 ) -> List[Test]:
@@ -111,34 +214,6 @@ def _get_failed_tests(
     ]
 
     return failed_tests[:max_failures]
-
-
-def _format_collector_info(collector: Collector, output: OutputBuilder) -> bool:
-    """Format information about a failed collector.
-
-    Args:
-        collector: The failed collector to format
-        output: OutputBuilder instance to add content to
-
-    Returns:
-        True if successful, False if truncated
-    """
-    if not output.add(
-        f"Collector ID: {collector.nodeid} - outcome {collector.outcome}\n"
-    ):
-        return False
-
-    # Collection errors are always shown (critical setup issues)
-    if collector.longrepr:
-        if not output.add(f"  Longrepr: {collector.longrepr}\n"):
-            return False
-
-    if collector.result:
-        for result in collector.result:
-            if not output.add(f"  Result: {result}\n"):
-                return False
-
-    return output.add("\n")
 
 
 def _format_test_output(
@@ -265,29 +340,24 @@ def _format_test_info(
     return True
 
 
-def _process_failed_collectors(
-    failed_collectors: List[Collector], output: OutputBuilder
-) -> bool:
-    """Process and format all failed collectors.
+def _process_failed_collectors(report: PytestReport, output: OutputBuilder) -> bool:
+    """Add the count line and one group per distinct collector error.
 
     Args:
-        failed_collectors: List of failed collectors
+        report: The parsed pytest report
         output: OutputBuilder instance
 
     Returns:
-        True if successful, False if truncated
+        True if successful or no collector failed, False if truncated
     """
-    if not failed_collectors:
+    line = collectors_failed_line(report)
+    if not line:
         return True
 
-    if not output.add("The following collectors failed during the test session:\n"):
+    if not output.add(f"{line}\n\n"):
         return False
 
-    for collector in failed_collectors:
-        if not _format_collector_info(collector, output):
-            return False
-
-    return True
+    return all(output.add(f"{group}\n\n") for group in group_failed_collectors(report))
 
 
 def _process_failed_tests(
@@ -357,12 +427,10 @@ def create_prompt_for_failed_tests(
     """
     output = OutputBuilder(max_output_lines)
 
-    # Get failed collectors and tests
-    failed_collectors = _get_failed_collectors(test_session_result)
     failed_tests = _get_failed_tests(test_session_result, max_failures)
 
     # Process failed collectors (always shown - critical setup issues)
-    if not _process_failed_collectors(failed_collectors, output):
+    if not _process_failed_collectors(test_session_result, output):
         return output.get_result()
 
     # Process failed tests

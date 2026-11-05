@@ -223,6 +223,42 @@ class TestRunTestVerdictMapping:
         assert summary_text in result.summary
         assert "ImportError: no module named 'missing'" in result.summary
 
+    def test_failed_without_failing_tests_counts_collectors(
+        self, tmp_path: Path
+    ) -> None:
+        problem = "ImportError: no module named 'missing'"
+        collector = Collector(
+            nodeid="tests/test_broken.py",
+            outcome="failed",
+            result=[],
+            longrepr=problem,
+        )
+        results = make_pytest_results(
+            RunStatus.FAILED,
+            [problem],
+            test_results=_report(0, collectors=[collector]),
+            summary_text="Collected 0 tests in 0.0 seconds",
+        )
+
+        result = _run_with(tmp_path, results)
+
+        assert result.status == "error"
+        count_line = "1 collector failed (1 distinct error)"
+        assert result.summary.index(count_line) < result.summary.index(problem)
+
+    def test_failed_without_collector_keeps_summary(self, tmp_path: Path) -> None:
+        results = make_pytest_results(
+            RunStatus.FAILED,
+            ["some problem"],
+            test_results=_report(0),
+            summary_text="Collected 0 tests in 0.0 seconds",
+        )
+
+        result = _run_with(tmp_path, results)
+
+        assert result.status == "error"
+        assert result.summary == ("Collected 0 tests in 0.0 seconds\n\nsome problem\n")
+
     def test_passed_is_ok(self, tmp_path: Path) -> None:
         results = make_pytest_results(
             RunStatus.PASSED,

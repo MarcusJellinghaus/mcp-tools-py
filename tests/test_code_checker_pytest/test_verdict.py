@@ -10,10 +10,9 @@ from mcp_tools_py.code_checker_pytest.models import (
     PytestReport,
     Summary,
 )
-from mcp_tools_py.code_checker_pytest.reporting import MAX_OUTPUT_LINES
+from mcp_tools_py.code_checker_pytest.reporting import MAX_OUTPUT_LINES, XDIST_MARKER
 from mcp_tools_py.code_checker_pytest.verdict import (
     XDIST_HINT,
-    XDIST_MARKER,
     RunStatus,
     RunVerdict,
     classify_run,
@@ -160,10 +159,10 @@ def test_dedup_xdist_marker() -> None:
     assert "worker gw0" in problems[0]
 
 
-def test_dedup_same_first_line() -> None:
+def test_same_first_line_with_different_last_lines_stay_separate() -> None:
     collectors = [_collector("ImportError: x\nA"), _collector("ImportError: x\nB")]
     report = _report(_summary(0), collectors=collectors, error_context=_ctx(2))
-    assert classify_run(report).problems == ["ImportError: x\nA"]
+    assert classify_run(report).problems == ["ImportError: x\nA", "ImportError: x\nB"]
 
 
 def test_format_error_text_truncates_and_keeps_hint() -> None:

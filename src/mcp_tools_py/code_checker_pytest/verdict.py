@@ -7,12 +7,14 @@ from mcp_tools_py.code_checker_pytest.models import PytestReport, Summary
 from mcp_tools_py.code_checker_pytest.reporting import (
     FAILED_OUTCOMES,
     MAX_OUTPUT_LINES,
+    XDIST_MARKER,
     OutputBuilder,
+    collectors_failed_line,
     get_test_summary,
+    group_failed_collectors,
 )
 from mcp_tools_py.code_checker_pytest.utils import get_pytest_exit_code_info
 
-XDIST_MARKER = "Different tests were collected"
 XDIST_HINT = (
     "Hint: pytest-xdist workers collected different tests. Parametrize values "
     "must be identical across workers (no `datetime.now()` or random values). "
@@ -82,6 +84,9 @@ def format_error_text(report: PytestReport | None, verdict: RunVerdict) -> str:
         lines.append(f"Exit code {code}: {get_pytest_exit_code_info(code)[0]}")
     if verdict.problems:
         lines.append("Problems:")
+        count_line = collectors_failed_line(report) if report else ""
+        if count_line:
+            lines.extend([count_line, ""])
         lines.append(cap_problems(verdict.problems) + _xdist_hint(verdict.problems))
     return "\n".join(lines)
 
@@ -140,35 +145,16 @@ def _merge_problems(report: PytestReport, with_tail: bool) -> list[str]:
     """Collect problems from collectors, collection errors and the output tail.
 
     Returns:
-        De-duplicated problems, first occurrence kept.
+        One text per distinct collector error, then the other problems.
     """
     ctx = report.error_context
-    items = [
-        c.longrepr
-        for c in report.collectors or []
-        if c.outcome in FAILED_OUTCOMES and c.longrepr
-    ]
+    items = group_failed_collectors(report)
     if ctx and ctx.collection_errors:
         items.append("\n".join(ctx.collection_errors))
     # ErrorContext holds the full output on every non-zero exit, so the tail is only used for ERROR
     if with_tail and not items and ctx and ctx.error_message.strip():
         items.append("\n".join(ctx.error_message.splitlines()[-_ERROR_TAIL_LINES:]))
-    seen: set[str] = set()
-    problems = []
-    for item in items:
-        key = _dedup_key(item)
-        if key not in seen:
-            seen.add(key)
-            problems.append(item)
-    return problems
-
-
-def _dedup_key(text: str) -> str:
-    """Return the de-duplication key for a problem text."""
-    if XDIST_MARKER in text:
-        return XDIST_MARKER
-    stripped = text.strip()
-    return stripped.splitlines()[0] if stripped else ""
+    return items
 
 
 def _xdist_hint(problems: list[str]) -> str:
