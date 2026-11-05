@@ -8,8 +8,11 @@ configures or the user passes: coverage is reported, never enforced.
 import json
 import os
 import shlex
-from typing import Any
+from typing import Any, TypedDict
 
+from mcp_tools_py.code_checker_pytest.models import PytestReport
+from mcp_tools_py.code_checker_pytest.reporting import failed_collector_count, plural
+from mcp_tools_py.code_checker_pytest.verdict import RunStatus, RunVerdict
 from mcp_tools_py.utils.environment_info import PROBE_TIMEOUT_SECONDS
 from mcp_tools_py.utils.file_utils import read_file
 from mcp_tools_py.utils.subprocess_runner import execute_command
@@ -22,6 +25,55 @@ _FAIL_UNDER_SCRIPT = "import coverage; print(coverage.Coverage().config.fail_und
 MAX_FUNCTIONS_PER_MODULE = 3
 MAX_RANGES_PER_FUNCTION = 5
 MODULE_LEVEL = "<module level>"
+
+
+class RunOutcome(TypedDict):
+    """The failure state of one pytest run, as the digest qualifies it."""
+
+    failed_collectors: int
+    failed_tests: int
+    generic_warning: bool
+
+
+def run_outcome(report: PytestReport | None, verdict: RunVerdict) -> RunOutcome:
+    """Reduce a pytest run to the counts and flag that qualify its coverage.
+
+    Args:
+        report: The parsed pytest report, if any.
+        verdict: The verdict of the run.
+
+    Returns:
+        The failed-collector and failed-test counts, and whether the run is an
+        ERROR with neither to show for it. All zero without a report.
+    """
+    if report is None:
+        return RunOutcome(failed_collectors=0, failed_tests=0, generic_warning=False)
+    failed_collectors = failed_collector_count(report)
+    # classify_run returns FAILED on summary.error alone, so errors count here.
+    failed_tests = (report.summary.failed or 0) + (report.summary.error or 0)
+    return RunOutcome(
+        failed_collectors=failed_collectors,
+        failed_tests=failed_tests,
+        generic_warning=verdict.status is RunStatus.ERROR
+        and failed_collectors == 0
+        and failed_tests == 0,
+    )
+
+
+def no_report_message(failed_collectors: int) -> str:
+    """Render the reply for a run that left no coverage report to digest.
+
+    Args:
+        failed_collectors: The failed-collector count of the run.
+
+    Returns:
+        The one-line message, naming the count when there is one.
+    """
+    message = "Coverage report was not produced."
+    if not failed_collectors:
+        return message
+    noun = plural(failed_collectors, "collector")
+    return f"{message} {failed_collectors} {noun} failed."
 
 
 def coverage_args(
@@ -147,12 +199,42 @@ def _option_value(tokens: list[str], flag: str) -> str | None:
     return value
 
 
+def _warning_lines(
+    failed_collectors: int, failed_tests: int, generic_warning: bool
+) -> list[str]:
+    """Render the lines that qualify a digest, each only when it applies.
+
+    Returns:
+        The collector, test and generic warning lines, in that order.
+    """
+    lines = []
+    if failed_collectors:
+        noun = plural(failed_collectors, "collector")
+        lines.append(
+            f"⚠ {failed_collectors} {noun} failed — "
+            "coverage below reflects a partial run"
+        )
+    if failed_tests:
+        noun = plural(failed_tests, "test")
+        lines.append(
+            f"⚠ {failed_tests} {noun} failed — "
+            "coverage below comes from a run with failures"
+        )
+    if generic_warning:
+        lines.append(
+            "⚠ the pytest run reported an error — coverage below may be incomplete"
+        )
+    return lines
+
+
 def format_coverage_digest(
     data: dict[str, Any],
     selection: str,
     max_modules: int = 10,
     fail_under: float | None = 0.0,
-    tests_failed: bool = False,
+    failed_collectors: int = 0,
+    failed_tests: int = 0,
+    generic_warning: bool = False,
 ) -> str:
     """Render the coverage JSON as the digest appended to the pytest reply.
 
@@ -164,7 +246,9 @@ def format_coverage_digest(
         selection: The line from selection_line.
         max_modules: How many modules to detail in each list.
         fail_under: The project's threshold; None when it could not be read.
-        tests_failed: Whether the run had test failures.
+        failed_collectors: How many collectors failed in the run.
+        failed_tests: How many tests failed or errored in the run.
+        generic_warning: Whether the run errored with neither count to show.
 
     Returns:
         The multi-line digest.
@@ -174,6 +258,7 @@ def format_coverage_digest(
     files: dict[str, Any] = data.get("files", {})
 
     lines = [
+        *_warning_lines(failed_collectors, failed_tests, generic_warning),
         f"{totals.get('percent_covered', 0.0):.1f}%  "
         f"{totals.get('num_statements', 0)} stmts  "
         f"{totals.get('missing_lines', 0)} missed  |  "
@@ -185,10 +270,6 @@ def format_coverage_digest(
     elif fail_under > 0:
         lines.append(
             f"fail_under={fail_under:g} is configured; not applied to this run"
-        )
-    if tests_failed:
-        lines.append(
-            "Warning: tests failed; these numbers come from a run with failures."
         )
 
     zero = []

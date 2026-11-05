@@ -97,7 +97,7 @@ def _get_failed_collectors(test_session_result: PytestReport) -> List[Collector]
     ]
 
 
-def _plural(count: int, noun: str) -> str:
+def plural(count: int, noun: str) -> str:
     """Return `noun`, with an "s" unless `count` is 1."""
     return noun if count == 1 else f"{noun}s"
 
@@ -142,7 +142,7 @@ def _render_collector_group(longrepr: str, node_ids: list[str]) -> str:
         hidden = len(others) - MAX_COLLECTOR_IDS
         if hidden > 0:
             listed += f", … and {hidden} more"
-        noun = _plural(len(others), "collector")
+        noun = plural(len(others), "collector")
         parts.append(f"same error in {len(others)} more {noun}: {listed}")
     return "\n".join(parts)
 
@@ -193,8 +193,8 @@ def collectors_failed_line(report: PytestReport) -> str:
         return ""
     distinct = len(group_failed_collectors(report))
     return (
-        f"{count} {_plural(count, 'collector')} failed "
-        f"({distinct} distinct {_plural(distinct, 'error')})"
+        f"{count} {plural(count, 'collector')} failed "
+        f"({distinct} distinct {plural(distinct, 'error')})"
     )
 
 

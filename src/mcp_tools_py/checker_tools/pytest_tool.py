@@ -8,8 +8,10 @@ from typing import TYPE_CHECKING, Dict, List, Optional
 from mcp_tools_py.code_checker_pytest.coverage import (
     coverage_args,
     format_coverage_digest,
+    no_report_message,
     read_coverage_report,
     read_fail_under,
+    run_outcome,
     selection_line,
 )
 from mcp_tools_py.code_checker_pytest.runners import check_code_with_pytest
@@ -176,11 +178,13 @@ def register(mcp: "FastMCPProtocol", checker_tools: "CheckerTools") -> None:
 
             summary = test_results.get("summary", {})
             verdict = test_results["verdict"]
-            tests_failed = verdict.status in (RunStatus.FAILED, RunStatus.ERROR)
             if temp_dir is not None:
-                data = read_coverage_report(temp_dir)
+                report = test_results.get("test_results")
+                outcome = run_outcome(report, verdict)
+                # Without a parsed report, JSON from import-time lines proves nothing.
+                data = read_coverage_report(temp_dir) if report is not None else None
                 if data is None:
-                    digest = "Coverage report was not produced."
+                    digest = no_report_message(outcome["failed_collectors"])
                 else:
                     selection = selection_line(
                         markers,
@@ -193,7 +197,7 @@ def register(mcp: "FastMCPProtocol", checker_tools: "CheckerTools") -> None:
                         selection,
                         max_modules=max_modules,
                         fail_under=fail_under,
-                        tests_failed=tests_failed,
+                        **outcome,
                     )
                 result = f"{result}\n\n{digest}"
 

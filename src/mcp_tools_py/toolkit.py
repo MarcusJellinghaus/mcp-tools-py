@@ -27,6 +27,7 @@ from mcp_tools_py.code_checker_pytest.coverage import (
     format_coverage_digest,
     read_coverage_report,
     read_fail_under,
+    run_outcome,
     selection_line,
 )
 from mcp_tools_py.code_checker_pytest.models import PytestReport, Test
@@ -202,7 +203,7 @@ def _run_test(context: ToolContext, depth: str) -> ActionResult:
                     data,
                     selection,
                     fail_under=fail_under,
-                    tests_failed=bool(findings),
+                    **run_outcome(report, verdict),
                 )
         return action_result
     finally:

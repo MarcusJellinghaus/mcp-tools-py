@@ -87,7 +87,7 @@ def test_coverage_digest_from_a_real_run(project: Path) -> None:
     assert "selection: full suite" in result
     assert "fail_under=99 is configured; not applied to this run" in result
     assert "uncovered  6-7" in result
-    assert "Warning: tests failed" not in result
+    assert "⚠" not in result
 
 
 def test_coverage_leaves_the_project_clean(project: Path) -> None:

@@ -45,9 +45,9 @@ This tracks **Feature Implementation** consisting of multiple **Tasks**.
 ### Step 4: Replace `tests_failed` with counts and warning lines; handle no-report runs
 [Details](./steps/step_4.md)
 
-- [ ] Implementation (tests + production code)
-- [ ] Quality checks: pylint, pytest, mypy — fix all issues
-- [ ] Commit message prepared
+- [x] Implementation (tests + production code)
+- [x] Quality checks: pylint, pytest, mypy — fix all issues
+- [x] Commit message prepared
 
 ### Step 5: Compute totals from `files`; add the package table
 [Details](./steps/step_5.md)

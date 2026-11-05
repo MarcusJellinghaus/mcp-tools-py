@@ -830,27 +830,32 @@ _COVERAGE_DATA: Dict[str, Any] = {
 }
 
 
+def _parsed_report(summary: Summary) -> PytestReport:
+    return PytestReport(
+        created=0.0,
+        duration=1.0,
+        exitcode=0,
+        root="/project",
+        environment={},
+        summary=summary,
+    )
+
+
 def _pytest_results(failed: int = 0) -> Dict[str, Any]:
     return make_pytest_results(
         RunStatus.FAILED if failed else RunStatus.PASSED,
         summary={"passed": 1, "failed": failed, "error": 0, "collected": 1},
-        test_results=None,
+        test_results=_parsed_report(
+            Summary(collected=1, total=1 + failed, passed=1, failed=failed, error=0)
+        ),
     )
 
 
 def _error_results_with_report() -> Dict[str, Any]:
     """ERROR result carrying a real report whose summary shows no failures."""
-    report = PytestReport(
-        created=0.0,
-        duration=1.0,
-        exitcode=1,
-        root="/project",
-        environment={},
-        summary=Summary(collected=5, total=5, passed=5),
-    )
     return make_pytest_results(
         summary={"passed": 5, "collected": 5},
-        test_results=report,
+        test_results=_parsed_report(Summary(collected=5, total=5, passed=5)),
         verdict=RunVerdict(RunStatus.ERROR, ["something broke"], 1),
     )
 
@@ -988,7 +993,7 @@ class TestPytestCoverage:
         assert "selection: full suite" in result
         assert result.index("passed") < result.index("50.0%")
         assert "untested" in result
-        assert "Warning: tests failed" not in result
+        assert "⚠" not in result
 
     def test_failed_run_carries_the_warning(self, run_pytest_check: Any) -> None:
         """A run with failures says the numbers come from it."""
@@ -999,10 +1004,12 @@ class TestPytestCoverage:
             mock_check.return_value = _pytest_results(failed=1)
             result = run_pytest_check(coverage=True, coverage_source=["src"])
 
-        assert "Warning: tests failed" in result
+        assert "⚠ 1 test failed" in result
 
-    def test_unsuccessful_run_carries_the_warning(self, run_pytest_check: Any) -> None:
-        """A run that failed with no summary still carries the warning."""
+    def test_run_without_a_parsed_report_has_no_digest(
+        self, run_pytest_check: Any
+    ) -> None:
+        """No parsed report counts as no coverage report, even if JSON was written."""
         with (
             patch(f"{_PYTEST_TOOL}.check_code_with_pytest") as mock_check,
             patch(f"{_PYTEST_TOOL}.read_coverage_report", return_value=_COVERAGE_DATA),
@@ -1010,10 +1017,13 @@ class TestPytestCoverage:
             mock_check.return_value = make_pytest_results(RunStatus.ERROR, ["boom"])
             result = run_pytest_check(coverage=True, coverage_source=["src"])
 
-        assert "Warning: tests failed" in result
+        assert result.endswith("Coverage report was not produced.")
+        assert "stmts" not in result
 
-    def test_error_with_report_carries_the_warning(self, run_pytest_check: Any) -> None:
-        """An ERROR run with a report and no failures still carries the warning."""
+    def test_error_with_report_carries_the_generic_warning(
+        self, run_pytest_check: Any
+    ) -> None:
+        """An ERROR run with a report and no failures carries the generic warning."""
         with (
             patch(f"{_PYTEST_TOOL}.check_code_with_pytest") as mock_check,
             patch(f"{_PYTEST_TOOL}.read_coverage_report", return_value=_COVERAGE_DATA),
@@ -1021,7 +1031,10 @@ class TestPytestCoverage:
             mock_check.return_value = _error_results_with_report()
             result = run_pytest_check(coverage=True, coverage_source=["src"])
 
-        assert "Warning: tests failed" in result
+        assert (
+            "⚠ the pytest run reported an error — coverage below may be incomplete"
+            in result
+        )
 
     def test_suspicious_run_has_no_warning(self, run_pytest_check: Any) -> None:
         """A SUSPICIOUS run is not reported as failed."""
@@ -1030,11 +1043,14 @@ class TestPytestCoverage:
             patch(f"{_PYTEST_TOOL}.read_coverage_report", return_value=_COVERAGE_DATA),
         ):
             mock_check.return_value = make_pytest_results(
-                RunStatus.SUSPICIOUS, summary={"collected": 3}, test_results=None
+                RunStatus.SUSPICIOUS,
+                summary={"collected": 3},
+                test_results=_parsed_report(Summary(collected=3, total=3)),
             )
             result = run_pytest_check(coverage=True, coverage_source=["src"])
 
-        assert "Warning: tests failed" not in result
+        assert "stmts" in result
+        assert "⚠" not in result
 
     def test_missing_report_is_stated(self, run_pytest_check: Any) -> None:
         """No coverage JSON gives a one-line note instead of a digest."""
