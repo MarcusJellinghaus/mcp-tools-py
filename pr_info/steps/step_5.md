@@ -9,6 +9,8 @@
 ## WHERE
 
 - `src/mcp_tools_py/code_checker_pytest/coverage.py`
+- `src/mcp_tools_py/checker_tools/pytest_tool.py` (docstring)
+- `README.md`
 - `tests/test_code_checker_pytest/_coverage_report.py` (new: `_file`, `_report` and `_SELECTION` moved out of `test_coverage.py`)
 - `tests/test_code_checker_pytest/test_coverage.py` (imports those helpers)
 - `tests/test_code_checker_pytest/test_coverage_package_table.py` (new)
@@ -27,6 +29,7 @@ def _package_table(files: dict[str, Any]) -> list[str]: ...
 - `format_coverage_digest` stops reading `data["totals"]`. The header sums `num_statements` and `missing_lines` from `files`, and takes the percentage from `percent_covered`.
 - The table goes after the selection and `fail_under` lines, preceded by a blank line, and before the gap ranking.
 - Report keys are printed as they are in the gap ranking. `norm_path` is only for comparing and grouping here, and steps 6 and 9 reuse it.
+- Add the package table to the digest contents listed in the `coverage` docstring of `run_pytest_check` and in `README.md:78`.
 
 ## ALGORITHM
 

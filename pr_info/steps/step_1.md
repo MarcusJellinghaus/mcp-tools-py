@@ -32,7 +32,7 @@ def _collector_key(longrepr: str) -> str: ...
 
 ## HOW
 
-- `verdict.py` imports `XDIST_MARKER` and the helpers from `reporting`, so `from ...verdict import XDIST_MARKER` in tests keeps working.
+- `verdict.py` imports `XDIST_MARKER` and the helpers from `reporting` for its own use. It doesn't re-export them, so callers import `XDIST_MARKER` from `reporting`.
 - `_merge_problems`: `items = group_failed_collectors(report)`, then the existing `collection_errors` branch (removed in step 2) and tail fallback. Remove `_dedup_key` and the `seen` loop.
 - `format_error_text`: when `collectors_failed_line(report)` is not empty, add it and a blank line right after `Problems:`.
 - `toolkit.py`, the FAILED-with-no-findings return (`:176`), which renders `cap_problems(verdict.problems)` directly: when `collectors_failed_line(report)` is not empty, add it and a blank line before the capped problems. With no failed collector the summary stays as it is.
@@ -74,6 +74,6 @@ render: if the first longrepr has E lines, the joined E lines, then the longrepr
 
 `test_toolkit_test.py`, using `_run_with`: a FAILED verdict with a failed collector and no failing test returns `status == "error"`, and the summary contains `1 collector failed (1 distinct error)` before the problem text.
 
-`test_verdict.py`: rewrite `test_dedup_same_first_line` (`:163`) so the two collectors, whose last lines differ, stay separate.
+`test_verdict.py`: import `XDIST_MARKER` from `reporting` instead of `verdict` (`:16`), because strict mypy's `no_implicit_reexport` rejects the old import. Rewrite `test_dedup_same_first_line` (`:163`) so the two collectors, whose last lines differ, stay separate.
 
 `test_code_checker/test_reporting.py`: at `:572` and `:833`, assert `1 collector failed (1 distinct error)` instead of the old header. Remove the `test_broken.py` assertion at `:573`, because a single-collector group has no node ID line and that fixture's longrepr doesn't name the file. `:834` still passes through the failing test's ID.

@@ -81,7 +81,7 @@ With no saved set, or when the only saved run has the same identity, it behaves 
 
 - Unit: `combine_with_previous=True` without `coverage=True` is refused and pytest never runs. `use_last_coverage_run=True` with `combine_with_previous=True` is refused.
 - `integration`, real project via `tests/_coverage_project.py`:
-  - Two selections via `extra_args` merge: the percentage is higher than either alone, and the selection line lists both.
+  - Two selections via `extra_args` merge: the percentage is higher than either alone, the selection line lists both, and the reply doesn't contain `Saved runs discarded: merging failed`.
   - Editing a source between runs gives the discarded note and doesn't merge.
   - A different `coverage_source` does the same.
   - Reuse after a merge returns the merged set, with summed warning counts.

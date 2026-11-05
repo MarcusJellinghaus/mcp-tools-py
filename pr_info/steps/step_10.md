@@ -49,6 +49,7 @@ identity: m = effective -m, with the markers parameter sorted before joining wit
     return json.dumps([m, k, paths, rest, env])
 
 merge: any input missing -> None
+    os.makedirs(merge_dir, exist_ok=True)   # sqlite3 doesn't create the data file's parent directory
     env = {**(env_vars or {}), "COVERAGE_FILE": merge_dir/.coverage}   # never one of the inputs
     run [interpreter, "-m", "coverage", "combine", "--keep", *inputs]
     run [interpreter, "-m", "coverage", "json", "-o", merge_dir/coverage.json, "--fail-under=0"]
@@ -76,7 +77,7 @@ merge: any input missing -> None
 `test_coverage_merge.py`:
 
 - `integration`, real data files made with `sys.executable -m coverage run --data-file=...` in `tmp_path`, with `pytest.importorskip("coverage")`:
-  - Two runs covering different functions merge to a higher percentage, the report's keys stay relative, and per-function regions survive.
+  - Two runs covering different functions, with `merge/` not yet existing: the merge succeeds and returns a report rather than `None`, which is what step 11 would turn into `Saved runs discarded: merging failed`. The percentage is higher, the report's keys stay relative, and per-function regions survive.
   - The inputs still exist afterwards.
   - A configured `fail_under = 99` doesn't fail the merge.
   - A branch run and a statement run return `None`.

@@ -93,13 +93,15 @@ One run entry: `{"selection": ..., "data_file": None, **outcome}`. `write_saved`
 `test_toolkit_saved_coverage.py`, `integration`, real projects via `tests/_coverage_project.py`:
 
 - All three early returns update saved data: `No Tests Found` clears it; a failing collector under `-n 2` (ERROR with a report and JSON) saves it; a mocked `FAILED` verdict with no findings saves it.
+  - `_run_test` accepts no `extra_args`, so `-n 2` comes from `addopts = "-n 2"` in the test project's `pyproject.toml`.
+  - The mocked case patches `mcp_tools_py.toolkit.check_code_with_pytest` and also `mcp_tools_py.toolkit.read_coverage_report`. The mock writes no JSON, so without the second patch `data` is `None` and the store is cleared, not saved.
 - Quick and standard depths leave saved data alone.
 
 `test_server_params.py` stays as it is: its mocks produce no `.coverage` file, and `write_saved` tolerates that, writing into `tmp_path`.
 
 `test_pytest_tool_coverage.py`:
 
-- Rewrite `test_coverage_leaves_the_project_clean`: `git init` in the project (skip when `shutil.which("git")` is `None`), run with `coverage=True`, assert `.mcp-tools-py/coverage/last_run.json` exists and `git status --porcelain --untracked-files=all` mentions neither `.mcp-tools-py` nor `coverage.json` nor `.coverage ` at the root.
+- Rewrite `test_coverage_leaves_the_project_clean`: `git init` in the project (skip when `shutil.which("git")` is `None`), run with `coverage=True`, assert `.mcp-tools-py/coverage/last_run.json` exists, and compare whole lines of `git status --porcelain --untracked-files=all` output: no line in `splitlines()` mentions `.mcp-tools-py`, and neither `?? .coverage` nor `?? coverage.json` is in `splitlines()`. A substring check for `.coverage` would wrongly match the fixture's `.coveragerc`.
 - A run without coverage leaves the saved data untouched.
 - A run with `extra_args=["-k", "nomatch"]` says `Coverage report was not produced.` and clears the saved data.
 - `coverage=True` with `extra_args=["-n", "2"]`, on the project plus a test module that fails to import and a passing one: the digest's first line, which follows the blank line after the pytest reply, is `⚠ 1 collector failed — coverage below reflects a partial run`, and `tests failed` appears nowhere in the reply, digest included.

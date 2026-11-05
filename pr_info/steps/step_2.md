@@ -12,6 +12,7 @@
 - `src/mcp_tools_py/code_checker_pytest/models.py`
 - `src/mcp_tools_py/code_checker_pytest/utils.py`
 - `src/mcp_tools_py/checker_tools/__init__.py`
+- `README.md`
 - `tests/test_code_checker_pytest/test_verdict.py`
 - `tests/test_checker_tools_formatting.py`
 
@@ -28,6 +29,7 @@ def format_collection_problems(verdict: RunVerdict) -> str: ...  # report parame
 - `_merge_problems`: remove the `collection_errors` branch.
 - `format_collection_problems`: now only emits the xdist hint. The call in `checker_tools/__init__.py` loses its `report` argument.
 - Remove `ErrorContext.collection_errors` (`models.py:155`) and the block in `create_error_context` (`utils.py:233-250`).
+- `README.md:76`: an errored run no longer always shows the exit code. Say it shows the problems, plus the exit code unless collection failures explain it and no test failed.
 
 ## ALGORITHM
 
