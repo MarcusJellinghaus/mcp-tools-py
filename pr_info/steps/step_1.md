@@ -2,7 +2,7 @@
 
 ## LLM prompt
 
-> Read `pr_info/steps/summary.md` and this file (`pr_info/steps/step_1.md`), then implement this step exactly. Do not change anything outside the files listed under WHERE. Do not edit `pr_info/TASK_TRACKER.md`. Produce one commit.
+> Read `pr_info/steps/summary.md` and this file (`pr_info/steps/step_1.md`), then implement this step exactly. Do not change any project files other than those listed under WHERE. Files under `pr_info/` that the workflow requires, such as the task tracker and `pr_info/.commit_message.txt`, are exempt.
 
 ## WHERE
 
@@ -50,7 +50,7 @@ def test_config(name):
 3. Run the probe again. Both cases must pass.
 4. Delete the probe with `delete_directory(".scratch", recursive=True)`.
 5. Run pylint, pytest (`extra_args=["-n", "auto", "-m", "not integration"]`) and mypy, then `run_format_code`.
-6. Commit only the two config files.
+6. Write the commit message below to `pr_info/.commit_message.txt`. Do not commit.
 
 ## DATA
 

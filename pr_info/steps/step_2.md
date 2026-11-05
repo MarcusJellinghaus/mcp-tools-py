@@ -2,7 +2,7 @@
 
 ## LLM prompt
 
-> Read `pr_info/steps/summary.md` and this file (`pr_info/steps/step_2.md`), then implement this step exactly. Make minimal edits; do not rewrite `INSTALL.md`. Do not change anything outside the files listed under WHERE. Do not edit `pr_info/TASK_TRACKER.md`. Produce one commit.
+> Read `pr_info/steps/summary.md` and this file (`pr_info/steps/step_2.md`), then implement this step exactly. Make minimal edits; do not rewrite `INSTALL.md`. Do not change any project files other than those listed under WHERE. Files under `pr_info/` that the workflow requires, such as the task tracker and `pr_info/.commit_message.txt`, are exempt.
 
 ## WHERE
 
@@ -24,7 +24,7 @@ Documentation edits only. No functions and no new tests: the docs have no test h
 
    Add these as plain paragraphs, not as a blockquote.
 
-2. In "Quick install", and in step 1 of "Automated Setup", put these lines before the `pip install git+...` line, in the same code block:
+2. Add these lines in the same code block in both places: in "Quick install", above the `# Install from GitHub (recommended)` comment, which stays next to its `pip install` command; in step 1 of "Automated Setup", above the `pip install git+...` line:
 
    ```bash
    python -m venv .venv
@@ -172,7 +172,7 @@ No code integration. The cross-references are the `#installation` anchor in `REA
 3. Use `search_files` on `INSTALL.md` for `pip install mcp-tools-py`. Each hit must follow venv activation, be the commented `.venv\Scripts\python.exe -m pip` fallback, or be `--force-reinstall`.
 4. Use `git diff` to confirm that the client config examples, "Using as a Dependency" and the `--venv-path` mentions in `README.md` are untouched.
 5. Run pylint, pytest (`extra_args=["-n", "auto", "-m", "not integration"]`) and mypy, then `run_format_code`.
-6. Commit only the three doc files.
+6. Write the commit message below to `pr_info/.commit_message.txt`. Do not commit.
 
 ## DATA
 
