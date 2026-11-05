@@ -527,7 +527,8 @@ def write_saved(
 ) -> None:
     """Save a run set, replacing the previous metadata.
 
-    An ``OSError`` propagates; the previous metadata stays until the replace.
+    An ``OSError`` before the replace propagates and the previous metadata
+    stays. Deleting the data files no run references any more is best-effort.
 
     Args:
         project_dir: Path to the target project.
@@ -555,7 +556,9 @@ def write_saved(
     referenced = {run["data_file"] for run in saved["runs"]}
     for path in Path(store).glob("run-*.coverage"):
         if path.name not in referenced:
-            path.unlink()
+            # The set is already saved; the next save retries a locked file.
+            with contextlib.suppress(OSError):
+                path.unlink()
 
 
 def _replace_metadata(store: str, content: str) -> None:

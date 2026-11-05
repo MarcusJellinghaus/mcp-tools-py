@@ -186,16 +186,17 @@ def collectors_failed_line(report: PytestReport) -> str:
         report: The parsed pytest report
 
     Returns:
-        The count line, or "" when no collector failed.
+        The count line, without the distinct errors when no collector has a
+        longrepr to group by, or "" when no collector failed.
     """
     count = failed_collector_count(report)
     if not count:
         return ""
+    line = f"{count} {plural(count, 'collector')} failed"
     distinct = len(group_failed_collectors(report))
-    return (
-        f"{count} {plural(count, 'collector')} failed "
-        f"({distinct} distinct {plural(distinct, 'error')})"
-    )
+    if not distinct:
+        return line
+    return f"{line} ({distinct} distinct {plural(distinct, 'error')})"
 
 
 def _get_failed_tests(

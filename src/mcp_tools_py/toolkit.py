@@ -204,15 +204,13 @@ def _run_test(context: ToolContext, depth: str) -> ActionResult:
             for test in report.tests or []
             if test.outcome in _FAILED_OUTCOMES
         ]
+        count_line = collectors_failed_line(report)
+        count_text = f"{count_line}\n\n" if count_line else ""
+        failed_summary = (
+            f"{summary_text}\n\n{count_text}{cap_problems(verdict.problems)}"
+        )
         if verdict.status is RunStatus.FAILED and not findings:
-            count_line = collectors_failed_line(report)
-            count_text = f"{count_line}\n\n" if count_line else ""
-            return ActionResult(
-                status="error",
-                summary=(
-                    f"{summary_text}\n\n{count_text}{cap_problems(verdict.problems)}"
-                ),
-            )
+            return ActionResult(status="error", summary=failed_summary)
         ok_summary = (
             format_suspicious_text(report.summary.collected)
             if verdict.status is RunStatus.SUSPICIOUS
@@ -222,7 +220,7 @@ def _run_test(context: ToolContext, depth: str) -> ActionResult:
             error=None,
             findings=findings,
             ok_summary=ok_summary,
-            findings_summary=summary_text,
+            findings_summary=failed_summary if count_line else summary_text,
         )
 
         if finished is not None and finished.data is not None:

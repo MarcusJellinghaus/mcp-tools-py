@@ -152,6 +152,31 @@ class TestCombine:
         assert (store / "run-old.coverage").exists()
         assert (store / saved["runs"][-1]["data_file"]).read_bytes() == b"new"
 
+    def test_locked_unreferenced_file_keeps_the_merged_digest(
+        self, tmp_path: Path, mock_merge: MagicMock
+    ) -> None:
+        """A failed cleanup after the replace doesn't read as a failed save."""
+        temp_dir = tmp_path / "temp"
+        temp_dir.mkdir()
+        (temp_dir / ".coverage").write_bytes(b"new")
+        project = tmp_path / "project"
+        run = _coverage_run(project, temp_dir, combine=True)
+        _seed_runs(project, run, _named("old"))
+        orphan = project / STORE_DIR / "run-orphan.coverage"
+        orphan.write_bytes(b"orphan")
+
+        with patch("pathlib.Path.unlink", side_effect=OSError("locked")) as unlink:
+            finished = finish_coverage_run(run, _NEW, None, _verdict())
+
+        unlink.assert_called_once()
+        mock_merge.assert_called_once()
+        assert finished.data == _MERGED
+        assert not finished.notes
+        saved = load_saved(str(project))
+        assert saved is not None
+        assert saved["report"] == _MERGED
+        assert orphan.exists()
+
     def test_failed_merge_saves_only_the_new_run(
         self, tmp_path: Path, mock_merge: MagicMock
     ) -> None:

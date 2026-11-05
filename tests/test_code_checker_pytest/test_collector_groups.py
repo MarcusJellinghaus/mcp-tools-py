@@ -187,6 +187,23 @@ def test_collector_without_longrepr_is_counted_but_forms_no_group() -> None:
     assert collectors_failed_line(report) == "2 collectors failed (1 distinct error)"
 
 
+def test_collectors_without_longrepr_show_no_distinct_errors() -> None:
+    report = _report([_collector("tests/a.py", None), _collector("tests/b.py", None)])
+
+    assert collectors_failed_line(report) == "2 collectors failed"
+
+
+def test_error_path_without_longrepr_shows_count_above_output_tail() -> None:
+    report = _report([_collector("tests/a.py", None), _collector("tests/b.py", None)])
+    assert report.error_context is not None
+    report.error_context.error_message = "collection output tail"
+
+    text = format_error_text(report, classify_run(report))
+
+    assert "Problems:\n2 collectors failed\n\ncollection output tail" in text
+    assert "distinct" not in text
+
+
 def test_passed_collectors_are_ignored() -> None:
     report = _report([_collector("tests", "E   ignored", outcome="passed")])
 

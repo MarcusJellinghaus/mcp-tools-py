@@ -13,6 +13,7 @@ from mcp_tools_py.code_checker_pytest.models import (
     Summary,
     Test,
 )
+from mcp_tools_py.code_checker_pytest.reporting import group_failed_collectors
 from mcp_tools_py.code_checker_pytest.verdict import RunStatus
 from mcp_tools_py.toolkit import PythonToolkit
 from tests._pytest_results import make_pytest_results
@@ -216,6 +217,41 @@ class TestRunTestVerdictMapping:
 
         assert result.status == "findings"
         assert [f.key for f in result.findings] == ["tests/test_a.py::test_x"]
+        assert result.summary == "Collected 1 tests in 0.0 seconds"
+
+    def test_failed_with_failing_test_and_collectors_shows_both(
+        self, tmp_path: Path
+    ) -> None:
+        failing = Test(
+            nodeid="tests/test_a.py::test_x", lineno=1, keywords=[], outcome="failed"
+        )
+        problem = "E   ImportError: no module named 'missing'"
+        report = _report(
+            2,
+            failed=1,
+            tests=[failing],
+            collectors=[
+                Collector(nodeid=nodeid, outcome="failed", result=[], longrepr=problem)
+                for nodeid in ("tests/test_b.py", "tests/test_c.py")
+            ],
+        )
+        grouped = group_failed_collectors(report)
+        summary_text = "Collected 2 tests in 0.0 seconds"
+        results = make_pytest_results(
+            RunStatus.FAILED,
+            grouped,
+            test_results=report,
+            summary_text=summary_text,
+        )
+
+        result = _run_with(tmp_path, results)
+
+        assert result.status == "findings"
+        assert [f.key for f in result.findings] == ["tests/test_a.py::test_x"]
+        assert result.summary.startswith(
+            f"{summary_text}\n\n2 collectors failed (1 distinct error)\n\n{problem}\n"
+        )
+        assert "same error in 1 more collector: tests/test_c.py" in result.summary
 
     def test_failed_without_failing_tests_is_error(self, tmp_path: Path) -> None:
         collector = Collector(
