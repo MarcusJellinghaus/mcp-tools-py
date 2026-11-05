@@ -219,6 +219,36 @@ class TestLibrarySearchTools:
             assert result == {"error": "boom"}
             mock_search.assert_not_called()
 
+    @pytest.mark.parametrize("directory", ["", "no_such_directory_xyz"])
+    def test_non_directory_scope_returns_error(
+        self, tool_context: ToolContext, directory: str
+    ) -> None:
+        mcp = MagicMock()
+        captured = {}
+
+        def _capture(fn):  # type: ignore[no-untyped-def]
+            captured["fn"] = fn
+            return fn
+
+        mcp.tool.return_value = _capture
+        LibrarySearchTools(tool_context).register(mcp)
+        search_library_files = captured["fn"]
+
+        with (
+            patch(
+                "mcp_tools_py.library_search.resolve_scope",
+                return_value=ScopeResolution(directory=directory),
+            ),
+            patch("mcp_tools_py.library_search.search_in_directory") as mock_search,
+        ):
+            result = search_library_files("mypy")
+
+            assert result == {
+                "error": f"scope 'mypy' resolved to {directory!r}, "
+                "which is not a directory"
+            }
+            mock_search.assert_not_called()
+
     def test_wiring_matches_direct_call(
         self, tool_context: ToolContext, tmp_path: Path
     ) -> None:
