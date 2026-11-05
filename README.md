@@ -69,7 +69,7 @@ by passing an explicit list:
 | `timeout_seconds` | integer | None (resolved from config, else 300) | Maximum seconds to wait for the test run. Positive integers only |
 | `coverage` | boolean | False | Measure coverage with pytest-cov and append a coverage digest to the reply |
 | `coverage_source` | list | None (auto-detected) | Directories to measure. Auto-detected from `[tool.setuptools.packages.find] where`, excluding test paths |
-| `max_modules` | integer | 10 | How many modules the coverage digest details in each list |
+| `max_modules` | integer | 10 | How many modules the coverage digest's gap ranking details; `0` shows only the overview |
 
 **Note:** The tool never adds `-n`. Tests run in parallel only when you pass `-n` or the project's `addopts` sets it. `-n 0` disables pytest-xdist.
 

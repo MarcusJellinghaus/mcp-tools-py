@@ -332,7 +332,7 @@ class TestFormatCoverageDigest:
         assert "2 further modules have gaps (use max_modules to see more)." in digest
 
     def test_max_modules_zero(self) -> None:
-        """max_modules=0 leaves only the header and the counts."""
+        """max_modules=0 drops the gap ranking but not the zero-coverage list."""
         data = _report(
             {
                 "a.py": _file(10, [1], {"f": [1]}),
@@ -342,9 +342,10 @@ class TestFormatCoverageDigest:
 
         digest = format_coverage_digest(data, _SELECTION, max_modules=0)
 
-        assert "a.py" not in digest and "z.py" not in digest
+        assert "a.py" not in digest
         assert "1 modules have no covered statements in this selection:" in digest
-        assert "… and 1 more" in digest
+        assert "    z.py (5 missing statements)" in digest
+        assert "… and 1 more" not in digest
         assert "1 further modules have gaps" in digest
 
     def test_negative_max_modules_clamped(self) -> None:

@@ -68,8 +68,8 @@ def register(mcp: "FastMCPProtocol", checker_tools: "CheckerTools") -> None:
                 `# pragma: no cover`.
             coverage_source: Directories to measure. Defaults to the project's
                 source directories from pyproject.toml, excluding test paths.
-            max_modules: How many modules the coverage digest details in each
-                list (default: 10).
+            max_modules: How many modules the coverage digest's gap ranking
+                details; 0 shows only the overview (default: 10).
 
         Returns:
             A string containing either pytest results or a prompt for an LLM to interpret

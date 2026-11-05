@@ -26,6 +26,7 @@ _FAIL_UNDER_SCRIPT = "import coverage; print(coverage.Coverage().config.fail_und
 
 MAX_FUNCTIONS_PER_MODULE = 3
 MAX_RANGES_PER_FUNCTION = 5
+MAX_ZERO_COVERAGE_ROWS = 15
 MODULE_LEVEL = "<module level>"
 ROOT_ROW = "(root)"
 
@@ -314,6 +315,52 @@ def _package_table(files: dict[str, Any]) -> list[str]:
     ]
 
 
+def _is_filesystem_root(directory: tuple[str, ...]) -> bool:
+    """Tell whether split path components name ``/`` or a drive such as ``C:``.
+
+    Returns:
+        True for a filesystem root.
+    """
+    return len(directory) == 1 and (not directory[0] or directory[0].endswith(":"))
+
+
+def _zero_coverage_rows(files: dict[str, Any]) -> list[tuple[str, int]]:
+    """Collapse modules with nothing covered into their uncovered directories.
+
+    A module's row is its top-most ancestor with no covered file below it, as
+    ``a/b/``, never above the common prefix. A module with no such ancestor, or
+    outside the prefix, gets its own row. Files with no statements are ignored.
+
+    Args:
+        files: The ``files`` entry of the coverage JSON.
+
+    Returns:
+        (label, missing statements) rows, sorted by missing statements.
+    """
+    prefix = _common_prefix(files)
+    blocked: set[tuple[str, ...]] = set()
+    zero = []
+    for path, entry in files.items():
+        summary = entry.get("summary", {})
+        parts = tuple(norm_path(path).split("/"))
+        if summary.get("covered_lines", 0) > 0:
+            blocked.update(parts[:depth] for depth in range(1, len(parts)))
+        elif summary.get("num_statements", 0):
+            zero.append((parts, summary.get("missing_lines", 0)))
+
+    rows: dict[str, int] = {}
+    for parts, missing in zero:
+        label = "/".join(parts)
+        if parts[: len(prefix)] == prefix:
+            for depth in range(max(len(prefix), 1), len(parts)):
+                ancestor = parts[:depth]
+                if ancestor not in blocked and not _is_filesystem_root(ancestor):
+                    label = "/".join(ancestor) + "/"
+                    break
+        rows[label] = rows.get(label, 0) + missing
+    return sorted(rows.items(), key=lambda row: (-row[1], row[0]))
+
+
 def format_coverage_digest(
     data: dict[str, Any],
     selection: str,
@@ -327,13 +374,14 @@ def format_coverage_digest(
 
     The totals are summed from ``files``, never read from the report's
     ``totals``. Modules with gaps are ranked by absolute missing statements;
-    modules with nothing covered are listed separately, with no cause
-    attributed.
+    modules with nothing covered are listed separately, collapsed by directory,
+    with no cause attributed.
 
     Args:
         data: The coverage JSON report.
         selection: The line from selection_line.
-        max_modules: How many modules to detail in each list.
+        max_modules: How many modules the gap ranking details; 0 shows only
+            the overview.
         fail_under: The project's threshold; None when it could not be read.
         failed_collectors: How many collectors failed in the run.
         failed_tests: How many tests failed or errored in the run.
@@ -370,7 +418,7 @@ def format_coverage_digest(
         summary = entry.get("summary", {})
         missing = summary.get("missing_lines", 0)
         if summary.get("covered_lines", 0) == 0 and summary.get("num_statements", 0):
-            zero.append((path, missing))
+            zero.append(path)
         elif missing > 0:
             gaps.append((path, missing))
     gaps.sort(key=lambda gap: (-gap[1], gap[0]))
@@ -413,12 +461,13 @@ def format_coverage_digest(
             "",
             f"{len(zero)} modules have no covered statements in this selection:",
         ]
+        rows = _zero_coverage_rows(files)
         lines += [
-            f"    {path} ({missing} missing statements)"
-            for path, missing in zero[:max_modules]
+            f"    {label} ({missing} missing statements)"
+            for label, missing in rows[:MAX_ZERO_COVERAGE_ROWS]
         ]
-        if len(zero) > max_modules:
-            lines.append(f"    … and {len(zero) - max_modules} more")
+        if len(rows) > MAX_ZERO_COVERAGE_ROWS:
+            lines.append(f"    … and {len(rows) - MAX_ZERO_COVERAGE_ROWS} more")
 
     if len(gaps) > max_modules:
         lines += [
