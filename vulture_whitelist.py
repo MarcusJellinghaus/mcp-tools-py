@@ -68,6 +68,9 @@ _clear_project_cache  # Autouse fixture in tests/test_refactoring/conftest.py an
 _fixed_formatter_binary  # Autouse fixture in the formatter runner test modules
 _fixed_version_line  # Autouse fixture in the formatter runner test modules
 _declare_formatter  # Autouse fixture in tests/test_formatter_tools.py
+_inputs  # Fixture named "inputs" in tests/test_code_checker_pytest/test_coverage_merge.py, invoked by pytest
+_temp_dir  # Fixture named "temp_dir" in tests/test_code_checker_pytest/test_coverage_merge.py, invoked by pytest
+_no_outer_tracing  # Autouse fixture in tests/test_subprocess_tracing.py
 python_executable  # Deprecated runner parameter, accepted and ignored until mcp_coder#1173
 
 # Data file variables used for module resolution
