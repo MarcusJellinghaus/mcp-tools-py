@@ -1,6 +1,7 @@
 """Integration tests for the saved coverage data of PythonToolkit's `test` action."""
 
 import importlib.util
+import tempfile
 from pathlib import Path
 from unittest.mock import patch
 
@@ -149,6 +150,29 @@ def test_other_depths_leave_the_data_alone(project: Path, depth: str) -> None:
 
     assert result.status == "ok"
     assert metadata.read_bytes() == before
+
+
+def test_malformed_timeout_leaves_no_temp_dir(
+    project: Path, tmp_path_factory: pytest.TempPathFactory
+) -> None:
+    """A ValueError during the coverage setup still removes the run's temp dir."""
+    pyproject = project / "pyproject.toml"
+    pyproject.write_text(
+        pyproject.read_text() + '\n[tool.mcp-tools-py]\npytest-timeout = "soon"\n'
+    )
+    temp_root = tmp_path_factory.mktemp("temp_root")
+
+    with (
+        patch.object(tempfile, "tempdir", str(temp_root)),
+        patch(
+            "mcp_tools_py.toolkit.tempfile.mkdtemp", wraps=tempfile.mkdtemp
+        ) as mkdtemp,
+        pytest.raises(ValueError, match="pytest-timeout"),
+    ):
+        _run_test(project)
+
+    mkdtemp.assert_any_call(prefix="pytest_cov_")
+    assert not list(temp_root.glob("pytest_cov_*"))
 
 
 def test_failed_save_is_appended_to_raw(project: Path) -> None:

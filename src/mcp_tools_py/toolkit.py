@@ -135,31 +135,31 @@ def _run_test(context: ToolContext, depth: str) -> ActionResult:
     fail_under: float | None = None
     temp_dir: str | None = None
     coverage_run: CoverageRun | None = None
-    if depth == "full":
-        sources = resolve_coverage_source(project_dir, None)
-        if isinstance(sources, str):
-            return ActionResult(status="error", summary=sources)
-        temp_dir = tempfile.mkdtemp(prefix="pytest_cov_")
-        cov_args, cov_env = coverage_args(sources, temp_dir)
-        extra_args = cov_args
-        env_vars = cov_env
-        fail_under = read_fail_under(interpreter, project_dir)
-        addopts = get_pytest_addopts(project_dir)
-        coverage_run = start_coverage_run(
-            project_dir,
-            temp_dir,
-            context.test_folder,
-            None,
-            sources,
-            fail_under,
-            selection_line(markers, [], [], addopts),
-            selection_identity(markers, [], [], addopts, None),
-            interpreter,
-            None,
-            context.resolve_timeout("pytest"),
-        )
-
     try:
+        if depth == "full":
+            sources = resolve_coverage_source(project_dir, None)
+            if isinstance(sources, str):
+                return ActionResult(status="error", summary=sources)
+            temp_dir = tempfile.mkdtemp(prefix="pytest_cov_")
+            cov_args, cov_env = coverage_args(sources, temp_dir)
+            extra_args = cov_args
+            env_vars = cov_env
+            fail_under = read_fail_under(interpreter, project_dir)
+            addopts = get_pytest_addopts(project_dir)
+            coverage_run = start_coverage_run(
+                project_dir,
+                temp_dir,
+                context.test_folder,
+                None,
+                sources,
+                fail_under,
+                selection_line(markers, [], [], addopts),
+                selection_identity(markers, [], [], addopts, None),
+                interpreter,
+                None,
+                context.resolve_timeout("pytest"),
+            )
+
         result = check_code_with_pytest(
             project_dir,
             python_executable=interpreter,
