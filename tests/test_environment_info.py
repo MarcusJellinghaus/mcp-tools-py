@@ -16,12 +16,13 @@ from mcp_tools_py.utils.environment_info import (
     TOOL_DISTRIBUTIONS,
     TOOL_MODULES,
     EnvironmentInfo,
+    ScopeResolution,
     get_environment_info,
     locate_packages,
     probe_script_path,
     resolve_scope,
 )
-from mcp_tools_py.utils.subprocess_runner import execute_command
+from mcp_tools_py.utils.subprocess_runner import CommandResult, execute_command
 from tests.conftest import make_command_result
 from tests.test_tool_availability._helpers import _create_server, _dummy_python
 
@@ -454,28 +455,46 @@ class TestResolveScope:
             assert resolution.error is None
             mock_exec.assert_not_called()
 
-    def test_stdlib_failure_when_probe_untrustworthy(self) -> None:
-        """A failed probe leaves `stdlib` unresolved, and says why."""
-        info = EnvironmentInfo(
-            version="",
-            sys_path=(),
-            distributions={},
-            importable={},
-            error="boom",
-        )
-        with (
-            patch(
-                "mcp_tools_py.utils.environment_info.get_environment_info",
-                return_value=info,
+    @pytest.mark.parametrize(
+        "retry, expected",
+        [
+            (
+                make_command_result(stdout="/some/stdlib\n"),
+                ScopeResolution(directory="/some/stdlib"),
             ),
-            patch("mcp_tools_py.utils.environment_info.execute_command") as mock_exec,
-        ):
-            resolution = resolve_scope("/stdlib-fail/python", "stdlib")
+            (
+                make_command_result(
+                    return_code=-1,
+                    timed_out=True,
+                    execution_error="Process timed out after 30 seconds",
+                ),
+                ScopeResolution(
+                    error="resolving scope 'stdlib' timed out after "
+                    f"{PROBE_TIMEOUT_SECONDS} seconds"
+                ),
+            ),
+            (
+                make_command_result(return_code=1, stderr="boom"),
+                ScopeResolution(error="could not resolve scope 'stdlib': boom"),
+            ),
+        ],
+    )
+    def test_stdlib_retries_after_cached_failure(
+        self, retry: CommandResult, expected: ScopeResolution
+    ) -> None:
+        """A cached failure sends `stdlib` to a fresh probe, and stays cached."""
+        with patch("mcp_tools_py.utils.environment_info.execute_command") as mock_exec:
+            mock_exec.side_effect = [
+                make_command_result(return_code=1, stderr="info failed"),
+                retry,
+            ]
 
-            assert resolution.directory is None
-            assert resolution.error is not None
-            assert "boom" in resolution.error
-            mock_exec.assert_not_called()
+            assert resolve_scope("/stdlib-retry/python", "stdlib") == expected
+            assert mock_exec.call_args.args[0][-2:] == ["scope", "stdlib"]
+
+            error = get_environment_info("/stdlib-retry/python").error
+            assert error is not None and "info failed" in error
+            assert mock_exec.call_count == 2
 
     def test_package_scope_runs_the_scope_subcommand(self) -> None:
         """A non-stdlib scope runs `probe.py scope NAME` uncached."""
@@ -668,6 +687,21 @@ class TestProbeScript:
         assert package_result.return_code == 0, package_result.stderr
         assert module_result.return_code == 0, module_result.stderr
         assert Path(module_result.stdout.strip()) == Path(package_result.stdout.strip())
+
+    def test_real_child_scope_stdlib_matches_info(self) -> None:
+        """`scope stdlib` names the same directory the info blob does."""
+        info_result = execute_command(
+            [sys.executable, str(probe_script_path()), "info"],
+            timeout_seconds=60,
+        )
+        scope_result = execute_command(
+            [sys.executable, str(probe_script_path()), "scope", "stdlib"],
+            timeout_seconds=60,
+        )
+
+        assert info_result.return_code == 0, info_result.stderr
+        assert scope_result.return_code == 0, scope_result.stderr
+        assert scope_result.stdout.strip() == json.loads(info_result.stdout)["stdlib"]
 
     def test_real_child_scope_reports_unknown_name(self) -> None:
         """An unresolvable name fails with a message naming it."""

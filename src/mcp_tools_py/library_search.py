@@ -274,6 +274,11 @@ class LibrarySearchTools:
             if resolution.error is not None:
                 return {"error": resolution.error}
             assert resolution.directory is not None
+            if not os.path.isdir(resolution.directory):
+                return {
+                    "error": f"scope '{scope}' resolved to "
+                    f"{resolution.directory!r}, which is not a directory"
+                }
             try:
                 return search_in_directory(
                     Path(resolution.directory),

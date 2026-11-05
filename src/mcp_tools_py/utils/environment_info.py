@@ -5,8 +5,9 @@ server run — Python version, which modules are importable, which
 distributions are installed.  One subprocess answers all of them, and the
 answer is cached per interpreter path.
 
-`locate_packages` is the exception: where a package lives can change while the
-server runs, so it probes afresh on every call.
+`locate_packages` and `resolve_scope` for named scopes are the exceptions: where
+a package lives can change while the server runs, so both probe afresh on every
+call.  `resolve_scope` also probes `stdlib` afresh after a cached failure.
 """
 
 import json
@@ -162,6 +163,10 @@ def locate_packages(
 def resolve_scope(interpreter: str, scope: str) -> ScopeResolution:
     """Ask `interpreter` for the one directory `scope` names.
 
+    `stdlib` is answered from the cached probe.  After a cached failure it is
+    probed afresh, leaving the cache untouched.  Other names are always probed
+    afresh.
+
     Args:
         interpreter: Path to the Python interpreter to ask.
         scope: ``"stdlib"``, or a module or package name.
@@ -171,11 +176,8 @@ def resolve_scope(interpreter: str, scope: str) -> ScopeResolution:
     """
     if scope == "stdlib":
         info = get_environment_info(interpreter)
-        if info.error:
-            return ScopeResolution(
-                error=f"could not resolve scope 'stdlib': {info.error}"
-            )
-        return ScopeResolution(directory=info.stdlib)
+        if not info.error:
+            return ScopeResolution(directory=info.stdlib)
 
     result = execute_command(
         [interpreter, str(probe_script_path()), "scope", scope],
