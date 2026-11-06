@@ -9,9 +9,7 @@ instead of returning structured data.
 
 import shutil
 import tempfile
-from collections.abc import Mapping
 from pathlib import Path
-from typing import Any
 
 from mcp_coder_utils.toolkit import (
     ActionRequest,
@@ -319,7 +317,7 @@ def _run_format(context: ToolContext, depth: str) -> ActionResult:
 class PythonToolkit(Toolkit):
     """mcp-coder's Python toolkit: runs mcp-tools-py's checkers directly."""
 
-    def describe(self, config: Mapping[str, Any]) -> ToolkitInfo:
+    def describe(self) -> ToolkitInfo:
         """Describe PythonToolkit's actions, depths and LLM permissions.
 
         `run` only handles `test` so far; `format`/`check` are declared here
@@ -329,7 +327,6 @@ class PythonToolkit(Toolkit):
         Returns:
             The final ToolkitInfo for all three actions.
         """
-        del config
         return ToolkitInfo(
             actions={
                 "format": ["apply", "check"],
@@ -389,14 +386,17 @@ class PythonToolkit(Toolkit):
             return _run_check(context, request.depth)
         raise NotImplementedError(request.action)
 
-    def verify(self, project_dir: Path) -> list[VerifyItem]:
+    def verify(self, project_dir: Path, action: str | None = None) -> list[VerifyItem]:
         """Check that every tool this toolkit drives is available.
+
+        `action` is ignored for now, so every action checks everything.
 
         Returns:
             One VerifyItem per console-script tool, per `python -m` tool
             (mypy, pylint, pytest), and one more named "formatter" for
             whether a formatter can be resolved for `project_dir`.
         """
+        del action
         context = _build_context(project_dir)
         items: list[VerifyItem] = []
         for tool in sorted(CONSOLE_SCRIPT_TOOLS | {"mypy", "pylint", "pytest"}):

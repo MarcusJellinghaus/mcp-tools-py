@@ -25,9 +25,9 @@ This tracks **Feature Implementation** consisting of multiple **Tasks**.
 
 See [step_1.md](./steps/step_1.md).
 
-- [ ] Implementation (tests + production code): update `TestDescribe` in `tests/test_toolkit.py`, then the signatures in `src/mcp_tools_py/toolkit.py`
-- [ ] Quality checks: pylint, pytest, mypy, ruff — fix all issues
-- [ ] Commit message prepared
+- [x] Implementation (tests + production code): update `TestDescribe` in `tests/test_toolkit.py`, then the signatures in `src/mcp_tools_py/toolkit.py`
+- [x] Quality checks: pylint, pytest, mypy, ruff — fix all issues
+- [x] Commit message prepared
 
 ## Pull Request
 
