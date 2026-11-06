@@ -8,9 +8,16 @@ import pytest
 
 from mcp_tools_py.checker_tools import CheckerTools
 from mcp_tools_py.code_checker_mypy.reporting import MYPY_FAILURE_PREFIX
-from mcp_tools_py.code_checker_pytest.models import ErrorContext, PytestReport, Summary
+from mcp_tools_py.code_checker_pytest.models import (
+    Collector,
+    ErrorContext,
+    PytestReport,
+    Summary,
+)
 from mcp_tools_py.code_checker_pytest.parsers import parse_pytest_report
+from mcp_tools_py.code_checker_pytest.reporting import XDIST_MARKER
 from mcp_tools_py.code_checker_pytest.verdict import (
+    XDIST_HINT,
     RunStatus,
     RunVerdict,
     classify_run,
@@ -230,7 +237,7 @@ def test_format_pytest_result_execution_error(checker_tools: CheckerTools) -> No
     assert "completed" not in result
 
 
-def _failed_report(collection_errors: list[str] | None = None) -> PytestReport:
+def _failed_report(collectors: list[Collector] | None = None) -> PytestReport:
     """Build a real FAILED report (exit 1) with only error_message unless given."""
     return PytestReport(
         created=0.0,
@@ -239,14 +246,13 @@ def _failed_report(collection_errors: list[str] | None = None) -> PytestReport:
         root="/project",
         environment={},
         summary=Summary(collected=2, total=2, passed=1, failed=1),
-        collectors=[],
+        collectors=collectors or [],
         tests=[],
         error_context=ErrorContext(
             exit_code=1,
             exit_code_meaning="Tests failed",
             error_message="full pytest output\n1 failed, 1 passed",
             suggestion="",
-            collection_errors=collection_errors,
         ),
     )
 
@@ -254,8 +260,17 @@ def _failed_report(collection_errors: list[str] | None = None) -> PytestReport:
 def test_format_pytest_result_failed_with_collection_errors(
     checker_tools: CheckerTools,
 ) -> None:
-    """Collection errors precede the failure prompt in a FAILED run."""
-    report = _failed_report(["ERROR tests/test_x.py - ImportError: boom"])
+    """The xdist hint precedes the failure prompt in a FAILED run."""
+    report = _failed_report(
+        [
+            Collector(
+                nodeid="tests",
+                outcome="failed",
+                result=[],
+                longrepr=f"{XDIST_MARKER} on gw1",
+            )
+        ]
+    )
     test_results = make_pytest_results(
         summary={"passed": 1, "failed": 1, "collected": 2},
         test_results=report,
@@ -269,8 +284,8 @@ def test_format_pytest_result_failed_with_collection_errors(
             test_results, show_details=True
         )
     assert result.startswith("Collection problems:\n")
-    assert "ImportError: boom" in result
-    assert result.index("ImportError: boom") < result.index(
+    assert XDIST_HINT in result
+    assert result.index(XDIST_HINT) < result.index(
         "Pytest found issues that need attention:"
     )
     assert result.endswith("Detailed failure info...")

@@ -13,6 +13,7 @@ from mcp_tools_py.code_checker_pytest.models import (
     Summary,
     Test,
 )
+from mcp_tools_py.code_checker_pytest.reporting import group_failed_collectors
 from mcp_tools_py.code_checker_pytest.verdict import RunStatus
 from mcp_tools_py.toolkit import PythonToolkit
 from tests._pytest_results import make_pytest_results
@@ -95,6 +96,21 @@ class TestRunTest:
 
         assert result.status == "skipped"
         assert result.findings == []
+
+    @pytest.mark.integration
+    def test_every_module_failing_to_import_is_error(self, tmp_path: Path) -> None:
+        (tmp_path / "tests").mkdir()
+        for name in ("test_a.py", "test_b.py"):
+            (tmp_path / "tests" / name).write_text(
+                "import module_that_does_not_exist\n"
+            )
+        request = ActionRequest(
+            action="test", depth="standard", project_dir=tmp_path, params={}
+        )
+
+        result = PythonToolkit().run(request)
+
+        assert result.status == "error"
 
     def test_full_depth_sets_raw_coverage_digest(self, tmp_path: Path) -> None:
         pytest.importorskip("pytest_cov")
@@ -201,6 +217,41 @@ class TestRunTestVerdictMapping:
 
         assert result.status == "findings"
         assert [f.key for f in result.findings] == ["tests/test_a.py::test_x"]
+        assert result.summary == "Collected 1 tests in 0.0 seconds"
+
+    def test_failed_with_failing_test_and_collectors_shows_both(
+        self, tmp_path: Path
+    ) -> None:
+        failing = Test(
+            nodeid="tests/test_a.py::test_x", lineno=1, keywords=[], outcome="failed"
+        )
+        problem = "E   ImportError: no module named 'missing'"
+        report = _report(
+            2,
+            failed=1,
+            tests=[failing],
+            collectors=[
+                Collector(nodeid=nodeid, outcome="failed", result=[], longrepr=problem)
+                for nodeid in ("tests/test_b.py", "tests/test_c.py")
+            ],
+        )
+        grouped = group_failed_collectors(report)
+        summary_text = "Collected 2 tests in 0.0 seconds"
+        results = make_pytest_results(
+            RunStatus.FAILED,
+            grouped,
+            test_results=report,
+            summary_text=summary_text,
+        )
+
+        result = _run_with(tmp_path, results)
+
+        assert result.status == "findings"
+        assert [f.key for f in result.findings] == ["tests/test_a.py::test_x"]
+        assert result.summary.startswith(
+            f"{summary_text}\n\n2 collectors failed (1 distinct error)\n\n{problem}\n"
+        )
+        assert "same error in 1 more collector: tests/test_c.py" in result.summary
 
     def test_failed_without_failing_tests_is_error(self, tmp_path: Path) -> None:
         collector = Collector(
@@ -222,6 +273,42 @@ class TestRunTestVerdictMapping:
         assert result.status == "error"
         assert summary_text in result.summary
         assert "ImportError: no module named 'missing'" in result.summary
+
+    def test_failed_without_failing_tests_counts_collectors(
+        self, tmp_path: Path
+    ) -> None:
+        problem = "ImportError: no module named 'missing'"
+        collector = Collector(
+            nodeid="tests/test_broken.py",
+            outcome="failed",
+            result=[],
+            longrepr=problem,
+        )
+        results = make_pytest_results(
+            RunStatus.FAILED,
+            [problem],
+            test_results=_report(0, collectors=[collector]),
+            summary_text="Collected 0 tests in 0.0 seconds",
+        )
+
+        result = _run_with(tmp_path, results)
+
+        assert result.status == "error"
+        count_line = "1 collector failed (1 distinct error)"
+        assert result.summary.index(count_line) < result.summary.index(problem)
+
+    def test_failed_without_collector_keeps_summary(self, tmp_path: Path) -> None:
+        results = make_pytest_results(
+            RunStatus.FAILED,
+            ["some problem"],
+            test_results=_report(0),
+            summary_text="Collected 0 tests in 0.0 seconds",
+        )
+
+        result = _run_with(tmp_path, results)
+
+        assert result.status == "error"
+        assert result.summary == ("Collected 0 tests in 0.0 seconds\n\nsome problem\n")
 
     def test_passed_is_ok(self, tmp_path: Path) -> None:
         results = make_pytest_results(

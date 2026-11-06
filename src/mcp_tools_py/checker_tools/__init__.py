@@ -98,7 +98,7 @@ class CheckerTools:
         if verdict.status is RunStatus.FAILED:
             if report is None or not should_show_details(test_results, show_details):
                 return f"Pytest found failures. {test_results.get('summary_text') or ''}".rstrip()
-            block = format_collection_problems(report, verdict)
+            block = format_collection_problems(verdict)
             failed_tests_prompt = create_prompt_for_failed_tests(
                 report,
                 max_number_of_tests_reported=MAX_FAILURES,

@@ -6,17 +6,30 @@ from pathlib import Path
 from typing import Any
 from unittest.mock import patch
 
+import pytest
+
 from mcp_tools_py.code_checker_pytest.coverage import (
     _ranges,
     coverage_args,
     format_coverage_digest,
+    no_report_message,
     read_coverage_report,
     read_fail_under,
+    run_outcome,
     selection_line,
 )
+from mcp_tools_py.code_checker_pytest.models import Collector, PytestReport, Summary
+from mcp_tools_py.code_checker_pytest.verdict import RunStatus, RunVerdict
 from tests.conftest import make_command_result
+from tests.test_code_checker_pytest._coverage_report import _SELECTION, _file, _report
 
 _EXECUTE = "mcp_tools_py.code_checker_pytest.coverage.execute_command"
+
+_COLLECTOR_WARNING = "⚠ 47 collectors failed — coverage below reflects a partial run"
+_TEST_WARNING = "⚠ 2 tests failed — coverage below comes from a run with failures"
+_GENERIC_WARNING = (
+    "⚠ the pytest run reported an error — coverage below may be incomplete"
+)
 
 
 class TestCoverageArgs:
@@ -207,47 +220,6 @@ class TestSelectionLine:
         )
 
 
-_SELECTION = "selection: full suite (no markers, -k or path arguments)"
-
-
-def _file(
-    stmts: int,
-    missing: list[int],
-    functions: dict[str, list[int]] | None = None,
-) -> dict[str, Any]:
-    """One file entry of the coverage JSON."""
-    covered = stmts - len(missing)
-    entry: dict[str, Any] = {
-        "summary": {
-            "num_statements": stmts,
-            "covered_lines": covered,
-            "missing_lines": len(missing),
-            "percent_covered": 100.0 * covered / stmts if stmts else 100.0,
-        },
-        "missing_lines": missing,
-    }
-    if functions is not None:
-        entry["functions"] = {
-            name: {"missing_lines": lines} for name, lines in functions.items()
-        }
-    return entry
-
-
-def _report(files: dict[str, dict[str, Any]]) -> dict[str, Any]:
-    """A coverage JSON with totals summed from files."""
-    stmts = sum(f["summary"]["num_statements"] for f in files.values())
-    missed = sum(f["summary"]["missing_lines"] for f in files.values())
-    return {
-        "totals": {
-            "num_statements": stmts,
-            "missing_lines": missed,
-            "covered_lines": stmts - missed,
-            "percent_covered": 100.0 * (stmts - missed) / stmts if stmts else 100.0,
-        },
-        "files": files,
-    }
-
-
 class TestRanges:
     """Test collapsing line numbers into ranges."""
 
@@ -360,7 +332,7 @@ class TestFormatCoverageDigest:
         assert "2 further modules have gaps (use max_modules to see more)." in digest
 
     def test_max_modules_zero(self) -> None:
-        """max_modules=0 leaves only the header and the counts."""
+        """max_modules=0 drops the gap ranking but not the zero-coverage list."""
         data = _report(
             {
                 "a.py": _file(10, [1], {"f": [1]}),
@@ -370,9 +342,10 @@ class TestFormatCoverageDigest:
 
         digest = format_coverage_digest(data, _SELECTION, max_modules=0)
 
-        assert "a.py" not in digest and "z.py" not in digest
+        assert "a.py" not in digest
         assert "1 modules have no covered statements in this selection:" in digest
-        assert "… and 1 more" in digest
+        assert "    z.py (5 missing statements)" in digest
+        assert "… and 1 more" not in digest
         assert "1 further modules have gaps" in digest
 
     def test_negative_max_modules_clamped(self) -> None:
@@ -420,14 +393,49 @@ class TestFormatCoverageDigest:
 
         assert "fail_under: could not be read from the coverage config" in digest
 
-    def test_tests_failed_warning(self) -> None:
-        """A failed run carries a warning line."""
+    @pytest.mark.parametrize(
+        ("outcome", "expected"),
+        [
+            ({"failed_collectors": 47}, [_COLLECTOR_WARNING]),
+            ({"failed_tests": 2}, [_TEST_WARNING]),
+            (
+                {"failed_collectors": 47, "failed_tests": 2},
+                [_COLLECTOR_WARNING, _TEST_WARNING],
+            ),
+            ({"generic_warning": True}, [_GENERIC_WARNING]),
+            ({}, []),
+        ],
+        ids=["collectors", "tests", "both", "generic", "none"],
+    )
+    def test_warning_lines_come_first(
+        self, outcome: dict[str, Any], expected: list[str]
+    ) -> None:
+        """Each warning that applies leads the digest, in a fixed order."""
         data = _report({"a.py": _file(10, [1], {"f": [1]})})
 
-        assert "Warning: tests failed" not in format_coverage_digest(data, _SELECTION)
-        assert "Warning: tests failed" in format_coverage_digest(
-            data, _SELECTION, tests_failed=True
+        lines = format_coverage_digest(data, _SELECTION, **outcome).splitlines()
+
+        assert lines[: len(expected)] == expected
+        assert "⚠" not in "\n".join(lines[len(expected) :])
+
+    def test_warning_lines_use_the_singular(self) -> None:
+        """A count of 1 reads as one collector and one test."""
+        data = _report({"a.py": _file(10, [1], {"f": [1]})})
+
+        digest = format_coverage_digest(
+            data, _SELECTION, failed_collectors=1, failed_tests=1
         )
+
+        assert "⚠ 1 collector failed —" in digest
+        assert "⚠ 1 test failed —" in digest
+
+    def test_collection_only_digest_does_not_claim_tests_failed(self) -> None:
+        """Failed collectors alone never read as failed tests."""
+        data = _report({"a.py": _file(10, [1], {"f": [1]})})
+
+        digest = format_coverage_digest(data, _SELECTION, failed_collectors=47)
+
+        assert "tests failed" not in digest
 
     def test_fully_covered(self) -> None:
         """No gaps at all is said explicitly."""
@@ -436,3 +444,92 @@ class TestFormatCoverageDigest:
         digest = format_coverage_digest(data, _SELECTION)
 
         assert "No uncovered statements in the measured modules." in digest
+
+
+def _pytest_report(
+    collectors: list[Collector] | None = None, **counts: int
+) -> PytestReport:
+    return PytestReport(
+        created=0.0,
+        duration=1.0,
+        exitcode=0,
+        root="/project",
+        environment={},
+        summary=Summary(collected=1, total=1, **counts),
+        collectors=collectors,
+    )
+
+
+def _verdict(status: RunStatus) -> RunVerdict:
+    return RunVerdict(status, [], 0)
+
+
+class TestRunOutcome:
+    """Test the failure state of one run."""
+
+    def test_no_report_gives_zeros(self) -> None:
+        """Without a report there is nothing to count, and no generic warning."""
+        assert run_outcome(None, _verdict(RunStatus.ERROR)) == {
+            "failed_collectors": 0,
+            "failed_tests": 0,
+            "generic_warning": False,
+        }
+
+    def test_failed_and_error_both_count_as_failed_tests(self) -> None:
+        """The failed-test count adds summary.failed and summary.error."""
+        report = _pytest_report(failed=2, error=3)
+
+        outcome = run_outcome(report, _verdict(RunStatus.FAILED))
+
+        assert outcome["failed_tests"] == 5
+
+    def test_summary_error_alone_counts_as_a_failed_test(self) -> None:
+        """classify_run returns FAILED on summary.error alone, so it counts."""
+        outcome = run_outcome(_pytest_report(error=1), _verdict(RunStatus.FAILED))
+
+        assert outcome["failed_tests"] == 1
+        assert outcome["generic_warning"] is False
+
+    def test_failed_collectors_are_counted(self) -> None:
+        """Failed collectors count; a collected one does not."""
+        report = _pytest_report(
+            [
+                Collector(nodeid="a", outcome="failed", result=[]),
+                Collector(nodeid="b", outcome="failed", result=[]),
+                Collector(nodeid="c", outcome="passed", result=[]),
+            ]
+        )
+
+        outcome = run_outcome(report, _verdict(RunStatus.ERROR))
+
+        assert outcome["failed_collectors"] == 2
+        assert outcome["generic_warning"] is False
+
+    def test_error_with_zero_counts_sets_the_generic_warning(self) -> None:
+        """An ERROR run with nothing counted still has to say something."""
+        outcome = run_outcome(_pytest_report(), _verdict(RunStatus.ERROR))
+
+        assert outcome["generic_warning"] is True
+
+    @pytest.mark.parametrize("status", [RunStatus.PASSED, RunStatus.SUSPICIOUS])
+    def test_other_statuses_have_no_generic_warning(self, status: RunStatus) -> None:
+        """Only ERROR sets the generic warning."""
+        outcome = run_outcome(_pytest_report(), _verdict(status))
+
+        assert outcome["generic_warning"] is False
+
+
+class TestNoReportMessage:
+    """Test the reply for a run with no coverage report."""
+
+    @pytest.mark.parametrize(
+        ("failed_collectors", "expected"),
+        [
+            (0, "Coverage report was not produced."),
+            (1, "Coverage report was not produced. 1 collector failed."),
+            (47, "Coverage report was not produced. 47 collectors failed."),
+        ],
+    )
+    def test_message(self, failed_collectors: int, expected: str) -> None:
+        """The failed-collector count is included when there is one."""
+        assert no_report_message(failed_collectors) == expected

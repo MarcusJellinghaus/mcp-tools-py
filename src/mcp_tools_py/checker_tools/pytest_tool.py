@@ -8,9 +8,17 @@ from typing import TYPE_CHECKING, Dict, List, Optional
 from mcp_tools_py.code_checker_pytest.coverage import (
     coverage_args,
     format_coverage_digest,
+    no_report_message,
     read_coverage_report,
     read_fail_under,
+    selection_identity,
     selection_line,
+)
+from mcp_tools_py.code_checker_pytest.coverage_store import (
+    CoverageRun,
+    finish_coverage_run,
+    format_last_run,
+    start_coverage_run,
 )
 from mcp_tools_py.code_checker_pytest.runners import check_code_with_pytest
 from mcp_tools_py.code_checker_pytest.utils import sanitize_extra_args
@@ -43,6 +51,8 @@ def register(mcp: "FastMCPProtocol", checker_tools: "CheckerTools") -> None:
         coverage: bool = False,
         coverage_source: Optional[List[str]] = None,
         max_modules: int = 10,
+        use_last_coverage_run: bool = False,
+        combine_with_previous: bool = False,
     ) -> str:
         """Run pytest on the project code and generate smart prompts for LLMs.
 
@@ -59,15 +69,27 @@ def register(mcp: "FastMCPProtocol", checker_tools: "CheckerTools") -> None:
                 then 300.
             coverage: Measure coverage with pytest-cov (must be installed in the
                 project's environment) and append a digest to the reply: total,
-                modules ranked by missing statements with per-function line
-                ranges, modules with nothing covered, and the test selection
-                the numbers come from. The project's `fail_under` is not
+                a per-package table, modules ranked by missing statements with
+                per-function line ranges, modules with nothing covered, and the
+                test selection the numbers come from. The project's `fail_under` is not
                 applied. Exclude code with coverage's own `omit` setting or
                 `# pragma: no cover`.
             coverage_source: Directories to measure. Defaults to the project's
                 source directories from pyproject.toml, excluding test paths.
-            max_modules: How many modules the coverage digest details in each
-                list (default: 10).
+                With use_last_coverage_run, directories to narrow the digest to;
+                anything outside what was measured is refused.
+            max_modules: How many modules the coverage digest's gap ranking
+                details; 0 shows only the overview (default: 10).
+            use_last_coverage_run: Run no tests and return the digest of the last
+                coverage run, or "stale — rerun" when a Python file in scope has
+                changed since. Only coverage_source and max_modules can be combined
+                with it; other arguments are refused.
+            combine_with_previous: Merge this coverage run with the saved runs, so
+                the digest covers every selection; requires coverage=True. A rerun
+                of an identical selection replaces its earlier data. When a Python
+                file in scope or coverage_source changed, or the merge fails, the
+                saved runs are discarded and the reply says so. A run with no
+                report leaves them unchanged.
 
         Returns:
             A string containing either pytest results or a prompt for an LLM to interpret
@@ -102,7 +124,42 @@ def register(mcp: "FastMCPProtocol", checker_tools: "CheckerTools") -> None:
 
             # Coverage digest for the full suite
             run_pytest_check(coverage=True)
+
+            # Drill into the last coverage run without rerunning tests
+            run_pytest_check(use_last_coverage_run=True, coverage_source=["src/pkg"])
+
+            # Add a second selection to the last coverage run
+            run_pytest_check(
+                coverage=True,
+                combine_with_previous=True,
+                extra_args=["tests/test_other.py"],
+            )
         """
+        if use_last_coverage_run:
+            conflicts = [
+                name
+                for name, given in (
+                    ("markers", bool(markers)),
+                    ("extra_args", bool(extra_args)),
+                    ("env_vars", bool(env_vars)),
+                    ("timeout_seconds", timeout_seconds is not None),
+                    ("combine_with_previous", combine_with_previous),
+                    ("coverage", coverage),
+                )
+                if given
+            ]
+            if conflicts:
+                return (
+                    "Error: use_last_coverage_run=True cannot be used with: "
+                    f"{', '.join(conflicts)}."
+                )
+            return format_last_run(
+                str(context.project_dir), coverage_source, max_modules
+            )
+
+        if combine_with_previous and not coverage:
+            return "Error: combine_with_previous=True requires coverage=True."
+
         if not context.is_tool_available("pytest"):
             return context.unavailable_message("pytest")
 
@@ -142,12 +199,40 @@ def register(mcp: "FastMCPProtocol", checker_tools: "CheckerTools") -> None:
             run_args = sanitized.cleaned_args
             run_env = env_vars
             fail_under: Optional[float] = None
+            coverage_run: Optional[CoverageRun] = None
+            run_timeout = context.resolve_timeout("pytest", timeout_seconds)
             if coverage:
                 temp_dir = tempfile.mkdtemp(prefix="pytest_cov_")
                 cov_args, cov_env = coverage_args(sources, temp_dir)
                 run_args = sanitized.cleaned_args + cov_args
                 run_env = {**(env_vars or {}), **cov_env}
                 fail_under = read_fail_under(interpreter, project_dir)
+                addopts = get_pytest_addopts(project_dir)
+                coverage_run = start_coverage_run(
+                    project_dir,
+                    temp_dir,
+                    context.test_folder,
+                    coverage_source,
+                    sources,
+                    fail_under,
+                    selection_line(
+                        markers,
+                        sanitized.cleaned_args,
+                        sanitized.path_args,
+                        addopts,
+                    ),
+                    selection_identity(
+                        markers,
+                        sanitized.cleaned_args,
+                        sanitized.path_args,
+                        addopts,
+                        env_vars,
+                    ),
+                    interpreter,
+                    env_vars,
+                    run_timeout,
+                    combine_with_previous,
+                )
 
             # Run pytest
             test_results = check_code_with_pytest(
@@ -161,7 +246,7 @@ def register(mcp: "FastMCPProtocol", checker_tools: "CheckerTools") -> None:
                 venv_bin=str(context.environment.bin_dir),
                 keep_temp_files=context.keep_temp_files,
                 skip_default_test_folder=sanitized.has_path_args,
-                timeout_seconds=context.resolve_timeout("pytest", timeout_seconds),
+                timeout_seconds=run_timeout,
             )
 
             # Always show detailed failure output
@@ -176,25 +261,26 @@ def register(mcp: "FastMCPProtocol", checker_tools: "CheckerTools") -> None:
 
             summary = test_results.get("summary", {})
             verdict = test_results["verdict"]
-            tests_failed = verdict.status in (RunStatus.FAILED, RunStatus.ERROR)
-            if temp_dir is not None:
-                data = read_coverage_report(temp_dir)
-                if data is None:
-                    digest = "Coverage report was not produced."
+            if coverage_run is not None:
+                report = test_results.get("test_results")
+                # Without a parsed report, JSON from import-time lines proves nothing.
+                data = (
+                    read_coverage_report(coverage_run.temp_dir)
+                    if report is not None
+                    else None
+                )
+                finished = finish_coverage_run(coverage_run, data, report, verdict)
+                if finished.data is None:
+                    digest = no_report_message(finished.outcome["failed_collectors"])
                 else:
-                    selection = selection_line(
-                        markers,
-                        sanitized.cleaned_args,
-                        sanitized.path_args,
-                        get_pytest_addopts(project_dir),
-                    )
                     digest = format_coverage_digest(
-                        data,
-                        selection,
+                        finished.data,
+                        finished.selection,
                         max_modules=max_modules,
                         fail_under=fail_under,
-                        tests_failed=tests_failed,
+                        **finished.outcome,
                     )
+                digest = "\n".join([digest, *finished.notes])
                 result = f"{result}\n\n{digest}"
 
             if verdict.status in (RunStatus.PASSED, RunStatus.FAILED):

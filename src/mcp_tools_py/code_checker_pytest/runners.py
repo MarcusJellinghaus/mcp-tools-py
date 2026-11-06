@@ -329,7 +329,7 @@ def run_tests(
                     raise
 
             # Check specifically for 'no tests found' case
-            if "collected 0 items" in combined_output or process.returncode == 5:
+            if process.returncode == 5:
                 detail = _build_error_detail(output, error_output)
                 raise ValueError(
                     f"No Tests Found: Pytest did not find any tests to run.{detail}"
@@ -398,26 +398,20 @@ def run_tests(
             # Final check to ensure we have a report file
             if not report_exists:
                 logger.warning("Pytest produced no report file: %s", combined_output)
-                if "collected 0 items" in combined_output:
-                    detail = _build_error_detail(output, error_output)
-                    raise ValueError(
-                        f"No Tests Found: Pytest did not find any tests to run.{detail}"
-                    )
-                else:
-                    # Check for missing pytest module
-                    stderr = error_output or ""
-                    tool_error = check_tool_missing_error(
-                        stderr, "pytest", python_executable
-                    )
-                    if tool_error:
-                        raise RuntimeError(tool_error)
+                # Check for missing pytest module
+                stderr = error_output or ""
+                tool_error = check_tool_missing_error(
+                    stderr, "pytest", python_executable
+                )
+                if tool_error:
+                    raise RuntimeError(tool_error)
 
-                    base_msg = (
-                        "Test execution completed but no report file was generated. "
-                        "Check for configuration errors in pytest.ini or pytest plugins."
-                    )
-                    base_msg += _build_error_detail(output, error_output)
-                    raise RuntimeError(base_msg)
+                base_msg = (
+                    "Test execution completed but no report file was generated. "
+                    "Check for configuration errors in pytest.ini or pytest plugins."
+                )
+                base_msg += _build_error_detail(output, error_output)
+                raise RuntimeError(base_msg)
 
             file_contents = read_file(temp_report_file)
             parsed_results = parse_pytest_report(file_contents)

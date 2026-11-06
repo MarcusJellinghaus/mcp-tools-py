@@ -5,14 +5,16 @@ from enum import Enum
 
 from mcp_tools_py.code_checker_pytest.models import PytestReport, Summary
 from mcp_tools_py.code_checker_pytest.reporting import (
-    FAILED_OUTCOMES,
     MAX_OUTPUT_LINES,
+    XDIST_MARKER,
     OutputBuilder,
+    collectors_failed_line,
+    failed_collector_count,
     get_test_summary,
+    group_failed_collectors,
 )
 from mcp_tools_py.code_checker_pytest.utils import get_pytest_exit_code_info
 
-XDIST_MARKER = "Different tests were collected"
 XDIST_HINT = (
     "Hint: pytest-xdist workers collected different tests. Parametrize values "
     "must be identical across workers (no `datetime.now()` or random values). "
@@ -78,10 +80,13 @@ def format_error_text(report: PytestReport | None, verdict: RunVerdict) -> str:
     else:
         lines.append("Pytest run did not complete.")
     code = verdict.exit_code
-    if code != 0 and not (code == 2 and report and _has_collection_problems(report)):
+    if code != 0 and not (report and _collection_explains_exit(report)):
         lines.append(f"Exit code {code}: {get_pytest_exit_code_info(code)[0]}")
     if verdict.problems:
         lines.append("Problems:")
+        count_line = collectors_failed_line(report) if report else ""
+        if count_line:
+            lines.extend([count_line, ""])
         lines.append(cap_problems(verdict.problems) + _xdist_hint(verdict.problems))
     return "\n".join(lines)
 
@@ -98,26 +103,17 @@ def format_suspicious_text(collected: int) -> str:
     return f"Collected {collected} tests but none reported an outcome. Not verified."
 
 
-def format_collection_problems(report: PytestReport | None, verdict: RunVerdict) -> str:
-    """Render what the failure prompt omits: collection errors and the xdist hint.
+def format_collection_problems(verdict: RunVerdict) -> str:
+    """Render what the failure prompt omits: the xdist hint.
 
     Args:
-        report: The parsed pytest report, if any
         verdict: The verdict to render
 
     Returns:
         The "Collection problems" block, or "" when there is nothing to add.
     """
-    if not verdict.problems:
-        return ""
-    ctx = report.error_context if report else None
-    body = (
-        cap_problems(["\n".join(ctx.collection_errors)])
-        if ctx and ctx.collection_errors
-        else ""
-    )
     hint = _xdist_hint(verdict.problems)
-    return f"Collection problems:\n{body}{hint}".rstrip() if body or hint else ""
+    return f"Collection problems:{hint}" if hint else ""
 
 
 def cap_problems(problems: list[str]) -> str:
@@ -137,38 +133,17 @@ def cap_problems(problems: list[str]) -> str:
 
 
 def _merge_problems(report: PytestReport, with_tail: bool) -> list[str]:
-    """Collect problems from collectors, collection errors and the output tail.
+    """Collect problems from collectors and the output tail.
 
     Returns:
-        De-duplicated problems, first occurrence kept.
+        One text per distinct collector error, or the output tail when there are none.
     """
     ctx = report.error_context
-    items = [
-        c.longrepr
-        for c in report.collectors or []
-        if c.outcome in FAILED_OUTCOMES and c.longrepr
-    ]
-    if ctx and ctx.collection_errors:
-        items.append("\n".join(ctx.collection_errors))
+    items = group_failed_collectors(report)
     # ErrorContext holds the full output on every non-zero exit, so the tail is only used for ERROR
     if with_tail and not items and ctx and ctx.error_message.strip():
         items.append("\n".join(ctx.error_message.splitlines()[-_ERROR_TAIL_LINES:]))
-    seen: set[str] = set()
-    problems = []
-    for item in items:
-        key = _dedup_key(item)
-        if key not in seen:
-            seen.add(key)
-            problems.append(item)
-    return problems
-
-
-def _dedup_key(text: str) -> str:
-    """Return the de-duplication key for a problem text."""
-    if XDIST_MARKER in text:
-        return XDIST_MARKER
-    stripped = text.strip()
-    return stripped.splitlines()[0] if stripped else ""
+    return items
 
 
 def _xdist_hint(problems: list[str]) -> str:
@@ -190,9 +165,14 @@ def _has_outcomes(summary: Summary) -> bool:
 
 
 def _has_collection_problems(report: PytestReport) -> bool:
-    """Return True when collectors failed or collection errors were recorded."""
-    ctx = report.error_context
-    failed_collectors = any(
-        c.outcome in FAILED_OUTCOMES for c in report.collectors or []
+    """Return True when collectors failed."""
+    return failed_collector_count(report) > 0
+
+
+def _collection_explains_exit(report: PytestReport) -> bool:
+    """Return True when collectors failed and no test failed or errored."""
+    summary = report.summary
+    return (
+        _has_collection_problems(report)
+        and (summary.failed or 0) + (summary.error or 0) == 0
     )
-    return failed_collectors or bool(ctx and ctx.collection_errors)

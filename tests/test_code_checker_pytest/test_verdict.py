@@ -10,10 +10,9 @@ from mcp_tools_py.code_checker_pytest.models import (
     PytestReport,
     Summary,
 )
-from mcp_tools_py.code_checker_pytest.reporting import MAX_OUTPUT_LINES
+from mcp_tools_py.code_checker_pytest.reporting import MAX_OUTPUT_LINES, XDIST_MARKER
 from mcp_tools_py.code_checker_pytest.verdict import (
     XDIST_HINT,
-    XDIST_MARKER,
     RunStatus,
     RunVerdict,
     classify_run,
@@ -27,17 +26,12 @@ def _summary(collected: int = 0, **counts: Optional[int]) -> Summary:
     return Summary(collected=collected, total=collected, **counts)
 
 
-def _ctx(
-    exit_code: int,
-    error_message: str = "",
-    collection_errors: Optional[List[str]] = None,
-) -> ErrorContext:
+def _ctx(exit_code: int, error_message: str = "") -> ErrorContext:
     return ErrorContext(
         exit_code=exit_code,
         exit_code_meaning="",
         error_message=error_message,
         suggestion="",
-        collection_errors=collection_errors,
     )
 
 
@@ -103,15 +97,6 @@ def test_classify_run(
     assert verdict.exit_code == expected_exit
 
 
-def test_problems_collectors_before_collection_errors() -> None:
-    report = _report(
-        _summary(0),
-        collectors=[_collector("collector problem")],
-        error_context=_ctx(2, "full output", collection_errors=["ctx error"]),
-    )
-    assert classify_run(report).problems == ["collector problem", "ctx error"]
-
-
 def test_problems_ignore_passed_collectors() -> None:
     report = _report(
         _summary(1, passed=1),
@@ -160,10 +145,10 @@ def test_dedup_xdist_marker() -> None:
     assert "worker gw0" in problems[0]
 
 
-def test_dedup_same_first_line() -> None:
+def test_same_first_line_with_different_last_lines_stay_separate() -> None:
     collectors = [_collector("ImportError: x\nA"), _collector("ImportError: x\nB")]
     report = _report(_summary(0), collectors=collectors, error_context=_ctx(2))
-    assert classify_run(report).problems == ["ImportError: x\nA"]
+    assert classify_run(report).problems == ["ImportError: x\nA", "ImportError: x\nB"]
 
 
 def test_format_error_text_truncates_and_keeps_hint() -> None:
@@ -183,6 +168,33 @@ def test_format_error_text_exit2_with_collector_omits_interrupted() -> None:
     assert "interrupted by the user" not in text
     assert "Exit code" not in text
     assert "ImportError" in text
+
+
+def test_format_error_text_exit1_with_collector_no_failed_test_omits_exit_line() -> (
+    None
+):
+    report = _report(
+        _summary(0), collectors=[_collector("ImportError")], error_context=_ctx(1)
+    )
+    text = format_error_text(report, classify_run(report))
+    assert "Exit code" not in text
+    assert "some tests failed" not in text
+    assert "ImportError" in text
+
+
+@pytest.mark.parametrize(
+    "counts", [{"failed": 1}, {"error": 1}], ids=["failed", "error"]
+)
+def test_format_error_text_exit1_with_collector_and_failed_test_keeps_exit_line(
+    counts: dict[str, int],
+) -> None:
+    report = _report(
+        _summary(2, passed=1, **counts),
+        collectors=[_collector("ImportError")],
+        error_context=_ctx(1),
+    )
+    text = format_error_text(report, classify_run(report))
+    assert "Exit code 1:" in text
 
 
 def test_format_error_text_exit1_includes_exit_line() -> None:
@@ -208,22 +220,9 @@ def test_format_error_text_includes_counts() -> None:
     assert "did not complete" not in text
 
 
-def test_format_collection_problems_only_collection_errors() -> None:
-    report = _report(
-        _summary(2, failed=1),
-        collectors=[_collector("collector text")],
-        error_context=_ctx(1, "tail text", collection_errors=["ctx error"]),
-    )
-    text = format_collection_problems(report, classify_run(report))
-    assert text.startswith("Collection problems:")
-    assert "ctx error" in text
-    assert "collector text" not in text
-    assert "tail text" not in text
-
-
 def test_format_collection_problems_empty() -> None:
     verdict = RunVerdict(RunStatus.FAILED, [], 1)
-    assert format_collection_problems(None, verdict) == ""
+    assert format_collection_problems(verdict) == ""
 
 
 def test_format_collection_problems_xdist_hint_from_collector() -> None:
@@ -232,9 +231,8 @@ def test_format_collection_problems_xdist_hint_from_collector() -> None:
         collectors=[_collector(f"{XDIST_MARKER} on gw1")],
         error_context=_ctx(1),
     )
-    text = format_collection_problems(report, classify_run(report))
-    assert XDIST_HINT in text
-    assert "on gw1" not in text
+    text = format_collection_problems(classify_run(report))
+    assert text == f"Collection problems:\n{XDIST_HINT}"
 
 
 def test_format_suspicious_text() -> None:

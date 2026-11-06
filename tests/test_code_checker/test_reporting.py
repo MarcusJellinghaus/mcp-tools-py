@@ -569,8 +569,7 @@ def test_create_prompt_with_collection_errors() -> None:
     prompt = create_prompt_for_failed_tests(report)
 
     assert prompt is not None
-    assert "The following collectors failed during the test session:" in prompt
-    assert "test_broken.py" in prompt
+    assert "1 collector failed (1 distinct error)" in prompt
     assert "ImportError: No module named 'missing_dependency'" in prompt
 
 
@@ -830,7 +829,7 @@ def test_collection_errors_always_shown() -> None:
     assert prompt is not None
 
     # Collection errors should always be shown
-    assert "The following collectors failed during the test session:" in prompt
+    assert "1 collector failed (1 distinct error)" in prompt
     assert "test_broken.py" in prompt
     assert "ImportError: No module named 'missing_dependency'" in prompt
 

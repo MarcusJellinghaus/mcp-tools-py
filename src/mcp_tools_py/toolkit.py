@@ -27,9 +27,17 @@ from mcp_tools_py.code_checker_pytest.coverage import (
     format_coverage_digest,
     read_coverage_report,
     read_fail_under,
+    selection_identity,
     selection_line,
 )
+from mcp_tools_py.code_checker_pytest.coverage_store import (
+    CoverageRun,
+    FinishedRun,
+    finish_coverage_run,
+    start_coverage_run,
+)
 from mcp_tools_py.code_checker_pytest.models import PytestReport, Test
+from mcp_tools_py.code_checker_pytest.reporting import collectors_failed_line
 from mcp_tools_py.code_checker_pytest.runners import check_code_with_pytest
 from mcp_tools_py.code_checker_pytest.verdict import (
     RunStatus,
@@ -101,9 +109,10 @@ def _test_failure_summary(test: Test) -> str:
 def _run_test(context: ToolContext, depth: str) -> ActionResult:
     """Run pytest at `depth` and map the outcome onto an ActionResult.
 
-    `full` additionally measures coverage and sets `raw` to the digest
-    (mirroring `run_pytest_check(coverage=True)`); a `fail_under` miss is
-    informational only and never changes `status`.
+    `full` additionally measures coverage, saves or clears the saved coverage
+    data, and sets `raw` to the digest (mirroring
+    `run_pytest_check(coverage=True)`); a `fail_under` miss is informational
+    only and never changes `status`.
 
     Returns:
         "error" if pytest is unavailable, the verdict is ERROR (other than
@@ -125,17 +134,32 @@ def _run_test(context: ToolContext, depth: str) -> ActionResult:
     env_vars: dict[str, str] = {}
     fail_under: float | None = None
     temp_dir: str | None = None
-    if depth == "full":
-        sources = resolve_coverage_source(project_dir, None)
-        if isinstance(sources, str):
-            return ActionResult(status="error", summary=sources)
-        temp_dir = tempfile.mkdtemp(prefix="pytest_cov_")
-        cov_args, cov_env = coverage_args(sources, temp_dir)
-        extra_args = cov_args
-        env_vars = cov_env
-        fail_under = read_fail_under(interpreter, project_dir)
-
+    coverage_run: CoverageRun | None = None
     try:
+        if depth == "full":
+            sources = resolve_coverage_source(project_dir, None)
+            if isinstance(sources, str):
+                return ActionResult(status="error", summary=sources)
+            temp_dir = tempfile.mkdtemp(prefix="pytest_cov_")
+            cov_args, cov_env = coverage_args(sources, temp_dir)
+            extra_args = cov_args
+            env_vars = cov_env
+            fail_under = read_fail_under(interpreter, project_dir)
+            addopts = get_pytest_addopts(project_dir)
+            coverage_run = start_coverage_run(
+                project_dir,
+                temp_dir,
+                context.test_folder,
+                None,
+                sources,
+                fail_under,
+                selection_line(markers, [], [], addopts),
+                selection_identity(markers, [], [], addopts, None),
+                interpreter,
+                None,
+                context.resolve_timeout("pytest"),
+            )
+
         result = check_code_with_pytest(
             project_dir,
             python_executable=interpreter,
@@ -150,6 +174,16 @@ def _run_test(context: ToolContext, depth: str) -> ActionResult:
 
         verdict: RunVerdict = result["verdict"]
         report: PytestReport | None = result.get("test_results")
+        finished: FinishedRun | None = None
+        if coverage_run is not None:
+            # Without a parsed report, JSON from import-time lines proves nothing.
+            data = (
+                read_coverage_report(coverage_run.temp_dir)
+                if report is not None
+                else None
+            )
+            finished = finish_coverage_run(coverage_run, data, report, verdict)
+
         known = (RunStatus.PASSED, RunStatus.FAILED, RunStatus.SUSPICIOUS)
         if report is None or verdict.status not in known:
             if any("No Tests Found" in p for p in verdict.problems):
@@ -170,11 +204,13 @@ def _run_test(context: ToolContext, depth: str) -> ActionResult:
             for test in report.tests or []
             if test.outcome in _FAILED_OUTCOMES
         ]
+        count_line = collectors_failed_line(report)
+        count_text = f"{count_line}\n\n" if count_line else ""
+        failed_summary = (
+            f"{summary_text}\n\n{count_text}{cap_problems(verdict.problems)}"
+        )
         if verdict.status is RunStatus.FAILED and not findings:
-            return ActionResult(
-                status="error",
-                summary=f"{summary_text}\n\n{cap_problems(verdict.problems)}",
-            )
+            return ActionResult(status="error", summary=failed_summary)
         ok_summary = (
             format_suspicious_text(report.summary.collected)
             if verdict.status is RunStatus.SUSPICIOUS
@@ -184,21 +220,17 @@ def _run_test(context: ToolContext, depth: str) -> ActionResult:
             error=None,
             findings=findings,
             ok_summary=ok_summary,
-            findings_summary=summary_text,
+            findings_summary=failed_summary if count_line else summary_text,
         )
 
-        if depth == "full" and temp_dir is not None:
-            data = read_coverage_report(temp_dir)
-            if data is not None:
-                selection = selection_line(
-                    markers, [], [], get_pytest_addopts(project_dir)
-                )
-                action_result.raw = format_coverage_digest(
-                    data,
-                    selection,
-                    fail_under=fail_under,
-                    tests_failed=bool(findings),
-                )
+        if finished is not None and finished.data is not None:
+            digest = format_coverage_digest(
+                finished.data,
+                finished.selection,
+                fail_under=fail_under,
+                **finished.outcome,
+            )
+            action_result.raw = "\n".join([digest, *finished.notes])
         return action_result
     finally:
         if temp_dir is not None and not context.keep_temp_files:

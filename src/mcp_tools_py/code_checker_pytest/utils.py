@@ -230,30 +230,10 @@ def create_error_context(exit_code: int, error_message: str) -> ErrorContext:
         if len(traceback_parts) > 1:
             traceback = "Traceback (most recent call last):" + traceback_parts[1]
 
-    # Extract collection errors if present
-    collection_errors = None
-    if "FAILED TO COLLECT" in error_message:
-        collection_error_lines = []
-        in_collection_error = False
-        for line in error_message.split("\n"):
-            if "FAILED TO COLLECT" in line:
-                in_collection_error = True
-                collection_error_lines.append(line)
-            elif in_collection_error and line.strip():
-                collection_error_lines.append(line)
-            elif (
-                in_collection_error and not line.strip()
-            ):  # Empty line ends the section
-                in_collection_error = False
-
-        if collection_error_lines:
-            collection_errors = collection_error_lines
-
     return ErrorContext(
         exit_code=exit_code,
         exit_code_meaning=exit_code_meaning,
         error_message=error_message,
         suggestion=suggestion,
         traceback=traceback,
-        collection_errors=collection_errors,
     )

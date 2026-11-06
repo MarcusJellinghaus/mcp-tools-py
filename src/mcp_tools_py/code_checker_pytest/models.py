@@ -152,7 +152,6 @@ class ErrorContext:
     error_message: str
     suggestion: str
     traceback: Optional[str] = None
-    collection_errors: Optional[List[str]] = None
 
 
 @dataclass

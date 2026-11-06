@@ -53,6 +53,8 @@ dev = [
     "build>=1.0",
     # Runs the run_pytest_check(coverage=True) integration test
     "pytest-cov>=5.0",
+    # patch = ["subprocess"] below needs 7.10; older versions only warn and don't trace
+    "coverage>=7.10",
     ]
 typecheck = ["mypy>=1.13.0"]
 
@@ -76,6 +78,8 @@ markers = [
     "integration: Integration tests requiring external resources",
 ]
 
+[tool.coverage.run]
+patch = ["subprocess"]
 
 [tool.black]
 line-length = 88

@@ -8,9 +8,11 @@ within a conservative budget, so a regression (e.g. re-introducing a heavy
 eager import) fails in CI instead of in a user's session.
 """
 
+import os
 import subprocess
 import sys
 import time
+from unittest.mock import patch
 
 import pytest
 
@@ -54,6 +56,12 @@ def test_server_startup_within_budget() -> None:
     so the measured run reflects steady-state import cost rather than one-time
     compilation noise.
     """
+    if "COVERAGE_PROCESS_CONFIG" in os.environ:
+        pytest.skip(
+            "Subprocess tracing inflates startup time; "
+            "the untraced CI job enforces the budget."
+        )
+
     _measure_startup_seconds()  # warm-up: compile .pyc, warm caches
     elapsed = min(_measure_startup_seconds() for _ in range(3))
 
@@ -62,3 +70,24 @@ def test_server_startup_within_budget() -> None:
         f"{STARTUP_BUDGET_SECONDS:.1f}s budget (Claude Code limit ~5s). "
         "A heavy module may now be imported eagerly at startup."
     )
+
+
+def test_startup_budget_runs_without_tracing(monkeypatch: pytest.MonkeyPatch) -> None:
+    """Without subprocess tracing the budget is measured and enforced."""
+    monkeypatch.delenv("COVERAGE_PROCESS_CONFIG", raising=False)
+
+    with patch(f"{__name__}._measure_startup_seconds", return_value=0.0) as measure:
+        test_server_startup_within_budget()
+
+    measure.assert_called()
+
+
+def test_startup_budget_skips_under_tracing(monkeypatch: pytest.MonkeyPatch) -> None:
+    """Subprocess tracing skips the budget before anything is spawned."""
+    monkeypatch.setenv("COVERAGE_PROCESS_CONFIG", "{}")
+
+    with patch(f"{__name__}._measure_startup_seconds") as measure:
+        with pytest.raises(pytest.skip.Exception):
+            test_server_startup_within_budget()
+
+    measure.assert_not_called()
