@@ -64,15 +64,19 @@ def _merge(results: list[ActionResult]) -> ActionResult:
     Returns:
         One ActionResult: status is the worst across `results` ("error" >
         "findings" > "ok" > "skipped"), findings and non-empty raw outputs
-        concatenated, fix_text rebuilt from the merged findings.
+        concatenated. fix_text joins each result's own fix_text, rebuilt from
+        that result's findings when not set; empty parts are skipped.
     """
     worst = max(results, key=lambda result: _STATUS_RANK[result.status])
     findings = [finding for result in results for finding in result.findings]
     summary = "; ".join(result.summary for result in results)
     raw = "\n\n".join(result.raw for result in results if result.raw)
-    fix_text = (
-        "\n".join(_finding_line(finding) for finding in findings) if findings else ""
-    )
+    parts = [
+        result.fix_text
+        or "\n".join(_finding_line(finding) for finding in result.findings)
+        for result in results
+    ]
+    fix_text = "\n".join(part for part in parts if part)
     return ActionResult(
         status=worst.status,
         summary=summary,
