@@ -7,10 +7,18 @@ from unittest.mock import patch
 import pytest
 
 from mcp_tools_py.code_checker_mypy.models import MypyMessage, MypyResult
-from mcp_tools_py.code_checker_mypy.reporting import create_mypy_prompt, get_mypy_prompt
+from mcp_tools_py.code_checker_mypy.reporting import (
+    MYPY_FAILURE_PREFIX,
+    MYPY_SUCCESS_TEXT,
+    create_mypy_prompt,
+    get_mypy_prompt,
+    run_signals,
+)
 from tests.conftest import make_command_result
 
 HEADER = "Mypy found type issues that need attention:"
+EARLY_STOP = "mypy exited with code 2, more errors may appear after these are fixed"
+WARNING = "Warning from mypy: careful"
 
 
 def _msg(
@@ -323,3 +331,103 @@ def test_get_mypy_prompt_forwards_max_issues(tmp_path: Path) -> None:
         get_mypy_prompt(str(tmp_path), python_executable=sys.executable, max_issues=2)
 
     assert mock_create.call_args.kwargs["max_issues"] == 2
+
+
+@pytest.mark.parametrize(
+    ("return_code", "has_messages", "stderr", "expected"),
+    [
+        (0, False, None, []),
+        (1, True, None, []),
+        (2, True, None, [EARLY_STOP]),
+        (1, True, "careful", [WARNING]),
+        (0, False, "careful", [WARNING]),
+        (2, True, "careful", [EARLY_STOP, WARNING]),
+        (2, False, None, []),
+    ],
+)
+def test_run_signals(
+    return_code: int, has_messages: bool, stderr: str | None, expected: list[str]
+) -> None:
+    """Early-stop line first, then the warning; rc 2 needs messages."""
+    messages = [_msg("src/a.py", 1, "misc")] if has_messages else []
+    result = MypyResult(return_code=return_code, messages=messages, stderr=stderr)
+
+    assert run_signals(result) == expected
+
+
+def test_create_mypy_prompt_early_stop_comes_first() -> None:
+    """An rc 2 report starts with the early-stop line, before the header."""
+    result = MypyResult(return_code=2, messages=[_msg("src/a.py", 1, "misc")])
+    prompt = create_mypy_prompt(result)
+
+    assert prompt is not None
+    lines = prompt.splitlines()
+    assert lines[0] == EARLY_STOP
+    assert lines[2] == HEADER
+
+
+def test_create_mypy_prompt_shows_warning_with_issues() -> None:
+    """An rc 1 report shows the stderr warning before the header."""
+    result = MypyResult(
+        return_code=1, messages=[_msg("src/a.py", 1, "misc")], stderr="careful"
+    )
+    prompt = create_mypy_prompt(result)
+
+    assert prompt is not None
+    lines = prompt.splitlines()
+    assert lines[0] == WARNING
+    assert lines[2] == HEADER
+
+
+def test_create_mypy_prompt_shows_warning_with_notes_only() -> None:
+    """A notes-only run shows the stderr warning."""
+    result = MypyResult(
+        return_code=0,
+        messages=[_msg("src/a.py", 9, "misc", severity="note", message="Revealed")],
+        stderr="careful",
+    )
+
+    assert create_mypy_prompt(result) == (
+        f"{WARNING}\n"
+        "\n"
+        "mypy found 0 issues across 0 rules\n"
+        "\n"
+        "Notes:\n"
+        "- src/a.py:9:1 - Revealed"
+    )
+
+
+def test_create_mypy_prompt_signals_survive_counts_only() -> None:
+    """Both signals appear at max_issues=0."""
+    result = MypyResult(
+        return_code=2, messages=[_msg("src/a.py", 1, "misc")], stderr="careful"
+    )
+    prompt = create_mypy_prompt(result, max_issues=0)
+
+    assert prompt is not None
+    lines = prompt.splitlines()
+    assert lines[0] == EARLY_STOP
+    assert lines[2] == WARNING
+
+
+@pytest.mark.parametrize(
+    ("return_code", "stderr", "expected"),
+    [
+        (0, "careful\n", f"{MYPY_SUCCESS_TEXT}\n\n{WARNING}"),
+        (0, "", None),
+        (1, "", f"{MYPY_FAILURE_PREFIX} mypy exited with code 1: no output"),
+    ],
+)
+def test_get_mypy_prompt_without_messages(
+    tmp_path: Path, return_code: int, stderr: str, expected: str | None
+) -> None:
+    """A run with no messages gives success plus warning, None, or a failure."""
+    with patch("mcp_tools_py.code_checker_mypy.runners.execute_command") as mock_exec:
+        mock_exec.return_value = make_command_result(
+            return_code=return_code, stderr=stderr
+        )
+        prompt = get_mypy_prompt(
+            str(tmp_path), python_executable=sys.executable, target_directories=["."]
+        )
+
+    assert prompt == expected

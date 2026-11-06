@@ -11,7 +11,28 @@ logger = logging.getLogger(__name__)
 # Prefix that marks a prompt as a failure rather than a list of type issues
 MYPY_FAILURE_PREFIX = "Mypy execution failed:"
 
+MYPY_SUCCESS_TEXT = "Mypy check completed. No type errors found."
+
 MAX_LOCATIONS_PER_CODE = 5
+
+
+def run_signals(result: MypyResult) -> list[str]:
+    """Collect what a report must say about the run itself.
+
+    Args:
+        result: MypyResult from type checking
+
+    Returns:
+        The early-stop line and the stderr warning, each only when it applies.
+    """
+    signals = []
+    if result.return_code == 2 and result.messages:
+        signals.append(
+            "mypy exited with code 2, more errors may appear after these are fixed"
+        )
+    if result.stderr:
+        signals.append(f"Warning from mypy: {result.stderr}")
+    return signals
 
 
 def _format_message(msg: MypyMessage) -> list[str]:
@@ -50,6 +71,8 @@ def create_mypy_prompt(result: MypyResult, max_issues: int | None = None) -> str
     limit = len(groups) if max_issues is None else max(0, max_issues)
 
     lines: list[str] = []
+    for signal in run_signals(result):
+        lines += [signal, ""]
     if issues:
         lines += ["Mypy found type issues that need attention:", ""]
     lines += [format_total_line("mypy", len(issues), len(groups)), ""]
@@ -115,7 +138,8 @@ def get_mypy_prompt(
         max_issues: Number of error codes to show in detail (see create_mypy_prompt)
 
     Returns:
-        LLM prompt string or None if no issues
+        LLM prompt string; the success text plus the warning for a passing run
+        with stderr; None only for a passing run without stderr
     """
     from mcp_tools_py.code_checker_mypy.runners import run_mypy_check
 
@@ -132,4 +156,7 @@ def get_mypy_prompt(
     if result.error:
         return f"{MYPY_FAILURE_PREFIX} {result.error}"
 
-    return create_mypy_prompt(result, max_issues=max_issues)
+    prompt = create_mypy_prompt(result, max_issues=max_issues)
+    if prompt is None and result.stderr:
+        return "\n\n".join([MYPY_SUCCESS_TEXT, *run_signals(result)])
+    return prompt
