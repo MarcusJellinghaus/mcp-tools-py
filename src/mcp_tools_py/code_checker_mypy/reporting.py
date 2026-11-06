@@ -35,6 +35,20 @@ def run_signals(result: MypyResult) -> list[str]:
     return signals
 
 
+def format_hint_lines(hint: str | None) -> list[str]:
+    """Indent a message's hint for display under its message.
+
+    Args:
+        hint: The message's hint, newline-separated, or None
+
+    Returns:
+        One indented line per hint line; empty when there is no hint.
+    """
+    if not hint:
+        return []
+    return [f"    {line}" for line in hint.splitlines()]
+
+
 def _format_message(msg: MypyMessage) -> list[str]:
     """Format one mypy message.
 
@@ -42,10 +56,7 @@ def _format_message(msg: MypyMessage) -> list[str]:
         The location line followed by the message's indented hint lines.
     """
     location = msg.file if msg.line < 0 else f"{msg.file}:{msg.line}:{msg.column}"
-    lines = [f"- {location} - {msg.message}"]
-    if msg.hint:
-        lines.extend(f"    {hint_line}" for hint_line in msg.hint.splitlines())
-    return lines
+    return [f"- {location} - {msg.message}", *format_hint_lines(msg.hint)]
 
 
 def create_mypy_prompt(result: MypyResult, max_issues: int | None = None) -> str | None:
