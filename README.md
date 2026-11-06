@@ -94,7 +94,7 @@ The mypy tools expose the following parameters for customization:
 | `follow_imports` | string | None (no flag sent; the project's `[tool.mypy]` decides) | How to handle imports during type checking |
 | `cache_dir` | string | None (no flag sent; `MYPY_CACHE_DIR` decides, else `[tool.mypy] cache_dir`, else `.mypy_cache`) | Custom cache directory for incremental checking |
 | `timeout_seconds` | integer | None (resolved from config, else 120) | Maximum seconds to wait for mypy. Positive integers only |
-| `max_issues` | integer | None | Number of error codes shown in detail (5 locations each); the rest get one summary line each. None details every code; `0` = counts only (per-code count and directory split) |
+| `max_issues` | integer | None | Number of error codes shown in detail (5 locations each); the rest get one summary line each. None details every code; `0` = counts only (per-code count and directory split). When mypy exits with code 2, the code holding the last error is also shown in detail without counting against `max_issues`, including with `max_issues=0` |
 
 ### Mypy Configuration
 
