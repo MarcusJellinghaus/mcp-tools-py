@@ -7,10 +7,18 @@ from unittest.mock import patch
 import pytest
 
 from mcp_tools_py.code_checker_mypy.models import MypyMessage, MypyResult
-from mcp_tools_py.code_checker_mypy.reporting import create_mypy_prompt, get_mypy_prompt
+from mcp_tools_py.code_checker_mypy.reporting import (
+    MYPY_FAILURE_PREFIX,
+    MYPY_SUCCESS_TEXT,
+    create_mypy_prompt,
+    get_mypy_prompt,
+    run_signals,
+)
 from tests.conftest import make_command_result
 
 HEADER = "Mypy found type issues that need attention:"
+EARLY_STOP = "mypy exited with code 2, more errors may appear after these are fixed"
+WARNING = "Warning from mypy: careful"
 
 
 def _msg(
@@ -323,3 +331,257 @@ def test_get_mypy_prompt_forwards_max_issues(tmp_path: Path) -> None:
         get_mypy_prompt(str(tmp_path), python_executable=sys.executable, max_issues=2)
 
     assert mock_create.call_args.kwargs["max_issues"] == 2
+
+
+@pytest.mark.parametrize(
+    ("return_code", "has_messages", "stderr", "expected"),
+    [
+        (0, False, None, []),
+        (1, True, None, []),
+        (2, True, None, [EARLY_STOP]),
+        (1, True, "careful", [WARNING]),
+        (0, False, "careful", [WARNING]),
+        (2, True, "careful", [EARLY_STOP, WARNING]),
+        (2, False, None, []),
+    ],
+)
+def test_run_signals(
+    return_code: int, has_messages: bool, stderr: str | None, expected: list[str]
+) -> None:
+    """Early-stop line first, then the warning; rc 2 needs messages."""
+    messages = [_msg("src/a.py", 1, "misc")] if has_messages else []
+    result = MypyResult(return_code=return_code, messages=messages, stderr=stderr)
+
+    assert run_signals(result) == expected
+
+
+def test_create_mypy_prompt_early_stop_comes_first() -> None:
+    """An rc 2 report starts with the early-stop line, before the header."""
+    result = MypyResult(return_code=2, messages=[_msg("src/a.py", 1, "misc")])
+    prompt = create_mypy_prompt(result)
+
+    assert prompt is not None
+    lines = prompt.splitlines()
+    assert lines[0] == EARLY_STOP
+    assert lines[2] == HEADER
+
+
+def test_create_mypy_prompt_shows_warning_with_issues() -> None:
+    """An rc 1 report shows the stderr warning before the header."""
+    result = MypyResult(
+        return_code=1, messages=[_msg("src/a.py", 1, "misc")], stderr="careful"
+    )
+    prompt = create_mypy_prompt(result)
+
+    assert prompt is not None
+    lines = prompt.splitlines()
+    assert lines[0] == WARNING
+    assert lines[2] == HEADER
+
+
+def test_create_mypy_prompt_shows_warning_with_notes_only() -> None:
+    """A notes-only run shows the stderr warning."""
+    result = MypyResult(
+        return_code=0,
+        messages=[_msg("src/a.py", 9, "misc", severity="note", message="Revealed")],
+        stderr="careful",
+    )
+
+    assert create_mypy_prompt(result) == (
+        f"{WARNING}\n"
+        "\n"
+        "mypy found 0 issues across 0 rules\n"
+        "\n"
+        "Notes:\n"
+        "- src/a.py:9:1 - Revealed"
+    )
+
+
+def test_create_mypy_prompt_signals_survive_counts_only() -> None:
+    """Both signals appear at max_issues=0."""
+    result = MypyResult(
+        return_code=2, messages=[_msg("src/a.py", 1, "misc")], stderr="careful"
+    )
+    prompt = create_mypy_prompt(result, max_issues=0)
+
+    assert prompt is not None
+    lines = prompt.splitlines()
+    assert lines[0] == EARLY_STOP
+    assert lines[2] == WARNING
+
+
+@pytest.mark.parametrize("severity", ["error", "note"])
+def test_create_mypy_prompt_negative_line_prints_file_only(severity: str) -> None:
+    """A file-level message has no line or column in its location."""
+    result = MypyResult(
+        return_code=2,
+        messages=[_msg("f.py", -1, None, severity=severity, message="msg")],
+    )
+    prompt = create_mypy_prompt(result)
+
+    assert prompt is not None
+    assert "- f.py - msg" in prompt
+    assert ":-1" not in prompt
+
+
+def test_create_mypy_prompt_line_zero_keeps_location() -> None:
+    """Line 0 is a real location, not a file-level message."""
+    result = MypyResult(return_code=1, messages=[_msg("f.py", 0, "misc")])
+    prompt = create_mypy_prompt(result)
+
+    assert prompt is not None
+    assert "- f.py:0:1 - problem" in prompt
+
+
+def _blocked_result(return_code: int = 2) -> MypyResult:
+    """Three codes: arg-type x3, attr-defined x2, misc x1 with the last error."""
+    return MypyResult(
+        return_code=return_code,
+        messages=[
+            _msg("src/a.py", 1, "arg-type"),
+            _msg("src/a.py", 2, "arg-type"),
+            _msg("src/a.py", 3, "arg-type"),
+            _msg("src/b.py", 4, "attr-defined"),
+            _msg("src/b.py", 5, "attr-defined"),
+            _msg("src/c.py", 6, "misc", message="blocker"),
+        ],
+    )
+
+
+def test_create_mypy_prompt_rc2_details_last_error_group() -> None:
+    """The last error's group is detailed without using the max_issues slot."""
+    prompt = create_mypy_prompt(_blocked_result(), max_issues=1)
+
+    assert prompt is not None
+    assert "**arg-type (3 issues) (src: 3)**" in prompt
+    assert "**misc (1 issue) (src: 1)**" in prompt
+    assert "- src/c.py:6:1 - blocker" in prompt
+    assert "**attr-defined" not in prompt
+    summary_at = prompt.index("- attr-defined: 2 occurrences (src: 2)")
+    assert prompt.index("**arg-type") < prompt.index("**misc") < summary_at
+
+
+def test_create_mypy_prompt_rc2_counts_only_details_last_error_group() -> None:
+    """At max_issues=0 only the last error's group is detailed."""
+    result = _blocked_result()
+    notes = [_msg("src/a.py", 9, "misc", severity="note", message="Revealed")]
+    result = result._replace(messages=result.messages + notes)
+
+    prompt = create_mypy_prompt(result, max_issues=0)
+
+    assert prompt is not None
+    assert "**misc (1 issue) (src: 1)**" in prompt
+    assert "- src/c.py:6:1 - blocker" in prompt
+    assert "- arg-type: 3 occurrences (src: 3)" in prompt
+    assert "- attr-defined: 2 occurrences (src: 2)" in prompt
+    assert "**arg-type" not in prompt
+    assert "Notes:" not in prompt
+
+
+def test_create_mypy_prompt_rc2_last_error_in_top_group_keeps_slot() -> None:
+    """A last-error group that is also the top group leaves the slot free."""
+    result = MypyResult(
+        return_code=2,
+        messages=[
+            _msg("src/b.py", 4, "attr-defined"),
+            _msg("src/b.py", 5, "attr-defined"),
+            _msg("src/c.py", 6, "misc"),
+            _msg("src/a.py", 1, "arg-type"),
+            _msg("src/a.py", 2, "arg-type"),
+            _msg("src/a.py", 3, "arg-type", message="blocker"),
+        ],
+    )
+    prompt = create_mypy_prompt(result, max_issues=1)
+
+    assert prompt is not None
+    assert prompt.count("**arg-type (3 issues) (src: 3)**") == 1
+    assert prompt.count("- src/a.py:3:1 - blocker") == 1
+    assert "**attr-defined (2 issues) (src: 2)**" in prompt
+    assert "**misc" not in prompt
+    assert "- misc: 1 occurrence (src: 1)" in prompt
+
+
+@pytest.mark.parametrize("return_code", [1, 3])
+def test_create_mypy_prompt_counts_only_without_rc2_has_no_detail(
+    return_code: int,
+) -> None:
+    """Only rc 2 details the last error's group."""
+    prompt = create_mypy_prompt(_blocked_result(return_code), max_issues=0)
+
+    assert prompt is not None
+    assert "- misc: 1 occurrence (src: 1)" in prompt
+    assert "**" not in prompt
+    assert ".py:" not in prompt
+
+
+def test_create_mypy_prompt_rc2_lists_last_error_beyond_location_cap() -> None:
+    """The last error follows the first five locations, then the hidden count."""
+    messages = [_msg(f"src/file{i}.py", i, "misc") for i in range(7)]
+    prompt = create_mypy_prompt(MypyResult(return_code=2, messages=messages))
+
+    assert prompt is not None
+    assert "src/file4.py:4:1" in prompt
+    assert "src/file5.py:5:1" not in prompt
+    assert "- src/file6.py:6:1 - problem\n  ... and 1 more" in prompt
+
+
+def test_create_mypy_prompt_rc1_does_not_list_last_error_beyond_cap() -> None:
+    """Without rc 2 the location cap applies to the last error too."""
+    messages = [_msg(f"src/file{i}.py", i, "misc") for i in range(7)]
+    prompt = create_mypy_prompt(MypyResult(return_code=1, messages=messages))
+
+    assert prompt is not None
+    assert "src/file6.py" not in prompt
+    assert "... and 2 more" in prompt
+
+
+@pytest.mark.parametrize("trailing_severity", ["note", "warning"])
+def test_create_mypy_prompt_rc2_group_chosen_by_last_error(
+    trailing_severity: str,
+) -> None:
+    """A trailing note or warning does not decide which group is detailed."""
+    result = _blocked_result()
+    trailing = _msg("src/d.py", 7, "unused", severity=trailing_severity)
+    result = result._replace(messages=result.messages + [trailing])
+
+    prompt = create_mypy_prompt(result, max_issues=0)
+
+    assert prompt is not None
+    assert "**misc (1 issue) (src: 1)**" in prompt
+    assert "**unused" not in prompt
+
+
+@pytest.mark.parametrize(
+    ("return_code", "footer_expected"), [(1, True), (2, False), (3, True)]
+)
+def test_create_mypy_prompt_footer_depends_on_return_code(
+    return_code: int, footer_expected: bool
+) -> None:
+    """Fix advice is left out of an rc 2 report."""
+    prompt = create_mypy_prompt(_blocked_result(return_code))
+
+    assert prompt is not None
+    assert ("To fix these issues:" in prompt) is footer_expected
+
+
+@pytest.mark.parametrize(
+    ("return_code", "stderr", "expected"),
+    [
+        (0, "careful\n", f"{MYPY_SUCCESS_TEXT}\n\n{WARNING}"),
+        (0, "", None),
+        (1, "", f"{MYPY_FAILURE_PREFIX} mypy exited with code 1: no output"),
+    ],
+)
+def test_get_mypy_prompt_without_messages(
+    tmp_path: Path, return_code: int, stderr: str, expected: str | None
+) -> None:
+    """A run with no messages gives success plus warning, None, or a failure."""
+    with patch("mcp_tools_py.code_checker_mypy.runners.execute_command") as mock_exec:
+        mock_exec.return_value = make_command_result(
+            return_code=return_code, stderr=stderr
+        )
+        prompt = get_mypy_prompt(
+            str(tmp_path), python_executable=sys.executable, target_directories=["."]
+        )
+
+    assert prompt == expected

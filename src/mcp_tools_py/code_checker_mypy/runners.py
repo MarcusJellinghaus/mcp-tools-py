@@ -7,7 +7,10 @@ from datetime import datetime
 from pathlib import Path
 
 from mcp_tools_py.code_checker_mypy.models import MypyResult
-from mcp_tools_py.code_checker_mypy.parsers import parse_mypy_json_output
+from mcp_tools_py.code_checker_mypy.parsers import (
+    parse_mypy_json_output,
+    strip_json_messages,
+)
 from mcp_tools_py.log_utils import log_function_call
 from mcp_tools_py.utils.project_config import DEFAULT_CHECK_TIMEOUT
 from mcp_tools_py.utils.subprocess_runner import (
@@ -17,6 +20,8 @@ from mcp_tools_py.utils.subprocess_runner import (
 )
 
 logger = logging.getLogger(__name__)
+
+MYPY_EXIT_PREFIX = "mypy exited with code"
 
 
 def _expand_config_cache_dir(path: str) -> str:
@@ -297,33 +302,34 @@ def run_mypy_check(
         )
 
     # Parse output first to ensure messages variable is defined
-    # For mypy config errors, check both stdout and stderr
-    output_to_parse = result.stdout
-    if result.return_code == 2 and not result.stdout.strip() and result.stderr.strip():
-        # Mypy config errors often go to stderr
-        output_to_parse = result.stderr
+    # At rc 2 with nothing on stdout, any messages mypy produced are on stderr
+    parse_stderr = (
+        result.return_code == 2 and not result.stdout.strip() and result.stderr.strip()
+    )
+    output_to_parse = result.stderr if parse_stderr else result.stdout
 
     messages, parse_error = parse_mypy_json_output(output_to_parse)
 
-    # Log raw output for debugging when return code is 2
-    if result.return_code == 2:
-        logger.warning(
-            "Mypy returned configuration error",
-            extra={
-                "return_code": result.return_code,
-                "stdout_length": len(result.stdout),
-                "stderr_length": len(result.stderr),
-                "command": " ".join(command),
-            },
+    # Count statistics
+    errors_found = len([m for m in messages if m.severity == "error"])
+
+    # A note alone gives rc 1 (reveal_type does that), so rc 1 only needs a
+    # message; any other failed exit needs an error to explain it
+    failed = (
+        not messages
+        if result.return_code == 1
+        else result.return_code != 0 and errors_found == 0
+    )
+    if failed:
+        return MypyResult(
+            return_code=result.return_code,
+            messages=[],
+            error=(
+                f"{MYPY_EXIT_PREFIX} {result.return_code}: "
+                f"{raw_output.strip() or 'no output'}"
+            ),
+            raw_output=raw_output,
         )
-        # For configuration errors, include stderr in the error message
-        if result.stderr.strip() and not messages:
-            return MypyResult(
-                return_code=result.return_code,
-                messages=[],
-                error=f"Mypy configuration error: {result.stderr.strip()}",
-                raw_output=raw_output,
-            )
 
     if parse_error:
         return MypyResult(
@@ -333,14 +339,14 @@ def run_mypy_check(
             raw_output=raw_output,
         )
 
-    # Count statistics
-    errors_found = len([m for m in messages if m.severity == "error"])
+    stderr_text = strip_json_messages(stderr) if parse_stderr else stderr.strip()
 
     mypy_result = MypyResult(
         return_code=result.return_code,
         messages=messages,
         raw_output=raw_output,
         errors_found=errors_found,
+        stderr=stderr_text or None,
     )
 
     logger.info(

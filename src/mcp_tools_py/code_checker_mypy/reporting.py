@@ -11,7 +11,42 @@ logger = logging.getLogger(__name__)
 # Prefix that marks a prompt as a failure rather than a list of type issues
 MYPY_FAILURE_PREFIX = "Mypy execution failed:"
 
+MYPY_SUCCESS_TEXT = "Mypy check completed. No type errors found."
+
 MAX_LOCATIONS_PER_CODE = 5
+
+
+def run_signals(result: MypyResult) -> list[str]:
+    """Collect what a report must say about the run itself.
+
+    Args:
+        result: MypyResult from type checking
+
+    Returns:
+        The early-stop line and the stderr warning, each only when it applies.
+    """
+    signals = []
+    if result.return_code == 2 and result.messages:
+        signals.append(
+            "mypy exited with code 2, more errors may appear after these are fixed"
+        )
+    if result.stderr:
+        signals.append(f"Warning from mypy: {result.stderr}")
+    return signals
+
+
+def format_hint_lines(hint: str | None) -> list[str]:
+    """Indent a message's hint for display under its message.
+
+    Args:
+        hint: The message's hint, newline-separated, or None
+
+    Returns:
+        One indented line per hint line; empty when there is no hint.
+    """
+    if not hint:
+        return []
+    return [f"    {line}" for line in hint.splitlines()]
 
 
 def _format_message(msg: MypyMessage) -> list[str]:
@@ -20,10 +55,8 @@ def _format_message(msg: MypyMessage) -> list[str]:
     Returns:
         The location line followed by the message's indented hint lines.
     """
-    lines = [f"- {msg.file}:{msg.line}:{msg.column} - {msg.message}"]
-    if msg.hint:
-        lines.extend(f"    {hint_line}" for hint_line in msg.hint.splitlines())
-    return lines
+    location = msg.file if msg.line < 0 else f"{msg.file}:{msg.line}:{msg.column}"
+    return [f"- {location} - {msg.message}", *format_hint_lines(msg.hint)]
 
 
 def create_mypy_prompt(result: MypyResult, max_issues: int | None = None) -> str | None:
@@ -33,6 +66,8 @@ def create_mypy_prompt(result: MypyResult, max_issues: int | None = None) -> str
         result: MypyResult from type checking
         max_issues: Number of error codes to show in detail; the rest get one
             summary line each. None shows all; 0 or less shows counts only.
+            When mypy exits with code 2, the code holding the last error is also
+            shown in detail without counting against max_issues, including at 0.
 
     Returns:
         Formatted prompt string or None if no messages
@@ -49,22 +84,36 @@ def create_mypy_prompt(result: MypyResult, max_issues: int | None = None) -> str
     groups = sorted(by_code.items(), key=lambda kv: (-len(kv[1]), kv[0]))
     limit = len(groups) if max_issues is None else max(0, max_issues)
 
+    # No field identifies a blocker, so use the last error on rc 2
+    errors = [m for m in issues if m.severity == "error"]
+    last_error = errors[-1] if result.return_code == 2 and errors else None
+    last_code = (last_error.code or "other") if last_error else None
+    # The last-error group does not count against the limit
+    others = [g for g in groups if g[0] != last_code][:limit]
+    detailed = [g for g in groups if g[0] == last_code or g in others]
+    summarised = [g for g in groups if g not in detailed]
+
     lines: list[str] = []
+    for signal in run_signals(result):
+        lines += [signal, ""]
     if issues:
         lines += ["Mypy found type issues that need attention:", ""]
     lines += [format_total_line("mypy", len(issues), len(groups)), ""]
 
-    for code, messages in groups[:limit]:
+    for code, messages in detailed:
         split = format_dir_split(m.file for m in messages)
         lines.append(f"**{code} ({plural(len(messages), 'issue')}) {split}**")
-        for msg in messages[:MAX_LOCATIONS_PER_CODE]:
+        shown = messages[:MAX_LOCATIONS_PER_CODE]
+        if last_error in messages and last_error not in shown:
+            shown.append(last_error)
+        for msg in shown:
             lines.extend(_format_message(msg))
-        if len(messages) > MAX_LOCATIONS_PER_CODE:
-            lines.append(f"  ... and {len(messages) - MAX_LOCATIONS_PER_CODE} more")
+        if len(messages) > len(shown):
+            lines.append(f"  ... and {len(messages) - len(shown)} more")
         lines.append("")
 
-    if groups[limit:]:
-        for code, messages in groups[limit:]:
+    if summarised:
+        for code, messages in summarised:
             split = format_dir_split(m.file for m in messages)
             lines.append(f"- {code}: {plural(len(messages), 'occurrence')} {split}")
         lines.append("")
@@ -75,7 +124,7 @@ def create_mypy_prompt(result: MypyResult, max_issues: int | None = None) -> str
             lines.extend(_format_message(msg))
         lines.append("")
 
-    if issues:
+    if issues and result.return_code != 2:
         lines.append("To fix these issues:")
         lines.append("1. Add missing type annotations where indicated")
         lines.append(
@@ -115,7 +164,8 @@ def get_mypy_prompt(
         max_issues: Number of error codes to show in detail (see create_mypy_prompt)
 
     Returns:
-        LLM prompt string or None if no issues
+        LLM prompt string; the success text plus the warning for a passing run
+        with stderr; None only for a passing run without stderr
     """
     from mcp_tools_py.code_checker_mypy.runners import run_mypy_check
 
@@ -132,4 +182,7 @@ def get_mypy_prompt(
     if result.error:
         return f"{MYPY_FAILURE_PREFIX} {result.error}"
 
-    return create_mypy_prompt(result, max_issues=max_issues)
+    prompt = create_mypy_prompt(result, max_issues=max_issues)
+    if prompt is None and result.stderr:
+        return "\n\n".join([MYPY_SUCCESS_TEXT, *run_signals(result)])
+    return prompt

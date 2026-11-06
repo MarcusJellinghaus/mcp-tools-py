@@ -4,6 +4,7 @@ import logging
 from typing import TYPE_CHECKING
 
 from mcp_tools_py.code_checker_mypy import get_mypy_prompt
+from mcp_tools_py.code_checker_mypy.reporting import MYPY_SUCCESS_TEXT
 from mcp_tools_py.log_utils import log_function_call
 from mcp_tools_py.utils.project_config import resolve_target_directories
 
@@ -72,7 +73,9 @@ def register(mcp: "FastMCPProtocol", checker_tools: "CheckerTools") -> None:
             max_issues: Number of error codes shown in detail (5 locations each).
                 None (default) details every code. 0 = counts only: one line per code
                 with count and directory split, no file paths. Remaining codes get one
-                summary line each.
+                summary line each. When mypy exits with code 2, the code holding the
+                last error is also shown in detail without counting against
+                max_issues, including with max_issues=0.
 
         Returns:
             A string containing mypy results or a prompt for an LLM to interpret
@@ -120,7 +123,8 @@ def register(mcp: "FastMCPProtocol", checker_tools: "CheckerTools") -> None:
             logger.info(
                 "Mypy check completed",
                 extra={
-                    "issues_found": mypy_prompt is not None,
+                    "issues_found": mypy_prompt is not None
+                    and not mypy_prompt.startswith(MYPY_SUCCESS_TEXT),
                     "result_length": len(result),
                 },
             )

@@ -222,14 +222,14 @@ state without relying on git.
 | Field | Value |
 |-------|-------|
 | **Call** | `run_mypy_check(max_issues=0)` |
-| **Expected** | If issues exist: starts with `mypy found N issues across M rules`, then one line per error code with count and directory split, e.g. `- arg-type: 2 occurrences (src: 2)`, sorted by count descending. No file paths, no `Notes:` section. |
+| **Expected** | If issues exist: starts with `mypy found N issues across M rules`, then one line per error code with count and directory split, e.g. `- arg-type: 2 occurrences (src: 2)`, sorted by count descending. No file paths, unless mypy exits with code 2, when the code holding the last error is shown in detail. No `Notes:` section. |
 
 ### 3f — One code in detail
 
 | Field | Value |
 |-------|-------|
 | **Call** | `run_mypy_check(max_issues=1)` |
-| **Expected** | Most frequent code shown in detail with up to 5 locations; every other code gets one summary line. |
+| **Expected** | Most frequent code shown in detail with up to 5 locations; every other code gets one summary line, unless mypy exits with code 2, when the code holding the last error is also shown in detail. |
 
 ---
 

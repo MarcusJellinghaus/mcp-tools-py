@@ -5,7 +5,10 @@ from pathlib import Path
 from typing import Any
 from unittest.mock import MagicMock, patch
 
+import pytest
+
 from mcp_tools_py.checker_tools import CheckerTools
+from mcp_tools_py.code_checker_mypy.reporting import MYPY_SUCCESS_TEXT
 from mcp_tools_py.utils.python_environment import PythonEnvironment
 from mcp_tools_py.utils.tool_context import ToolContext
 from tests.test_tool_availability._helpers import _dummy_python
@@ -482,6 +485,53 @@ def test_mypy_invalid_timeout_returns_message(tool_context: ToolContext) -> None
 
     assert "timeout_seconds" in result
     mock_prompt.assert_not_called()
+
+
+@pytest.mark.parametrize(
+    ("prompt", "expected_text", "expected_issues_found"),
+    [
+        (None, MYPY_SUCCESS_TEXT, False),
+        (
+            f"{MYPY_SUCCESS_TEXT}\n\nWarning from mypy: careful",
+            f"{MYPY_SUCCESS_TEXT}\n\nWarning from mypy: careful",
+            False,
+        ),
+        (
+            "Mypy found type issues that need attention:",
+            "Mypy found type issues that need attention:",
+            True,
+        ),
+    ],
+)
+def test_mypy_logs_issues_found(
+    tool_context: ToolContext,
+    prompt: str | None,
+    expected_text: str,
+    expected_issues_found: bool,
+) -> None:
+    """A success with a warning does not log as issues found; a report does."""
+    run_mypy = _capture_tool(tool_context, "run_mypy_check")
+
+    with (
+        patch(
+            "mcp_tools_py.checker_tools.mypy_tool.resolve_target_directories",
+            return_value=["src"],
+        ),
+        patch(
+            "mcp_tools_py.checker_tools.mypy_tool.get_mypy_prompt",
+            return_value=prompt,
+        ),
+        patch("mcp_tools_py.checker_tools.mypy_tool.logger") as mock_logger,
+    ):
+        result = run_mypy()
+
+    assert result == expected_text
+    completed = next(
+        call
+        for call in mock_logger.info.call_args_list
+        if call.args[0] == "Mypy check completed"
+    )
+    assert completed.kwargs["extra"]["issues_found"] is expected_issues_found
 
 
 def test_vulture_auto_detects_directories(tool_context: ToolContext) -> None:

@@ -1,13 +1,15 @@
 """Check-tool runner implementations used by PythonToolkit's check action."""
 
 from collections.abc import Callable
+from dataclasses import replace
 
 from mcp_coder_utils.toolkit import ActionResult, Finding
 
 from mcp_tools_py.code_checker_bandit.runners import run_bandit_check_impl
 from mcp_tools_py.code_checker_deptry.runners import run_deptry_check_impl
 from mcp_tools_py.code_checker_lint_imports.runners import run_lint_imports_check_impl
-from mcp_tools_py.code_checker_mypy.runners import run_mypy_check
+from mcp_tools_py.code_checker_mypy.reporting import format_hint_lines, run_signals
+from mcp_tools_py.code_checker_mypy.runners import MYPY_EXIT_PREFIX, run_mypy_check
 from mcp_tools_py.code_checker_pylint.runners import get_pylint_results
 from mcp_tools_py.code_checker_vulture.runners import run_vulture_check
 from mcp_tools_py.utils.project_config import (
@@ -64,15 +66,19 @@ def _merge(results: list[ActionResult]) -> ActionResult:
     Returns:
         One ActionResult: status is the worst across `results` ("error" >
         "findings" > "ok" > "skipped"), findings and non-empty raw outputs
-        concatenated, fix_text rebuilt from the merged findings.
+        concatenated. fix_text joins each result's own fix_text, rebuilt from
+        that result's findings when not set; empty parts are skipped.
     """
     worst = max(results, key=lambda result: _STATUS_RANK[result.status])
     findings = [finding for result in results for finding in result.findings]
     summary = "; ".join(result.summary for result in results)
     raw = "\n\n".join(result.raw for result in results if result.raw)
-    fix_text = (
-        "\n".join(_finding_line(finding) for finding in findings) if findings else ""
-    )
+    parts = [
+        result.fix_text
+        or "\n".join(_finding_line(finding) for finding in result.findings)
+        for result in results
+    ]
+    fix_text = "\n".join(part for part in parts if part)
     return ActionResult(
         status=worst.status,
         summary=summary,
@@ -80,6 +86,15 @@ def _merge(results: list[ActionResult]) -> ActionResult:
         raw=raw,
         fix_text=fix_text,
     )
+
+
+def _one_line(text: str) -> str:
+    """Collapse `text` onto one line, for use in `ActionResult.summary`.
+
+    Returns:
+        `text` with every run of whitespace replaced by a single space.
+    """
+    return " ".join(text.split())
 
 
 def _run_mypy(context: ToolContext, depth: str) -> ActionResult:
@@ -90,7 +105,9 @@ def _run_mypy(context: ToolContext, depth: str) -> ActionResult:
 
     Returns:
         "error" if target directories cannot be resolved or mypy itself
-        errored; "findings" with one Finding per message; else "ok".
+        errored; "findings" with one Finding per non-note message; else "ok".
+        The summary carries the run's signals on one line, fix_text the
+        message hints and raw the full error or stderr text.
     """
     del depth
     project_dir = str(context.project_dir)
@@ -104,6 +121,7 @@ def _run_mypy(context: ToolContext, depth: str) -> ActionResult:
         target_directories=dirs,
         timeout_seconds=context.resolve_timeout("mypy"),
     )
+    issues = [message for message in result.messages if message.severity != "note"]
     findings = [
         Finding(
             key=f"{message.file}|{message.code}|{message.message}",
@@ -112,14 +130,24 @@ def _run_mypy(context: ToolContext, depth: str) -> ActionResult:
             rule=message.code,
             severity=message.severity,
         )
-        for message in result.messages
+        for message in issues
     ]
-    return _result_from_findings(
-        error=result.error,
-        findings=findings,
-        ok_summary="mypy found no issues.",
-        findings_summary=f"mypy found {len(findings)} issue(s).",
+    fix_text = "\n".join(
+        line
+        for message, finding in zip(issues, findings)
+        for line in [_finding_line(finding), *format_hint_lines(message.hint)]
     )
+    suffix = "".join(f" {_one_line(signal)}" for signal in run_signals(result))
+    error = result.error
+    if error and error.startswith(MYPY_EXIT_PREFIX):
+        error = _one_line(error)
+    action = _result_from_findings(
+        error=error,
+        findings=findings,
+        ok_summary=f"mypy found no issues.{suffix}",
+        findings_summary=f"mypy found {len(findings)} issue(s).{suffix}",
+    )
+    return replace(action, fix_text=fix_text, raw=result.error or result.stderr or "")
 
 
 def _run_pylint(context: ToolContext, depth: str) -> ActionResult:

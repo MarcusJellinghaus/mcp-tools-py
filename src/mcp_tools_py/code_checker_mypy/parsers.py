@@ -48,7 +48,7 @@ def parse_mypy_json_output(output: str) -> tuple[list[MypyMessage], str | None]:
                 "Non-JSON line in mypy output",
                 extra={"line_num": line_num, "content": line[:100]},
             )
-        except (KeyError, TypeError, ValueError) as e:
+        except (AttributeError, KeyError, TypeError, ValueError) as e:
             parse_errors.append(f"Line {line_num}: {str(e)}")
 
     if parse_errors and not messages:
@@ -64,3 +64,27 @@ def parse_mypy_json_output(output: str) -> tuple[list[MypyMessage], str | None]:
     )
 
     return messages, None
+
+
+def strip_json_messages(output: str) -> str:
+    """Remove the lines `parse_mypy_json_output` reads as messages.
+
+    A message is a line that parses as a JSON object. Other JSON values, such
+    as `null` or `123`, are kept.
+
+    Args:
+        output: Text mixing mypy JSON messages with anything else
+
+    Returns:
+        The remaining lines joined with newlines and stripped
+    """
+    kept_lines = []
+    for line in output.splitlines():
+        try:
+            is_message = isinstance(json.loads(line), dict)
+        except json.JSONDecodeError:
+            is_message = False
+        if not is_message:
+            kept_lines.append(line)
+
+    return "\n".join(kept_lines).strip()

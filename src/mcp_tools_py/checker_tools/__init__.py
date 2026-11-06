@@ -15,6 +15,7 @@ from mcp_tools_py.checker_tools import (
     tach_tool,
     vulture_tool,
 )
+from mcp_tools_py.code_checker_mypy.reporting import MYPY_SUCCESS_TEXT
 from mcp_tools_py.code_checker_pytest.reporting import (
     MAX_FAILURES,
     MAX_OUTPUT_LINES,
@@ -119,7 +120,7 @@ class CheckerTools:
             User-facing summary of the mypy outcome.
         """
         if mypy_prompt is None:
-            return "Mypy check completed. No type errors found."
+            return MYPY_SUCCESS_TEXT
         return mypy_prompt
 
 

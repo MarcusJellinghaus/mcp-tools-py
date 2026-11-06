@@ -146,7 +146,72 @@ class TestMerge:
 
         assert merged.status == "findings"
         assert merged.findings == [finding]
-        assert merged.fix_text
+        assert merged.fix_text == "- a.py: broke"
+
+    def test_custom_fix_text_is_kept_exactly(self) -> None:
+        finding = Finding(key="f1", message="broke", path="a.py")
+        merged = _merge(
+            [
+                ActionResult(
+                    status="findings",
+                    summary="a",
+                    findings=[finding],
+                    fix_text="custom\n  report",
+                ),
+            ]
+        )
+
+        assert merged.fix_text == "custom\n  report"
+
+    def test_findings_without_fix_text_are_rebuilt(self) -> None:
+        first = Finding(key="f1", message="broke", path="a.py", rule="E1")
+        second = Finding(key="f2", message="also broke")
+        merged = _merge(
+            [
+                ActionResult(status="findings", summary="a", findings=[first, second]),
+            ]
+        )
+
+        assert merged.fix_text == "- a.py: E1: broke\n- also broke"
+
+    def test_ok_results_add_no_blank_lines(self) -> None:
+        finding = Finding(key="f1", message="broke", path="a.py")
+        merged = _merge(
+            [
+                ActionResult(status="ok", summary="a"),
+                ActionResult(status="findings", summary="b", findings=[finding]),
+                ActionResult(status="ok", summary="c"),
+            ]
+        )
+
+        assert merged.fix_text == "- a.py: broke"
+
+    def test_custom_and_rebuilt_text_are_joined_in_result_order(self) -> None:
+        finding = Finding(key="f1", message="broke", path="a.py")
+        custom = Finding(key="f2", message="ignored")
+        merged = _merge(
+            [
+                ActionResult(status="findings", summary="a", findings=[finding]),
+                ActionResult(
+                    status="findings",
+                    summary="b",
+                    findings=[custom],
+                    fix_text="custom report",
+                ),
+            ]
+        )
+
+        assert merged.fix_text == "- a.py: broke\ncustom report"
+
+    def test_all_ok_has_empty_fix_text(self) -> None:
+        merged = _merge(
+            [
+                ActionResult(status="ok", summary="a"),
+                ActionResult(status="ok", summary="b"),
+            ]
+        )
+
+        assert merged.fix_text == ""
 
     def test_findings_and_error_is_error(self) -> None:
         finding = Finding(key="f1", message="broke", path="a.py")
