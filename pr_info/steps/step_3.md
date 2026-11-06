@@ -24,6 +24,8 @@
 - `tests/test_code_checker_pytest/test_verdict.py`
 - `tests/test_checker_tools_formatting.py`
 - `tests/test_code_checker_pytest/test_integration_extra_args.py`
+- `tests/test_server_params.py`
+- `tests/test_toolkit_test.py`
 
 ## WHAT
 
@@ -142,3 +144,12 @@ Sanitizer notes stay ahead of this text, because `pytest_tool.py` prepends them.
 
 - Add `tests/test_second.py` with one passing test to the fixture from step 1. A real `--collect-only -k test_in` run through the helper: `report.summary.total == 0`, `report.summary.deselected == 1`, and `collected_test_ids(report)` lists only the test in `tests/test_in.py`. This pins the JSON shape `collected_test_ids` relies on.
 - The same run with `-n 2`: the same IDs, because xdist doesn't start workers for collect-only.
+- `check_code_with_pytest` on the same project with `--collect-only -k test_in`: `summary["deselected"] == 1`. This covers `summary_dict` in `runners.py`.
+
+`tests/test_server_params.py`
+
+- Beside the existing `run_pytest_check` test (`:75-99`), with the same server setup and mocked `check_code_with_pytest`: call `run_pytest_check(extra_args=["--collect-only"])`, with the mock returning `make_pytest_results(RunStatus.SUSPICIOUS, summary={"collected": 4, "deselected": 3}, test_results=report)`. `report` is a real `PytestReport` with those counts and a collector listing the IDs. The reply contains `Collected 1 test (3 deselected)` and the selected test ID, and doesn't contain `Not verified`. This covers `collect_only=sanitized.collect_only` in `pytest_tool.py`.
+
+`tests/test_toolkit_test.py`
+
+- Beside `test_suspicious_is_ok_not_verified` (`:194`): a report with `collected=4` and `deselected=3` gives `status == "ok"`, and the summary contains `Collected 1 tests` and `Not verified`. Set `report.summary.deselected = 3` on `_report(4)`. This covers `toolkit.py:215`.
