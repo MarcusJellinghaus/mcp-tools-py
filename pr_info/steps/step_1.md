@@ -24,17 +24,24 @@ No integration points change: there are no new imports, decorators or registrati
 
 ## ALGORITHM
 
-There is no new logic. The verification sequence is below, run from the repo root. These commands have no MCP equivalent, because the MCP checkers run against the project's environment. `<venv>` is a new directory outside the repo, such as one under the system temp directory.
+There is no new logic. Bash is disabled in the implement workflow, so run the verification as a scratch probe. After applying the diff, save `.scratch/test_probe.py` with one test that runs this sequence via `subprocess`, with the repo root as the working directory and `<venv>` as a directory under `tmp_path`, and asserts the results under DATA:
 
 ```
 uv venv <venv> --python 3.11
 uv pip install -e ".[dev]" "import-linter==2.12" --python <venv>/Scripts/python.exe
 <venv>/Scripts/lint-imports.exe --no-cache
 <venv>/Scripts/python.exe -m pytest tests/test_target_scripts_contract.py
-delete <venv>
 ```
 
-Don't add a marker filter to the pytest command: all three tests are marked `integration`.
+Pass the probe's subprocesses an environment without `PYTEST_*` variables, so the outer pytest run doesn't leak into the nested one. Don't add a marker filter to the nested pytest command: all three tests are marked `integration`.
+
+Run the probe, with the timeout raised because the install resolves git dependencies:
+
+```
+mcp__mcp-tools-py__run_pytest_check(extra_args=["-p", "no:cacheprovider", ".scratch/test_probe.py"], timeout_seconds=900)
+```
+
+Then delete it, whether it passed or failed: `mcp__mcp-workspace__delete_directory(".scratch", recursive=True)`.
 
 ## DATA
 
@@ -65,9 +72,8 @@ If any of these happens, write one line to `pr_info/.blocked.txt` and stop:
    - `mcp__mcp-tools-py__run_pylint_check`
    - `mcp__mcp-tools-py__run_mypy_check`
    - `mcp__mcp-tools-py__run_pytest_check(extra_args=["-n", "auto", "-m", "not integration"])`
-2. Run `mcp__mcp-tools-py__run_format_code`.
-3. Check with `mcp__mcp-workspace__git` (`status`) that `pyproject.toml` is the only tracked file modified.
-4. Stage only `pyproject.toml` and commit:
+2. After `.scratch/` is deleted, check with `mcp__mcp-workspace__git` (`status`) that the only tracked files modified are `pyproject.toml` and `pr_info/TASK_TRACKER.md`.
+3. Write this commit message to `pr_info/.commit_message.txt` and don't commit. The implement workflow formats, commits and pushes:
 
    ```
    fix(deps): raise import-linter minimum to 2.12 (#271)
