@@ -72,7 +72,9 @@
       "WebFetch(domain:*)",
       "mcp__mcp-workspace__search_files",
       "mcp__mcp-workspace__search_reference_files",
-      "mcp__mcp-tools-py__run_tach_check"
+      "mcp__mcp-tools-py__run_tach_check",
+      "mcp__mcp-workspace__github_label_list",
+      "mcp__mcp-tools-py__search_library_files"
     ]
   },
   "enableAllProjectMcpServers": true,
