@@ -3,7 +3,10 @@
 import pytest
 
 from mcp_tools_py.code_checker_mypy.models import MypyMessage
-from mcp_tools_py.code_checker_mypy.parsers import parse_mypy_json_output
+from mcp_tools_py.code_checker_mypy.parsers import (
+    parse_mypy_json_output,
+    strip_json_messages,
+)
 
 
 def test_parse_mypy_json_output_valid() -> None:
@@ -117,3 +120,36 @@ def test_parse_mypy_json_output_empty() -> None:
 
     assert len(messages) == 0
     assert error is None
+
+
+@pytest.mark.parametrize("line", ["null", "123", '["a"]'])
+def test_parse_mypy_json_output_non_dict_line_is_parse_error(line: str) -> None:
+    """Test that valid JSON which is not an object gives a parse error."""
+    messages, error = parse_mypy_json_output(line)
+
+    assert not messages
+    assert error is not None
+    assert "Failed to parse mypy output" in error
+
+
+def test_parse_mypy_json_output_non_dict_line_keeps_valid_message() -> None:
+    """Test that a non-dict line next to a valid message loses nothing."""
+    json_output = 'null\n{"file": "test.py", "line": 10, "severity": "error"}'
+
+    messages, error = parse_mypy_json_output(json_output)
+
+    assert error is None
+    assert len(messages) == 1
+    assert messages[0].file == "test.py"
+
+
+def test_strip_json_messages_removes_dict_lines_only() -> None:
+    """Test that text and non-dict JSON survive while messages are removed."""
+    output = 'warning: one\n{"file": "a.py", "severity": "error"}\nnull\n123\nlast'
+
+    assert strip_json_messages(output) == "warning: one\nnull\n123\nlast"
+
+
+def test_strip_json_messages_blank_output_gives_empty_string() -> None:
+    """Test that blank-only output strips to nothing."""
+    assert strip_json_messages("  \n\n  ") == ""

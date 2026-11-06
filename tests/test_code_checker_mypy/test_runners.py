@@ -10,8 +10,19 @@ from unittest.mock import patch
 import pytest
 
 from mcp_tools_py.code_checker_mypy import run_mypy_check
+from mcp_tools_py.code_checker_mypy.models import MypyResult
+from mcp_tools_py.code_checker_mypy.parsers import parse_mypy_json_output
 from mcp_tools_py.code_checker_mypy.runners import _describe_cache, _resolve_cache_dir
 from tests.conftest import make_command_result
+
+_JSON_ERROR = '{"file": "a.py", "line": 1, "severity": "error", "message": "Bad"}'
+_JSON_NOTE = '{"file": "a.py", "line": 1, "severity": "note", "message": "Seen"}'
+_WARNING = "Warning: unused section in mypy.ini"
+_INTERNAL_ERROR = "INTERNAL ERROR -- Please try using mypy master on GitHub"
+# Longer than the 500 characters truncate_stderr keeps, with a unique last line
+_LONG_TRACEBACK = (
+    "Traceback (most recent call last):\n" + "x" * 600 + "\nthe real cause"
+)
 
 
 def test_run_mypy_check_on_project() -> None:
@@ -22,7 +33,7 @@ def test_run_mypy_check_on_project() -> None:
         target_directories=["src"],
     )
 
-    # 0=no errors, 1=errors found, 2=config error (should be fixed now)
+    # 0=no errors, 1=errors found, 2=blocking or internal error
     assert result.return_code in [
         0,
         1,
@@ -364,3 +375,157 @@ class TestMypyTimeoutMessage:
             os.path.expanduser("~/env_cache"),
             True,
         )
+
+
+class TestMypyExitReporting:
+    """Every failed exit is reported, and stderr stays reachable on its own."""
+
+    @staticmethod
+    def _run(mock_exec: Any, tmp_path: Path, **kwargs: Any) -> MypyResult:
+        """Run the checker against a mocked mypy process."""
+        mock_exec.return_value = make_command_result(**kwargs)
+        return run_mypy_check(
+            project_dir=str(tmp_path),
+            python_executable=sys.executable,
+            target_directories=["."],
+        )
+
+    @pytest.mark.parametrize(
+        "return_code, stdout, stderr, expected_error, expected_messages, expected_stderr",
+        [
+            pytest.param(0, "", _WARNING, None, 0, _WARNING, id="rc0-warning"),
+            pytest.param(0, "", "", None, 0, None, id="rc0-silent"),
+            pytest.param(
+                1,
+                "",
+                _LONG_TRACEBACK,
+                f"mypy exited with code 1: {_LONG_TRACEBACK}",
+                0,
+                None,
+                id="rc1-traceback-kept-whole",
+            ),
+            pytest.param(
+                1, _JSON_ERROR, _WARNING, None, 1, _WARNING, id="rc1-error-and-warning"
+            ),
+            pytest.param(1, _JSON_NOTE, "", None, 1, None, id="rc1-note-only"),
+            pytest.param(
+                2,
+                "",
+                "Cannot decode file",
+                "mypy exited with code 2: Cannot decode file",
+                0,
+                None,
+                id="rc2-stderr-text",
+            ),
+            pytest.param(
+                2,
+                "not json",
+                "",
+                "mypy exited with code 2: not json",
+                0,
+                None,
+                id="rc2-stdout-text",
+            ),
+            pytest.param(
+                2,
+                "",
+                f"{_WARNING}\n{_JSON_ERROR}",
+                None,
+                1,
+                _WARNING,
+                id="rc2-messages-on-stderr",
+            ),
+            pytest.param(
+                2,
+                _JSON_ERROR,
+                _INTERNAL_ERROR,
+                None,
+                1,
+                _INTERNAL_ERROR,
+                id="rc2-error-and-internal-error",
+            ),
+            pytest.param(
+                2,
+                _JSON_NOTE,
+                _INTERNAL_ERROR,
+                f"mypy exited with code 2: {_JSON_NOTE}\n{_INTERNAL_ERROR}",
+                0,
+                None,
+                id="rc2-note-and-internal-error",
+            ),
+            pytest.param(
+                2,
+                "",
+                "",
+                "mypy exited with code 2: no output",
+                0,
+                None,
+                id="rc2-silent",
+            ),
+            pytest.param(
+                3,
+                "",
+                "",
+                "mypy exited with code 3: no output",
+                0,
+                None,
+                id="rc3-silent",
+            ),
+            pytest.param(
+                -11,
+                _JSON_NOTE,
+                "",
+                f"mypy exited with code -11: {_JSON_NOTE}",
+                0,
+                None,
+                id="signal-note-only",
+            ),
+            pytest.param(
+                1, "null", "", "mypy exited with code 1: null", 0, None, id="rc1-null"
+            ),
+            pytest.param(
+                0,
+                "null",
+                "",
+                parse_mypy_json_output("null")[1],
+                0,
+                None,
+                id="rc0-null-parse-error",
+            ),
+        ],
+    )
+    @patch("mcp_tools_py.code_checker_mypy.runners.execute_command")
+    def test_exit_is_reported(
+        self,
+        mock_exec: Any,
+        tmp_path: Path,
+        return_code: int,
+        stdout: str,
+        stderr: str,
+        expected_error: str | None,
+        expected_messages: int,
+        expected_stderr: str | None,
+    ) -> None:
+        result = self._run(
+            mock_exec, tmp_path, return_code=return_code, stdout=stdout, stderr=stderr
+        )
+
+        assert result.return_code == return_code
+        assert result.error == expected_error
+        assert len(result.messages) == expected_messages
+        assert result.stderr == expected_stderr
+
+    @pytest.mark.parametrize(
+        "return_code, stdout",
+        [(1, _JSON_ERROR), (2, _JSON_NOTE)],
+        ids=["reported-findings", "failed-exit"],
+    )
+    @patch("mcp_tools_py.code_checker_mypy.runners.execute_command")
+    def test_raw_output_holds_stdout_and_stderr(
+        self, mock_exec: Any, tmp_path: Path, return_code: int, stdout: str
+    ) -> None:
+        result = self._run(
+            mock_exec, tmp_path, return_code=return_code, stdout=stdout, stderr=_WARNING
+        )
+
+        assert result.raw_output == f"{stdout}\n{_WARNING}"

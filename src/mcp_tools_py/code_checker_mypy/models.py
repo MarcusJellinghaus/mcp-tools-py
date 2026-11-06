@@ -33,6 +33,7 @@ class MypyResult(NamedTuple):
     raw_output: str | None = None
     files_checked: int | None = None
     errors_found: int | None = None
+    stderr: str | None = None
 
     def get_error_codes(self) -> set[str]:
         """Returns unique error codes from messages."""
