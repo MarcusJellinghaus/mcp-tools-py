@@ -56,8 +56,12 @@ return replace(action, fix_text=fix_text, raw=result.error or result.stderr or "
 | Clean | `ok` | `mypy found no issues.` | `""` |
 | rc 0 with stderr | `ok` | `mypy found no issues. Warning from mypy: <one line>` | stderr |
 | rc 1, notes only | `ok` | `mypy found no issues.` | `""` |
+| rc 1, notes only, with stderr | `ok` | `mypy found no issues. Warning from mypy: <one line>` | stderr |
 | rc 1, errors | `findings` | `mypy found N issue(s).` | `""` |
-| rc 2, errors | `findings` | `mypy found N issue(s). mypy exited with code 2, more errors...` | stderr, if any |
+| rc 1, errors, with stderr (bad `python_version` or `Unrecognized option` plus a type error) | `findings` | `mypy found N issue(s). Warning from mypy: <one line>` | stderr |
+| rc 2, errors, no stderr | `findings` | `mypy found N issue(s). mypy exited with code 2, more errors...` | `""` |
+| rc 2, errors, with stderr | `findings` | `mypy found N issue(s). mypy exited with code 2, more errors... Warning from mypy: <one line>` | stderr |
+| rc 2, plugin crash after errors (`INTERNAL ERROR` on stderr) | `findings` | `mypy found N issue(s). mypy exited with code 2, more errors... Warning from mypy: ... INTERNAL ERROR ...` | stderr |
 | New failure | `error` | `mypy exited with code N: <one line>` | full error text |
 | Timeout | `error` | unchanged, multi-line | full error text |
 

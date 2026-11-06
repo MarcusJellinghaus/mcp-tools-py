@@ -54,6 +54,8 @@ if prompt is None and result.stderr:
 return prompt
 ```
 
+Update the `get_mypy_prompt` docstring's `Returns`, which says "None if no issues": it returns the success text plus the warning for a passing rc 0 run with stderr, and `None` only for a passing run without stderr.
+
 ## DATA
 
 - `run_signals` returns 0 to 2 strings, early-stop line first. It returns `[]` for any error result, because those have `messages=[]` and `stderr=None`.
