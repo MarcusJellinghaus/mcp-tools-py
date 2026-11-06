@@ -21,6 +21,15 @@ This tracks **Feature Implementation** consisting of multiple **Tasks**.
 
 ## Tasks
 
-<!-- Tasks populated from pr_info/steps/ by prepare_task_tracker -->
+### Step 1: Adopt the new `describe` and `verify` signatures
+
+See [step_1.md](./steps/step_1.md).
+
+- [ ] Implementation (tests + production code): update `TestDescribe` in `tests/test_toolkit.py`, then the signatures in `src/mcp_tools_py/toolkit.py`
+- [ ] Quality checks: pylint, pytest, mypy, ruff — fix all issues
+- [ ] Commit message prepared
 
 ## Pull Request
+
+- [ ] PR review: review the full branch diff against the base branch and address findings
+- [ ] PR summary prepared
