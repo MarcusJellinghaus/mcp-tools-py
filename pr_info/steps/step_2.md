@@ -31,11 +31,11 @@ def _with_note(result: ActionResult, note: str | None) -> ActionResult: ...
 
 - **`runners.py`:** import `resolve_test_paths` from `mcp_tools_py.utils.project_config`. Update the `test_folder` docstrings to say `None` means resolve from `testpaths`.
 - **`pytest_tool.py`:** read `test_results.get("test_paths_note")` and prepend it with the sanitizer notes. Use `.get`, because many tests hand-build results without the key.
-- **`toolkit.py`:** after `check_code_with_pytest`, read `result.get("test_paths_note")` and wrap the four returns after it in `_with_note`: "skipped", the two "error" returns, and the final `action_result`. Don't move the existing logic.
+- **`toolkit.py`** (as of `origin/main`): in `_run_test`, `context.test_folder` reaches `start_coverage_run` at `:253` and `check_code_with_pytest` at `:267`, and both pass `None` through unchanged. After `check_code_with_pytest`, read `result.get("test_paths_note")` and wrap the four returns after it in `_with_note`: "skipped" (`No Tests Found`), "error" with `format_error_text`, "error" with `failed_summary` (FAILED with no findings), and the final `action_result`. The early returns before the call (pytest unavailable, `resolve_coverage_source` error) have no note. Don't move the existing logic.
 
 ## ALGORITHM
 
-`run_tests`: replace the single `command.append(...)` in the block that adds the default folder:
+`run_tests`: replace the single `command.append(...)` in the block that adds the default folder. Since #279 that block comes before `extra_args`; keep it there, because `test_run_tests_default_test_folder_before_extra_args` pins that order:
 
 ```python
 if not skip_default_test_folder:
@@ -100,4 +100,4 @@ The result dict of `check_code_with_pytest` gains `test_paths_note: str | None` 
 
 **`test_server_params.py`:** with `check_code_with_pytest` patched to return `make_pytest_results(test_paths_note="NOTE", ...)`, the reply of `run_pytest_check` starts with `NOTE`.
 
-**`test_toolkit_test.py`:** with `check_code_with_pytest` patched to return a result with `test_paths_note="NOTE"`, assert the summary starts with `NOTE` on each of the four returns. Reuse the report builders already in that file.
+**`test_toolkit_test.py`:** with `check_code_with_pytest` patched to return a result with `test_paths_note="NOTE"`, assert the summary starts with `NOTE` on each of the four returns. Reuse the helpers already in that file: `_run_with` for the patch, `_passed_results` for the final return, `_error_results` for "skipped" and "error", and `_failed_results` with `_collector`/`_report` for FAILED with no findings. Add the cases as a new class next to `TestRunTestVerdictMapping`.

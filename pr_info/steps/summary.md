@@ -13,7 +13,7 @@ Which tests to run, in order:
 
 ## Precondition
 
-#49 step 1 must be on this branch: it stops removing a positional `tests` and stops reading option values as paths. Step 1 of this plan checks for it. The check is in the first step because #49 step 1 also moves the code that adds the default folder, which step 2 edits.
+**First action, before step 1: rebase this branch onto `origin/main`.** #49 step 1 is met by `origin/main` commit 330d139 (#279): it stops removing a positional `tests`, stops reading option values as paths, and adds the default folder before `extra_args`, which step 2 edits. The rebase also brings in #275, #277, #278 and #280. #280 rewrites `toolkit.py` and `tests/test_toolkit_test.py`, which step 2 edits. The line references in these steps are taken from `origin/main` at 1cdb593. Step 1 checks that the rebase happened.
 
 ## Architectural / design changes
 
@@ -53,7 +53,7 @@ Layering is unchanged: `code_checker_pytest` already imports from `utils.project
 | `src/mcp_tools_py/checker_tools/pytest_tool.py` | 2 | Show the note |
 | `src/mcp_tools_py/toolkit.py` | 2 | Show the note, via `_with_note` |
 | `tests/test_code_checker_pytest/test_coverage_store.py` | 2 | `None` roots |
-| `tests/test_server_params.py` | 2, 3 | Note in the reply; update the pins at `:589` and `:611` |
+| `tests/test_server_params.py` | 2, 3 | Note in the reply; update the pins at `:647` and `:669` |
 | `tests/test_toolkit_test.py` | 2 | Note in the summary |
 | `src/mcp_tools_py/main.py` | 3 | Default and help text |
 | `src/mcp_tools_py/server.py` | 3 | Defaults and docstrings |

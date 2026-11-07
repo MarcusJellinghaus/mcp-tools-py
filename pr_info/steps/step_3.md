@@ -6,8 +6,8 @@
 
 ## WHERE
 
-- Defaults: `src/mcp_tools_py/main.py:88`, `src/mcp_tools_py/server.py:30` and `:93`, `src/mcp_tools_py/utils/tool_context.py:57`, `src/mcp_tools_py/code_checker_pytest/runners.py:469`
-- Tests: `tests/test_code_checker_pytest/test_integration_test_paths.py` (new), `tests/test_server_params.py:589` and `:611`, `tests/test_main_args.py`
+- Defaults: `src/mcp_tools_py/main.py:88`, `src/mcp_tools_py/server.py:30` and `:93`, `src/mcp_tools_py/utils/tool_context.py:57`, `src/mcp_tools_py/code_checker_pytest/runners.py:470`
+- Tests: `tests/test_code_checker_pytest/test_integration_test_paths.py` (new), `tests/test_server_params.py:647` and `:669`, `tests/test_main_args.py`
 - Docs: `README.md:137`, `docs/pyproject-configuration.md:309`, `docs/architecture/architecture.md:182`, `docs/upgrade-notes.md`
 
 ## WHAT
@@ -28,8 +28,8 @@ test_folder: Optional[str] = None
 
 ## HOW
 
-- **Help text and docstrings:** `main.py:89`, `server.py:42` and `:105`, `tool_context.py:45`, `runners.py:483`. Suggested wording: "Path to the test folder (relative to project_dir). Overrides `testpaths`. Defaults to `[tool.pytest.ini_options] testpaths`, then 'tests'."
-- **Pinned tests:** `test_server_params.py:589` and `:611` become `is None`.
+- **Help text and docstrings:** `main.py:89`, `server.py:42` and `:105`, `tool_context.py:45`, `runners.py:484`. Suggested wording: "Path to the test folder (relative to project_dir). Overrides `testpaths`. Defaults to `[tool.pytest.ini_options] testpaths`, then 'tests'."
+- **Pinned tests:** `test_server_params.py:647` (`server.context.test_folder == "tests"`) and `:669` (`call_args[1]["test_folder"] == "tests"`) become `is None`.
 - **`tests/test_main_args.py`:** add that `--test-folder` defaults to `None` and that a given value is kept.
 - **`README.md:137`:** default `None`, with the same description as the help text.
 - **`docs/pyproject-configuration.md:309`:**
@@ -83,6 +83,6 @@ Each folder holds a different number of tests, so the pass count shows exactly w
 | `["tests"]` | `tests`, `checks` | `extra_args=["checks"]` | 2 | no |
 | `["tests"]` | `tests`, `checks` | `test_folder="checks"` | 2 | no |
 
-Add one test for the toolkit: `PythonToolkit().run(...)` with `testpaths = ["checks"]` and only `checks/` present returns status `ok`, because `_build_context` has no explicit folder and uses the new default.
+Add one test for the toolkit: `PythonToolkit().run(...)` with `testpaths = ["checks"]` and only `checks/` present returns status `ok`, because `_build_context` (`toolkit.py:109`) has no explicit folder and uses the new default.
 
 Add one test for coverage: `run_pytest_check(coverage=True)` with `testpaths = ["nope"]` and `tests/` present doesn't crash on the `None` folder and shows the note. `tests/_coverage_project.py` has a project layout to copy.

@@ -6,7 +6,7 @@
 
 ## Precondition
 
-Open `src/mcp_tools_py/code_checker_pytest/utils.py`. If it still contains `if arg in ("tests", "tests/"):`, #49 step 1 isn't on this branch: write one line to `pr_info/.blocked.txt` saying so and stop.
+Rebase onto `origin/main` first, which includes #49 step 1 as 330d139 (#279). After the rebase, check that `src/mcp_tools_py/code_checker_pytest/utils.py` no longer contains `if arg in ("tests", "tests/"):`. If it still does, the rebase didn't happen: write one line to `pr_info/.blocked.txt` saying so and stop.
 
 ## WHERE
 
