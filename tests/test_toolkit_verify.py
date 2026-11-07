@@ -63,6 +63,18 @@ class TestVerify:
         assert by_name["formatter"].status == "error"
         assert by_name["formatter"].message
 
+    def test_stale_virtual_env_is_single_environment_error(
+        self, tmp_path: Path, monkeypatch: pytest.MonkeyPatch
+    ) -> None:
+        monkeypatch.setenv("VIRTUAL_ENV", str(tmp_path / "missing"))
+
+        items = PythonToolkit().verify(tmp_path)
+
+        assert len(items) == 1
+        assert items[0].name == "environment"
+        assert items[0].status == "error"
+        assert "VIRTUAL_ENV" in items[0].message
+
 
 class TestVerifyAction:
     """verify(action=...) checks only the tools that action drives."""

@@ -35,9 +35,9 @@ This tracks **Feature Implementation** consisting of multiple **Tasks**.
 
 ### Step 3: Project environment from `VIRTUAL_ENV` — [step_3.md](./steps/step_3.md)
 
-- [ ] Implementation: autouse `VIRTUAL_ENV` fixture in `tests/conftest.py`, new `tests/test_toolkit_environment.py`, stale-env test in `tests/test_toolkit_verify.py`; then `_build_context`, `run`/`verify` guards, and the "Name Resolution" docs update
-- [ ] Quality checks: pylint, pytest, mypy — fix all issues
-- [ ] Commit message prepared
+- [x] Implementation: autouse `VIRTUAL_ENV` fixture in `tests/conftest.py`, new `tests/test_toolkit_environment.py`, stale-env test in `tests/test_toolkit_verify.py`; then `_build_context`, `run`/`verify` guards, and the "Name Resolution" docs update
+- [x] Quality checks: pylint, pytest, mypy — fix all issues
+- [x] Commit message prepared
 
 ### Step 4: `test@quick` excludes registered `*integration` markers — [step_4.md](./steps/step_4.md)
 

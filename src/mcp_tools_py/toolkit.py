@@ -8,6 +8,7 @@ instead of returning structured data.
 """
 
 import json
+import os
 import shutil
 import tempfile
 from dataclasses import replace
@@ -119,13 +120,32 @@ Expected output: Code or test changes that make the failing tests pass while mai
 def _build_context(project_dir: Path) -> ToolContext:
     """Build the ToolContext PythonToolkit runs its actions against.
 
-    Mirrors the old mcp_coder/mcp_tools_py.py shim: no python_executable or
-    venv_path override, since mcp-coder runs inside the project's own venv.
+    The project environment comes from VIRTUAL_ENV when it is set and
+    non-empty, else from sys.executable: mcp-coder can run from its own tool
+    env, while the shell's activated venv is the project's. A VIRTUAL_ENV
+    without an interpreter is an error, never a fallback. `tool_environment`
+    keeps its sys.executable default.
 
     Returns:
-        A context over `project_dir`'s own resolved Python environment.
+        A context over the resolved project Python environment.
+
+    Raises:
+        FileNotFoundError: VIRTUAL_ENV is set but has no interpreter; the
+            message names VIRTUAL_ENV.
     """
-    return ToolContext(project_dir=project_dir, environment=PythonEnvironment.resolve())
+    venv = os.environ.get("VIRTUAL_ENV")
+    if not venv:
+        return ToolContext(
+            project_dir=project_dir, environment=PythonEnvironment.resolve()
+        )
+    try:
+        environment = PythonEnvironment.resolve(venv_path=venv)
+    except FileNotFoundError as exc:
+        raise FileNotFoundError(
+            f"VIRTUAL_ENV is set to {venv}, but it has no Python interpreter. "
+            "Activate the project's environment or unset VIRTUAL_ENV."
+        ) from exc
+    return ToolContext(project_dir=project_dir, environment=environment)
 
 
 def _tool_item(context: ToolContext, tool: str) -> VerifyItem:
@@ -514,7 +534,8 @@ class PythonToolkit(Toolkit):
 
         Returns:
             The action outcome; status "error" for an action or depth that
-            `describe` doesn't declare.
+            `describe` doesn't declare, or when VIRTUAL_ENV is set but has no
+            interpreter.
         """
         actions = self.describe().actions
         depths = actions.get(request.action)
@@ -530,7 +551,10 @@ class PythonToolkit(Toolkit):
                 summary=f"Unknown depth '{request.depth}' for action "
                 f"'{request.action}'; declared: {', '.join(depths)}.",
             )
-        context = _build_context(request.project_dir)
+        try:
+            context = _build_context(request.project_dir)
+        except FileNotFoundError as exc:
+            return ActionResult(status="error", summary=str(exc))
         if request.action == "test":
             return _run_test(context, request.depth)
         if request.action == "format":
@@ -549,7 +573,9 @@ class PythonToolkit(Toolkit):
         Returns:
             One VerifyItem per tool, plus one named "formatter" for whether a
             formatter can be resolved for `project_dir`; a single "error"
-            item named after `action` when `describe` doesn't declare it.
+            item named after `action` when `describe` doesn't declare it; a
+            single "error" item named "environment" when VIRTUAL_ENV is set
+            but has no interpreter.
         """
         actions = self.describe().actions
         if action is not None and action not in actions:
@@ -561,7 +587,10 @@ class PythonToolkit(Toolkit):
                     f"declared: {', '.join(actions)}.",
                 )
             ]
-        context = _build_context(project_dir)
+        try:
+            context = _build_context(project_dir)
+        except FileNotFoundError as exc:
+            return [VerifyItem(name="environment", status="error", message=str(exc))]
         per_action = {"test": ["pytest"], "check": list(_CHECK_DEPTHS["full"])}
         tools = per_action.get(action or "", sorted(TOOL_MODULES))
         formatter_items: list[VerifyItem] = []
