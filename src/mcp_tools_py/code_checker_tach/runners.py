@@ -1,7 +1,31 @@
 """Functions for running tach architecture boundary checks."""
 
 from mcp_tools_py.utils.project_config import DEFAULT_CHECK_TIMEOUT
-from mcp_tools_py.utils.subprocess_runner import execute_command
+from mcp_tools_py.utils.subprocess_runner import CommandResult, execute_command
+
+
+def format_tach_result(result: CommandResult) -> str:
+    """Format a finished `tach check` run.
+
+    Args:
+        result: The completed tach command result.
+
+    Returns:
+        A status line from tach's exit code, followed by its combined stdout
+        and stderr when there is any.
+    """
+    output = result.stdout
+    if result.stderr:
+        output = output + "\n" + result.stderr if output else result.stderr
+
+    stripped = output.strip()
+    if result.return_code == 0:
+        if stripped:
+            return f"tach check passed:\n{stripped}"
+        return "tach check passed (no output)."
+    if stripped:
+        return f"tach check failed:\n{stripped}"
+    return f"tach check failed (exit code {result.return_code}, no output)."
 
 
 def run_tach_check(
@@ -17,7 +41,8 @@ def run_tach_check(
         timeout_seconds: Maximum seconds to wait for tach.
 
     Returns:
-        Status line followed by tach output, or fallback message if no output.
+        The text from `format_tach_result`, or a message when tach timed out
+        or failed to run.
     """
     command = [tach_binary, "check", "--output", "json"]
 
@@ -28,11 +53,4 @@ def run_tach_check(
     if result.execution_error:
         return f"tach check failed to run: {result.execution_error}"
 
-    output = result.stdout
-    if result.stderr:
-        output = output + "\n" + result.stderr if output else result.stderr
-
-    stripped = output.strip()
-    if stripped:
-        return f"tach check completed:\n{stripped}"
-    return "tach check passed (no output)."
+    return format_tach_result(result)

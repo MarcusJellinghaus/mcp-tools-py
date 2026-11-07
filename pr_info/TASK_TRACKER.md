@@ -23,9 +23,9 @@ This tracks **Feature Implementation** consisting of multiple **Tasks**.
 
 ### Step 1: Shared formatter used by `run_tach_check` — [step_1.md](./steps/step_1.md)
 
-- [ ] Implementation: parametrized `run_tach_check` test in `tests/test_code_checker_tach/test_runners.py`, `format_tach_result` in `runners.py`, docstring updates in `runners.py` and `tach_tool.py`
-- [ ] Quality checks: pylint, pytest, mypy — fix all issues
-- [ ] Commit message prepared
+- [x] Implementation: parametrized `run_tach_check` test in `tests/test_code_checker_tach/test_runners.py`, `format_tach_result` in `runners.py`, docstring updates in `runners.py` and `tach_tool.py`
+- [x] Quality checks: pylint, pytest, mypy — fix all issues
+- [x] Commit message prepared
 
 ### Step 2: `_run_tach` uses the shared formatter — [step_2.md](./steps/step_2.md)
 

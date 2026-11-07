@@ -3,54 +3,42 @@
 from typing import Any
 from unittest.mock import patch
 
+import pytest
+
 from mcp_tools_py.code_checker_tach.runners import run_tach_check
 from tests.conftest import make_command_result
 
 MODULE_PATH = "mcp_tools_py.code_checker_tach.runners"
 
 
+@pytest.mark.parametrize(
+    ("return_code", "stdout", "stderr", "expected"),
+    [
+        (0, '{"errors": []}\n', "", 'tach check passed:\n{"errors": []}'),
+        (
+            0,
+            '{"errors": []}',
+            "warning: deprecated",
+            'tach check passed:\n{"errors": []}\nwarning: deprecated',
+        ),
+        (0, "", "", "tach check passed (no output)."),
+        (1, '{"errors": []}', "", 'tach check failed:\n{"errors": []}'),
+        (1, "", "error: bad config", "tach check failed:\nerror: bad config"),
+        (1, "", "", "tach check failed (exit code 1, no output)."),
+    ],
+)
 @patch(f"{MODULE_PATH}.execute_command")
-def test_run_tach_success_returns_status_line_and_json(mock_exec: Any) -> None:
-    """Mock execute_command returning JSON stdout, verify status prefix added."""
-    mock_exec.return_value = make_command_result(stdout='{"errors": []}\n')
-
-    result = run_tach_check(tach_binary="/usr/bin/tach", project_dir="/project")
-
-    assert result == 'tach check completed:\n{"errors": []}'
-
-
-@patch(f"{MODULE_PATH}.execute_command")
-def test_run_tach_combines_stderr(mock_exec: Any) -> None:
-    """Mock with both stdout and stderr, verify combined output."""
+def test_run_tach_status_line_follows_exit_code(
+    mock_exec: Any, return_code: int, stdout: str, stderr: str, expected: str
+) -> None:
+    """The status line depends on the exit code; tach's output follows it."""
     mock_exec.return_value = make_command_result(
-        stdout='{"errors": []}', stderr="warning: deprecated"
+        return_code=return_code, stdout=stdout, stderr=stderr
     )
 
     result = run_tach_check(tach_binary="/usr/bin/tach", project_dir="/project")
 
-    assert result.startswith("tach check completed:\n")
-    assert '{"errors": []}' in result
-    assert "warning: deprecated" in result
-
-
-@patch(f"{MODULE_PATH}.execute_command")
-def test_run_tach_stderr_only(mock_exec: Any) -> None:
-    """Mock empty stdout but stderr present, verify stderr in output."""
-    mock_exec.return_value = make_command_result(stdout="", stderr="error: bad config")
-
-    result = run_tach_check(tach_binary="/usr/bin/tach", project_dir="/project")
-
-    assert result == "tach check completed:\nerror: bad config"
-
-
-@patch(f"{MODULE_PATH}.execute_command")
-def test_run_tach_empty_output_fallback(mock_exec: Any) -> None:
-    """Mock empty stdout/stderr, verify fallback message returned."""
-    mock_exec.return_value = make_command_result(stdout="", stderr="")
-
-    result = run_tach_check(tach_binary="/usr/bin/tach", project_dir="/project")
-
-    assert result == "tach check passed (no output)."
+    assert result == expected
 
 
 @patch(f"{MODULE_PATH}.execute_command")
