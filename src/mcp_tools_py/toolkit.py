@@ -7,8 +7,10 @@ discovers and runs it without naming any of mcp-tools-py's other modules.
 instead of returning structured data.
 """
 
+import json
 import shutil
 import tempfile
+from dataclasses import replace
 from pathlib import Path
 
 from mcp_coder_utils.toolkit import (
@@ -35,9 +37,13 @@ from mcp_tools_py.code_checker_pytest.coverage_store import (
     start_coverage_run,
 )
 from mcp_tools_py.code_checker_pytest.models import PytestReport, Test
-from mcp_tools_py.code_checker_pytest.reporting import collectors_failed_line
+from mcp_tools_py.code_checker_pytest.reporting import (
+    XDIST_MARKER,
+    collectors_failed_line,
+)
 from mcp_tools_py.code_checker_pytest.runners import check_code_with_pytest
 from mcp_tools_py.code_checker_pytest.verdict import (
+    XDIST_HINT,
     RunStatus,
     RunVerdict,
     cap_problems,
@@ -50,16 +56,38 @@ from mcp_tools_py.formatter.runner import (
     step_tool,
     validate_steps,
 )
-from mcp_tools_py.toolkit_checks import _result_from_findings, _run_check
+from mcp_tools_py.toolkit_checks import (
+    _CHECK_DEPTHS,
+    _result_from_findings,
+    _run_check,
+)
+from mcp_tools_py.utils.environment_info import TOOL_MODULES
 from mcp_tools_py.utils.project_config import (
     get_pytest_addopts,
     resolve_coverage_source,
     resolve_target_directories,
 )
 from mcp_tools_py.utils.python_environment import PythonEnvironment
-from mcp_tools_py.utils.tool_context import CONSOLE_SCRIPT_TOOLS, ToolContext
+from mcp_tools_py.utils.tool_context import ToolContext
 
 _FAILED_OUTCOMES = ("failed", "error")
+_XDIST_KEY = "pytest|collection|xdist"
+# pytest: "Interrupted: N error(s) during collection"
+_COLLECTION_INTERRUPTED = "during collection"
+
+# Same list as mcp-coder's workflows/rebase_automated.py::AUTOMATED_EXCLUDED_MARKERS;
+# this is the single home of the list.
+UNATTENDED_EXCLUDED_MARKERS: list[str] = [
+    "not claude_cli_integration",
+    "not copilot_cli_integration",
+    "not langchain_integration",
+    "not llm_integration",
+    "not jenkins_integration",
+    "not install_integration",
+]
+# Stops --strict-markers projects rejecting marker names they don't register.
+_STRICT_MARKERS_OFF: list[str] = ["-o", "strict_markers=false"]
+_LONG_TEST_TIMEOUT = 1800  # seconds; test@standard, @unattended and @full
 
 _FIX_CHECK_PROMPT = """\
 Fix the mypy type errors shown in the output below.
@@ -90,6 +118,21 @@ def _build_context(project_dir: Path) -> ToolContext:
     return ToolContext(project_dir=project_dir, environment=PythonEnvironment.resolve())
 
 
+def _tool_item(context: ToolContext, tool: str) -> VerifyItem:
+    """Report whether `tool` is available in `context`.
+
+    Returns:
+        An "ok" VerifyItem, or an "error" one carrying the standard
+        "tool not available" message.
+    """
+    ok = context.is_tool_available(tool)
+    return VerifyItem(
+        name=tool,
+        status="ok" if ok else "error",
+        message="" if ok else context.unavailable_message(tool),
+    )
+
+
 def _test_failure_summary(test: Test) -> str:
     """One-line failure summary for a failing or erroring pytest Finding.
 
@@ -104,6 +147,53 @@ def _test_failure_summary(test: Test) -> str:
     return test.outcome
 
 
+def _collector_findings(report: PytestReport) -> list[Finding]:
+    """One Finding per failed collector; xdist mismatches collapse into one.
+
+    Returns:
+        A Finding per distinct failed collector node id, keyed by it, whose
+        message is the last non-empty `longrepr` line; then, if any collector
+        failed with an xdist collection mismatch, one `_XDIST_KEY` Finding
+        without a path carrying `XDIST_HINT`.
+    """
+    by_id: dict[str, Finding] = {}
+    xdist: Finding | None = None
+    for collector in report.collectors or []:
+        if collector.outcome not in _FAILED_OUTCOMES:
+            continue
+        text = collector.longrepr or ""
+        if XDIST_MARKER in text:
+            xdist = xdist or Finding(
+                key=_XDIST_KEY, message=f"{XDIST_MARKER}\n{XDIST_HINT}"
+            )
+        elif collector.nodeid not in by_id:
+            lines = [line.strip() for line in text.splitlines() if line.strip()]
+            by_id[collector.nodeid] = Finding(
+                key=collector.nodeid,
+                message=lines[-1] if lines else "collection failed",
+                path=collector.nodeid.split("::")[0],
+            )
+    return [*by_id.values(), *([xdist] if xdist else [])]
+
+
+def _is_collection_error(report: PytestReport, verdict: RunVerdict) -> bool:
+    """True when an ERROR verdict was caused by collection errors.
+
+    Exit code 1 (tests failed) without any failed/errored test means only
+    collectors failed. Exit code 2 is also pytest's KeyboardInterrupt code,
+    so it additionally needs pytest's "during collection" line.
+
+    Returns:
+        Whether `verdict` is an ERROR that collection errors explain.
+    """
+    if verdict.status is not RunStatus.ERROR:
+        return False
+    if verdict.exit_code == 1:
+        return True
+    output = report.error_context.error_message if report.error_context else ""
+    return verdict.exit_code == 2 and _COLLECTION_INTERRUPTED in output
+
+
 def _run_test(context: ToolContext, depth: str) -> ActionResult:
     """Run pytest at `depth` and map the outcome onto an ActionResult.
 
@@ -112,23 +202,36 @@ def _run_test(context: ToolContext, depth: str) -> ActionResult:
     `run_pytest_check(coverage=True)`); a `fail_under` miss is informational
     only and never changes `status`.
 
+    Every depth but `quick` defaults the pytest timeout to
+    `_LONG_TEST_TIMEOUT`; `pytest-timeout` and `check-timeout` in
+    `[tool.mcp-tools-py]` still win.
+
+    Failed collectors become findings too, also when collection errors
+    alone made the verdict ERROR (exit 1, or exit 2 "during collection").
+
     Returns:
         "error" if pytest is unavailable, the verdict is ERROR (other than
-        "no tests found"), or FAILED without any failing/erroring test;
-        "skipped" for no tests found; "findings" with one Finding per
-        failing/erroring test; "ok" for PASSED, and for SUSPICIOUS with a
-        "Not verified" summary.
+        "no tests found" or one caused by failed collectors), or FAILED
+        without any failing/erroring test or collector; "skipped" for no
+        tests found; "findings" with one Finding per failing/erroring test
+        and per failed collector (one for all xdist mismatches); "ok" for
+        PASSED, and for SUSPICIOUS with a "Not verified" summary.
     """
     if not context.is_tool_available("pytest"):
         return ActionResult(
             status="error", summary=context.unavailable_message("pytest")
         )
+    if depth != "quick":
+        context = replace(context, check_timeout=_LONG_TEST_TIMEOUT)
 
     project_dir = str(context.project_dir)
     interpreter = str(context.environment.interpreter)
-    markers = ["not integration"] if depth == "quick" else None
+    markers = {
+        "quick": ["not integration"],
+        "unattended": list(UNATTENDED_EXCLUDED_MARKERS),
+    }.get(depth)
 
-    extra_args: list[str] = []
+    extra_args = list(_STRICT_MARKERS_OFF) if depth == "unattended" else []
     env_vars: dict[str, str] = {}
     fail_under: float | None = None
     temp_dir: str | None = None
@@ -140,7 +243,7 @@ def _run_test(context: ToolContext, depth: str) -> ActionResult:
                 return ActionResult(status="error", summary=sources)
             temp_dir = tempfile.mkdtemp(prefix="pytest_cov_")
             cov_args, cov_env = coverage_args(sources, temp_dir)
-            extra_args = cov_args
+            extra_args.extend(cov_args)
             env_vars = cov_env
             fail_under = read_fail_under(interpreter, project_dir)
             addopts = get_pytest_addopts(project_dir)
@@ -182,8 +285,14 @@ def _run_test(context: ToolContext, depth: str) -> ActionResult:
             )
             finished = finish_coverage_run(coverage_run, data, report, verdict)
 
+        # Before the `known` gate: a real collection failure arrives as ERROR.
+        collector_findings = _collector_findings(report) if report else []
+        collection_error = report is not None and _is_collection_error(report, verdict)
         known = (RunStatus.PASSED, RunStatus.FAILED, RunStatus.SUSPICIOUS)
-        if report is None or verdict.status not in known:
+        if report is None or (
+            verdict.status not in known
+            and not (collection_error and collector_findings)
+        ):
             if any("No Tests Found" in p for p in verdict.problems):
                 return ActionResult(
                     status="skipped", summary="\n".join(verdict.problems)
@@ -194,13 +303,16 @@ def _run_test(context: ToolContext, depth: str) -> ActionResult:
 
         summary_text: str = result["summary_text"]
         findings = [
-            Finding(
-                key=test.nodeid,
-                message=_test_failure_summary(test),
-                path=test.nodeid.split("::")[0],
-            )
-            for test in report.tests or []
-            if test.outcome in _FAILED_OUTCOMES
+            *(
+                Finding(
+                    key=test.nodeid,
+                    message=_test_failure_summary(test),
+                    path=test.nodeid.split("::")[0],
+                )
+                for test in report.tests or []
+                if test.outcome in _FAILED_OUTCOMES
+            ),
+            *collector_findings,
         ]
         count_line = collectors_failed_line(report)
         count_text = f"{count_line}\n\n" if count_line else ""
@@ -219,6 +331,8 @@ def _run_test(context: ToolContext, depth: str) -> ActionResult:
             findings=findings,
             ok_summary=ok_summary,
             findings_summary=failed_summary if count_line else summary_text,
+            # Node ids for tests and collectors; the xdist finding has no path.
+            locations=[f.key if f.path else None for f in findings],
         )
 
         if finished is not None and finished.data is not None:
@@ -331,7 +445,7 @@ class PythonToolkit(Toolkit):
             actions={
                 "format": ["apply", "check"],
                 "check": ["quick", "standard", "full"],
-                "test": ["quick", "standard", "full"],
+                "test": ["quick", "standard", "unattended", "full"],
             },
             params_schema={
                 "type": "object",
@@ -362,7 +476,7 @@ class PythonToolkit(Toolkit):
                 },
                 "test": {
                     depth: ["mcp__mcp-tools-py__run_pytest_check"]
-                    for depth in ("quick", "standard", "full")
+                    for depth in ("quick", "standard", "unattended", "full")
                 },
             },
         )
@@ -371,63 +485,96 @@ class PythonToolkit(Toolkit):
         """Run one action at one depth.
 
         Returns:
-            The action outcome.
-
-        Raises:
-            NotImplementedError: For any action other than "test", "format",
-                and "check".
+            The action outcome; status "error" for an action or depth that
+            `describe` doesn't declare.
         """
+        actions = self.describe().actions
+        depths = actions.get(request.action)
+        if depths is None:
+            return ActionResult(
+                status="error",
+                summary=f"Unknown action '{request.action}'; "
+                f"declared: {', '.join(actions)}.",
+            )
+        if request.depth not in depths:
+            return ActionResult(
+                status="error",
+                summary=f"Unknown depth '{request.depth}' for action "
+                f"'{request.action}'; declared: {', '.join(depths)}.",
+            )
         context = _build_context(request.project_dir)
         if request.action == "test":
             return _run_test(context, request.depth)
         if request.action == "format":
             return _run_format(context, request.depth)
-        if request.action == "check":
-            return _run_check(context, request.depth)
-        raise NotImplementedError(request.action)
+        return _run_check(context, request.depth)
 
     def verify(self, project_dir: Path, action: str | None = None) -> list[VerifyItem]:
-        """Check that every tool this toolkit drives is available.
+        """Check that the tools `action` drives are available.
 
-        `action` is ignored for now, so every action checks everything.
+        - None: every tool, plus "formatter".
+        - "format": "formatter" plus the tools of the resolved formatter
+          steps (none when no formatter resolves).
+        - "check": the tools of the `full` check depth.
+        - "test": pytest.
 
         Returns:
-            One VerifyItem per console-script tool, per `python -m` tool
-            (mypy, pylint, pytest), and one more named "formatter" for
-            whether a formatter can be resolved for `project_dir`.
+            One VerifyItem per tool, plus one named "formatter" for whether a
+            formatter can be resolved for `project_dir`; a single "error"
+            item named after `action` when `describe` doesn't declare it.
         """
-        del action
-        context = _build_context(project_dir)
-        items: list[VerifyItem] = []
-        for tool in sorted(CONSOLE_SCRIPT_TOOLS | {"mypy", "pylint", "pytest"}):
-            ok = context.is_tool_available(tool)
-            items.append(
+        actions = self.describe().actions
+        if action is not None and action not in actions:
+            return [
                 VerifyItem(
-                    name=tool,
-                    status="ok" if ok else "error",
-                    message="" if ok else context.unavailable_message(tool),
+                    name=action,
+                    status="error",
+                    message=f"Unknown action '{action}'; "
+                    f"declared: {', '.join(actions)}.",
                 )
-            )
-        try:
-            resolve_steps(project_dir)
-            items.append(VerifyItem(name="formatter", status="ok"))
-        except ValueError as exc:
-            items.append(VerifyItem(name="formatter", status="error", message=str(exc)))
-        return items
+            ]
+        context = _build_context(project_dir)
+        per_action = {"test": ["pytest"], "check": list(_CHECK_DEPTHS["full"])}
+        tools = per_action.get(action or "", sorted(TOOL_MODULES))
+        formatter_items: list[VerifyItem] = []
+        if action in (None, "format"):
+            try:
+                steps = resolve_steps(project_dir)
+                formatter_items.append(VerifyItem(name="formatter", status="ok"))
+                if action == "format":
+                    tools = sorted({step_tool(step) for step in steps})
+            except ValueError as exc:
+                formatter_items.append(
+                    VerifyItem(name="formatter", status="error", message=str(exc))
+                )
+                if action == "format":
+                    tools = []
+        return [_tool_item(context, tool) for tool in tools] + formatter_items
 
     def prompt_fragments(self) -> dict[str, str]:
         """Prompt text PythonToolkit contributes to mcp-coder's prompts.
 
         Returns:
-            `language_context`, `check_instructions`, and `fix.check` — the
-            Mypy Fix prompt, with its `[mypy_output]` placeholder dropped
-            since the actual output now travels via `ActionResult.fix_text`.
+            `language_context`, `check_instructions`,
+            `check_instructions.unattended` — the pytest marker filter of the
+            `unattended` test depth — and `fix.check` — the Mypy Fix prompt,
+            with its `[mypy_output]` placeholder dropped since the actual
+            output now travels via `ActionResult.fix_text`.
         """
+        names = ", ".join(m.removeprefix("not ") for m in UNATTENDED_EXCLUDED_MARKERS)
         return {
             "language_context": "This is a Python project.",
             "check_instructions": (
                 "Run pylint, mypy and pytest via the MCP tools. At full depth, "
                 "also run the other checkers, including deptry."
+            ),
+            "check_instructions.unattended": (
+                "When you run `mcp__mcp-tools-py__run_pytest_check`, pass "
+                f"markers={json.dumps(UNATTENDED_EXCLUDED_MARKERS)} and "
+                f"extra_args={json.dumps(_STRICT_MARKERS_OFF)}. This deselects "
+                f"tests marked {names}; the -o option stops projects using "
+                "--strict-markers from rejecting marker names they do not "
+                "register."
             ),
             "fix.check": _FIX_CHECK_PROMPT,
         }

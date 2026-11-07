@@ -94,7 +94,7 @@ def test_no_tests_found_clears_the_data(project: Path) -> None:
 
 
 def test_failing_collector_under_xdist_saves_the_data(project: Path) -> None:
-    """The ERROR early return with a report and JSON saves the partial run."""
+    """A failed collector under xdist is a finding, and the partial run's data is saved."""
     pyproject = project / "pyproject.toml"
     pyproject.write_text(pyproject.read_text() + 'addopts = "-n 2"\n')
     (project / "tests" / "test_broken.py").write_text(
@@ -103,7 +103,7 @@ def test_failing_collector_under_xdist_saves_the_data(project: Path) -> None:
 
     result = _run_test(project)
 
-    assert result.status == "error"
+    assert result.status == "findings"
     saved = load_saved(str(project))
     assert saved is not None
     assert saved["runs"][-1]["failed_collectors"] == 1

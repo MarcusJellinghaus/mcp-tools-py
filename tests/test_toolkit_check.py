@@ -90,6 +90,7 @@ class TestRunCheck:
 
         assert result.status == "findings"
         assert len(result.findings) == 1
+        assert "mod.py:3: W0611: " in result.fix_text
 
     def test_standard_both_tools_failing_concatenates_findings(
         self, tmp_path: Path
@@ -368,6 +369,7 @@ class TestRunCheckFull:
         assert finding.key == "mod.py|F401|'os' imported but unused"
         assert finding.path == "mod.py"
         assert finding.rule == "F401"
+        assert "- mod.py:1: F401: 'os' imported but unused" in result.fix_text
 
     def test_bandit_finding_is_finding_per_message(
         self, tmp_path: Path, monkeypatch: pytest.MonkeyPatch
@@ -393,6 +395,7 @@ class TestRunCheckFull:
         assert finding.path == "mod.py"
         assert finding.rule == "B102"
         assert finding.severity == "MEDIUM"
+        assert "- mod.py:3: B102: Use of exec detected." in result.fix_text
 
     def test_deptry_findings_have_one_key_per_module(
         self, tmp_path: Path, monkeypatch: pytest.MonkeyPatch
@@ -419,6 +422,28 @@ class TestRunCheckFull:
         ]
         assert result.findings[0].path == "pyproject.toml"
         assert result.findings[0].rule == "DEP002"
+        assert "- pyproject.toml: DEP002: 'requests'" in result.fix_text
+
+    def test_deptry_finding_with_line_shows_it(
+        self, tmp_path: Path, monkeypatch: pytest.MonkeyPatch
+    ) -> None:
+        _write_check_project(tmp_path, _CLEAN_SRC)
+        _patch_full_depth_clean(monkeypatch)
+        message = _deptry_message("requests")._replace(
+            code="DEP001", file="src/mod.py", line=4
+        )
+        monkeypatch.setattr(
+            "mcp_tools_py.toolkit_checks.run_deptry_check_impl",
+            lambda *args, **kwargs: DeptryResult(return_code=1, messages=[message]),
+        )
+        request = ActionRequest(
+            action="check", depth="full", project_dir=tmp_path, params={}
+        )
+
+        result = PythonToolkit().run(request)
+
+        assert result.status == "findings"
+        assert "- src/mod.py:4: DEP001: " in result.fix_text
 
     def test_deptry_error_is_error(
         self, tmp_path: Path, monkeypatch: pytest.MonkeyPatch
