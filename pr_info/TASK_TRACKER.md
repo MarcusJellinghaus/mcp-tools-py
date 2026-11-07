@@ -35,9 +35,9 @@ This tracks **Feature Implementation** consisting of multiple **Tasks**.
 
 ### Step 3: Report selected tests and IDs for --collect-only — [step_3.md](./steps/step_3.md)
 
-- [ ] Implementation: tests first, then `SanitizedArgs.collect_only`, `_scan_args`, `collected_test_ids`, `format_collect_only_text`, `format_suspicious_text` deselected count, wiring in `checker_tools`/`pytest_tool.py`/`runners.py`/`toolkit.py`, README update
-- [ ] Quality checks: pylint, pytest (unit + integration extra_args file), mypy — fix all issues
-- [ ] Commit message prepared: `feat(pytest): report selected tests and IDs for --collect-only (#49)`
+- [x] Implementation: tests first, then `SanitizedArgs.collect_only`, `_scan_args`, `collected_test_ids`, `format_collect_only_text`, `format_suspicious_text` deselected count, wiring in `checker_tools`/`pytest_tool.py`/`runners.py`/`toolkit.py`, README update
+- [x] Quality checks: pylint, pytest (unit + integration extra_args file), mypy — fix all issues
+- [x] Commit message prepared: `feat(pytest): report selected tests and IDs for --collect-only (#49)`
 
 ## Pull Request
 

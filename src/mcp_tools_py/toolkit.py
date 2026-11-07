@@ -210,7 +210,7 @@ def _run_test(context: ToolContext, depth: str) -> ActionResult:
         if verdict.status is RunStatus.FAILED and not findings:
             return ActionResult(status="error", summary=failed_summary)
         ok_summary = (
-            format_suspicious_text(report.summary.collected)
+            format_suspicious_text(report.summary.collected, report.summary.deselected)
             if verdict.status is RunStatus.SUSPICIOUS
             else summary_text
         )

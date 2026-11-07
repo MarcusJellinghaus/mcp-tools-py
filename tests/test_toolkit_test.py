@@ -203,6 +203,21 @@ class TestRunTestVerdictMapping:
         assert result.status == "ok"
         assert "Not verified" in result.summary
 
+    def test_suspicious_counts_selected_tests(self, tmp_path: Path) -> None:
+        report = _report(4)
+        report.summary.deselected = 3
+        results = make_pytest_results(
+            RunStatus.SUSPICIOUS,
+            test_results=report,
+            summary_text="",
+        )
+
+        result = _run_with(tmp_path, results)
+
+        assert result.status == "ok"
+        assert "Collected 1 tests" in result.summary
+        assert "Not verified" in result.summary
+
     def test_failed_with_failing_test_is_findings(self, tmp_path: Path) -> None:
         failing = Test(
             nodeid="tests/test_a.py::test_x", lineno=1, keywords=[], outcome="failed"

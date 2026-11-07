@@ -48,13 +48,22 @@ def _values_taken(arg: str) -> int:
     return 0
 
 
-def _positional_args(args: List[str]) -> List[str]:
-    """Return the tokens of ``args`` that are neither options nor their values.
+_COLLECT_ONLY_FLAGS = {"--collect-only", "--co", "--collectonly"}
+
+
+def _scan_args(args: List[str]) -> Tuple[List[str], bool]:
+    """Split ``args`` into positionals and whether collect-only was requested.
 
     An option takes up to its table count of following tokens that don't
-    start with ``-``. Everything after ``--`` is positional.
+    start with ``-``. Everything after ``--`` is positional, so a
+    collect-only flag there is not detected.
+
+    Returns:
+        The tokens that are neither options nor their values, and True when
+        a collect-only flag is present.
     """
     positionals: List[str] = []
+    collect_only = False
     i = 0
     while i < len(args):
         arg = args[i]
@@ -65,11 +74,12 @@ def _positional_args(args: List[str]) -> List[str]:
         if not arg.startswith("-"):
             positionals.append(arg)
             continue
+        collect_only = collect_only or arg in _COLLECT_ONLY_FLAGS
         for _ in range(_values_taken(arg)):
             if i == len(args) or args[i].startswith("-"):
                 break
             i += 1
-    return positionals
+    return positionals, collect_only
 
 
 SHOW_OUTPUT_NOTE = (
@@ -172,8 +182,9 @@ def sanitize_extra_args(
     # If shape doesn't match, fall back to existence check; missing → silent passthrough.
     has_path_args = False
     path_args: List[str] = []
+    positionals, collect_only = _scan_args(cleaned)
     if project_dir:
-        for arg in _positional_args(cleaned):
+        for arg in positionals:
             if os.path.isabs(arg):
                 notes.append(f"Absolute path '{arg}' ignored for path detection.")
                 continue
@@ -207,6 +218,7 @@ def sanitize_extra_args(
         has_path_args=has_path_args,
         show_output=show_output,
         path_args=path_args,
+        collect_only=collect_only,
     )
 
 

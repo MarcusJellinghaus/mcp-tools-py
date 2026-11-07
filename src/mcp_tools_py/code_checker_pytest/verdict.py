@@ -8,10 +8,13 @@ from mcp_tools_py.code_checker_pytest.reporting import (
     MAX_OUTPUT_LINES,
     XDIST_MARKER,
     OutputBuilder,
+    collected_test_ids,
     collectors_failed_line,
     failed_collector_count,
     get_test_summary,
     group_failed_collectors,
+    plural,
+    selected_count,
 )
 from mcp_tools_py.code_checker_pytest.utils import get_pytest_exit_code_info
 
@@ -91,16 +94,42 @@ def format_error_text(report: PytestReport | None, verdict: RunVerdict) -> str:
     return "\n".join(lines)
 
 
-def format_suspicious_text(collected: int) -> str:
+def format_suspicious_text(collected: int, deselected: int | None = None) -> str:
     """Render the text for a SUSPICIOUS verdict.
 
     Args:
         collected: Number of collected tests
+        deselected: Number of deselected tests, subtracted from ``collected``
 
     Returns:
         The not-verified message.
     """
-    return f"Collected {collected} tests but none reported an outcome. Not verified."
+    selected = collected - (deselected or 0)
+    return f"Collected {selected} tests but none reported an outcome. Not verified."
+
+
+def format_collect_only_text(report: PytestReport) -> str:
+    """Render the text for a ``--collect-only`` run.
+
+    Args:
+        report: The parsed pytest report
+
+    Returns:
+        The selected count, then one test ID per line, capped at
+        MAX_OUTPUT_LINES with a truncation marker.
+    """
+    selected = selected_count(report.summary)
+    deselected = report.summary.deselected or 0
+    header = f"Collected {selected} {plural(selected, 'test')}"
+    if deselected:
+        header += f" ({deselected} deselected)"
+    output = OutputBuilder(MAX_OUTPUT_LINES)
+    output.add(f"{header} in {report.duration:.2f} seconds. No tests were run.\n")
+    ids = collected_test_ids(report)
+    if ids:
+        # One add, so the truncation marker is written when the IDs hit the cap
+        output.add("\n".join(ids) + "\n")
+    return output.get_result()
 
 
 def format_collection_problems(verdict: RunVerdict) -> str:

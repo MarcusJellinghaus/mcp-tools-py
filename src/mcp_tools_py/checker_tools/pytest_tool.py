@@ -251,7 +251,10 @@ def register(mcp: "FastMCPProtocol", checker_tools: "CheckerTools") -> None:
 
             # Always show detailed failure output
             result = checker_tools._format_pytest_result_with_details(
-                test_results, show_details=True, show_output=sanitized.show_output
+                test_results,
+                show_details=True,
+                show_output=sanitized.show_output,
+                collect_only=sanitized.collect_only,
             )
 
             # Prepend deduplication notes so LLM can self-correct

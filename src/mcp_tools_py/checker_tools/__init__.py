@@ -26,6 +26,7 @@ from mcp_tools_py.code_checker_pytest.reporting import (
 )
 from mcp_tools_py.code_checker_pytest.verdict import (
     RunStatus,
+    format_collect_only_text,
     format_collection_problems,
     format_error_text,
     format_suspicious_text,
@@ -72,10 +73,12 @@ class CheckerTools:
         test_results: dict[str, Any],
         show_details: bool,
         show_output: bool = False,
+        collect_only: bool = False,
     ) -> str:
         """Format a pytest run by its verdict status; only PASSED reads as completed.
 
         With show_output, a passing run also lists the captured output of passing tests.
+        With collect_only, a run with no outcomes lists the selected test IDs.
         ERROR and unknown statuses fail closed and render the shared error text.
 
         Returns:
@@ -117,7 +120,11 @@ class CheckerTools:
                 filter(None, [counts, format_collection_problems(verdict), text])
             )
         if verdict.status is RunStatus.SUSPICIOUS:
-            return format_suspicious_text(summary.get("collected") or 0)
+            if collect_only and report:
+                return format_collect_only_text(report)
+            return format_suspicious_text(
+                summary.get("collected") or 0, summary.get("deselected")
+            )
         return format_error_text(report, verdict)
 
     def _format_mypy_result(self, mypy_prompt: str | None) -> str:

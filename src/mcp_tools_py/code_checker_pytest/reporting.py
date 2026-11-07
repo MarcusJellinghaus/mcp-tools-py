@@ -542,6 +542,26 @@ def selected_count(summary: Summary) -> int:
     return summary.collected - (summary.deselected or 0)
 
 
+def collected_test_ids(report: PytestReport) -> List[str]:
+    """List the selected test IDs from the collectors, in collection order.
+
+    Items that are themselves collectors (modules, classes) and deselected
+    items are dropped. Item types are not filtered, so coroutines and
+    doctests are kept.
+
+    Returns:
+        The test node IDs, or [] when the report has no collectors.
+    """
+    collectors = report.collectors or []
+    collector_ids = {collector.nodeid for collector in collectors}
+    return [
+        item.nodeid
+        for collector in collectors
+        for item in collector.result
+        if item.nodeid not in collector_ids and not item.deselected
+    ]
+
+
 def did_not_run_line(report: PytestReport) -> str:
     """Render how many selected tests did not run, or "" when all ran."""
     selected = selected_count(report.summary)

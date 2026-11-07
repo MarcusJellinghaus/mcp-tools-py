@@ -534,6 +534,7 @@ def check_code_with_pytest(
             "error": test_results.summary.error,
             "skipped": test_results.summary.skipped,
             "collected": test_results.summary.collected,
+            "deselected": test_results.summary.deselected,
             "duration": test_results.duration,
         }
 

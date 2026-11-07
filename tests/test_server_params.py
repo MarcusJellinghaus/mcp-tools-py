@@ -10,7 +10,12 @@ from unittest.mock import MagicMock, patch
 
 import pytest
 
-from mcp_tools_py.code_checker_pytest.models import PytestReport, Summary
+from mcp_tools_py.code_checker_pytest.models import (
+    Collector,
+    CollectorResult,
+    PytestReport,
+    Summary,
+)
 from mcp_tools_py.code_checker_pytest.utils import SHOW_OUTPUT_NOTE
 from mcp_tools_py.code_checker_pytest.verdict import RunStatus, RunVerdict
 from mcp_tools_py.utils.environment_info import EnvironmentInfo
@@ -97,6 +102,59 @@ async def test_run_pytest_check_parameters(
 
         # Verify the result is properly formatted
         assert "All 5 tests passed successfully" in result
+
+
+@pytest.mark.asyncio
+async def test_run_pytest_check_collect_only_lists_ids(
+    mock_project_dir: Path, all_modules_importable: Any
+) -> None:
+    """A --collect-only call reports the selected count and IDs, not 'Not verified'."""
+    report = PytestReport(
+        created=0.0,
+        duration=0.05,
+        exitcode=0,
+        root=str(mock_project_dir),
+        environment={},
+        summary=Summary(collected=4, total=0, deselected=3),
+        collectors=[
+            Collector(
+                nodeid="tests/test_x.py",
+                outcome="passed",
+                result=[
+                    CollectorResult(nodeid="tests/test_x.py::test_a", type="Function")
+                ],
+            )
+        ],
+    )
+    with (
+        patch("mcp.server.fastmcp.FastMCP") as mock_fastmcp,
+        patch(
+            "mcp_tools_py.checker_tools.pytest_tool.check_code_with_pytest"
+        ) as mock_check_pytest,
+    ):
+        mock_tool = MagicMock()
+        mock_fastmcp.return_value.tool.return_value = mock_tool
+        mock_check_pytest.return_value = make_pytest_results(
+            RunStatus.SUSPICIOUS,
+            summary={"collected": 4, "deselected": 3},
+            test_results=report,
+        )
+
+        from mcp_tools_py.server import ToolServer
+
+        with patch.object(
+            ToolServer,
+            "_warn_missing_console_scripts",
+            return_value=None,
+        ):
+            ToolServer(mock_project_dir, test_folder="custom_tests")
+
+        run_pytest_check = _get_tool(mock_tool, "run_pytest_check")
+        result = run_pytest_check(extra_args=["--collect-only"])
+
+    assert "Collected 1 test (3 deselected)" in result
+    assert "tests/test_x.py::test_a" in result
+    assert "Not verified" not in result
 
 
 @pytest.mark.asyncio

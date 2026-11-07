@@ -6,6 +6,7 @@ import pytest
 
 from mcp_tools_py.code_checker_pytest.models import (
     Collector,
+    CollectorResult,
     ErrorContext,
     PytestReport,
     Summary,
@@ -16,6 +17,7 @@ from mcp_tools_py.code_checker_pytest.verdict import (
     RunStatus,
     RunVerdict,
     classify_run,
+    format_collect_only_text,
     format_collection_problems,
     format_error_text,
     format_suspicious_text,
@@ -248,3 +250,52 @@ def test_package_exports() -> None:
     assert code_checker_pytest.RunStatus is RunStatus
     assert code_checker_pytest.RunVerdict is RunVerdict
     assert code_checker_pytest.classify_run is classify_run
+
+
+def test_format_suspicious_text_subtracts_deselected() -> None:
+    assert "Collected 1 tests" in format_suspicious_text(4, 3)
+
+
+def _collect_only_report(
+    ids: List[str], collected: int, deselected: Optional[int] = None
+) -> PytestReport:
+    """Build a collect-only report whose one collector lists ``ids``."""
+    collector = Collector(
+        nodeid="tests/test_x.py",
+        outcome="passed",
+        result=[CollectorResult(nodeid=nodeid, type="Function") for nodeid in ids],
+    )
+    summary = Summary(collected=collected, total=0, deselected=deselected)
+    return _report(summary, collectors=[collector])
+
+
+def test_format_collect_only_text_with_deselected() -> None:
+    report = _collect_only_report(["tests/test_x.py::test_a"], 4, deselected=3)
+    lines = format_collect_only_text(report).splitlines()
+    assert lines == [
+        "Collected 1 test (3 deselected) in 1.00 seconds. No tests were run.",
+        "tests/test_x.py::test_a",
+    ]
+
+
+def test_format_collect_only_text_without_deselected() -> None:
+    ids = ["tests/test_x.py::test_a", "tests/test_x.py::test_b"]
+    text = format_collect_only_text(_collect_only_report(ids, 2))
+    assert text.splitlines()[0] == (
+        "Collected 2 tests in 1.00 seconds. No tests were run."
+    )
+    assert "deselected" not in text
+
+
+def test_format_collect_only_text_truncates_ids() -> None:
+    ids = [f"tests/test_x.py::test_{n}" for n in range(400)]
+    text = format_collect_only_text(_collect_only_report(ids, 400))
+    assert text.splitlines()[0].startswith("Collected 400 tests")
+    assert f"[Output truncated at {MAX_OUTPUT_LINES} lines" in text
+
+
+def test_format_collect_only_text_without_collectors() -> None:
+    report = _report(Summary(collected=2, total=0))
+    assert format_collect_only_text(report) == (
+        "Collected 2 tests in 1.00 seconds. No tests were run.\n"
+    )

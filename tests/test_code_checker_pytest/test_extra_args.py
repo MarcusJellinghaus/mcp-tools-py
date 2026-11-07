@@ -8,7 +8,7 @@ import pytest
 from mcp_tools_py.code_checker_pytest.models import SanitizedArgs
 from mcp_tools_py.code_checker_pytest.utils import (
     SHOW_OUTPUT_NOTE,
-    _positional_args,
+    _scan_args,
     sanitize_extra_args,
 )
 
@@ -367,7 +367,31 @@ class TestPositionalArgs:
     )
     def test_positional_args(self, args: list[str], expected: list[str]) -> None:
         """Option values are skipped; only positionals are returned."""
-        assert _positional_args(args) == expected
+        assert _scan_args(args)[0] == expected
+
+
+class TestSanitizeExtraArgsCollectOnly:
+    """collect_only is detected from the arguments."""
+
+    @pytest.mark.parametrize(
+        "args",
+        [
+            ["--collect-only"],
+            ["--co"],
+            ["--collectonly"],
+            ["-k", "tests", "--collect-only", "-q", "p.py"],
+        ],
+    )
+    def test_collect_only_detected(self, args: list[str]) -> None:
+        """A collect-only flag sets collect_only, with or without a project_dir."""
+        assert sanitize_extra_args(args, None).collect_only is True
+        with tempfile.TemporaryDirectory() as tmpdir:
+            assert sanitize_extra_args(args, None, project_dir=tmpdir).collect_only
+
+    @pytest.mark.parametrize("args", [[], None, ["-x"], ["--", "--collect-only"]])
+    def test_collect_only_not_detected(self, args: list[str] | None) -> None:
+        """Without a collect-only flag before --, collect_only stays False."""
+        assert sanitize_extra_args(args, None).collect_only is False
 
 
 class TestSanitizeExtraArgsOptionValues:

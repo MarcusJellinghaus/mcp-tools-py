@@ -10,6 +10,7 @@ from mcp_tools_py.checker_tools import CheckerTools
 from mcp_tools_py.code_checker_mypy.reporting import MYPY_FAILURE_PREFIX
 from mcp_tools_py.code_checker_pytest.models import (
     Collector,
+    CollectorResult,
     ErrorContext,
     PytestReport,
     Summary,
@@ -395,6 +396,96 @@ def test_format_pytest_result_suspicious(checker_tools: CheckerTools) -> None:
     )
     assert "Not verified" in result
     assert "completed" not in result
+
+
+def test_format_pytest_result_suspicious_collect_only(
+    checker_tools: CheckerTools,
+) -> None:
+    """A collect-only run lists the selected IDs instead of not verified."""
+    report = PytestReport(
+        created=0.0,
+        duration=0.5,
+        exitcode=0,
+        root="/project",
+        environment={},
+        summary=Summary(collected=4, total=0, deselected=3),
+        collectors=[
+            Collector(
+                nodeid="tests/test_x.py",
+                outcome="passed",
+                result=[
+                    CollectorResult(nodeid="tests/test_x.py::test_a", type="Function")
+                ],
+            )
+        ],
+    )
+    test_results = make_pytest_results(
+        RunStatus.SUSPICIOUS,
+        summary={"collected": 4, "deselected": 3},
+        test_results=report,
+    )
+    result = checker_tools._format_pytest_result_with_details(
+        test_results, show_details=True, collect_only=True
+    )
+    assert result.startswith("Collected")
+    assert "tests/test_x.py::test_a" in result
+    assert "Not verified" not in result
+
+
+def test_format_pytest_result_suspicious_subtracts_deselected(
+    checker_tools: CheckerTools,
+) -> None:
+    """Without collect_only, SUSPICIOUS counts only the selected tests."""
+    test_results = make_pytest_results(
+        RunStatus.SUSPICIOUS,
+        summary={"collected": 4, "deselected": 3},
+        test_results=None,
+    )
+    result = checker_tools._format_pytest_result_with_details(
+        test_results, show_details=True
+    )
+    assert "Collected 1 tests" in result
+    assert "Not verified" in result
+
+
+def _error_results() -> dict[str, Any]:
+    report = PytestReport(
+        created=0.0,
+        duration=1.0,
+        exitcode=1,
+        root="/project",
+        environment={},
+        summary=Summary(collected=5, total=5, passed=5),
+    )
+    return make_pytest_results(
+        summary={"passed": 5, "collected": 5},
+        test_results=report,
+        verdict=RunVerdict(RunStatus.ERROR, ["something broke"], 1),
+    )
+
+
+def _failed_results() -> dict[str, Any]:
+    report = _failed_report()
+    return make_pytest_results(
+        summary={"passed": 1, "failed": 1, "collected": 2},
+        test_results=report,
+        verdict=classify_run(report),
+        summary_text="1 failed, 1 passed",
+    )
+
+
+@pytest.mark.parametrize("build", [_failed_results, _error_results])
+def test_format_pytest_result_collect_only_ignored_outside_suspicious(
+    checker_tools: CheckerTools, build: Any
+) -> None:
+    """FAILED and ERROR replies are the same with collect_only."""
+    without = checker_tools._format_pytest_result_with_details(
+        build(), show_details=True
+    )
+    with_flag = checker_tools._format_pytest_result_with_details(
+        build(), show_details=True, collect_only=True
+    )
+    assert with_flag == without
 
 
 def test_format_pytest_result_error_with_report(checker_tools: CheckerTools) -> None:
