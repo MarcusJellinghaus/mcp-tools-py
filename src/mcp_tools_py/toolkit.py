@@ -250,6 +250,8 @@ def _registered_markers(context: ToolContext) -> list[str] | str:
         wasn't understood).
     """
     timeout_seconds = context.resolve_timeout("pytest")
+    # Same PATH as the real run's venv_bin, so conftest.py loads alike.
+    venv_bin = str(context.environment.bin_dir)
     result = execute_command(
         [
             str(context.environment.interpreter),
@@ -260,6 +262,7 @@ def _registered_markers(context: ToolContext) -> list[str] | str:
         ],
         cwd=str(context.project_dir),
         timeout_seconds=timeout_seconds,
+        env={"PATH": f"{venv_bin}{os.pathsep}{os.environ.get('PATH', '')}"},
     )
     if result.timed_out:
         return f"{_MARKER_READ_FAILED}: timed out after {timeout_seconds} seconds."

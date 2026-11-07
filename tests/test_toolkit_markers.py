@@ -1,5 +1,6 @@
 """Tests for `test@quick`'s selection of registered `*integration` markers."""
 
+import os
 from pathlib import Path
 from typing import Any
 from unittest.mock import MagicMock, patch
@@ -123,6 +124,30 @@ class TestQuickMarkerSelection:
         assert result.status == "error"
         assert "timed out" in result.summary
         mock_pytest.assert_not_called()
+
+
+class TestMarkerReadPath:
+    """The marker read gets the real run's venv_bin on PATH."""
+
+    def test_marker_read_prepends_venv_bin_to_path(self, tmp_path: Path) -> None:
+        request = ActionRequest(
+            action="test", depth="quick", project_dir=tmp_path, params={}
+        )
+        with (
+            patch(
+                "mcp_tools_py.toolkit.execute_command",
+                return_value=make_command_result(stdout=_stdout(_SKIP_LINE)),
+            ) as mock_execute,
+            patch(
+                "mcp_tools_py.toolkit.check_code_with_pytest",
+                return_value=_passed_results(),
+            ) as mock_pytest,
+        ):
+            PythonToolkit().run(request)
+
+        venv_bin = mock_pytest.call_args.kwargs["venv_bin"]
+        path = mock_execute.call_args.kwargs["env"]["PATH"]
+        assert path.split(os.pathsep)[0] == venv_bin
 
 
 class TestQuickMarkerRealRun:
