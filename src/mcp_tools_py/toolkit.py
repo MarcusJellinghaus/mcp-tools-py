@@ -371,20 +371,29 @@ class PythonToolkit(Toolkit):
         """Run one action at one depth.
 
         Returns:
-            The action outcome.
-
-        Raises:
-            NotImplementedError: For any action other than "test", "format",
-                and "check".
+            The action outcome; status "error" for an action or depth that
+            `describe` doesn't declare.
         """
+        actions = self.describe().actions
+        depths = actions.get(request.action)
+        if depths is None:
+            return ActionResult(
+                status="error",
+                summary=f"Unknown action '{request.action}'; "
+                f"declared: {', '.join(actions)}.",
+            )
+        if request.depth not in depths:
+            return ActionResult(
+                status="error",
+                summary=f"Unknown depth '{request.depth}' for action "
+                f"'{request.action}'; declared: {', '.join(depths)}.",
+            )
         context = _build_context(request.project_dir)
         if request.action == "test":
             return _run_test(context, request.depth)
         if request.action == "format":
             return _run_format(context, request.depth)
-        if request.action == "check":
-            return _run_check(context, request.depth)
-        raise NotImplementedError(request.action)
+        return _run_check(context, request.depth)
 
     def verify(self, project_dir: Path, action: str | None = None) -> list[VerifyItem]:
         """Check that every tool this toolkit drives is available.

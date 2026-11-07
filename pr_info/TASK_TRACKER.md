@@ -24,9 +24,9 @@ This tracks **Feature Implementation** consisting of multiple **Tasks**.
 ### Step 1: `run` returns `error` for an undeclared action or depth
 See [step_1.md](./steps/step_1.md)
 
-- [ ] Implementation: tests (`test_unknown_action_is_error`, `test_undeclared_depth_is_error`) + validate against `describe().actions` before `_build_context` in `PythonToolkit.run`
-- [ ] Quality checks: pylint, pytest, mypy — fix all issues
-- [ ] Commit message prepared
+- [x] Implementation: tests (`test_unknown_action_is_error`, `test_undeclared_depth_is_error`) + validate against `describe().actions` before `_build_context` in `PythonToolkit.run`
+- [x] Quality checks: pylint, pytest, mypy — fix all issues
+- [x] Commit message prepared
 
 ### Step 2: `verify` honours `action`
 See [step_2.md](./steps/step_2.md)

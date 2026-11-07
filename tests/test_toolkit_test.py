@@ -125,13 +125,32 @@ class TestRunTest:
         assert result.raw
         assert "stmts" in result.raw
 
-    def test_unknown_action_raises(self, tmp_path: Path) -> None:
+    def test_unknown_action_is_error(self, tmp_path: Path) -> None:
         request = ActionRequest(
             action="bogus", depth="quick", project_dir=tmp_path, params={}
         )
 
-        with pytest.raises(NotImplementedError):
-            PythonToolkit().run(request)
+        result = PythonToolkit().run(request)
+
+        assert result.status == "error"
+        assert "bogus" in result.summary
+
+    @pytest.mark.parametrize(
+        ("action", "depth"),
+        [("test", "bogus"), ("format", "quick"), ("check", "apply")],
+    )
+    def test_undeclared_depth_is_error(
+        self, tmp_path: Path, action: str, depth: str
+    ) -> None:
+        request = ActionRequest(
+            action=action, depth=depth, project_dir=tmp_path, params={}
+        )
+
+        with patch("mcp_tools_py.toolkit._build_context", side_effect=AssertionError):
+            result = PythonToolkit().run(request)
+
+        assert result.status == "error"
+        assert depth in result.summary
 
 
 def _report(
