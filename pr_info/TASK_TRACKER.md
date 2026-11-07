@@ -21,6 +21,28 @@ This tracks **Feature Implementation** consisting of multiple **Tasks**.
 
 ## Tasks
 
-<!-- Tasks populated from pr_info/steps/ by prepare_task_tracker -->
+### Step 1: Resolver `resolve_test_paths` in `project_config.py`
+See [step_1.md](./steps/step_1.md)
+
+- [ ] Implementation: rebase onto `origin/main` + force-push, precondition guard, tests in `tests/test_resolve_test_paths.py`, add `resolve_test_paths`
+- [ ] Quality checks: pylint, pytest, mypy — fix all issues
+- [ ] Commit message prepared
+
+### Step 2: Runner and replies accept `None`
+See [step_2.md](./steps/step_2.md)
+
+- [ ] Implementation: tests + `None` support in `runners.py`, `coverage_store.py`, `pytest_tool.py`, `toolkit.py` (`_with_note`, `test_paths_note`)
+- [ ] Quality checks: pylint, pytest, mypy — fix all issues
+- [ ] Commit message prepared
+
+### Step 3: Flip the defaults to `None`
+See [step_3.md](./steps/step_3.md)
+
+- [ ] Implementation: integration tests, default flips in `main.py`/`server.py`/`tool_context.py`/`runners.py`, updated pins, docs
+- [ ] Quality checks: pylint, pytest (including integration), mypy — fix all issues
+- [ ] Commit message prepared
 
 ## Pull Request
+
+- [ ] PR review: review all changes against `pr_info/steps/summary.md`
+- [ ] PR summary prepared
