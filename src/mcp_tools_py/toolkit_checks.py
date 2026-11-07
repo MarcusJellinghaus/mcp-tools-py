@@ -106,9 +106,10 @@ def _run_mypy(context: ToolContext, depth: str) -> ActionResult:
 
     Returns:
         "error" if target directories cannot be resolved or mypy itself
-        errored; "findings" with one Finding per non-note message; else "ok".
+        errored; "findings" with one Finding per error message; else "ok".
         The summary carries the run's signals on one line, fix_text the
-        message hints and raw the full error or stderr text.
+        message hints and raw mypy's raw output, empty when the runner
+        returned early (e.g. on a timeout).
     """
     del depth
     project_dir = str(context.project_dir)
@@ -122,7 +123,7 @@ def _run_mypy(context: ToolContext, depth: str) -> ActionResult:
         target_directories=dirs,
         timeout_seconds=context.resolve_timeout("mypy"),
     )
-    issues = [message for message in result.messages if message.severity != "note"]
+    issues = [message for message in result.messages if message.severity == "error"]
     findings = [
         Finding(
             key=f"{message.file}|{message.code}|{message.message}",
@@ -148,7 +149,7 @@ def _run_mypy(context: ToolContext, depth: str) -> ActionResult:
         ok_summary=f"mypy found no issues.{suffix}",
         findings_summary=f"mypy found {len(findings)} issue(s).{suffix}",
     )
-    return replace(action, fix_text=fix_text, raw=result.error or result.stderr or "")
+    return replace(action, fix_text=fix_text, raw=result.raw_output or "")
 
 
 def _run_pylint(context: ToolContext, depth: str) -> ActionResult:

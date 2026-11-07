@@ -26,6 +26,15 @@ _NOTE = MypyMessage(
     severity="note",
     message='Revealed type is "int"',
 )
+_WARNING = MypyMessage(
+    file="src/mod.py",
+    line=7,
+    column=1,
+    severity="warning",
+    message="Unused section",
+)
+_RAW = "mypy raw text"
+_NOTE_RAW = 'src/mod.py:5:1: note: Revealed type is "int"'
 _STDERR = "first warning line\nsecond warning line"
 _STDERR_ONE_LINE = "Warning from mypy: first warning line second warning line"
 
@@ -63,64 +72,74 @@ class TestStatusSummaryRaw:
                 id="clean",
             ),
             pytest.param(
-                MypyResult(return_code=0, messages=[], stderr=_STDERR),
+                MypyResult(return_code=0, messages=[], raw_output=_RAW, stderr=_STDERR),
                 "ok",
                 f"{_NO_ISSUES} {_STDERR_ONE_LINE}",
-                _STDERR,
+                _RAW,
                 id="rc0-stderr",
             ),
             pytest.param(
-                MypyResult(return_code=1, messages=[_NOTE]),
+                MypyResult(return_code=1, messages=[_NOTE], raw_output=_NOTE_RAW),
                 "ok",
                 _NO_ISSUES,
-                "",
+                _NOTE_RAW,
                 id="rc1-notes-only",
             ),
             pytest.param(
-                MypyResult(return_code=1, messages=[_NOTE], stderr=_STDERR),
+                MypyResult(
+                    return_code=1,
+                    messages=[_NOTE],
+                    raw_output=_NOTE_RAW,
+                    stderr=_STDERR,
+                ),
                 "ok",
                 f"{_NO_ISSUES} {_STDERR_ONE_LINE}",
-                _STDERR,
+                _NOTE_RAW,
                 id="rc1-notes-only-stderr",
             ),
             pytest.param(
-                MypyResult(return_code=1, messages=[_ERROR]),
+                MypyResult(return_code=1, messages=[_ERROR], raw_output=_RAW),
                 "findings",
                 "mypy found 1 issue(s).",
-                "",
+                _RAW,
                 id="rc1-errors",
             ),
             pytest.param(
-                MypyResult(return_code=1, messages=[_ERROR], stderr=_STDERR),
+                MypyResult(
+                    return_code=1, messages=[_ERROR], raw_output=_RAW, stderr=_STDERR
+                ),
                 "findings",
                 f"mypy found 1 issue(s). {_STDERR_ONE_LINE}",
-                _STDERR,
+                _RAW,
                 id="rc1-errors-stderr",
             ),
             pytest.param(
-                MypyResult(return_code=2, messages=[_ERROR]),
+                MypyResult(return_code=2, messages=[_ERROR], raw_output=_RAW),
                 "findings",
                 f"mypy found 1 issue(s). {_EARLY_STOP}",
-                "",
+                _RAW,
                 id="rc2-errors",
             ),
             pytest.param(
-                MypyResult(return_code=2, messages=[_ERROR], stderr=_STDERR),
+                MypyResult(
+                    return_code=2, messages=[_ERROR], raw_output=_RAW, stderr=_STDERR
+                ),
                 "findings",
                 f"mypy found 1 issue(s). {_EARLY_STOP} {_STDERR_ONE_LINE}",
-                _STDERR,
+                _RAW,
                 id="rc2-errors-stderr",
             ),
             pytest.param(
                 MypyResult(
                     return_code=2,
                     messages=[_ERROR],
+                    raw_output=_RAW,
                     stderr="plugin.py: INTERNAL ERROR\nTraceback",
                 ),
                 "findings",
                 f"mypy found 1 issue(s). {_EARLY_STOP} "
                 "Warning from mypy: plugin.py: INTERNAL ERROR Traceback",
-                "plugin.py: INTERNAL ERROR\nTraceback",
+                _RAW,
                 id="rc2-plugin-crash",
             ),
             pytest.param(
@@ -128,10 +147,11 @@ class TestStatusSummaryRaw:
                     return_code=3,
                     messages=[],
                     error="mypy exited with code 3: first line\nsecond line",
+                    raw_output=_RAW,
                 ),
                 "error",
                 "mypy exited with code 3: first line second line",
-                "mypy exited with code 3: first line\nsecond line",
+                _RAW,
                 id="new-failure",
             ),
         ],
@@ -168,7 +188,7 @@ class TestStatusSummaryRaw:
 
         assert result.status == "error"
         assert result.summary == error
-        assert result.raw == error
+        assert result.raw == ""
 
 
 class TestFindings:
@@ -186,6 +206,19 @@ class TestFindings:
         assert [finding.message for finding in result.findings] == ["Bad return type"]
         assert "1 issue(s)" in result.summary
         assert "Revealed type" not in result.fix_text
+
+    def test_warning_severity_is_not_a_finding(
+        self, tmp_path: Path, monkeypatch: pytest.MonkeyPatch
+    ) -> None:
+        result = _run_check(
+            tmp_path,
+            monkeypatch,
+            MypyResult(return_code=1, messages=[_ERROR, _WARNING]),
+        )
+
+        assert [finding.message for finding in result.findings] == ["Bad return type"]
+        assert "1 issue(s)" in result.summary
+        assert "Unused section" not in result.fix_text
 
     def test_finding_message_and_key_are_unchanged(
         self, tmp_path: Path, monkeypatch: pytest.MonkeyPatch

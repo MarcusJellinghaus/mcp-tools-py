@@ -38,9 +38,9 @@ See [step_2.md](./steps/step_2.md)
 ### Step 3: mypy errors-only findings, `raw` = mypy's raw output
 See [step_3.md](./steps/step_3.md)
 
-- [ ] Implementation: rework `TestStatusSummaryRaw` / timeout tests, add `test_warning_severity_is_not_a_finding` + filter `severity == "error"` and `raw=result.raw_output or ""` in `_run_mypy`
-- [ ] Quality checks: pylint, pytest, mypy — fix all issues
-- [ ] Commit message prepared
+- [x] Implementation: rework `TestStatusSummaryRaw` / timeout tests, add `test_warning_severity_is_not_a_finding` + filter `severity == "error"` and `raw=result.raw_output or ""` in `_run_mypy`
+- [x] Quality checks: pylint, pytest, mypy — fix all issues
+- [x] Commit message prepared
 
 ### Step 4: Locations in `fix_text`
 See [step_4.md](./steps/step_4.md)
