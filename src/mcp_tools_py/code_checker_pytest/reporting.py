@@ -563,7 +563,12 @@ def collected_test_ids(report: PytestReport) -> List[str]:
 
 
 def did_not_run_line(report: PytestReport) -> str:
-    """Render how many selected tests did not run, or "" when all ran."""
+    """Render how many selected tests did not run.
+
+    Returns:
+        A line such as "N of M selected tests did not run", or an empty
+        string when every selected test ran.
+    """
     selected = selected_count(report.summary)
     missing = selected - report.summary.total
     if missing <= 0:
