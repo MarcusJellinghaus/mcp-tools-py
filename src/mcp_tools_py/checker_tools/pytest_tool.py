@@ -257,9 +257,11 @@ def register(mcp: "FastMCPProtocol", checker_tools: "CheckerTools") -> None:
                 collect_only=sanitized.collect_only,
             )
 
-            # Prepend deduplication notes so LLM can self-correct
-            if sanitized.notes:
-                notes_text = "\n".join(sanitized.notes)
+            # Prepend the test-paths and deduplication notes so LLM can self-correct
+            test_paths_note = test_results.get("test_paths_note")
+            notes = [*([test_paths_note] if test_paths_note else []), *sanitized.notes]
+            if notes:
+                notes_text = "\n".join(notes)
                 result = f"{notes_text}\n\n{result}"
 
             summary = test_results.get("summary", {})

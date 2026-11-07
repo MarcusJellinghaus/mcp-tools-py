@@ -747,6 +747,28 @@ async def test_run_pytest_check_prepends_dedup_notes(
 
 
 @pytest.mark.asyncio
+async def test_run_pytest_check_prepends_test_paths_note(
+    mock_server: Tuple[Any, MagicMock],
+) -> None:
+    """The test_paths_note of the result leads the reply."""
+    _server, mock_tool = mock_server
+
+    with patch(
+        "mcp_tools_py.checker_tools.pytest_tool.check_code_with_pytest"
+    ) as mock_check:
+        mock_check.return_value = make_pytest_results(
+            test_paths_note="NOTE",
+            summary={"passed": 1, "failed": 0, "error": 0, "collected": 1},
+            test_results=None,
+        )
+
+        run_pytest_check = _get_tool(mock_tool, "run_pytest_check")
+        result = run_pytest_check()
+
+    assert result.startswith("NOTE")
+
+
+@pytest.mark.asyncio
 async def test_run_pytest_check_turns_s_into_show_output(
     mock_server: Tuple[Any, MagicMock],
 ) -> None:

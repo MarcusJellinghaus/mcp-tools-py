@@ -31,9 +31,9 @@ See [step_1.md](./steps/step_1.md)
 ### Step 2: Runner and replies accept `None`
 See [step_2.md](./steps/step_2.md)
 
-- [ ] Implementation: tests + `None` support in `runners.py`, `coverage_store.py`, `pytest_tool.py`, `toolkit.py` (`_with_note`, `test_paths_note`)
-- [ ] Quality checks: pylint, pytest, mypy — fix all issues
-- [ ] Commit message prepared
+- [x] Implementation: tests + `None` support in `runners.py`, `coverage_store.py`, `pytest_tool.py`, `toolkit.py` (`_with_note`, `test_paths_note`)
+- [x] Quality checks: pylint, pytest, mypy — fix all issues
+- [x] Commit message prepared
 
 ### Step 3: Flip the defaults to `None`
 See [step_3.md](./steps/step_3.md)
