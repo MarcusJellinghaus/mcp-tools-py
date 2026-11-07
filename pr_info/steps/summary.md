@@ -42,7 +42,10 @@ changes, and no new module.
   optional, parallel to `findings`; omitted → unchanged output, so
   `_run_format`, `_merge`'s fallback and `TestMerge` are untouched.
 - `_tool_item(context, tool) -> VerifyItem` — the existing verify loop body.
-- `_collector_findings(report) -> list[Finding]` — the only new logic helper.
+- `_collector_findings(report) -> list[Finding]` and
+  `_is_collection_error(report, verdict) -> bool` — the only new logic
+  helpers; failed collectors bypass the `known` gate only for an ERROR caused
+  by collection errors.
 - New constants in `toolkit.py`: `UNATTENDED_EXCLUDED_MARKERS`,
   `_STRICT_MARKERS_OFF`, `_LONG_TEST_TIMEOUT`, `_XDIST_KEY`.
 
@@ -57,7 +60,7 @@ No new source files or folders.
 | `tests/test_toolkit.py` | `TestDescribe`, `TestPromptFragments`, `_finding_line`/`_result_from_findings` location tests |
 | `tests/test_toolkit_test.py` | unknown action/depth, timeouts, unattended, collector findings, flipped verdict tests |
 | `tests/test_toolkit_verify.py` | per-action verify, 12 items |
-| `tests/test_toolkit_check.py` | unknown check depth (if placed here), line locations for pylint/ruff/bandit/deptry |
+| `tests/test_toolkit_check.py` | line locations for pylint/ruff/bandit/deptry |
 | `tests/test_toolkit_check_mypy.py` | errors-only, `raw` = `raw_output`, located fix_text |
 | `tests/test_toolkit_saved_coverage.py` | xdist collector test flips to `findings` |
 

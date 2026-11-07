@@ -21,6 +21,7 @@
 _XDIST_KEY = "pytest|collection|xdist"
 
 def _collector_findings(report: PytestReport) -> list[Finding]: ...
+def _is_collection_error(report: PytestReport, verdict: RunVerdict) -> bool: ...
 ```
 
 ## HOW
@@ -34,10 +35,39 @@ def _collector_findings(report: PytestReport) -> list[Finding]: ...
 
 ```python
 collector_findings = _collector_findings(report) if report is not None else []
-if report is None or (verdict.status not in known and not collector_findings):
+collection_error = report is not None and _is_collection_error(report, verdict)
+if report is None or (
+    verdict.status not in known and not (collection_error and collector_findings)
+):
     ...  # unchanged skipped / error returns
 findings = [<test findings as today>, *collector_findings]
 ```
+
+- Only an ERROR caused by collection errors is bypassed. Every other ERROR
+  (internal error, usage error, KeyboardInterrupt, timeout/kill) stays
+  `error`, even when the report also holds a failed collector. New helper in
+  `toolkit.py`:
+
+```python
+_COLLECTION_INTERRUPTED = "during collection"  # pytest: "Interrupted: N error(s) during collection"
+
+def _is_collection_error(report: PytestReport, verdict: RunVerdict) -> bool:
+    """True when an ERROR verdict was caused by collection errors."""
+    if verdict.status is not RunStatus.ERROR:
+        return False
+    if verdict.exit_code == 1:  # TESTS_FAILED with no failed/errored test: collectors only
+        return True
+    output = report.error_context.error_message if report.error_context else ""
+    return verdict.exit_code == 2 and _COLLECTION_INTERRUPTED in output
+```
+
+  Exit code 2 is also pytest's code for a KeyboardInterrupt, which is why
+  exit 2 additionally needs pytest's "during collection" line. Codes 3
+  (internal error), 4 (usage error) and 5 (no tests) never qualify. The
+  real-run tests in this step (`test_every_module_failing_to_import_is_findings`
+  and `test_failing_collector_under_xdist_saves_the_data`) confirm the
+  exit-code/output shape. If either run ends with a different shape, stop
+  and write it to `pr_info/.blocked.txt` instead of widening the rule.
 
 - Locations for `fix_text` (from step 4): node id for tests and collectors,
   `None` for the xdist finding — e.g.
@@ -87,8 +117,16 @@ return [*by_id.values(), *([xdist] if xdist else [])]
   `"findings"`; count line still precedes the problem.
 - `test_failed_without_collector_keeps_summary`: unchanged (`error`).
 - New:
-  - ERROR verdict (`make_pytest_results(RunStatus.ERROR, ...)`) with a report
-    holding one failed collector → `"findings"`.
+  - `make_pytest_results` hard-codes `exit_code=0`, so build these results'
+    `verdict` as `RunVerdict(RunStatus.ERROR, [problem], <code>)` directly
+    (or give the helper an optional `exit_code`), and give the report an
+    `error_context` whose `error_message` holds the pytest output.
+  - Collection-error ERROR + one failed collector → `"findings"`,
+    parametrized: exit 2 with output
+    `"Interrupted: 1 error during collection"`, and exit 1.
+  - Unrelated ERROR + one failed collector stays `"error"`, parametrized:
+    exit 3 (internal error), and exit 2 with `KeyboardInterrupt` output and no
+    "during collection" line.
   - empty `longrepr` → message `"collection failed"`.
   - same node id twice → one finding.
   - a collector with outcome `"skipped"` / `"passed"` → no finding.
