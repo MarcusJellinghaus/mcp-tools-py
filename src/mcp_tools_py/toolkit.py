@@ -90,19 +90,29 @@ _STRICT_MARKERS_OFF: list[str] = ["-o", "strict_markers=false"]
 _LONG_TEST_TIMEOUT = 1800  # seconds; test@standard, @unattended and @full
 
 _FIX_CHECK_PROMPT = """\
-Fix the mypy type errors shown in the output below.
+Fix the findings reported by the checkers in the output below \
+(type checker, linter or other static checks).
 
-Focus only on resolving the type errors - do not make unnecessary changes to the code.
+Fix only the reported findings - do not make unnecessary changes to the code.
 
-For each error:
-1. Understand the type mismatch or missing annotation
-2. Add appropriate type hints or fix incorrect types
-3. Use proper typing imports (List, Dict, Optional, etc.) from typing module
-4. Ensure all function parameters and return types are properly annotated
+For each finding:
+1. Read the message and the code it points at
+2. Fix the cause in the code rather than silencing the checker
 
-Keep changes minimal and focused on type correctness.
+Keep changes minimal and focused.
 
-Expected output: Code changes that resolve all type errors while maintaining functionality.
+Expected output: Code changes that resolve all reported findings while maintaining functionality.
+"""
+
+_FIX_TEST_PROMPT = """\
+Fix the failing tests named in the output below.
+
+For each failure, find the cause and fix whichever is wrong - the code or the test.
+Keep changes minimal and focused; do not change unrelated code or tests.
+
+Re-run only the failing tests named in the output to confirm the fix, not the whole suite.
+
+Expected output: Code or test changes that make the failing tests pass while maintaining functionality.
 """
 
 
@@ -575,9 +585,10 @@ class PythonToolkit(Toolkit):
         Returns:
             `language_context`, `check_instructions`,
             `check_instructions.unattended` — the pytest marker filter of the
-            `unattended` test depth — and `fix.check` — the Mypy Fix prompt,
-            with its `[mypy_output]` placeholder dropped since the actual
-            output now travels via `ActionResult.fix_text`.
+            `unattended` test depth — `fix.check` — fix the findings of any
+            checker — and `fix.test` — fix the failing tests and re-run only
+            those. Neither fix prompt has a placeholder: the actual output
+            travels via `ActionResult.fix_text`.
         """
         names = ", ".join(m.removeprefix("not ") for m in UNATTENDED_EXCLUDED_MARKERS)
         return {
@@ -595,4 +606,5 @@ class PythonToolkit(Toolkit):
                 "register."
             ),
             "fix.check": _FIX_CHECK_PROMPT,
+            "fix.test": _FIX_TEST_PROMPT,
         }

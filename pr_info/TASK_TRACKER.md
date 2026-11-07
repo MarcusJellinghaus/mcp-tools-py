@@ -23,9 +23,9 @@ This tracks **Feature Implementation** consisting of multiple **Tasks**.
 
 ### Step 1: Reword `fix.check`, add `fix.test` — [step_1.md](./steps/step_1.md)
 
-- [ ] Implementation: update `TestPromptFragments` tests, then reword `_FIX_CHECK_PROMPT`, add `_FIX_TEST_PROMPT` and the `fix.test` key in `prompt_fragments()`
-- [ ] Quality checks: pylint, pytest, mypy — fix all issues
-- [ ] Commit message prepared
+- [x] Implementation: update `TestPromptFragments` tests, then reword `_FIX_CHECK_PROMPT`, add `_FIX_TEST_PROMPT` and the `fix.test` key in `prompt_fragments()`
+- [x] Quality checks: pylint, pytest, mypy — fix all issues
+- [x] Commit message prepared
 
 ### Step 2: 600 s default timeout for check depths — [step_2.md](./steps/step_2.md)
 
