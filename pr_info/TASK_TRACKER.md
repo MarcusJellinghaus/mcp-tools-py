@@ -23,9 +23,9 @@ This tracks **Feature Implementation** consisting of multiple **Tasks**.
 
 ### Step 1: Raise the `import-linter` floor and verify it — [step_1.md](./steps/step_1.md)
 
-- [ ] Implementation: raise `import-linter` to `>=2.12` in `pyproject.toml` and verify via scratch probe (fresh venv with `import-linter==2.12`: install, `lint-imports` keeps 4 contracts, `tests/test_target_scripts_contract.py` 3 passed)
-- [ ] Quality checks: pylint, pytest, mypy — fix all issues
-- [ ] Commit message prepared
+- [x] Implementation: raise `import-linter` to `>=2.12` in `pyproject.toml` and verify via scratch probe (fresh venv with `import-linter==2.12`: install, `lint-imports` keeps 4 contracts, `tests/test_target_scripts_contract.py` 3 passed)
+- [x] Quality checks: pylint, pytest, mypy — fix all issues
+- [x] Commit message prepared
 
 ## Pull Request
 
