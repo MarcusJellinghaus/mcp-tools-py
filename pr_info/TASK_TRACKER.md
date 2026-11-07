@@ -24,9 +24,9 @@ This tracks **Feature Implementation** consisting of multiple **Tasks**.
 ### Step 1: Resolver `resolve_test_paths` in `project_config.py`
 See [step_1.md](./steps/step_1.md)
 
-- [ ] Implementation: rebase onto `origin/main` + force-push, precondition guard, tests in `tests/test_resolve_test_paths.py`, add `resolve_test_paths`
-- [ ] Quality checks: pylint, pytest, mypy — fix all issues
-- [ ] Commit message prepared
+- [x] Implementation: rebase onto `origin/main` + force-push, precondition guard, tests in `tests/test_resolve_test_paths.py`, add `resolve_test_paths`
+- [x] Quality checks: pylint, pytest, mypy — fix all issues
+- [x] Commit message prepared
 
 ### Step 2: Runner and replies accept `None`
 See [step_2.md](./steps/step_2.md)

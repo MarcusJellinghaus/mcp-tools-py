@@ -5,6 +5,7 @@ with sensible fallbacks when sections are missing.
 """
 
 import dataclasses
+import glob
 import logging
 import os
 import tomllib
@@ -159,6 +160,44 @@ def get_test_directories(project_dir: str) -> list[str]:
         pyproject.toml is not valid TOML.
     """
     return _read_test_dirs(_load_pyproject(project_dir), [])
+
+
+def resolve_test_paths(
+    project_dir: str, test_folder: str | None
+) -> tuple[list[str], str | None]:
+    """Choose the test paths to pass to pytest.
+
+    An explicit *test_folder* wins and pyproject.toml is not read.  Otherwise
+    the non-empty ``[tool.pytest.ini_options] testpaths`` entries are expanded
+    as globs and those that exist are used.  When ``testpaths`` is unset, empty
+    or not a list, or no entry exists, ``tests`` is used.
+
+    Args:
+        project_dir: Path to project root containing pyproject.toml.
+        test_folder: Explicit test folder, or None to resolve from pyproject.toml.
+
+    Returns:
+        ``(paths, note)``: a non-empty list of paths relative to *project_dir*,
+        and a note when ``testpaths`` is set but no entry exists, else None.
+        A ``ValueError`` from :func:`_load_pyproject` propagates when
+        pyproject.toml is not valid TOML.
+    """
+    if test_folder is not None:
+        return [test_folder], None
+    warnings: list[str] = []
+    entries = _read_test_dirs(_load_pyproject(project_dir), warnings)
+    if warnings or not entries:
+        return ["tests"], None
+    paths = [
+        path
+        for entry in entries
+        for path in sorted(glob.iglob(entry, root_dir=project_dir, recursive=True))
+    ]
+    if paths:
+        return paths, None
+    return [
+        "tests"
+    ], f"testpaths entries not found: {entries}; falling back to 'tests'."
 
 
 def resolve_target_directories(
