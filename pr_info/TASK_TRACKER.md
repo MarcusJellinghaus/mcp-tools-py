@@ -66,9 +66,9 @@ See [step_6.md](./steps/step_6.md)
 ### Step 7: Failed collectors become findings
 See [step_7.md](./steps/step_7.md)
 
-- [ ] Implementation: collector/xdist/exit-code tests and flipped verdict tests + `_XDIST_KEY`, `_collector_findings`, `_is_collection_error`, collector findings before the `known` gate in `_run_test`
-- [ ] Quality checks: pylint, pytest, mypy — fix all issues (also run `tests/test_toolkit_saved_coverage.py` explicitly)
-- [ ] Commit message prepared
+- [x] Implementation: collector/xdist/exit-code tests and flipped verdict tests + `_XDIST_KEY`, `_collector_findings`, `_is_collection_error`, collector findings before the `known` gate in `_run_test`
+- [x] Quality checks: pylint, pytest, mypy — fix all issues (also run `tests/test_toolkit_saved_coverage.py` explicitly)
+- [x] Commit message prepared
 
 ## Pull Request
 

@@ -10,12 +10,17 @@ from mcp_coder_utils.toolkit import ActionRequest, ActionResult
 from mcp_tools_py.code_checker_pytest.coverage_store import start_coverage_run
 from mcp_tools_py.code_checker_pytest.models import (
     Collector,
+    ErrorContext,
     PytestReport,
     Summary,
     Test,
 )
 from mcp_tools_py.code_checker_pytest.reporting import group_failed_collectors
-from mcp_tools_py.code_checker_pytest.verdict import RunStatus
+from mcp_tools_py.code_checker_pytest.verdict import (
+    XDIST_HINT,
+    RunStatus,
+    RunVerdict,
+)
 from mcp_tools_py.toolkit import UNATTENDED_EXCLUDED_MARKERS, PythonToolkit
 from tests._pytest_results import make_pytest_results
 
@@ -98,8 +103,7 @@ class TestRunTest:
         assert result.status == "skipped"
         assert result.findings == []
 
-    @pytest.mark.integration
-    def test_every_module_failing_to_import_is_error(self, tmp_path: Path) -> None:
+    def test_every_module_failing_to_import_is_findings(self, tmp_path: Path) -> None:
         (tmp_path / "tests").mkdir()
         for name in ("test_a.py", "test_b.py"):
             (tmp_path / "tests" / name).write_text(
@@ -111,7 +115,12 @@ class TestRunTest:
 
         result = PythonToolkit().run(request)
 
-        assert result.status == "error"
+        assert result.status == "findings"
+        keys = sorted(f.key for f in result.findings)
+        assert len(keys) == 2
+        assert keys[0].endswith("test_a.py")
+        assert keys[1].endswith("test_b.py")
+        assert all("module_that_does_not_exist" in f.message for f in result.findings)
 
     def test_full_depth_sets_raw_coverage_digest(self, tmp_path: Path) -> None:
         pytest.importorskip("pytest_cov")
@@ -398,13 +407,17 @@ class TestRunTestVerdictMapping:
         result = _run_with(tmp_path, results)
 
         assert result.status == "findings"
-        assert [f.key for f in result.findings] == ["tests/test_a.py::test_x"]
+        assert [f.key for f in result.findings] == [
+            "tests/test_a.py::test_x",
+            "tests/test_b.py",
+            "tests/test_c.py",
+        ]
         assert result.summary.startswith(
             f"{summary_text}\n\n2 collectors failed (1 distinct error)\n\n{problem}\n"
         )
         assert "same error in 1 more collector: tests/test_c.py" in result.summary
 
-    def test_failed_without_failing_tests_is_error(self, tmp_path: Path) -> None:
+    def test_failed_without_failing_tests_is_findings(self, tmp_path: Path) -> None:
         collector = Collector(
             nodeid="tests/test_broken.py",
             outcome="failed",
@@ -421,7 +434,8 @@ class TestRunTestVerdictMapping:
 
         result = _run_with(tmp_path, results)
 
-        assert result.status == "error"
+        assert result.status == "findings"
+        assert [f.key for f in result.findings] == ["tests/test_broken.py"]
         assert summary_text in result.summary
         assert "ImportError: no module named 'missing'" in result.summary
 
@@ -444,7 +458,7 @@ class TestRunTestVerdictMapping:
 
         result = _run_with(tmp_path, results)
 
-        assert result.status == "error"
+        assert result.status == "findings"
         count_line = "1 collector failed (1 distinct error)"
         assert result.summary.index(count_line) < result.summary.index(problem)
 
@@ -472,3 +486,115 @@ class TestRunTestVerdictMapping:
 
         assert result.status == "ok"
         assert result.findings == []
+
+
+def _collector(
+    nodeid: str, longrepr: str | None = "E   ImportError: boom", outcome: str = "failed"
+) -> Collector:
+    return Collector(nodeid=nodeid, outcome=outcome, result=[], longrepr=longrepr)
+
+
+def _error_results(
+    exit_code: int, output: str, collectors: list[Collector]
+) -> dict[str, Any]:
+    report = _report(0, collectors=collectors)
+    report.error_context = ErrorContext(
+        exit_code=exit_code,
+        exit_code_meaning="",
+        error_message=output,
+        suggestion="",
+    )
+    return {
+        "verdict": RunVerdict(RunStatus.ERROR, ["problem"], exit_code),
+        "summary_text": "Collected 0 tests in 0.0 seconds",
+        "test_results": report,
+    }
+
+
+def _failed_results(collectors: list[Collector]) -> dict[str, Any]:
+    return make_pytest_results(
+        RunStatus.FAILED,
+        ["problem"],
+        test_results=_report(0, collectors=collectors),
+        summary_text="Collected 0 tests in 0.0 seconds",
+    )
+
+
+class TestRunTestCollectors:
+    """Failed collectors become findings."""
+
+    @pytest.mark.parametrize(
+        ("exit_code", "output"),
+        [(2, "Interrupted: 1 error during collection"), (1, "")],
+    )
+    def test_collection_error_is_findings(
+        self, tmp_path: Path, exit_code: int, output: str
+    ) -> None:
+        results = _error_results(
+            exit_code, output, [_collector("tests/test_broken.py")]
+        )
+
+        result = _run_with(tmp_path, results)
+
+        assert result.status == "findings"
+        assert [f.key for f in result.findings] == ["tests/test_broken.py"]
+        assert result.findings[0].path == "tests/test_broken.py"
+        assert result.findings[0].message == "E   ImportError: boom"
+
+    @pytest.mark.parametrize(
+        ("exit_code", "output"),
+        [(3, "INTERNALERROR> boom"), (2, "KeyboardInterrupt")],
+    )
+    def test_unrelated_error_stays_error(
+        self, tmp_path: Path, exit_code: int, output: str
+    ) -> None:
+        results = _error_results(
+            exit_code, output, [_collector("tests/test_broken.py")]
+        )
+
+        result = _run_with(tmp_path, results)
+
+        assert result.status == "error"
+        assert result.findings == []
+
+    def test_empty_longrepr_is_collection_failed(self, tmp_path: Path) -> None:
+        results = _failed_results([_collector("tests/test_broken.py", longrepr="")])
+
+        result = _run_with(tmp_path, results)
+
+        assert [f.message for f in result.findings] == ["collection failed"]
+
+    def test_same_node_id_twice_is_one_finding(self, tmp_path: Path) -> None:
+        results = _failed_results(
+            [_collector("tests/test_broken.py"), _collector("tests/test_broken.py")]
+        )
+
+        result = _run_with(tmp_path, results)
+
+        assert [f.key for f in result.findings] == ["tests/test_broken.py"]
+
+    @pytest.mark.parametrize("outcome", ["skipped", "passed"])
+    def test_non_failed_collector_is_no_finding(
+        self, tmp_path: Path, outcome: str
+    ) -> None:
+        results = _failed_results([_collector("tests/test_x.py", outcome=outcome)])
+
+        result = _run_with(tmp_path, results)
+
+        assert result.status == "error"
+        assert result.findings == []
+
+    def test_xdist_collectors_are_one_finding(self, tmp_path: Path) -> None:
+        longrepr = "Different tests were collected between gw0 and gw1."
+        results = _failed_results(
+            [_collector("gw0", longrepr), _collector("gw1", longrepr)]
+        )
+
+        result = _run_with(tmp_path, results)
+
+        assert result.status == "findings"
+        assert len(result.findings) == 1
+        finding = result.findings[0]
+        assert finding.key == "pytest|collection|xdist"
+        assert finding.path is None
+        assert result.fix_text.count(XDIST_HINT) == 1

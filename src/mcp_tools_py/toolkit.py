@@ -37,9 +37,13 @@ from mcp_tools_py.code_checker_pytest.coverage_store import (
     start_coverage_run,
 )
 from mcp_tools_py.code_checker_pytest.models import PytestReport, Test
-from mcp_tools_py.code_checker_pytest.reporting import collectors_failed_line
+from mcp_tools_py.code_checker_pytest.reporting import (
+    XDIST_MARKER,
+    collectors_failed_line,
+)
 from mcp_tools_py.code_checker_pytest.runners import check_code_with_pytest
 from mcp_tools_py.code_checker_pytest.verdict import (
+    XDIST_HINT,
     RunStatus,
     RunVerdict,
     cap_problems,
@@ -67,6 +71,9 @@ from mcp_tools_py.utils.python_environment import PythonEnvironment
 from mcp_tools_py.utils.tool_context import ToolContext
 
 _FAILED_OUTCOMES = ("failed", "error")
+_XDIST_KEY = "pytest|collection|xdist"
+# pytest: "Interrupted: N error(s) during collection"
+_COLLECTION_INTERRUPTED = "during collection"
 
 # Same list as mcp-coder's workflows/rebase_automated.py::AUTOMATED_EXCLUDED_MARKERS;
 # this is the single home of the list.
@@ -140,6 +147,53 @@ def _test_failure_summary(test: Test) -> str:
     return test.outcome
 
 
+def _collector_findings(report: PytestReport) -> list[Finding]:
+    """One Finding per failed collector; xdist mismatches collapse into one.
+
+    Returns:
+        A Finding per distinct failed collector node id, keyed by it, whose
+        message is the last non-empty `longrepr` line; then, if any collector
+        failed with an xdist collection mismatch, one `_XDIST_KEY` Finding
+        without a path carrying `XDIST_HINT`.
+    """
+    by_id: dict[str, Finding] = {}
+    xdist: Finding | None = None
+    for collector in report.collectors or []:
+        if collector.outcome not in _FAILED_OUTCOMES:
+            continue
+        text = collector.longrepr or ""
+        if XDIST_MARKER in text:
+            xdist = xdist or Finding(
+                key=_XDIST_KEY, message=f"{XDIST_MARKER}\n{XDIST_HINT}"
+            )
+        elif collector.nodeid not in by_id:
+            lines = [line.strip() for line in text.splitlines() if line.strip()]
+            by_id[collector.nodeid] = Finding(
+                key=collector.nodeid,
+                message=lines[-1] if lines else "collection failed",
+                path=collector.nodeid.split("::")[0],
+            )
+    return [*by_id.values(), *([xdist] if xdist else [])]
+
+
+def _is_collection_error(report: PytestReport, verdict: RunVerdict) -> bool:
+    """True when an ERROR verdict was caused by collection errors.
+
+    Exit code 1 (tests failed) without any failed/errored test means only
+    collectors failed. Exit code 2 is also pytest's KeyboardInterrupt code,
+    so it additionally needs pytest's "during collection" line.
+
+    Returns:
+        Whether `verdict` is an ERROR that collection errors explain.
+    """
+    if verdict.status is not RunStatus.ERROR:
+        return False
+    if verdict.exit_code == 1:
+        return True
+    output = report.error_context.error_message if report.error_context else ""
+    return verdict.exit_code == 2 and _COLLECTION_INTERRUPTED in output
+
+
 def _run_test(context: ToolContext, depth: str) -> ActionResult:
     """Run pytest at `depth` and map the outcome onto an ActionResult.
 
@@ -152,12 +206,16 @@ def _run_test(context: ToolContext, depth: str) -> ActionResult:
     `_LONG_TEST_TIMEOUT`; `pytest-timeout` and `check-timeout` in
     `[tool.mcp-tools-py]` still win.
 
+    Failed collectors become findings too, also when collection errors
+    alone made the verdict ERROR (exit 1, or exit 2 "during collection").
+
     Returns:
         "error" if pytest is unavailable, the verdict is ERROR (other than
-        "no tests found"), or FAILED without any failing/erroring test;
-        "skipped" for no tests found; "findings" with one Finding per
-        failing/erroring test; "ok" for PASSED, and for SUSPICIOUS with a
-        "Not verified" summary.
+        "no tests found" or one caused by failed collectors), or FAILED
+        without any failing/erroring test or collector; "skipped" for no
+        tests found; "findings" with one Finding per failing/erroring test
+        and per failed collector (one for all xdist mismatches); "ok" for
+        PASSED, and for SUSPICIOUS with a "Not verified" summary.
     """
     if not context.is_tool_available("pytest"):
         return ActionResult(
@@ -227,8 +285,14 @@ def _run_test(context: ToolContext, depth: str) -> ActionResult:
             )
             finished = finish_coverage_run(coverage_run, data, report, verdict)
 
+        # Before the `known` gate: a real collection failure arrives as ERROR.
+        collector_findings = _collector_findings(report) if report else []
+        collection_error = report is not None and _is_collection_error(report, verdict)
         known = (RunStatus.PASSED, RunStatus.FAILED, RunStatus.SUSPICIOUS)
-        if report is None or verdict.status not in known:
+        if report is None or (
+            verdict.status not in known
+            and not (collection_error and collector_findings)
+        ):
             if any("No Tests Found" in p for p in verdict.problems):
                 return ActionResult(
                     status="skipped", summary="\n".join(verdict.problems)
@@ -239,13 +303,16 @@ def _run_test(context: ToolContext, depth: str) -> ActionResult:
 
         summary_text: str = result["summary_text"]
         findings = [
-            Finding(
-                key=test.nodeid,
-                message=_test_failure_summary(test),
-                path=test.nodeid.split("::")[0],
-            )
-            for test in report.tests or []
-            if test.outcome in _FAILED_OUTCOMES
+            *(
+                Finding(
+                    key=test.nodeid,
+                    message=_test_failure_summary(test),
+                    path=test.nodeid.split("::")[0],
+                )
+                for test in report.tests or []
+                if test.outcome in _FAILED_OUTCOMES
+            ),
+            *collector_findings,
         ]
         count_line = collectors_failed_line(report)
         count_text = f"{count_line}\n\n" if count_line else ""
@@ -264,7 +331,8 @@ def _run_test(context: ToolContext, depth: str) -> ActionResult:
             findings=findings,
             ok_summary=ok_summary,
             findings_summary=failed_summary if count_line else summary_text,
-            locations=[finding.key for finding in findings],
+            # Node ids for tests and collectors; the xdist finding has no path.
+            locations=[f.key if f.path else None for f in findings],
         )
 
         if finished is not None and finished.data is not None:
