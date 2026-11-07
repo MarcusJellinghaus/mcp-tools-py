@@ -23,9 +23,9 @@ This tracks **Feature Implementation** consisting of multiple **Tasks**.
 
 ### Step 1: Stop misreading extra_args values as paths — [step_1.md](./steps/step_1.md)
 
-- [ ] Implementation: tests first, then `_OPTION_VALUES`/`_values_taken`/`_positional_args` in `utils.py`, keep `tests` in `sanitize_extra_args`, add the default test folder before `extra_args` in `runners.py`, new integration test file
-- [ ] Quality checks: pylint, pytest (unit + new integration file), mypy — fix all issues
-- [ ] Commit message prepared: `fix(pytest): stop misreading extra_args values as paths (#49)`
+- [x] Implementation: tests first, then `_OPTION_VALUES`/`_values_taken`/`_positional_args` in `utils.py`, keep `tests` in `sanitize_extra_args`, add the default test folder before `extra_args` in `runners.py`, new integration test file
+- [x] Quality checks: pylint, pytest (unit + new integration file), mypy — fix all issues
+- [x] Commit message prepared: `fix(pytest): stop misreading extra_args values as paths (#49)`
 
 ### Step 2: Lead failure replies with counts and unrun tests — [step_2.md](./steps/step_2.md)
 

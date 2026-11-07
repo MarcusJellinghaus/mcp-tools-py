@@ -8,6 +8,7 @@ import pytest
 from mcp_tools_py.code_checker_pytest.models import SanitizedArgs
 from mcp_tools_py.code_checker_pytest.utils import (
     SHOW_OUTPUT_NOTE,
+    _positional_args,
     sanitize_extra_args,
 )
 
@@ -112,15 +113,12 @@ class TestSanitizeExtraArgs:
         assert result.verbosity == 2
         assert result.notes == []
 
-    def test_tests_path_removed(self) -> None:
-        """Bare 'tests' or 'tests/' path is removed (auto-appended)."""
-        result_tests = sanitize_extra_args(["tests"], None)
-        assert result_tests.cleaned_args == []
-        assert result_tests.verbosity == 2
-
-        result_tests_slash = sanitize_extra_args(["tests/"], None)
-        assert result_tests_slash.cleaned_args == []
-        assert result_tests_slash.verbosity == 2
+    @pytest.mark.parametrize("arg", ["tests", "tests/"])
+    def test_tests_path_kept(self, arg: str) -> None:
+        """Bare 'tests' or 'tests/' is an ordinary path and is kept."""
+        result = sanitize_extra_args([arg], None)
+        assert result.cleaned_args == [arg]
+        assert result.verbosity == 2
 
     def test_test_path_selector_preserved(self) -> None:
         """Specific test paths with :: selectors or filenames are preserved."""
@@ -141,7 +139,7 @@ class TestSanitizeExtraArgs:
         result = sanitize_extra_args(
             ["-s", "-vvv", "-m", "slow", "tests", "-x"], ["unit"]
         )
-        assert result.cleaned_args == ["-x"]
+        assert result.cleaned_args == ["tests", "-x"]
         assert result.verbosity == 3
         assert result.show_output is True
         assert len(result.notes) == 2
@@ -320,3 +318,82 @@ class TestSanitizeExtraArgsPathArgs:
                 ["no_such_file.py", abs_path], None, project_dir=tmpdir
             )
             assert result.path_args == []
+
+
+class TestPositionalArgs:
+    """Tests for splitting positionals from options and their values."""
+
+    @pytest.mark.parametrize(
+        "args,expected",
+        [
+            (["-k", "tests", "--collect-only", "-q", "p.py"], ["p.py"]),
+            (["-k", "tests", "p.py"], ["p.py"]),
+            (["-k", "tests"], []),
+            (["-m", "tests"], []),
+            (["-p", "tests"], []),
+            (["-xk", "tests"], []),
+            (["-xk", "tests", "p.py"], ["p.py"]),
+            (["-ktests", "p.py"], ["p.py"]),
+            (["-vrs", "p.py"], ["p.py"]),
+            (["--collect-only", "--ignore", "tests", "p.py"], ["p.py"]),
+            (["tests"], ["tests"]),
+            (["tests/"], ["tests/"]),
+            (["--rootdir", "."], []),
+            (["-k", "src"], []),
+            (["--ignore", "other"], []),
+            (["--cov", "src"], []),
+            (["-c", "pyproject.toml"], []),
+            (["--deselect", "other/x.py::t"], []),
+            (["--cov"], []),
+            (["--debug"], []),
+            (["--cache-show", "glob"], []),
+            (["--cache-show", "-x"], []),
+            (["--cov", "src", "p.py"], ["p.py"]),
+            (["--cov", "-x", "p.py"], ["p.py"]),
+            (["--cov=src", "p.py"], ["p.py"]),
+            (["--debug", "-x", "p.py"], ["p.py"]),
+            (["--metadata", "a", "b", "p.py"], ["p.py"]),
+            (["--json-report-omit", "log"], []),
+            (["--json-report-omit", "log", "keywords", "-x", "p.py"], ["p.py"]),
+            (["--json-report-omit=log", "p.py"], ["p.py"]),
+            (["--maxfail", "-1", "p.py"], ["p.py"]),
+            (["--maxfail=2", "p.py"], ["p.py"]),
+            (["-k", "-a b", "p.py"], ["p.py"]),
+            (["-n", "auto", "p.py"], ["p.py"]),
+            (["-n2", "p.py"], ["p.py"]),
+            (["--", "tests"], ["tests"]),
+            (["--unknown-option", "val"], ["val"]),
+        ],
+    )
+    def test_positional_args(self, args: list[str], expected: list[str]) -> None:
+        """Option values are skipped; only positionals are returned."""
+        assert _positional_args(args) == expected
+
+
+class TestSanitizeExtraArgsOptionValues:
+    """Option values are never treated as paths."""
+
+    @pytest.mark.parametrize("args", [["-k", "src"], ["--rootdir", "."]])
+    def test_option_value_naming_existing_dir_not_a_path(self, args: list[str]) -> None:
+        """A value that names an existing directory is not a path argument."""
+        with tempfile.TemporaryDirectory() as tmpdir:
+            os.makedirs(os.path.join(tmpdir, "src"))
+            result = sanitize_extra_args(args, None, project_dir=tmpdir)
+            assert result.has_path_args is False
+            assert result.notes == []
+            assert result.cleaned_args == args
+
+    def test_deselect_missing_value_no_not_found_note(self) -> None:
+        """A --deselect value that looks like a missing path adds no note."""
+        with tempfile.TemporaryDirectory() as tmpdir:
+            result = sanitize_extra_args(
+                ["--deselect", "missing/x.py::t"], None, project_dir=tmpdir
+            )
+            assert not any("not found" in n for n in result.notes)
+
+    def test_positional_tests_detected_as_path(self) -> None:
+        """A positional 'tests' with tests/ present is a path argument."""
+        with tempfile.TemporaryDirectory() as tmpdir:
+            os.makedirs(os.path.join(tmpdir, "tests"))
+            result = sanitize_extra_args(["tests"], None, project_dir=tmpdir)
+            assert result.path_args == ["tests"]

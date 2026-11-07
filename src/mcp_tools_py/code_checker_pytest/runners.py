@@ -109,7 +109,7 @@ def run_tests(
         venv_bin: Optional bin/Scripts directory to prepend to PATH. This is the directory the interpreter lives in, not a virtual environment root
         keep_temp_files: Whether to keep temporary files after execution (useful for debugging failures)
         timeout_seconds: Maximum time in seconds to wait for test execution. Default is 300 seconds
-        skip_default_test_folder: When True, do not append `test_folder` to the pytest command (caller already passed test paths via `extra_args`)
+        skip_default_test_folder: When True, do not add `test_folder` to the pytest command (caller already passed test paths via `extra_args`)
 
     Returns:
         PytestReport: An object containing the results of the test session with the following attributes:
@@ -182,13 +182,14 @@ def run_tests(
             ]
         )
 
+        # Add the test folder path (unless caller provides explicit paths)
+        # before extra_args, so a trailing option can't take it as a value
+        if not skip_default_test_folder:
+            command.append(os.path.join(project_dir, test_folder))
+
         # Add any extra arguments
         if extra_args:
             command.extend(extra_args)
-
-        # Add the test folder path (unless caller provides explicit paths)
-        if not skip_default_test_folder:
-            command.append(os.path.join(project_dir, test_folder))
 
         logger.debug("Running command: %s", " ".join(command))
 
@@ -489,7 +490,7 @@ def check_code_with_pytest(
         venv_bin: Optional bin/Scripts directory to prepend to PATH. This is the directory the interpreter lives in, not a virtual environment root
         keep_temp_files: Whether to keep temporary files after test execution. Useful for debugging when tests fail
         timeout_seconds: Maximum time in seconds to wait for test execution. Default is 300 seconds
-        skip_default_test_folder: When True, do not append `test_folder` to the pytest command (caller already passed test paths via `extra_args`)
+        skip_default_test_folder: When True, do not add `test_folder` to the pytest command (caller already passed test paths via `extra_args`)
 
     Returns:
         Dictionary with test results containing the following keys:

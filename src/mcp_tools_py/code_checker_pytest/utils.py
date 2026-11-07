@@ -1,6 +1,7 @@
 """Utility functions for code checker pytest operations."""
 
 import os
+import sys
 from typing import List, Optional, Tuple
 
 from mcp_tools_py.code_checker_pytest.models import ErrorContext, SanitizedArgs
@@ -8,6 +9,68 @@ from mcp_tools_py.utils.file_utils import read_file as read_file
 
 # Letters of short switches that take no value and may be combined (e.g. -xvs).
 _SWITCH_LETTERS = set("xvsql")
+
+# Hard-coded from pytest's parser with this repo's plugins. An option missing
+# from it takes no value, so a following token is read as a positional, as before.
+_ONE_VALUE_OPTIONS = """
+-W -c -k -m -n -o -p -r
+--anyio-mode --assert --asyncio-mode --basetemp --cache-show --capture
+--code-highlight --color --confcutdir --config-file --cov --cov-config
+--cov-context --cov-fail-under --cov-precision --cov-report --debug --deselect
+--dist --doctest-glob --doctest-report --durations --durations-min --ignore
+--ignore-glob --import-mode --json-report-file --json-report-indent
+--json-report-verbosity --junit-prefix --junit-xml --junitprefix --junitxml
+--last-failed-no-failures --lfnf --log-auto-indent --log-cli-date-format
+--log-cli-format --log-cli-level --log-date-format --log-disable --log-file
+--log-file-date-format --log-file-format --log-file-level --log-file-mode
+--log-format --log-level --max-warnings --max-worker-restart --maxfail
+--maxprocesses --maxschedchunk --metadata-from-json --metadata-from-json-file
+--numprocesses --override-ini --pastebin --pdbcls --px --pythonwarnings
+--report-chars --rootdir --rsyncdir --rsyncignore --show-capture --tach-base
+--tach-head --tb --testrunuid --tx --verbosity
+""".split()
+
+# Option spelling -> most values it can take.
+_OPTION_VALUES: dict[str, int] = {
+    **dict.fromkeys(_ONE_VALUE_OPTIONS, 1),
+    "--metadata": 2,
+    "--json-report-omit": sys.maxsize,
+}
+
+
+def _values_taken(arg: str) -> int:
+    """Return how many following tokens the option ``arg`` can take."""
+    if arg.startswith("--"):
+        return 0 if "=" in arg else _OPTION_VALUES.get(arg, 0)
+    for pos, letter in enumerate(arg[1:], start=2):
+        if f"-{letter}" in _OPTION_VALUES:
+            return 0 if arg[pos:] else 1  # -ktests vs -xk tests
+    return 0
+
+
+def _positional_args(args: List[str]) -> List[str]:
+    """Return the tokens of ``args`` that are neither options nor their values.
+
+    An option takes up to its table count of following tokens that don't
+    start with ``-``. Everything after ``--`` is positional.
+    """
+    positionals: List[str] = []
+    i = 0
+    while i < len(args):
+        arg = args[i]
+        i += 1
+        if arg == "--":
+            positionals += args[i:]
+            break
+        if not arg.startswith("-"):
+            positionals.append(arg)
+            continue
+        for _ in range(_values_taken(arg)):
+            if i == len(args) or args[i].startswith("-"):
+                break
+            i += 1
+    return positionals
+
 
 SHOW_OUTPUT_NOTE = (
     "Note: -s was not passed to pytest. It was turned into the captured-output "
@@ -35,6 +98,9 @@ def sanitize_extra_args(
         - An ``-s`` in the project's ``addopts`` or in ``PYTEST_ADDOPTS``
           still disables capture.
         - Output printed at import or collection time is not shown.
+        - Path detection reads option values from a hard-coded table. A value
+          after an option missing from the table is read as a positional.
+        - Tokens after ``--`` are positional for path detection.
 
     Args:
         extra_args: Optional list of extra arguments for pytest.
@@ -86,10 +152,6 @@ def sanitize_extra_args(
             skip_next = True
             continue
 
-        # Bare "tests" or "tests/" path: auto-appended, remove
-        if arg in ("tests", "tests/"):
-            continue
-
         # -m flag: remove if markers parameter is provided
         if arg == "-m" and markers is not None:
             skip_next = True
@@ -111,9 +173,7 @@ def sanitize_extra_args(
     has_path_args = False
     path_args: List[str] = []
     if project_dir:
-        for arg in cleaned:
-            if arg.startswith("-"):
-                continue
+        for arg in _positional_args(cleaned):
             if os.path.isabs(arg):
                 notes.append(f"Absolute path '{arg}' ignored for path detection.")
                 continue
