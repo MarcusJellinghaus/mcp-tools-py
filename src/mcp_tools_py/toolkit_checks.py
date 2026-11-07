@@ -11,6 +11,7 @@ from mcp_tools_py.code_checker_lint_imports.runners import run_lint_imports_chec
 from mcp_tools_py.code_checker_mypy.reporting import format_hint_lines, run_signals
 from mcp_tools_py.code_checker_mypy.runners import MYPY_EXIT_PREFIX, run_mypy_check
 from mcp_tools_py.code_checker_pylint.runners import get_pylint_results
+from mcp_tools_py.code_checker_tach.runners import format_tach_result
 from mcp_tools_py.code_checker_vulture.runners import run_vulture_check
 from mcp_tools_py.utils.project_config import (
     resolve_source_directories,
@@ -276,11 +277,11 @@ def _run_lint_imports(context: ToolContext, depth: str) -> ActionResult:
 def _run_tach(context: ToolContext, depth: str) -> ActionResult:
     """Run tach and map the outcome onto an ActionResult.
 
-    `code_checker_tach.runners.run_tach_check` discards the subprocess
-    return code, so this builds and runs the same command itself to read
-    it, reusing that runner's own text formatting for the finding's
-    message. tach's output has no stable per-location key, so a finding is
-    reported once, keyed `tach|{depth}`.
+    `code_checker_tach.runners.run_tach_check` returns only text, so this
+    builds and runs the same command itself to read the return code, and
+    shares that runner's `format_tach_result` for the finding's message.
+    tach's output has no stable per-location key, so a finding is reported
+    once, keyed `tach|{depth}`.
 
     Returns:
         "error" if tach timed out or failed to run; "findings" with one
@@ -307,19 +308,10 @@ def _run_tach(context: ToolContext, depth: str) -> ActionResult:
             summary=f"tach check failed to run: {result.execution_error}",
         )
 
-    output = result.stdout
-    if result.stderr:
-        output = output + "\n" + result.stderr if output else result.stderr
-    stripped = output.strip()
-    message = (
-        f"tach check completed:\n{stripped}"
-        if stripped
-        else "tach check passed (no output)."
-    )
-
     if result.return_code == 0:
         return ActionResult(status="ok", summary="tach found no issues.")
 
+    message = format_tach_result(result)
     finding = Finding(key=f"tach|{depth}", message=message)
     return ActionResult(
         status="findings",

@@ -29,9 +29,9 @@ This tracks **Feature Implementation** consisting of multiple **Tasks**.
 
 ### Step 2: `_run_tach` uses the shared formatter — [step_2.md](./steps/step_2.md)
 
-- [ ] Implementation: parametrize `test_tach_violation_is_degraded_finding` in `tests/test_toolkit_check.py`, `_run_tach` calls `format_tach_result` in `toolkit_checks.py`, docstring update
-- [ ] Quality checks: pylint, pytest, mypy (plus lint-imports, tach) — fix all issues
-- [ ] Commit message prepared
+- [x] Implementation: parametrize `test_tach_violation_is_degraded_finding` in `tests/test_toolkit_check.py`, `_run_tach` calls `format_tach_result` in `toolkit_checks.py`, docstring update
+- [x] Quality checks: pylint, pytest, mypy (plus lint-imports, tach) — fix all issues
+- [x] Commit message prepared
 
 ## Pull Request
 
