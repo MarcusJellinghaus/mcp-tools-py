@@ -50,7 +50,7 @@ class TestDescribe:
     """describe() must return the final, complete ToolkitInfo."""
 
     def test_returns_exact_toolkit_info(self) -> None:
-        info = PythonToolkit().describe({})
+        info = PythonToolkit().describe()
 
         assert info.actions == _EXPECTED_ACTIONS
         assert info.params_schema == {
