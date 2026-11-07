@@ -23,7 +23,9 @@ def register(mcp: "FastMCPProtocol", checker_tools: "CheckerTools") -> None:
         """Run tach check on the project to validate architectural boundaries.
 
         Returns:
-            Status line followed by raw JSON output from `tach check --output json`.
+            A status line saying whether `tach check` passed or failed, by its
+            exit code, followed by tach's output. The output is JSON, or plain
+            text when the config fails to load.
         """
         tach_binary = context.tool_environment.binary("tach")
         if not context.is_tool_available("tach") or tach_binary is None:

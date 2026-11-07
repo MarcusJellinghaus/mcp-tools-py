@@ -244,8 +244,19 @@ class TestRunCheckFull:
         assert len(result.findings) == 1
         assert result.findings[0].key == "vulture|full"
 
+    @pytest.mark.parametrize(
+        ("stdout", "expected_message"),
+        [
+            ('{"errors": []}', 'tach check failed:\n{"errors": []}'),
+            ("", "tach check failed (exit code 1, no output)."),
+        ],
+    )
     def test_tach_violation_is_degraded_finding(
-        self, tmp_path: Path, monkeypatch: pytest.MonkeyPatch
+        self,
+        tmp_path: Path,
+        monkeypatch: pytest.MonkeyPatch,
+        stdout: str,
+        expected_message: str,
     ) -> None:
         _write_check_project(tmp_path, _CLEAN_SRC)
         _patch_full_depth_clean(monkeypatch)
@@ -253,7 +264,7 @@ class TestRunCheckFull:
         def fake_execute_command(command: list[str], **kwargs: object) -> object:
             del kwargs
             if command[2] == "--output":
-                return make_command_result(return_code=1, stdout='{"errors": []}')
+                return make_command_result(return_code=1, stdout=stdout)
             return make_command_result(return_code=0, stdout="[]")
 
         monkeypatch.setattr(
@@ -268,6 +279,7 @@ class TestRunCheckFull:
         assert result.status == "findings"
         assert len(result.findings) == 1
         assert result.findings[0].key == "tach|full"
+        assert result.findings[0].message == expected_message
 
     def test_tach_timeout_is_error(
         self, tmp_path: Path, monkeypatch: pytest.MonkeyPatch
