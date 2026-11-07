@@ -9,3 +9,11 @@ pr_info/steps/step_2.md:15 — low — `replace(context, check_timeout=600)` in 
 Verdict(decision='tasks', tasks=['In pr_info/steps/step_3.md, add an autouse fixture (in tests/conftest.py or scoped to the toolkit tests) that runs monkeypatch.delenv("VIRTUAL_ENV", raising=False). Existing real-run toolkit tests then stop picking up the VIRTUAL_ENV inherited from the shell or CI. Have the new VIRTUAL_ENV tests set the variable explicitly.', 'In pr_info/steps/step_3.md, change test_set_uses_its_interpreter to choose between Scripts/python.exe and bin/python from python_environment._IS_WINDOWS, the flag PythonEnvironment.resolve uses, instead of detecting the platform itself.', 'In pr_info/steps/step_2.md, restrict the check_timeout=600 default in _run_check to mypy and pylint, as the issue asks. Leave the other checks at check@full with their existing default, and extend test_default_is_600_for_mypy_and_pylint to cover the full depth, including a case showing the non-mypy/pylint checks keep the old default.'], escalate_reason=None)
 **Changes**:
 applied
+
+## Round 2 — 2026-11-07
+**Findings**:
+Plan files and core code read; checking `PythonEnvironment.resolve` and `ToolContext` to validate steps 2–4.`pr_info/steps/step_4.md:15` — low — `_MARKER_LINE = r"^@pytest\.mark\.([^(:]+)"` doesn't exclude newlines, so a marker line with no colon would run into the next line and produce a bad name. This could happen with a hand-written fake stdout like the bare `integration` line planned at `step_4.md:58`. Use `[^(:\s]+` so a name stops at whitespace, and write every fake line in the `@pytest.mark.<name>: <desc>` form real pytest prints.
+**Decisions**:
+Verdict(decision='tasks', tasks=['In pr_info/steps/step_4.md:15, change _MARKER_LINE to r"^@pytest\\.mark\\.([^(:\\s]+)" so a marker name stops at whitespace or a newline. Rewrite the fake stdout fixtures, including the bare `integration` line at step_4.md:58, in the `@pytest.mark.<name>: <desc>` form that real pytest prints.'], escalate_reason=None)
+**Changes**:
+applied
