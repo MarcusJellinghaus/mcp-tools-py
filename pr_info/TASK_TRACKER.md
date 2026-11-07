@@ -21,6 +21,19 @@ This tracks **Feature Implementation** consisting of multiple **Tasks**.
 
 ## Tasks
 
-<!-- Tasks populated from pr_info/steps/ by prepare_task_tracker -->
+### Step 1: Shared formatter used by `run_tach_check` — [step_1.md](./steps/step_1.md)
+
+- [ ] Implementation: parametrized `run_tach_check` test in `tests/test_code_checker_tach/test_runners.py`, `format_tach_result` in `runners.py`, docstring updates in `runners.py` and `tach_tool.py`
+- [ ] Quality checks: pylint, pytest, mypy — fix all issues
+- [ ] Commit message prepared
+
+### Step 2: `_run_tach` uses the shared formatter — [step_2.md](./steps/step_2.md)
+
+- [ ] Implementation: parametrize `test_tach_violation_is_degraded_finding` in `tests/test_toolkit_check.py`, `_run_tach` calls `format_tach_result` in `toolkit_checks.py`, docstring update
+- [ ] Quality checks: pylint, pytest, mypy (plus lint-imports, tach) — fix all issues
+- [ ] Commit message prepared
 
 ## Pull Request
+
+- [ ] PR review: review all changes across steps
+- [ ] PR summary prepared
