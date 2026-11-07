@@ -41,9 +41,9 @@ This tracks **Feature Implementation** consisting of multiple **Tasks**.
 
 ### Step 4: `test@quick` excludes registered `*integration` markers — [step_4.md](./steps/step_4.md)
 
-- [ ] Implementation: new `tests/test_toolkit_markers.py` (unit + real strict-marker run), then `_registered_markers` and the `quick` marker selection in `_run_test`
-- [ ] Quality checks: pylint, pytest, mypy — fix all issues
-- [ ] Commit message prepared
+- [x] Implementation: new `tests/test_toolkit_markers.py` (unit + real strict-marker run), then `_registered_markers` and the `quick` marker selection in `_run_test`
+- [x] Quality checks: pylint, pytest, mypy — fix all issues
+- [x] Commit message prepared
 
 ## Pull Request
 

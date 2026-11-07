@@ -9,6 +9,7 @@ instead of returning structured data.
 
 import json
 import os
+import re
 import shutil
 import tempfile
 from dataclasses import replace
@@ -69,6 +70,7 @@ from mcp_tools_py.utils.project_config import (
     resolve_target_directories,
 )
 from mcp_tools_py.utils.python_environment import PythonEnvironment
+from mcp_tools_py.utils.subprocess_runner import execute_command
 from mcp_tools_py.utils.tool_context import ToolContext
 
 _FAILED_OUTCOMES = ("failed", "error")
@@ -89,6 +91,9 @@ UNATTENDED_EXCLUDED_MARKERS: list[str] = [
 # Stops --strict-markers projects rejecting marker names they don't register.
 _STRICT_MARKERS_OFF: list[str] = ["-o", "strict_markers=false"]
 _LONG_TEST_TIMEOUT = 1800  # seconds; test@standard, @unattended and @full
+# One line per marker in `pytest --markers`: "@pytest.mark.<name>[(<args>)]: <desc>"
+_MARKER_LINE = re.compile(r"^@pytest\.mark\.([^(:\s]+)", re.MULTILINE)
+_MARKER_READ_FAILED = "Could not read the project's pytest markers"
 
 _FIX_CHECK_PROMPT = """\
 Fix the findings reported by the checkers in the output below \
@@ -235,6 +240,39 @@ def _with_note(result: ActionResult, note: str | None) -> ActionResult:
     return result
 
 
+def _registered_markers(context: ToolContext) -> list[str] | str:
+    """Names of the markers registered in the project, read via `pytest --markers`.
+
+    Returns:
+        The marker names, or an error message when the list can't be read:
+        timeout, run failure, non-zero exit, or exit 0 with no marker lines
+        (pytest's built-in markers always print, so no lines means the output
+        wasn't understood).
+    """
+    timeout_seconds = context.resolve_timeout("pytest")
+    result = execute_command(
+        [
+            str(context.environment.interpreter),
+            "-m",
+            "pytest",
+            "--markers",
+            "--color=no",
+        ],
+        cwd=str(context.project_dir),
+        timeout_seconds=timeout_seconds,
+    )
+    if result.timed_out:
+        return f"{_MARKER_READ_FAILED}: timed out after {timeout_seconds} seconds."
+    if result.execution_error:
+        return f"{_MARKER_READ_FAILED}: {result.execution_error}"
+    if result.return_code != 0:
+        output = (result.stderr or result.stdout).strip()
+        tail = "\n".join(output.splitlines()[-20:])
+        return f"{_MARKER_READ_FAILED}: exit code {result.return_code}\n{tail}"
+    names = [name.strip() for name in _MARKER_LINE.findall(result.stdout)]
+    return names or f"{_MARKER_READ_FAILED}: no marker lines in the output."
+
+
 def _run_test(context: ToolContext, depth: str) -> ActionResult:
     """Run pytest at `depth` and map the outcome onto an ActionResult.
 
@@ -242,6 +280,10 @@ def _run_test(context: ToolContext, depth: str) -> ActionResult:
     data, and sets `raw` to the digest (mirroring
     `run_pytest_check(coverage=True)`); a `fail_under` miss is informational
     only and never changes `status`.
+
+    `quick` excludes every registered marker whose name ends in
+    `integration`, read via `_registered_markers`; with none registered it
+    runs unfiltered. A failed marker read is `error`, never an unfiltered run.
 
     Every depth but `quick` defaults the pytest timeout to
     `_LONG_TEST_TIMEOUT`; `pytest-timeout` and `check-timeout` in
@@ -251,7 +293,8 @@ def _run_test(context: ToolContext, depth: str) -> ActionResult:
     alone made the verdict ERROR (exit 1, or exit 2 "during collection").
 
     Returns:
-        "error" if pytest is unavailable, the verdict is ERROR (other than
+        "error" if pytest is unavailable, `quick` can't read the registered
+        markers, the verdict is ERROR (other than
         "no tests found" or one caused by failed collectors), or FAILED
         without any failing/erroring test or collector; "skipped" for no
         tests found; "findings" with one Finding per failing/erroring test
@@ -267,10 +310,12 @@ def _run_test(context: ToolContext, depth: str) -> ActionResult:
 
     project_dir = str(context.project_dir)
     interpreter = str(context.environment.interpreter)
-    markers = {
-        "quick": ["not integration"],
-        "unattended": list(UNATTENDED_EXCLUDED_MARKERS),
-    }.get(depth)
+    markers = list(UNATTENDED_EXCLUDED_MARKERS) if depth == "unattended" else None
+    if depth == "quick":
+        names = _registered_markers(context)
+        if isinstance(names, str):
+            return ActionResult(status="error", summary=names)
+        markers = [f"not {n}" for n in names if n.endswith("integration")] or None
 
     extra_args = list(_STRICT_MARKERS_OFF) if depth == "unattended" else []
     env_vars: dict[str, str] = {}
