@@ -1,0 +1,10 @@
+# review-plan review log 2
+
+## Round 1 — 2026-11-07
+**Findings**:
+Checking whether the plan's line references still match `origin/main`, where #49 has since landed.pr_info/steps/step_1.md:9 — high — The precondition still fails on this branch: `src/mcp_tools_py/code_checker_pytest/utils.py:90` still has `if arg in ("tests", "tests/"):`. #49 step 1 is now on `origin/main` (330d139, #279), but the branch is still based on 417f8cd, so the implementer would write `.blocked.txt` and stop. Change the precondition to "rebase onto `origin/main` first", or rebase before handing off.
+pr_info/steps/summary.md:16 — high — The precondition says #49 step 1 "must be on this branch" but gives no way to get it there. Five commits on `origin/main` are missing from this branch (#275, #277, #278, #279, #280). Two of them rewrite `toolkit.py` (+259 lines) and `tests/test_toolkit_test.py` (+303 lines), which step 2 edits. Name the rebase as the first action, and say that line references from the issue (`toolkit.py:92`, `:152`, `:166`, `test_server_params.py:589`, `:611`) must be checked again afterwards.
+**Decisions**:
+Verdict(decision='tasks', tasks=['Rebase the branch onto origin/main so it includes #275, #277, #278, #279 and #280, and resolve any conflicts in the pr_info/ plan files.', 'In pr_info/steps/summary.md, make rebasing onto origin/main the first required action. Say that the #49 step 1 precondition is met by origin/main commit 330d139 (#279).', 'In pr_info/steps/step_1.md:9, change the precondition from \'must already be on this branch\' to \'rebase onto origin/main first\'. After rebasing, confirm that src/mcp_tools_py/code_checker_pytest/utils.py no longer contains `if arg in ("tests", "tests/"):`.', 'After the rebase, re-check every line reference in the plan against the rebased code: toolkit.py:92, :152 and :166, and tests/test_server_params.py:589 and :611. Also re-check any references to tests/test_toolkit_test.py. Update all plan steps to the current line numbers and code shapes.'], escalate_reason=None)
+**Changes**:
+applied
