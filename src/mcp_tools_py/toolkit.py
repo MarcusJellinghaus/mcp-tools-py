@@ -7,6 +7,7 @@ discovers and runs it without naming any of mcp-tools-py's other modules.
 instead of returning structured data.
 """
 
+import json
 import shutil
 import tempfile
 from pathlib import Path
@@ -65,6 +66,19 @@ from mcp_tools_py.utils.python_environment import PythonEnvironment
 from mcp_tools_py.utils.tool_context import ToolContext
 
 _FAILED_OUTCOMES = ("failed", "error")
+
+# Same list as mcp-coder's workflows/rebase_automated.py::AUTOMATED_EXCLUDED_MARKERS;
+# this is the single home of the list.
+UNATTENDED_EXCLUDED_MARKERS: list[str] = [
+    "not claude_cli_integration",
+    "not copilot_cli_integration",
+    "not langchain_integration",
+    "not llm_integration",
+    "not jenkins_integration",
+    "not install_integration",
+]
+# Stops --strict-markers projects rejecting marker names they don't register.
+_STRICT_MARKERS_OFF: list[str] = ["-o", "strict_markers=false"]
 
 _FIX_CHECK_PROMPT = """\
 Fix the mypy type errors shown in the output below.
@@ -146,9 +160,12 @@ def _run_test(context: ToolContext, depth: str) -> ActionResult:
 
     project_dir = str(context.project_dir)
     interpreter = str(context.environment.interpreter)
-    markers = ["not integration"] if depth == "quick" else None
+    markers = {
+        "quick": ["not integration"],
+        "unattended": list(UNATTENDED_EXCLUDED_MARKERS),
+    }.get(depth)
 
-    extra_args: list[str] = []
+    extra_args = list(_STRICT_MARKERS_OFF) if depth == "unattended" else []
     env_vars: dict[str, str] = {}
     fail_under: float | None = None
     temp_dir: str | None = None
@@ -160,7 +177,7 @@ def _run_test(context: ToolContext, depth: str) -> ActionResult:
                 return ActionResult(status="error", summary=sources)
             temp_dir = tempfile.mkdtemp(prefix="pytest_cov_")
             cov_args, cov_env = coverage_args(sources, temp_dir)
-            extra_args = cov_args
+            extra_args.extend(cov_args)
             env_vars = cov_env
             fail_under = read_fail_under(interpreter, project_dir)
             addopts = get_pytest_addopts(project_dir)
@@ -352,7 +369,7 @@ class PythonToolkit(Toolkit):
             actions={
                 "format": ["apply", "check"],
                 "check": ["quick", "standard", "full"],
-                "test": ["quick", "standard", "full"],
+                "test": ["quick", "standard", "unattended", "full"],
             },
             params_schema={
                 "type": "object",
@@ -383,7 +400,7 @@ class PythonToolkit(Toolkit):
                 },
                 "test": {
                     depth: ["mcp__mcp-tools-py__run_pytest_check"]
-                    for depth in ("quick", "standard", "full")
+                    for depth in ("quick", "standard", "unattended", "full")
                 },
             },
         )
@@ -462,15 +479,26 @@ class PythonToolkit(Toolkit):
         """Prompt text PythonToolkit contributes to mcp-coder's prompts.
 
         Returns:
-            `language_context`, `check_instructions`, and `fix.check` — the
-            Mypy Fix prompt, with its `[mypy_output]` placeholder dropped
-            since the actual output now travels via `ActionResult.fix_text`.
+            `language_context`, `check_instructions`,
+            `check_instructions.unattended` — the pytest marker filter of the
+            `unattended` test depth — and `fix.check` — the Mypy Fix prompt,
+            with its `[mypy_output]` placeholder dropped since the actual
+            output now travels via `ActionResult.fix_text`.
         """
+        names = ", ".join(m.removeprefix("not ") for m in UNATTENDED_EXCLUDED_MARKERS)
         return {
             "language_context": "This is a Python project.",
             "check_instructions": (
                 "Run pylint, mypy and pytest via the MCP tools. At full depth, "
                 "also run the other checkers, including deptry."
+            ),
+            "check_instructions.unattended": (
+                "When you run `mcp__mcp-tools-py__run_pytest_check`, pass "
+                f"markers={json.dumps(UNATTENDED_EXCLUDED_MARKERS)} and "
+                f"extra_args={json.dumps(_STRICT_MARKERS_OFF)}. This deselects "
+                f"tests marked {names}; the -o option stops projects using "
+                "--strict-markers from rejecting marker names they do not "
+                "register."
             ),
             "fix.check": _FIX_CHECK_PROMPT,
         }

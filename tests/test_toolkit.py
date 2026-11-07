@@ -8,13 +8,13 @@ test_toolkit_verify.py.
 import pytest
 from mcp_coder_utils.toolkit import ActionResult, Finding
 
-from mcp_tools_py.toolkit import PythonToolkit
+from mcp_tools_py.toolkit import UNATTENDED_EXCLUDED_MARKERS, PythonToolkit
 from mcp_tools_py.toolkit_checks import _finding_line, _merge, _result_from_findings
 
 _EXPECTED_ACTIONS = {
     "format": ["apply", "check"],
     "check": ["quick", "standard", "full"],
-    "test": ["quick", "standard", "full"],
+    "test": ["quick", "standard", "unattended", "full"],
 }
 _EXPECTED_PERMISSIONS = {
     "format": {
@@ -41,6 +41,7 @@ _EXPECTED_PERMISSIONS = {
     "test": {
         "quick": ["mcp__mcp-tools-py__run_pytest_check"],
         "standard": ["mcp__mcp-tools-py__run_pytest_check"],
+        "unattended": ["mcp__mcp-tools-py__run_pytest_check"],
         "full": ["mcp__mcp-tools-py__run_pytest_check"],
     },
 }
@@ -62,7 +63,7 @@ class TestDescribe:
 
 
 class TestPromptFragments:
-    """prompt_fragments() must contribute the three Python-specific slots."""
+    """prompt_fragments() must contribute the four Python-specific slots."""
 
     def test_contains_required_keys(self) -> None:
         fragments = PythonToolkit().prompt_fragments()
@@ -70,10 +71,19 @@ class TestPromptFragments:
         assert set(fragments) == {
             "language_context",
             "check_instructions",
+            "check_instructions.unattended",
             "fix.check",
         }
         assert fragments["language_context"]
         assert fragments["check_instructions"]
+
+    def test_unattended_instructions(self) -> None:
+        text = PythonToolkit().prompt_fragments()["check_instructions.unattended"]
+
+        for marker in UNATTENDED_EXCLUDED_MARKERS:
+            assert marker in text
+        assert 'extra_args=["-o", "strict_markers=false"]' in text
+        assert "external" not in text
 
     def test_fix_check_has_no_mypy_output_placeholder(self) -> None:
         fragments = PythonToolkit().prompt_fragments()

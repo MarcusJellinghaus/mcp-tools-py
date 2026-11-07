@@ -52,9 +52,9 @@ See [step_4.md](./steps/step_4.md)
 ### Step 5: `test@unattended`
 See [step_5.md](./steps/step_5.md)
 
-- [ ] Implementation: describe/permissions/prompt-fragment/run tests + `UNATTENDED_EXCLUDED_MARKERS`, `_STRICT_MARKERS_OFF`, `unattended` depth in `describe`/`_run_test`, `check_instructions.unattended` fragment
-- [ ] Quality checks: pylint, pytest, mypy — fix all issues
-- [ ] Commit message prepared
+- [x] Implementation: describe/permissions/prompt-fragment/run tests + `UNATTENDED_EXCLUDED_MARKERS`, `_STRICT_MARKERS_OFF`, `unattended` depth in `describe`/`_run_test`, `check_instructions.unattended` fragment
+- [x] Quality checks: pylint, pytest, mypy — fix all issues
+- [x] Commit message prepared
 
 ### Step 6: Depth-based pytest timeouts
 See [step_6.md](./steps/step_6.md)

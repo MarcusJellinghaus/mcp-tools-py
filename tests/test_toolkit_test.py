@@ -15,7 +15,7 @@ from mcp_tools_py.code_checker_pytest.models import (
 )
 from mcp_tools_py.code_checker_pytest.reporting import group_failed_collectors
 from mcp_tools_py.code_checker_pytest.verdict import RunStatus
-from mcp_tools_py.toolkit import PythonToolkit
+from mcp_tools_py.toolkit import UNATTENDED_EXCLUDED_MARKERS, PythonToolkit
 from tests._pytest_results import make_pytest_results
 
 
@@ -181,6 +181,51 @@ def _run_with(tmp_path: Path, results: dict[str, Any]) -> ActionResult:
     )
     with patch("mcp_tools_py.toolkit.check_code_with_pytest", return_value=results):
         return PythonToolkit().run(request)
+
+
+class TestRunTestUnattended:
+    """`unattended` deselects the LLM/CI-integration markers."""
+
+    def test_unattended_passes_markers_and_strict_markers_off(
+        self, tmp_path: Path
+    ) -> None:
+        results = make_pytest_results(
+            RunStatus.PASSED,
+            test_results=_report(1, passed=1),
+            summary_text="Collected 1 tests in 0.0 seconds",
+        )
+        request = ActionRequest(
+            action="test", depth="unattended", project_dir=tmp_path, params={}
+        )
+
+        with patch(
+            "mcp_tools_py.toolkit.check_code_with_pytest", return_value=results
+        ) as mock_pytest:
+            result = PythonToolkit().run(request)
+
+        assert result.status == "ok"
+        kwargs = mock_pytest.call_args.kwargs
+        assert kwargs["markers"] == UNATTENDED_EXCLUDED_MARKERS
+        assert kwargs["extra_args"] == ["-o", "strict_markers=false"]
+
+    def test_unattended_in_strict_marker_project_is_ok(self, tmp_path: Path) -> None:
+        (tmp_path / "pyproject.toml").write_text(
+            '[tool.pytest.ini_options]\naddopts = "--strict-markers"\n'
+        )
+        (tmp_path / "tests").mkdir()
+        (tmp_path / "tests" / "test_mixed.py").write_text(
+            "import pytest\n\n\n"
+            "def test_ok():\n    assert True\n\n\n"
+            "@pytest.mark.llm_integration\n"
+            "def test_llm():\n    assert False\n"
+        )
+        request = ActionRequest(
+            action="test", depth="unattended", project_dir=tmp_path, params={}
+        )
+
+        result = PythonToolkit().run(request)
+
+        assert result.status == "ok"
 
 
 class TestRunTestVerdictMapping:
