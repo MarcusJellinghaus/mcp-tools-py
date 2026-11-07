@@ -2,14 +2,17 @@
 
 import json
 from pathlib import Path
-from typing import Any, Dict, List
+from typing import Any, Dict, List, Optional
+
+import pytest
 
 from mcp_tools_py.checker_tools import CheckerTools
-from mcp_tools_py.code_checker_pytest.models import PytestReport
+from mcp_tools_py.code_checker_pytest.models import PytestReport, Summary
 from mcp_tools_py.code_checker_pytest.parsers import parse_pytest_report
 from mcp_tools_py.code_checker_pytest.reporting import (
     NO_CAPTURED_OUTPUT_NOTE,
     create_prompt_for_passing_output,
+    did_not_run_line,
 )
 from mcp_tools_py.code_checker_pytest.verdict import classify_run
 from mcp_tools_py.server import ToolServer
@@ -619,3 +622,29 @@ class TestPassingOutput:
 
         assert "[Output truncated" in result
         assert "LINE_19" not in result
+
+
+@pytest.mark.parametrize(
+    ("collected", "total", "deselected", "expected"),
+    [
+        (4, 2, None, "2 of 4 selected tests did not run"),
+        (4, 1, 2, "1 of 2 selected tests did not run"),
+        (2, 2, None, ""),
+        (4, 2, 2, ""),
+        (2, 3, None, ""),
+    ],
+    ids=["stopped", "stopped_deselected", "xdist_k", "all_ran", "more_ran"],
+)
+def test_did_not_run_line(
+    collected: int, total: int, deselected: Optional[int], expected: str
+) -> None:
+    """The line counts the selected tests that did not run, or is empty."""
+    report = PytestReport(
+        created=0.0,
+        duration=0.1,
+        exitcode=1,
+        root="/project",
+        environment={},
+        summary=Summary(collected=collected, total=total, deselected=deselected),
+    )
+    assert did_not_run_line(report) == expected

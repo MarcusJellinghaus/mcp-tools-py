@@ -167,7 +167,7 @@ def mock_pytest_results_few_tests() -> Dict[str, Any]:
             "collected": 3,
             "duration": 1.5,
         },
-        test_results=MagicMock(),
+        test_results=MagicMock(summary=Summary(collected=3, total=3)),
     )
 
 
@@ -183,7 +183,7 @@ def mock_pytest_results_many_failures() -> Dict[str, Any]:
             "collected": 22,
             "duration": 5.2,
         },
-        test_results=MagicMock(),
+        test_results=MagicMock(summary=Summary(collected=22, total=22)),
     )
 
 
@@ -368,7 +368,7 @@ async def test_show_details_output_length_limits(
     long_output_results = make_pytest_results(
         RunStatus.FAILED,
         summary={"passed": 0, "failed": 5, "error": 0, "collected": 5},
-        test_results=MagicMock(),
+        test_results=MagicMock(summary=Summary(collected=5, total=5)),
     )
 
     with (
@@ -450,7 +450,7 @@ async def test_enhanced_reporting_integration_preparation(
         mock_check.return_value = make_pytest_results(
             RunStatus.FAILED,
             summary={"passed": 2, "failed": 1, "error": 0, "collected": 3},
-            test_results=MagicMock(),
+            test_results=MagicMock(summary=Summary(collected=3, total=3)),
         )
         mock_create_prompt.return_value = "Enhanced failure details..."
 

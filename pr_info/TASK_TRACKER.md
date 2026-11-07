@@ -29,9 +29,9 @@ This tracks **Feature Implementation** consisting of multiple **Tasks**.
 
 ### Step 2: Lead failure replies with counts and unrun tests — [step_2.md](./steps/step_2.md)
 
-- [ ] Implementation: tests first, then `selected_count`/`did_not_run_line` in `reporting.py`, counts first in the `FAILED` branch of `checker_tools/__init__.py`, README update
-- [ ] Quality checks: pylint, pytest, mypy — fix all issues
-- [ ] Commit message prepared: `feat(pytest): lead failure replies with counts and unrun tests (#49)`
+- [x] Implementation: tests first, then `selected_count`/`did_not_run_line` in `reporting.py`, counts first in the `FAILED` branch of `checker_tools/__init__.py`, README update
+- [x] Quality checks: pylint, pytest, mypy — fix all issues
+- [x] Commit message prepared: `feat(pytest): lead failure replies with counts and unrun tests (#49)`
 
 ### Step 3: Report selected tests and IDs for --collect-only — [step_3.md](./steps/step_3.md)
 

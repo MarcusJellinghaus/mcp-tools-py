@@ -129,7 +129,7 @@ def test_format_pytest_result_failure(checker_tools: CheckerTools) -> None:
             "collected": 7,
             "duration": 1.5,
         },
-        test_results=MagicMock(),
+        test_results=MagicMock(summary=Summary(collected=7, total=7)),
     )
     with patch(
         "mcp_tools_py.checker_tools.create_prompt_for_failed_tests"
@@ -275,6 +275,7 @@ def test_format_pytest_result_failed_with_collection_errors(
         summary={"passed": 1, "failed": 1, "collected": 2},
         test_results=report,
         verdict=classify_run(report),
+        summary_text="1 failed, 1 passed",
     )
     with patch(
         "mcp_tools_py.checker_tools.create_prompt_for_failed_tests"
@@ -283,7 +284,7 @@ def test_format_pytest_result_failed_with_collection_errors(
         result = checker_tools._format_pytest_result_with_details(
             test_results, show_details=True
         )
-    assert result.startswith("Collection problems:\n")
+    assert result.startswith("1 failed, 1 passed\n\nCollection problems:\n")
     assert XDIST_HINT in result
     assert result.index(XDIST_HINT) < result.index(
         "Pytest found issues that need attention:"
@@ -300,12 +301,52 @@ def test_format_pytest_result_plain_failed_has_no_collection_block(
         summary={"passed": 1, "failed": 1, "collected": 2},
         test_results=report,
         verdict=classify_run(report),
+        summary_text="1 failed, 1 passed",
     )
     result = checker_tools._format_pytest_result_with_details(
         test_results, show_details=True
     )
     assert "Collection problems:" not in result
-    assert result.startswith("Pytest found issues that need attention:")
+    assert result.startswith(
+        "1 failed, 1 passed\n\nPytest found issues that need attention:"
+    )
+
+
+def _stopped_results(summary: Summary) -> dict[str, Any]:
+    """Build FAILED results over a report with the given summary."""
+    report = _failed_report()
+    report.summary = summary
+    return make_pytest_results(
+        summary={"passed": 1, "failed": 1, "collected": summary.collected},
+        test_results=report,
+        verdict=classify_run(report),
+        summary_text="1 failed, 1 passed",
+    )
+
+
+def test_format_pytest_result_failed_leads_with_did_not_run_line(
+    checker_tools: CheckerTools,
+) -> None:
+    """Unrun selected tests are counted directly after the summary text."""
+    test_results = _stopped_results(Summary(collected=4, total=2, passed=1, failed=1))
+    result = checker_tools._format_pytest_result_with_details(
+        test_results, show_details=True
+    )
+    assert result.startswith(
+        "1 failed, 1 passed\n2 of 4 selected tests did not run\n\n"
+        "Pytest found issues that need attention:"
+    )
+
+
+def test_format_pytest_result_failed_all_ran_has_no_did_not_run_line(
+    checker_tools: CheckerTools,
+) -> None:
+    """When every selected test ran, no did-not-run text appears."""
+    test_results = _stopped_results(Summary(collected=2, total=2, passed=1, failed=1))
+    result = checker_tools._format_pytest_result_with_details(
+        test_results, show_details=True
+    )
+    assert "did not run" not in result
 
 
 def test_format_pytest_result_failed_without_report(

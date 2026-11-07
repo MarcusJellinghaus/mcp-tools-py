@@ -21,6 +21,7 @@ from mcp_tools_py.code_checker_pytest.reporting import (
     MAX_OUTPUT_LINES,
     create_prompt_for_failed_tests,
     create_prompt_for_passing_output,
+    did_not_run_line,
     should_show_details,
 )
 from mcp_tools_py.code_checker_pytest.verdict import (
@@ -99,7 +100,6 @@ class CheckerTools:
         if verdict.status is RunStatus.FAILED:
             if report is None or not should_show_details(test_results, show_details):
                 return f"Pytest found failures. {test_results.get('summary_text') or ''}".rstrip()
-            block = format_collection_problems(verdict)
             failed_tests_prompt = create_prompt_for_failed_tests(
                 report,
                 max_number_of_tests_reported=MAX_FAILURES,
@@ -107,8 +107,15 @@ class CheckerTools:
                 max_failures=MAX_FAILURES,
                 max_output_lines=MAX_OUTPUT_LINES,
             )
+            counts = "\n".join(
+                filter(
+                    None, [test_results.get("summary_text"), did_not_run_line(report)]
+                )
+            )
             text = f"Pytest found issues that need attention:\n\n{failed_tests_prompt}"
-            return f"{block}\n\n{text}" if block else text
+            return "\n\n".join(
+                filter(None, [counts, format_collection_problems(verdict), text])
+            )
         if verdict.status is RunStatus.SUSPICIOUS:
             return format_suspicious_text(summary.get("collected") or 0)
         return format_error_text(report, verdict)
