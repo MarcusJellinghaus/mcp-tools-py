@@ -644,7 +644,7 @@ async def test_integration_with_existing_server_parameters(
 
     # Verify that server constructor parameters are properly used
     assert server.project_dir == Path("/test/project")
-    assert server.context.test_folder == "tests"  # default
+    assert server.context.test_folder is None  # default
     assert server.context.keep_temp_files == False  # default
 
     with patch(
@@ -666,7 +666,7 @@ async def test_integration_with_existing_server_parameters(
         call_args = mock_check.call_args
 
         assert call_args[1]["project_dir"] == str(Path("/test/project"))
-        assert call_args[1]["test_folder"] == "tests"
+        assert call_args[1]["test_folder"] is None
         assert call_args[1]["keep_temp_files"] == False
 
 
@@ -744,6 +744,28 @@ async def test_run_pytest_check_prepends_dedup_notes(
         # The note about -m flag should be prepended
         assert "Note:" in result
         assert "-m" in result
+
+
+@pytest.mark.asyncio
+async def test_run_pytest_check_prepends_test_paths_note(
+    mock_server: Tuple[Any, MagicMock],
+) -> None:
+    """The test_paths_note of the result leads the reply."""
+    _server, mock_tool = mock_server
+
+    with patch(
+        "mcp_tools_py.checker_tools.pytest_tool.check_code_with_pytest"
+    ) as mock_check:
+        mock_check.return_value = make_pytest_results(
+            test_paths_note="NOTE",
+            summary={"passed": 1, "failed": 0, "error": 0, "collected": 1},
+            test_results=None,
+        )
+
+        run_pytest_check = _get_tool(mock_tool, "run_pytest_check")
+        result = run_pytest_check()
+
+    assert result.startswith("NOTE")
 
 
 @pytest.mark.asyncio

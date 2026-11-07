@@ -67,6 +67,23 @@ class TestVenvPathDeprecation:
         assert "--venv-path" not in epilog
 
 
+class TestTestFolder:
+    """Test the --test-folder default."""
+
+    def test_defaults_to_none(self) -> None:
+        with patch("sys.argv", ["mcp-tools-py", "--project-dir", "X"]):
+            args = parse_args()
+        assert args.test_folder is None
+
+    def test_given_value_is_kept(self) -> None:
+        with patch(
+            "sys.argv",
+            ["mcp-tools-py", "--project-dir", "X", "--test-folder", "checks"],
+        ):
+            args = parse_args()
+        assert args.test_folder == "checks"
+
+
 class TestMissingInterpreter:
     """Test the startup failure for an unresolvable --python-executable."""
 

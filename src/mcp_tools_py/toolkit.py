@@ -194,6 +194,17 @@ def _is_collection_error(report: PytestReport, verdict: RunVerdict) -> bool:
     return verdict.exit_code == 2 and _COLLECTION_INTERRUPTED in output
 
 
+def _with_note(result: ActionResult, note: str | None) -> ActionResult:
+    """Prepend `note` to the summary of `result`.
+
+    Returns:
+        `result`, its summary led by `note` and a blank line when `note` is set.
+    """
+    if note:
+        result.summary = f"{note}\n\n{result.summary}"
+    return result
+
+
 def _run_test(context: ToolContext, depth: str) -> ActionResult:
     """Run pytest at `depth` and map the outcome onto an ActionResult.
 
@@ -273,6 +284,7 @@ def _run_test(context: ToolContext, depth: str) -> ActionResult:
             timeout_seconds=context.resolve_timeout("pytest"),
         )
 
+        note: str | None = result.get("test_paths_note")
         verdict: RunVerdict = result["verdict"]
         report: PytestReport | None = result.get("test_results")
         finished: FinishedRun | None = None
@@ -294,11 +306,15 @@ def _run_test(context: ToolContext, depth: str) -> ActionResult:
             and not (collection_error and collector_findings)
         ):
             if any("No Tests Found" in p for p in verdict.problems):
-                return ActionResult(
-                    status="skipped", summary="\n".join(verdict.problems)
+                return _with_note(
+                    ActionResult(status="skipped", summary="\n".join(verdict.problems)),
+                    note,
                 )
-            return ActionResult(
-                status="error", summary=format_error_text(report, verdict)
+            return _with_note(
+                ActionResult(
+                    status="error", summary=format_error_text(report, verdict)
+                ),
+                note,
             )
 
         summary_text: str = result["summary_text"]
@@ -320,7 +336,9 @@ def _run_test(context: ToolContext, depth: str) -> ActionResult:
             f"{summary_text}\n\n{count_text}{cap_problems(verdict.problems)}"
         )
         if verdict.status is RunStatus.FAILED and not findings:
-            return ActionResult(status="error", summary=failed_summary)
+            return _with_note(
+                ActionResult(status="error", summary=failed_summary), note
+            )
         ok_summary = (
             format_suspicious_text(report.summary.collected, report.summary.deselected)
             if verdict.status is RunStatus.SUSPICIOUS
@@ -343,7 +361,7 @@ def _run_test(context: ToolContext, depth: str) -> ActionResult:
                 **finished.outcome,
             )
             action_result.raw = "\n".join([digest, *finished.notes])
-        return action_result
+        return _with_note(action_result, note)
     finally:
         if temp_dir is not None and not context.keep_temp_files:
             shutil.rmtree(temp_dir, ignore_errors=True)

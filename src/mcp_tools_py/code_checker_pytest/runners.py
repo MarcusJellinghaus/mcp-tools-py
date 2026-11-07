@@ -19,6 +19,7 @@ from mcp_tools_py.code_checker_pytest.verdict import (
     classify_run,
 )
 from mcp_tools_py.log_utils import log_function_call
+from mcp_tools_py.utils.project_config import resolve_test_paths
 from mcp_tools_py.utils.subprocess_runner import (
     check_tool_missing_error,
     execute_command,
@@ -85,7 +86,7 @@ class ProcessResult:
 
 def run_tests(
     project_dir: str,
-    test_folder: str,
+    test_folder: Optional[str],
     python_executable: str,
     markers: Optional[List[str]] = None,
     verbosity: int = 2,
@@ -100,7 +101,7 @@ def run_tests(
 
     Args:
         project_dir: The path to the project directory
-        test_folder: The path to the folder containing the tests relative to the project directory
+        test_folder: The path to the folder containing the tests relative to the project directory, or None to resolve from `testpaths` in pyproject.toml
         python_executable: Optional path to Python interpreter to use. Defaults to sys.executable if not provided
         markers: Optional list of pytest markers to filter tests. Examples: ['slow', 'integration', 'unit']
         verbosity: Integer for pytest verbosity level (0-3). Default is 2. Higher values provide more detailed output
@@ -185,7 +186,8 @@ def run_tests(
         # Add the test folder path (unless caller provides explicit paths)
         # before extra_args, so a trailing option can't take it as a value
         if not skip_default_test_folder:
-            command.append(os.path.join(project_dir, test_folder))
+            paths, _ = resolve_test_paths(project_dir, test_folder)
+            command.extend(os.path.join(project_dir, path) for path in paths)
 
         # Add any extra arguments
         if extra_args:
@@ -467,7 +469,7 @@ def run_tests(
 def check_code_with_pytest(
     project_dir: str,
     python_executable: str,
-    test_folder: str = "tests",
+    test_folder: Optional[str] = None,
     markers: Optional[List[str]] = None,
     verbosity: int = 2,
     extra_args: Optional[List[str]] = None,
@@ -481,7 +483,7 @@ def check_code_with_pytest(
 
     Args:
         project_dir: Path to the project directory
-        test_folder: Path to the test folder (relative to project_dir). Defaults to 'tests'
+        test_folder: Path to the test folder (relative to project_dir). Overrides `testpaths`. Defaults to `[tool.pytest.ini_options] testpaths`, then 'tests'
         python_executable: Optional path to Python interpreter to use for running tests. If None, defaults to sys.executable
         markers: Optional list of pytest markers to filter tests. Examples: ['slow', 'integration', 'unit']
         verbosity: Integer for pytest verbosity level (0-3), default 2. Higher values provide more detailed output
@@ -498,6 +500,7 @@ def check_code_with_pytest(
         - summary: Summary of test results as a formatted string
         - failed_tests_prompt: Formatted prompt for failed tests (if any)
         - test_results: Complete PytestReport object with detailed test information
+        - test_paths_note: Note when `testpaths` is set but no entry exists, else None; present on every return
     """
     logger.info(
         "Starting pytest code check",
@@ -509,7 +512,10 @@ def check_code_with_pytest(
         },
     )
 
+    note = None
     try:
+        if not skip_default_test_folder:
+            _, note = resolve_test_paths(project_dir, test_folder)
         test_results = run_tests(
             project_dir,
             test_folder,
@@ -562,6 +568,7 @@ def check_code_with_pytest(
             "summary_text": summary_text,  # Formatted string for display
             "failed_tests_prompt": failed_tests_prompt,
             "test_results": test_results,
+            "test_paths_note": note,
         }
 
     except Exception as e:
@@ -574,4 +581,7 @@ def check_code_with_pytest(
                 "test_folder": test_folder,
             },
         )
-        return {"verdict": RunVerdict(RunStatus.ERROR, [str(e)], 0)}
+        return {
+            "verdict": RunVerdict(RunStatus.ERROR, [str(e)], 0),
+            "test_paths_note": note,
+        }

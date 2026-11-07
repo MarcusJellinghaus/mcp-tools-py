@@ -488,6 +488,52 @@ class TestRunTestVerdictMapping:
         assert result.findings == []
 
 
+class TestRunTestPathsNote:
+    """The test_paths_note of the result leads the summary of every return."""
+
+    def test_skipped(self, tmp_path: Path) -> None:
+        results = {
+            **_error_results(5, "", []),
+            "verdict": RunVerdict(RunStatus.ERROR, ["No Tests Found: none"], 5),
+            "test_paths_note": "NOTE",
+        }
+
+        result = _run_with(tmp_path, results)
+
+        assert result.status == "skipped"
+        assert result.summary.startswith("NOTE")
+
+    def test_error(self, tmp_path: Path) -> None:
+        results = {
+            **_error_results(3, "INTERNALERROR> boom", []),
+            "test_paths_note": "NOTE",
+        }
+
+        result = _run_with(tmp_path, results)
+
+        assert result.status == "error"
+        assert result.summary.startswith("NOTE")
+
+    def test_failed_without_findings(self, tmp_path: Path) -> None:
+        results = {
+            **_failed_results([_collector("tests/test_x.py", outcome="passed")]),
+            "test_paths_note": "NOTE",
+        }
+
+        result = _run_with(tmp_path, results)
+
+        assert result.status == "error"
+        assert result.summary.startswith("NOTE")
+
+    def test_passed(self, tmp_path: Path) -> None:
+        results = {**_passed_results(), "test_paths_note": "NOTE"}
+
+        result = _run_with(tmp_path, results)
+
+        assert result.status == "ok"
+        assert result.summary.startswith("NOTE")
+
+
 def _collector(
     nodeid: str, longrepr: str | None = "E   ImportError: boom", outcome: str = "failed"
 ) -> Collector:

@@ -43,6 +43,8 @@ class ToolContext:
             `--python-executable`.  pytest, pylint, mypy and deptry run in it, and
             Python names resolve against it.
         test_folder: Path to the test folder, relative to `project_dir`.
+            Overrides `testpaths`.  None defaults to
+            `[tool.pytest.ini_options] testpaths`, then 'tests'.
         keep_temp_files: Whether to keep temporary files after a test run.
         vulture_whitelist: Filename of the vulture whitelist.
         check_timeout: Server-level subprocess timeout in seconds, if any.
@@ -54,7 +56,7 @@ class ToolContext:
 
     project_dir: Path
     environment: PythonEnvironment
-    test_folder: str = "tests"
+    test_folder: Optional[str] = None
     keep_temp_files: bool = False
     vulture_whitelist: str = "vulture_whitelist.py"
     check_timeout: Optional[int] = None

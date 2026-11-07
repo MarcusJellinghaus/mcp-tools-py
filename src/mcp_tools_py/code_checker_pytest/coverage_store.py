@@ -33,6 +33,7 @@ from mcp_tools_py.utils.file_utils import read_file
 from mcp_tools_py.utils.project_config import (
     get_test_directories,
     resolve_coverage_source,
+    resolve_test_paths,
 )
 from mcp_tools_py.utils.subprocess_runner import execute_command
 
@@ -88,7 +89,7 @@ class FinishedRun:
 def start_coverage_run(  # pylint: disable=too-many-arguments,too-many-positional-arguments
     project_dir: str,
     temp_dir: str,
-    test_folder: str,
+    test_folder: str | None,
     coverage_source: list[str] | None,
     sources: list[str],
     fail_under: float | None,
@@ -104,7 +105,7 @@ def start_coverage_run(  # pylint: disable=too-many-arguments,too-many-positiona
     Args:
         project_dir: Path to the target project.
         temp_dir: Directory the run writes its report and data file into.
-        test_folder: The test folder of the run.
+        test_folder: The test folder of the run, or None to resolve it.
         coverage_source: The caller's raw ``coverage_source``, for the roots.
         sources: The resolved directories to measure.
         fail_under: The project's ``fail_under``, if it could be read.
@@ -381,7 +382,7 @@ def _is_below(parts: tuple[str, ...], directory: tuple[str, ...]) -> bool:
 
 
 def freshness_roots(
-    project_dir: str, coverage_source: list[str] | None, test_folder: str
+    project_dir: str, coverage_source: list[str] | None, test_folder: str | None
 ) -> list[str]:
     """List the directories whose Python files decide if saved data is fresh.
 
@@ -389,11 +390,12 @@ def freshness_roots(
         project_dir: Path to the target project.
         coverage_source: The caller's raw ``coverage_source``; entries that are
             package names are not directories and drop out.
-        test_folder: The test folder of the run.
+        test_folder: The test folder of the run, or None to resolve it from
+            ``testpaths``.
 
     Returns:
-        The configured source and test directories, *coverage_source* and
-        *test_folder*: normalized, deduped, and only those on disk.
+        The configured source and test directories, *coverage_source* and the
+        resolved test paths: normalized, deduped, and only those on disk.
     """
     resolved = resolve_coverage_source(project_dir, None)
     candidates = [] if isinstance(resolved, str) else list(resolved)
@@ -402,7 +404,10 @@ def freshness_roots(
         candidates += get_test_directories(project_dir)
     except ValueError:
         pass
-    candidates.append(test_folder)
+    try:
+        candidates += resolve_test_paths(project_dir, test_folder)[0]
+    except ValueError:
+        pass
 
     unique = dict.fromkeys(norm_path(candidate) for candidate in candidates)
     return [root for root in unique if os.path.isdir(os.path.join(project_dir, root))]

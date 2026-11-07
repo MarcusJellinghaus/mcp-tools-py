@@ -118,6 +118,34 @@ class TestFreshnessRoots:
 
         assert not freshness_roots(str(tmp_path), None, "tests")
 
+    def test_none_with_empty_testpaths_uses_tests(self, tmp_path: Path) -> None:
+        """test_folder=None and testpaths = [] fall back to tests."""
+        _write_layout(tmp_path, '["src"]', "[]")
+        _make_dirs(tmp_path, "src", "tests")
+
+        assert "tests" in freshness_roots(str(tmp_path), None, None)
+
+    def test_none_with_missing_testpaths_uses_tests(self, tmp_path: Path) -> None:
+        """test_folder=None and no testpaths entry on disk fall back to tests."""
+        _write_layout(tmp_path, '["src"]', '["nope"]')
+        _make_dirs(tmp_path, "src", "tests")
+
+        assert "tests" in freshness_roots(str(tmp_path), None, None)
+
+    def test_none_expands_testpaths_globs(self, tmp_path: Path) -> None:
+        """test_folder=None makes each folder a testpaths glob matches a root."""
+        _write_layout(tmp_path, '["src"]', '["pkgs/*/tests"]')
+        _make_dirs(tmp_path, "src", "pkgs/a/tests")
+
+        assert "pkgs/a/tests" in freshness_roots(str(tmp_path), None, None)
+
+    def test_none_with_invalid_pyproject_does_not_raise(self, tmp_path: Path) -> None:
+        """test_folder=None and invalid TOML give roots without raising."""
+        (tmp_path / "pyproject.toml").write_text("invalid {{{{", encoding="utf-8")
+        _make_dirs(tmp_path, "lib")
+
+        assert freshness_roots(str(tmp_path), ["lib"], None) == ["lib"]
+
 
 class TestHashPythonFiles:
     """Test the mapping of Python files to digests."""

@@ -134,7 +134,7 @@ mcp-tools-py --project-dir /path/to/project [options]
 #### Test Configuration
 | Parameter | Type | Default | Description |
 |-----------|------|---------|-------------|
-| `--test-folder` | string | "tests" | Path to the test folder (relative to project-dir) |
+| `--test-folder` | string | None | Path to the test folder (relative to project-dir). Overrides `testpaths`. Defaults to `[tool.pytest.ini_options] testpaths`, then `tests` |
 | `--keep-temp-files` | flag | False | Keep temporary files after test execution. Useful for debugging when tests fail |
 
 #### Logging Configuration

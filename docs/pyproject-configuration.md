@@ -306,8 +306,9 @@ valid pylint option works here.
 
 ## Target directory auto-detection
 
-When `target_directories` is omitted (or `None`), the checker tools (pylint, mypy,
-vulture) auto-detect which directories to analyze from `pyproject.toml`:
+When `target_directories` is omitted (or `None`), pylint, mypy, ruff, bandit,
+vulture and `run_format_code` auto-detect which directories to analyze from
+`pyproject.toml`:
 
 | Setting | `pyproject.toml` key | Fallback |
 |---------|---------------------|----------|
@@ -328,6 +329,29 @@ Only directories that actually exist on disk are included. If none of the resolv
 directories exist, an error is returned.
 
 Pass an explicit `target_directories` list to override auto-detection.
+
+---
+
+## Which tests `run_pytest_check` runs
+
+Without a path from the caller, `run_pytest_check` picks the tests in this order:
+
+1. A path in `extra_args`: only that path runs.
+2. `--test-folder` set on the server command line: that folder runs.
+3. Non-empty `[tool.pytest.ini_options] testpaths` in `pyproject.toml`: every
+   entry that exists runs. Glob entries such as `"pkgs/*/tests"` are expanded.
+4. Otherwise `tests`. When `testpaths` is set but no entry exists, the reply
+   starts with a note saying so.
+
+`pyproject.toml` wins over a `pytest.ini` alongside it, matching the static
+checkers; pytest itself would prefer `pytest.ini`.
+
+These cases still need `--test-folder` or a path in `extra_args`:
+
+- No `testpaths`, with the tests outside `tests/`.
+- `testpaths` only in `pytest.ini`, `tox.ini` or `setup.cfg`.
+- `testpaths` given as a TOML string rather than a list.
+- `testpaths` under `[tool.pytest]` instead of `[tool.pytest.ini_options]`.
 
 ---
 
