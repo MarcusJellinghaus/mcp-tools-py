@@ -248,10 +248,23 @@ class TestHints:
         )
 
         assert result.fix_text.splitlines() == [
-            "- src/mod.py: return-value: Bad return type",
+            "- src/mod.py:3: return-value: Bad return type",
             "    First hint",
             "    Second hint",
-            "- src/mod.py: arg-type: Other error",
+            "- src/mod.py:3: arg-type: Other error",
+        ]
+
+    def test_negative_line_has_no_line_number(
+        self, tmp_path: Path, monkeypatch: pytest.MonkeyPatch
+    ) -> None:
+        unlocated = _ERROR._replace(line=-1)
+
+        result = _run_check(
+            tmp_path, monkeypatch, MypyResult(return_code=1, messages=[unlocated])
+        )
+
+        assert result.fix_text.splitlines() == [
+            "- src/mod.py: return-value: Bad return type",
         ]
 
     def test_hint_keeps_its_own_indentation(

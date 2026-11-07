@@ -22,13 +22,17 @@ from mcp_tools_py.utils.subprocess_runner import execute_command
 from mcp_tools_py.utils.tool_context import ToolContext
 
 
-def _finding_line(finding: Finding) -> str:
+def _finding_line(finding: Finding, location: str | None = None) -> str:
     """One bullet line for `finding`, used to build `ActionResult.fix_text`.
 
+    `location` (e.g. "path:line" or a test node id) replaces `finding.path`
+    when given.
+
     Returns:
-        "- path: rule: message", omitting path/rule when either is absent.
+        "- location: rule: message", omitting location/rule when absent.
     """
-    prefix = ": ".join(part for part in (finding.path, finding.rule) if part)
+    where = location or finding.path
+    prefix = ": ".join(part for part in (where, finding.rule) if part)
     return f"- {prefix}: {finding.message}" if prefix else f"- {finding.message}"
 
 
@@ -37,8 +41,12 @@ def _result_from_findings(
     findings: list[Finding],
     ok_summary: str,
     findings_summary: str,
+    locations: list[str | None] | None = None,
 ) -> ActionResult:
     """Map a tool's error/findings outcome onto ActionResult's status rules.
+
+    `locations`, when given, runs parallel to `findings` and is passed to
+    `_finding_line` for each one.
 
     Returns:
         status="error" when `error` is set; "findings" (with `fix_text`
@@ -48,7 +56,11 @@ def _result_from_findings(
     if error is not None:
         return ActionResult(status="error", summary=error, findings=findings)
     if findings:
-        fix_text = "\n".join(_finding_line(finding) for finding in findings)
+        locs = locations or [None] * len(findings)
+        fix_text = "\n".join(
+            _finding_line(finding, location)
+            for finding, location in zip(findings, locs)
+        )
         return ActionResult(
             status="findings",
             summary=findings_summary,
@@ -137,7 +149,13 @@ def _run_mypy(context: ToolContext, depth: str) -> ActionResult:
     fix_text = "\n".join(
         line
         for message, finding in zip(issues, findings)
-        for line in [_finding_line(finding), *format_hint_lines(message.hint)]
+        for line in [
+            _finding_line(
+                finding,
+                f"{message.file}:{message.line}" if message.line >= 0 else None,
+            ),
+            *format_hint_lines(message.hint),
+        ]
     )
     suffix = "".join(f" {_one_line(signal)}" for signal in run_signals(result))
     error = result.error
@@ -188,6 +206,7 @@ def _run_pylint(context: ToolContext, depth: str) -> ActionResult:
         findings=findings,
         ok_summary="pylint found no issues.",
         findings_summary=f"pylint found {len(findings)} issue(s).",
+        locations=[f"{message.path}:{message.line}" for message in result.messages],
     )
 
 
@@ -377,6 +396,7 @@ def _run_ruff(context: ToolContext, depth: str) -> ActionResult:
         findings=findings,
         ok_summary="ruff found no issues.",
         findings_summary=f"ruff found {len(findings)} issue(s).",
+        locations=[f"{message.filename}:{message.line}" for message in messages],
     )
 
 
@@ -423,6 +443,9 @@ def _run_bandit(context: ToolContext, depth: str) -> ActionResult:
         findings=findings,
         ok_summary="bandit found no issues.",
         findings_summary=f"bandit found {len(findings)} issue(s).",
+        locations=[
+            f"{message.filename}:{message.line_number}" for message in result.messages
+        ],
     )
 
 
@@ -463,6 +486,10 @@ def _run_deptry(context: ToolContext, depth: str) -> ActionResult:
         findings=findings,
         ok_summary="deptry found no issues.",
         findings_summary=f"deptry found {len(findings)} issue(s).",
+        locations=[
+            f"{message.file}:{message.line}" if message.line is not None else None
+            for message in result.messages
+        ],
     )
 
 

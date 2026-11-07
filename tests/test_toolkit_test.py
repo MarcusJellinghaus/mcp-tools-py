@@ -84,7 +84,7 @@ class TestRunTest:
         finding = result.findings[0]
         assert finding.key.endswith("test_fail.py::test_fails")
         assert finding.path is not None and finding.path.endswith("test_fail.py")
-        assert result.fix_text
+        assert "test_fail.py::test_fails" in result.fix_text
 
     def test_no_tests_collected_is_skipped(self, tmp_path: Path) -> None:
         _write_empty_project(tmp_path)

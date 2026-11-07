@@ -239,6 +239,7 @@ def _run_test(context: ToolContext, depth: str) -> ActionResult:
             findings=findings,
             ok_summary=ok_summary,
             findings_summary=failed_summary if count_line else summary_text,
+            locations=[finding.key for finding in findings],
         )
 
         if finished is not None and finished.data is not None:

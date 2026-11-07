@@ -45,9 +45,9 @@ See [step_3.md](./steps/step_3.md)
 ### Step 4: Locations in `fix_text`
 See [step_4.md](./steps/step_4.md)
 
-- [ ] Implementation: location tests for helpers, check tools, mypy and test + optional `location`/`locations` args in `_finding_line`/`_result_from_findings`, line locations in pylint/ruff/bandit/deptry/mypy runners, node ids in `_run_test`
-- [ ] Quality checks: pylint, pytest, mypy — fix all issues
-- [ ] Commit message prepared
+- [x] Implementation: location tests for helpers, check tools, mypy and test + optional `location`/`locations` args in `_finding_line`/`_result_from_findings`, line locations in pylint/ruff/bandit/deptry/mypy runners, node ids in `_run_test`
+- [x] Quality checks: pylint, pytest, mypy — fix all issues
+- [x] Commit message prepared
 
 ### Step 5: `test@unattended`
 See [step_5.md](./steps/step_5.md)
