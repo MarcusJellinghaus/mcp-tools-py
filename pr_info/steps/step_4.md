@@ -12,7 +12,7 @@ pass, run `run_format_code`, and make exactly one commit.
 
 ## WHAT
 ```python
-_MARKER_LINE = re.compile(r"^@pytest\.mark\.([^(:]+)", re.MULTILINE)
+_MARKER_LINE = re.compile(r"^@pytest\.mark\.([^(:\s]+)", re.MULTILINE)
 
 def _registered_markers(context: ToolContext) -> list[str] | str:
     """Names of the markers registered in the project, read via `pytest --markers`.
@@ -54,14 +54,20 @@ New `tests/test_toolkit_markers.py`. For the unit cases, patch
 from `tests.conftest`, and patch `mcp_tools_py.toolkit.check_code_with_pytest`
 with passing results (copy the `_report` / `make_pytest_results` pattern
 from `tests/test_toolkit_test.py`). Assert on `call_args.kwargs["markers"]`.
-- `test_registered_integration_markers_are_excluded`: stdout has lines for
-  `integration`, `git_integration: desc`, `slow: mentions @pytest.mark.llm_integration`
+Write every fake stdout line in the form real pytest prints,
+`@pytest.mark.<name>: <desc>` (or `@pytest.mark.<name>(<args>): <desc>`).
+- `test_registered_integration_markers_are_excluded`: stdout has the lines
+  `@pytest.mark.integration: needs external resources`,
+  `@pytest.mark.git_integration: desc`,
+  `@pytest.mark.slow: mentions @pytest.mark.llm_integration`
   and a built-in `@pytest.mark.skip(reason=None): ...`. markers ==
   `["not integration", "not git_integration"]`. The marker named only in a
   description is not included.
 - `test_marker_with_arguments`: line `@pytest.mark.llm_integration(model): runs an LLM`
   → `["not llm_integration"]`.
-- `test_none_registered_runs_unfiltered`: only built-in lines → markers is `None`.
+- `test_none_registered_runs_unfiltered`: only built-in lines (for example
+  `@pytest.mark.skip(reason=None): ...` and `@pytest.mark.xfail(...): ...`)
+  → markers is `None`.
 - `test_nonzero_exit_is_error`: `return_code=4` → status `error`, and
   `check_code_with_pytest` is not called.
 - `test_exit_zero_without_marker_lines_is_error`: `return_code=0`,
