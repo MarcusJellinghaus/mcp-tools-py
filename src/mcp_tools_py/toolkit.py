@@ -10,6 +10,7 @@ instead of returning structured data.
 import json
 import shutil
 import tempfile
+from dataclasses import replace
 from pathlib import Path
 
 from mcp_coder_utils.toolkit import (
@@ -79,6 +80,7 @@ UNATTENDED_EXCLUDED_MARKERS: list[str] = [
 ]
 # Stops --strict-markers projects rejecting marker names they don't register.
 _STRICT_MARKERS_OFF: list[str] = ["-o", "strict_markers=false"]
+_LONG_TEST_TIMEOUT = 1800  # seconds; test@standard, @unattended and @full
 
 _FIX_CHECK_PROMPT = """\
 Fix the mypy type errors shown in the output below.
@@ -146,6 +148,10 @@ def _run_test(context: ToolContext, depth: str) -> ActionResult:
     `run_pytest_check(coverage=True)`); a `fail_under` miss is informational
     only and never changes `status`.
 
+    Every depth but `quick` defaults the pytest timeout to
+    `_LONG_TEST_TIMEOUT`; `pytest-timeout` and `check-timeout` in
+    `[tool.mcp-tools-py]` still win.
+
     Returns:
         "error" if pytest is unavailable, the verdict is ERROR (other than
         "no tests found"), or FAILED without any failing/erroring test;
@@ -157,6 +163,8 @@ def _run_test(context: ToolContext, depth: str) -> ActionResult:
         return ActionResult(
             status="error", summary=context.unavailable_message("pytest")
         )
+    if depth != "quick":
+        context = replace(context, check_timeout=_LONG_TEST_TIMEOUT)
 
     project_dir = str(context.project_dir)
     interpreter = str(context.environment.interpreter)

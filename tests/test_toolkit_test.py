@@ -7,6 +7,7 @@ from unittest.mock import patch
 import pytest
 from mcp_coder_utils.toolkit import ActionRequest, ActionResult
 
+from mcp_tools_py.code_checker_pytest.coverage_store import start_coverage_run
 from mcp_tools_py.code_checker_pytest.models import (
     Collector,
     PytestReport,
@@ -226,6 +227,77 @@ class TestRunTestUnattended:
         result = PythonToolkit().run(request)
 
         assert result.status == "ok"
+
+
+def _passed_results() -> dict[str, Any]:
+    return make_pytest_results(
+        RunStatus.PASSED,
+        test_results=_report(1, passed=1),
+        summary_text="Collected 1 tests in 0.0 seconds",
+    )
+
+
+def _pytest_timeout(tmp_path: Path, depth: str) -> int:
+    request = ActionRequest(action="test", depth=depth, project_dir=tmp_path, params={})
+    with patch(
+        "mcp_tools_py.toolkit.check_code_with_pytest", return_value=_passed_results()
+    ) as mock_pytest:
+        result = PythonToolkit().run(request)
+    assert result.status == "ok"
+    timeout: int = mock_pytest.call_args.kwargs["timeout_seconds"]
+    return timeout
+
+
+class TestRunTestTimeout:
+    """Non-quick depths default pytest to the long timeout."""
+
+    @pytest.mark.parametrize("depth", ["standard", "unattended"])
+    def test_non_quick_depth_uses_long_timeout(
+        self, tmp_path: Path, depth: str
+    ) -> None:
+        assert _pytest_timeout(tmp_path, depth) == 1800
+
+    def test_quick_uses_default_timeout(self, tmp_path: Path) -> None:
+        assert _pytest_timeout(tmp_path, "quick") == 300
+
+    def test_pytest_timeout_setting_wins(self, tmp_path: Path) -> None:
+        (tmp_path / "pyproject.toml").write_text(
+            "[tool.mcp-tools-py]\npytest-timeout = 42\n"
+        )
+
+        assert _pytest_timeout(tmp_path, "standard") == 42
+
+    def test_check_timeout_setting_wins(self, tmp_path: Path) -> None:
+        (tmp_path / "pyproject.toml").write_text(
+            "[tool.mcp-tools-py]\ncheck-timeout = 77\n"
+        )
+
+        assert _pytest_timeout(tmp_path, "standard") == 77
+
+    def test_full_uses_long_timeout_for_pytest_and_coverage_run(
+        self, tmp_path: Path
+    ) -> None:
+        pytest.importorskip("pytest_cov")
+        _write_coverage_project(tmp_path)
+        request = ActionRequest(
+            action="test", depth="full", project_dir=tmp_path, params={}
+        )
+
+        with (
+            patch(
+                "mcp_tools_py.toolkit.check_code_with_pytest",
+                return_value=_passed_results(),
+            ) as mock_pytest,
+            patch(
+                "mcp_tools_py.toolkit.start_coverage_run", wraps=start_coverage_run
+            ) as mock_start,
+            patch("mcp_tools_py.toolkit.finish_coverage_run", return_value=None),
+        ):
+            result = PythonToolkit().run(request)
+
+        assert result.status == "ok"
+        assert mock_pytest.call_args.kwargs["timeout_seconds"] == 1800
+        assert mock_start.call_args.args[-1] == 1800
 
 
 class TestRunTestVerdictMapping:

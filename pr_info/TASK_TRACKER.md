@@ -59,9 +59,9 @@ See [step_5.md](./steps/step_5.md)
 ### Step 6: Depth-based pytest timeouts
 See [step_6.md](./steps/step_6.md)
 
-- [ ] Implementation: `TestRunTestTimeout` tests + `_LONG_TEST_TIMEOUT` applied via `replace(context, check_timeout=...)` for non-quick depths in `_run_test`
-- [ ] Quality checks: pylint, pytest, mypy — fix all issues (also run `test_malformed_timeout_leaves_no_temp_dir` explicitly)
-- [ ] Commit message prepared
+- [x] Implementation: `TestRunTestTimeout` tests + `_LONG_TEST_TIMEOUT` applied via `replace(context, check_timeout=...)` for non-quick depths in `_run_test`
+- [x] Quality checks: pylint, pytest, mypy — fix all issues (also run `test_malformed_timeout_leaves_no_temp_dir` explicitly)
+- [x] Commit message prepared
 
 ### Step 7: Failed collectors become findings
 See [step_7.md](./steps/step_7.md)
