@@ -31,8 +31,8 @@ output, empty when the runner returned early, e.g. on a timeout).
 ```
 issues = messages with severity == "error"
 findings / fix_text built from issues as today
-result = _result_from_findings(...)
-return replace(result, fix_text=fix_text, raw=result.raw_output or "")
+action = _result_from_findings(...)
+return replace(action, fix_text=fix_text, raw=result.raw_output or "")
 ```
 
 ## DATA
