@@ -10,7 +10,7 @@ mcp-coder a test-fix prompt. Nothing changes in mcp-coder-utils.
 |---|---|---|
 | Project environment | `_build_context` always resolves `sys.executable`. | `_build_context` resolves `VIRTUAL_ENV` when it's set and non-empty, else `sys.executable`. A `VIRTUAL_ENV` with no interpreter raises `FileNotFoundError` naming `VIRTUAL_ENV`. `run` turns it into an `error` result and `verify` into one `error` item named `environment`. There is no fallback. `tool_environment` doesn't change. |
 | Name Resolution rule | "never through `VIRTUAL_ENV`" | The toolkit's context is the documented exception. |
-| Check timeouts | Every checker's default is 120 s (`DEFAULT_CHECK_TIMEOUT`). | `_run_check` sets `check_timeout=600` on the context for every check depth, the same mechanism #272 uses for test depths. `[tool.mcp-tools-py]` `<tool>-timeout` / `check-timeout` still win. At `check@full` the other tools (vulture, ruff, bandit and so on) also get 600 s by default; that only lengthens how long a hung tool runs before it's reported. |
+| Check timeouts | Every checker's default is 120 s (`DEFAULT_CHECK_TIMEOUT`). | At every check depth, `_run_check` runs mypy and pylint with `check_timeout=600` on the context, the same mechanism #272 uses for test depths. `[tool.mcp-tools-py]` `<tool>-timeout` / `check-timeout` still win. The other `check@full` tools keep the 120 s default. |
 | `test@quick` selection | Fixed `-m "not integration"`. That misses `*_integration` markers and gives a usage error under `--strict-markers` when `integration` isn't registered. | Excludes every **registered** marker whose name ends in `integration`, read from `python -m pytest --markers --color=no` in the project env. No match → no marker filter. A failed read (non-zero exit, timeout, run error, or exit 0 with no `@pytest.mark.` lines) → `error`; it never runs unfiltered. No `-o strict_markers=false`, because only registered names are passed. |
 | Prompt fragments | `fix.check` is mypy-only. There is no test-fix fragment. | `fix.check` covers findings from any checker. A new `fix.test` fragment says to fix the failing tests named in the output and re-run only those. |
 
@@ -35,6 +35,7 @@ Modified:
 - `tests/test_toolkit.py`: prompt fragment tests.
 - `tests/test_toolkit_check.py`: timeout tests.
 - `tests/test_toolkit_verify.py`: stale `VIRTUAL_ENV` item.
+- `tests/conftest.py`: autouse fixture clearing an inherited `VIRTUAL_ENV`.
 
 Created:
 - `tests/test_toolkit_environment.py`: `VIRTUAL_ENV` set, unset and stale for `run`.

@@ -11,11 +11,14 @@ pass, run `run_format_code`, and make exactly one commit.
 - `tests/test_toolkit_check.py`: new class `TestRunCheckTimeout`.
 
 ## WHAT
-- `_LONG_CHECK_TIMEOUT = 600  # seconds; every check depth (mypy has no cache on a fresh checkout)`
-- `_run_check(context, depth)`: after the availability loop, before
-  running the tools:
-  `context = replace(context, check_timeout=_LONG_CHECK_TIMEOUT)`
-  (`dataclasses.replace` is already imported). Mention it in the docstring:
+- `_LONG_CHECK_TIMEOUT = 600  # seconds; mypy and pylint at every check depth (mypy has no cache on a fresh checkout)`
+- `_LONG_CHECK_TOOLS = frozenset({"mypy", "pylint"})`
+- `_run_check(context, depth)`: after the availability loop, run each tool
+  with `replace(context, check_timeout=_LONG_CHECK_TIMEOUT)` when it is in
+  `_LONG_CHECK_TOOLS`, else with `context` unchanged
+  (`dataclasses.replace` is already imported). The other `check@full` tools
+  keep their existing default (`DEFAULT_CHECK_TIMEOUT`, 120 s). Mention it
+  in the docstring: mypy and pylint default to 600 s;
   `[tool.mcp-tools-py]` `<tool>-timeout` and `check-timeout` still win.
 
 ## HOW
@@ -32,7 +35,14 @@ with fakes that record `kwargs["timeout_seconds"]` and return a clean
 result (`MypyResult`/`PylintResult`, or whatever the existing tests in this
 file and `test_toolkit_check_mypy.py` use). Use `_write_check_project(tmp_path, _CLEAN_SRC)`.
 - `test_default_is_600_for_mypy_and_pylint`: parametrize depth over
-  `quick`, `standard`. Every recorded timeout is 600.
+  `quick`, `standard`, `full`. Every recorded mypy/pylint timeout is 600.
+  For `full`, also `monkeypatch.setitem` the other `_CHECK_RUNNERS` entries
+  with fakes that record `context.resolve_timeout(tool)` and return
+  `ActionResult(status="ok", summary="")`, and patch
+  `ToolContext.is_tool_available` to `True`.
+- `test_full_other_checks_keep_default_timeout`: depth `full`, same fakes.
+  vulture, lint-imports, tach, ruff, bandit and deptry each record
+  `DEFAULT_CHECK_TIMEOUT` (import it, don't hard-code 120).
 - `test_project_tool_timeout_wins`: `pyproject.toml` has
   `[tool.mcp-tools-py]\npylint-timeout = 45\n`, depth `standard`. pylint
   records 45 and mypy records 600.

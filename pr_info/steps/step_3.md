@@ -12,6 +12,7 @@ pass, run `run_format_code`, and make exactly one commit.
 - `docs/architecture/architecture.md`: "Name Resolution" section.
 - `tests/test_toolkit_environment.py` (new).
 - `tests/test_toolkit_verify.py`.
+- `tests/conftest.py`: autouse fixture clearing `VIRTUAL_ENV`.
 
 ## WHAT
 ```python
@@ -53,6 +54,14 @@ run from its own tool env. A `VIRTUAL_ENV` with no interpreter is an error,
 never a fallback.
 
 ## Tests (write first)
+In `tests/conftest.py`, add an autouse fixture that runs
+`monkeypatch.delenv("VIRTUAL_ENV", raising=False)`, so the existing
+real-run toolkit tests (`test_toolkit_test.py`, `test_toolkit_verify.py`,
+`test_toolkit_check*.py`, `test_toolkit_saved_coverage.py`) and step 4's
+strict-marker run never pick up a `VIRTUAL_ENV` inherited from the shell
+or CI. Every new `VIRTUAL_ENV` test below sets (or deletes) the variable
+explicitly with `monkeypatch`.
+
 New `tests/test_toolkit_environment.py`. Use `monkeypatch` and patch
 `mcp_tools_py.toolkit.check_code_with_pytest`, or call `_build_context`
 directly where that's simpler:
@@ -60,8 +69,10 @@ directly where that's simpler:
   `_build_context(tmp_path).environment.interpreter == Path(sys.executable)`.
 - `test_empty_is_treated_as_unset`: `setenv("VIRTUAL_ENV", "")`. Same as unset.
 - `test_set_uses_its_interpreter`: build a fake venv in `tmp_path`
-  (`Scripts/python.exe` on Windows, `bin/python` otherwise; an empty file
-  is enough for `resolve`) and set `VIRTUAL_ENV` to it. The context's
+  (`Scripts/python.exe` when `mcp_tools_py.utils.python_environment._IS_WINDOWS`
+  is true, else `bin/python`; read that flag, the one
+  `PythonEnvironment.resolve` uses, rather than `os.name`/`sys.platform`;
+  an empty file is enough for `resolve`) and set `VIRTUAL_ENV` to it. The context's
   interpreter is that file, and `tool_environment.interpreter == Path(sys.executable)`.
 - `test_stale_run_is_error_naming_virtual_env`: `VIRTUAL_ENV` →
   `tmp_path / "missing"`. `PythonToolkit().run(ActionRequest(action="test", depth="standard", ...))`
