@@ -4,6 +4,17 @@ Behaviour changes to check when upgrading. Newest first.
 
 ---
 
+## `run_pytest_check` runs `testpaths` (#58)
+
+`--test-folder` now defaults to unset. Without it, and without a path in
+`extra_args`, `run_pytest_check` and the toolkit's `test` action run the
+existing entries of `[tool.pytest.ini_options] testpaths`, falling back to
+`tests`. Projects whose `testpaths` differs from `tests/` now run those folders.
+Set `--test-folder` to keep the old behaviour. See
+[Which tests `run_pytest_check` runs](pyproject-configuration.md#which-tests-run_pytest_check-runs).
+
+---
+
 ## Toolkit interface for mcp-coder (#245)
 
 `src/mcp_tools_py/toolkit.py` adds `PythonToolkit`, registered under the

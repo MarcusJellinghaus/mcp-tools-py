@@ -644,7 +644,7 @@ async def test_integration_with_existing_server_parameters(
 
     # Verify that server constructor parameters are properly used
     assert server.project_dir == Path("/test/project")
-    assert server.context.test_folder == "tests"  # default
+    assert server.context.test_folder is None  # default
     assert server.context.keep_temp_files == False  # default
 
     with patch(
@@ -666,7 +666,7 @@ async def test_integration_with_existing_server_parameters(
         call_args = mock_check.call_args
 
         assert call_args[1]["project_dir"] == str(Path("/test/project"))
-        assert call_args[1]["test_folder"] == "tests"
+        assert call_args[1]["test_folder"] is None
         assert call_args[1]["keep_temp_files"] == False
 
 

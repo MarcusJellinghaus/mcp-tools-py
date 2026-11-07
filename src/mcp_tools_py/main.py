@@ -85,8 +85,11 @@ Examples:
     parser.add_argument(
         "--test-folder",
         type=str,
-        default="tests",
-        help="Path to the test folder (relative to project_dir). Defaults to 'tests'",
+        default=None,
+        help=(
+            "Path to the test folder (relative to project_dir). Overrides `testpaths`. "
+            "Defaults to `[tool.pytest.ini_options] testpaths`, then 'tests'"
+        ),
     )
     parser.add_argument(
         "--keep-temp-files",

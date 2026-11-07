@@ -27,7 +27,7 @@ class ToolServer:
         project_dir: Path,
         python_executable: Optional[str] = None,
         venv_path: Optional[str] = None,
-        test_folder: str = "tests",
+        test_folder: Optional[str] = None,
         keep_temp_files: bool = False,
         refactoring_timeout: int = 120,
         vulture_whitelist: str = "vulture_whitelist.py",
@@ -39,7 +39,7 @@ class ToolServer:
             project_dir: Path to the project directory to check
             python_executable: Optional path to the Python interpreter of the project's environment. The checkers run in it and library/symbol lookups resolve against it, so it must be the environment holding the project's dependencies. The console-script tools black, isort, ruff, bandit, vulture, tach and lint-imports come from mcp-tools-py's own environment instead. If None, defaults to sys.executable.
             venv_path: Deprecated, use python_executable instead. Optional path to a virtual environment. When specified, the Python executable from this venv is used instead of python_executable, which is now its only effect: it no longer locates the tools.
-            test_folder: Path to the test folder (relative to project_dir). Defaults to 'tests'.
+            test_folder: Path to the test folder (relative to project_dir). Overrides `testpaths`. Defaults to `[tool.pytest.ini_options] testpaths`, then 'tests'.
             keep_temp_files: Whether to keep temporary files after test execution. Useful for debugging when tests fail.
             refactoring_timeout: Timeout in seconds for rope refactoring operations.
             vulture_whitelist: Filename for vulture whitelist file. Defaults to 'vulture_whitelist.py'.
@@ -90,7 +90,7 @@ def create_server(
     project_dir: Path,
     python_executable: Optional[str] = None,
     venv_path: Optional[str] = None,
-    test_folder: str = "tests",
+    test_folder: Optional[str] = None,
     keep_temp_files: bool = False,
     refactoring_timeout: int = 120,
     vulture_whitelist: str = "vulture_whitelist.py",
@@ -102,7 +102,7 @@ def create_server(
         project_dir: Path to the project directory to check
         python_executable: Optional path to the Python interpreter of the project's environment. The checkers run in it and library/symbol lookups resolve against it, so it must be the environment holding the project's dependencies. The console-script tools black, isort, ruff, bandit, vulture, tach and lint-imports come from mcp-tools-py's own environment instead. If None, defaults to sys.executable.
         venv_path: Deprecated, use python_executable instead. Optional path to a virtual environment. When specified, the Python executable from this venv is used instead of python_executable, which is now its only effect: it no longer locates the tools.
-        test_folder: Path to the test folder (relative to project_dir). Defaults to 'tests'.
+        test_folder: Path to the test folder (relative to project_dir). Overrides `testpaths`. Defaults to `[tool.pytest.ini_options] testpaths`, then 'tests'.
         keep_temp_files: Whether to keep temporary files after test execution. Useful for debugging when tests fail.
         refactoring_timeout: Timeout in seconds for rope refactoring operations.
         vulture_whitelist: Filename for vulture whitelist file. Defaults to 'vulture_whitelist.py'.

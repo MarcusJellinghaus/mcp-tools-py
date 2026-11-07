@@ -38,9 +38,9 @@ See [step_2.md](./steps/step_2.md)
 ### Step 3: Flip the defaults to `None`
 See [step_3.md](./steps/step_3.md)
 
-- [ ] Implementation: integration tests, default flips in `main.py`/`server.py`/`tool_context.py`/`runners.py`, updated pins, docs
-- [ ] Quality checks: pylint, pytest (including integration), mypy — fix all issues
-- [ ] Commit message prepared
+- [x] Implementation: integration tests, default flips in `main.py`/`server.py`/`tool_context.py`/`runners.py`, updated pins, docs
+- [x] Quality checks: pylint, pytest (including integration), mypy — fix all issues
+- [x] Commit message prepared
 
 ## Pull Request
 

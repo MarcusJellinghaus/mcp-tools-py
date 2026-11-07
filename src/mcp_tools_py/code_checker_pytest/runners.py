@@ -469,7 +469,7 @@ def run_tests(
 def check_code_with_pytest(
     project_dir: str,
     python_executable: str,
-    test_folder: Optional[str] = "tests",
+    test_folder: Optional[str] = None,
     markers: Optional[List[str]] = None,
     verbosity: int = 2,
     extra_args: Optional[List[str]] = None,
@@ -483,7 +483,7 @@ def check_code_with_pytest(
 
     Args:
         project_dir: Path to the project directory
-        test_folder: Path to the test folder (relative to project_dir), or None to resolve from `testpaths` in pyproject.toml. Defaults to 'tests'
+        test_folder: Path to the test folder (relative to project_dir). Overrides `testpaths`. Defaults to `[tool.pytest.ini_options] testpaths`, then 'tests'
         python_executable: Optional path to Python interpreter to use for running tests. If None, defaults to sys.executable
         markers: Optional list of pytest markers to filter tests. Examples: ['slow', 'integration', 'unit']
         verbosity: Integer for pytest verbosity level (0-3), default 2. Higher values provide more detailed output
