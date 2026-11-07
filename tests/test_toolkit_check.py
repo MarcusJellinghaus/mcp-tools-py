@@ -1,13 +1,18 @@
 """Tests for PythonToolkit's `check` action, at each depth."""
 
+from collections.abc import Callable
 from pathlib import Path
 
 import pytest
-from mcp_coder_utils.toolkit import ActionRequest
+from mcp_coder_utils.toolkit import ActionRequest, ActionResult
 
 from mcp_tools_py.code_checker_bandit.models import BanditMessage, BanditResult
 from mcp_tools_py.code_checker_deptry.runners import DeptryMessage, DeptryResult
+from mcp_tools_py.code_checker_mypy.models import MypyResult
+from mcp_tools_py.code_checker_pylint.models import PylintResult
 from mcp_tools_py.toolkit import PythonToolkit
+from mcp_tools_py.toolkit_checks import _CHECK_RUNNERS
+from mcp_tools_py.utils.project_config import DEFAULT_CHECK_TIMEOUT, ToolName
 from mcp_tools_py.utils.ruff_parsing import RuffMessage
 from mcp_tools_py.utils.tool_context import ToolContext
 from tests.conftest import make_command_result
@@ -606,3 +611,116 @@ class TestRunCheckFull:
 
         assert result.status == "findings"
         assert len(result.findings) == 2
+
+
+_OTHER_FULL_TOOLS: tuple[ToolName, ...] = (
+    "vulture",
+    "lint-imports",
+    "tach",
+    "ruff",
+    "bandit",
+    "deptry",
+)
+
+
+def _record_timeouts(
+    monkeypatch: pytest.MonkeyPatch, depth: str
+) -> dict[str, list[int]]:
+    """Replace each check runner at `depth` with a clean fake that records timeouts.
+
+    Returns:
+        Tool name to the timeouts it was run with, filled in as the check runs.
+    """
+    recorded: dict[str, list[int]] = {}
+
+    def fake_mypy(*args: object, **kwargs: int) -> MypyResult:
+        del args
+        recorded.setdefault("mypy", []).append(kwargs["timeout_seconds"])
+        return MypyResult(return_code=0, messages=[])
+
+    def fake_pylint(*args: object, **kwargs: int) -> PylintResult:
+        del args
+        recorded.setdefault("pylint", []).append(kwargs["timeout_seconds"])
+        return PylintResult(return_code=0, messages=[])
+
+    monkeypatch.setattr("mcp_tools_py.toolkit_checks.run_mypy_check", fake_mypy)
+    monkeypatch.setattr("mcp_tools_py.toolkit_checks.get_pylint_results", fake_pylint)
+
+    def fake_runner(tool: ToolName) -> Callable[[ToolContext, str], ActionResult]:
+        def run(context: ToolContext, run_depth: str) -> ActionResult:
+            del run_depth
+            recorded.setdefault(tool, []).append(context.resolve_timeout(tool))
+            return ActionResult(status="ok", summary="")
+
+        return run
+
+    if depth == "full":
+        for tool in _OTHER_FULL_TOOLS:
+            monkeypatch.setitem(_CHECK_RUNNERS, tool, fake_runner(tool))
+        monkeypatch.setattr(
+            ToolContext, "is_tool_available", lambda self, tool_name: True
+        )
+    return recorded
+
+
+def _run_check_at(tmp_path: Path, depth: str) -> None:
+    request = ActionRequest(
+        action="check", depth=depth, project_dir=tmp_path, params={}
+    )
+    PythonToolkit().run(request)
+
+
+class TestRunCheckTimeout:
+    """Subprocess timeouts `_run_check` gives each check tool."""
+
+    @pytest.mark.parametrize("depth", ["quick", "standard", "full"])
+    def test_default_is_600_for_mypy_and_pylint(
+        self, tmp_path: Path, monkeypatch: pytest.MonkeyPatch, depth: str
+    ) -> None:
+        _write_check_project(tmp_path, _CLEAN_SRC)
+        recorded = _record_timeouts(monkeypatch, depth)
+
+        _run_check_at(tmp_path, depth)
+
+        assert recorded["mypy"] == [600]
+        if depth != "quick":
+            assert recorded["pylint"] == [600]
+
+    def test_full_other_checks_keep_default_timeout(
+        self, tmp_path: Path, monkeypatch: pytest.MonkeyPatch
+    ) -> None:
+        _write_check_project(tmp_path, _CLEAN_SRC)
+        recorded = _record_timeouts(monkeypatch, "full")
+
+        _run_check_at(tmp_path, "full")
+
+        for tool in _OTHER_FULL_TOOLS:
+            assert recorded[tool] == [DEFAULT_CHECK_TIMEOUT]
+
+    def test_project_tool_timeout_wins(
+        self, tmp_path: Path, monkeypatch: pytest.MonkeyPatch
+    ) -> None:
+        _write_check_project(tmp_path, _CLEAN_SRC)
+        (tmp_path / "pyproject.toml").write_text(
+            "[tool.mcp-tools-py]\npylint-timeout = 45\n"
+        )
+        recorded = _record_timeouts(monkeypatch, "standard")
+
+        _run_check_at(tmp_path, "standard")
+
+        assert recorded["pylint"] == [45]
+        assert recorded["mypy"] == [600]
+
+    def test_project_check_timeout_wins(
+        self, tmp_path: Path, monkeypatch: pytest.MonkeyPatch
+    ) -> None:
+        _write_check_project(tmp_path, _CLEAN_SRC)
+        (tmp_path / "pyproject.toml").write_text(
+            "[tool.mcp-tools-py]\ncheck-timeout = 30\n"
+        )
+        recorded = _record_timeouts(monkeypatch, "standard")
+
+        _run_check_at(tmp_path, "standard")
+
+        assert recorded["pylint"] == [30]
+        assert recorded["mypy"] == [30]

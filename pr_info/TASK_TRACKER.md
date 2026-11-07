@@ -29,9 +29,9 @@ This tracks **Feature Implementation** consisting of multiple **Tasks**.
 
 ### Step 2: 600 s default timeout for check depths — [step_2.md](./steps/step_2.md)
 
-- [ ] Implementation: add `TestRunCheckTimeout` tests, then `_LONG_CHECK_TIMEOUT` / `_LONG_CHECK_TOOLS` in `_run_check` for mypy and pylint
-- [ ] Quality checks: pylint, pytest, mypy — fix all issues
-- [ ] Commit message prepared
+- [x] Implementation: add `TestRunCheckTimeout` tests, then `_LONG_CHECK_TIMEOUT` / `_LONG_CHECK_TOOLS` in `_run_check` for mypy and pylint
+- [x] Quality checks: pylint, pytest, mypy — fix all issues
+- [x] Commit message prepared
 
 ### Step 3: Project environment from `VIRTUAL_ENV` — [step_3.md](./steps/step_3.md)
 
