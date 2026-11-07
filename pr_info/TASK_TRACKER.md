@@ -31,9 +31,9 @@ See [step_1.md](./steps/step_1.md)
 ### Step 2: `verify` honours `action`
 See [step_2.md](./steps/step_2.md)
 
-- [ ] Implementation: per-action verify tests (12 items incl. deptry, format/check/test, undeclared) + `_tool_item` and action-aware `verify`
-- [ ] Quality checks: pylint, pytest, mypy — fix all issues
-- [ ] Commit message prepared
+- [x] Implementation: per-action verify tests (12 items incl. deptry, format/check/test, undeclared) + `_tool_item` and action-aware `verify`
+- [x] Quality checks: pylint, pytest, mypy — fix all issues
+- [x] Commit message prepared
 
 ### Step 3: mypy errors-only findings, `raw` = mypy's raw output
 See [step_3.md](./steps/step_3.md)

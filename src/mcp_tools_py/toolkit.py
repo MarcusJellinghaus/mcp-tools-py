@@ -50,14 +50,19 @@ from mcp_tools_py.formatter.runner import (
     step_tool,
     validate_steps,
 )
-from mcp_tools_py.toolkit_checks import _result_from_findings, _run_check
+from mcp_tools_py.toolkit_checks import (
+    _CHECK_DEPTHS,
+    _result_from_findings,
+    _run_check,
+)
+from mcp_tools_py.utils.environment_info import TOOL_MODULES
 from mcp_tools_py.utils.project_config import (
     get_pytest_addopts,
     resolve_coverage_source,
     resolve_target_directories,
 )
 from mcp_tools_py.utils.python_environment import PythonEnvironment
-from mcp_tools_py.utils.tool_context import CONSOLE_SCRIPT_TOOLS, ToolContext
+from mcp_tools_py.utils.tool_context import ToolContext
 
 _FAILED_OUTCOMES = ("failed", "error")
 
@@ -88,6 +93,21 @@ def _build_context(project_dir: Path) -> ToolContext:
         A context over `project_dir`'s own resolved Python environment.
     """
     return ToolContext(project_dir=project_dir, environment=PythonEnvironment.resolve())
+
+
+def _tool_item(context: ToolContext, tool: str) -> VerifyItem:
+    """Report whether `tool` is available in `context`.
+
+    Returns:
+        An "ok" VerifyItem, or an "error" one carrying the standard
+        "tool not available" message.
+    """
+    ok = context.is_tool_available(tool)
+    return VerifyItem(
+        name=tool,
+        status="ok" if ok else "error",
+        message="" if ok else context.unavailable_message(tool),
+    )
 
 
 def _test_failure_summary(test: Test) -> str:
@@ -396,33 +416,46 @@ class PythonToolkit(Toolkit):
         return _run_check(context, request.depth)
 
     def verify(self, project_dir: Path, action: str | None = None) -> list[VerifyItem]:
-        """Check that every tool this toolkit drives is available.
+        """Check that the tools `action` drives are available.
 
-        `action` is ignored for now, so every action checks everything.
+        - None: every tool, plus "formatter".
+        - "format": "formatter" plus the tools of the resolved formatter
+          steps (none when no formatter resolves).
+        - "check": the tools of the `full` check depth.
+        - "test": pytest.
 
         Returns:
-            One VerifyItem per console-script tool, per `python -m` tool
-            (mypy, pylint, pytest), and one more named "formatter" for
-            whether a formatter can be resolved for `project_dir`.
+            One VerifyItem per tool, plus one named "formatter" for whether a
+            formatter can be resolved for `project_dir`; a single "error"
+            item named after `action` when `describe` doesn't declare it.
         """
-        del action
-        context = _build_context(project_dir)
-        items: list[VerifyItem] = []
-        for tool in sorted(CONSOLE_SCRIPT_TOOLS | {"mypy", "pylint", "pytest"}):
-            ok = context.is_tool_available(tool)
-            items.append(
+        actions = self.describe().actions
+        if action is not None and action not in actions:
+            return [
                 VerifyItem(
-                    name=tool,
-                    status="ok" if ok else "error",
-                    message="" if ok else context.unavailable_message(tool),
+                    name=action,
+                    status="error",
+                    message=f"Unknown action '{action}'; "
+                    f"declared: {', '.join(actions)}.",
                 )
-            )
-        try:
-            resolve_steps(project_dir)
-            items.append(VerifyItem(name="formatter", status="ok"))
-        except ValueError as exc:
-            items.append(VerifyItem(name="formatter", status="error", message=str(exc)))
-        return items
+            ]
+        context = _build_context(project_dir)
+        per_action = {"test": ["pytest"], "check": list(_CHECK_DEPTHS["full"])}
+        tools = per_action.get(action or "", sorted(TOOL_MODULES))
+        formatter_items: list[VerifyItem] = []
+        if action in (None, "format"):
+            try:
+                steps = resolve_steps(project_dir)
+                formatter_items.append(VerifyItem(name="formatter", status="ok"))
+                if action == "format":
+                    tools = sorted({step_tool(step) for step in steps})
+            except ValueError as exc:
+                formatter_items.append(
+                    VerifyItem(name="formatter", status="error", message=str(exc))
+                )
+                if action == "format":
+                    tools = []
+        return [_tool_item(context, tool) for tool in tools] + formatter_items
 
     def prompt_fragments(self) -> dict[str, str]:
         """Prompt text PythonToolkit contributes to mcp-coder's prompts.
