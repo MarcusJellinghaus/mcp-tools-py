@@ -3,7 +3,12 @@
 import logging
 from typing import Any, Dict, List, Optional, Tuple
 
-from mcp_tools_py.code_checker_pytest.models import Collector, PytestReport, Test
+from mcp_tools_py.code_checker_pytest.models import (
+    Collector,
+    PytestReport,
+    Summary,
+    Test,
+)
 from mcp_tools_py.log_utils import log_function_call
 
 logger = logging.getLogger(__name__)
@@ -532,6 +537,45 @@ def get_detailed_test_summary(
     return summary_base
 
 
+def selected_count(summary: Summary) -> int:
+    """Return the tests left after deselection; an absent count means zero."""
+    return summary.collected - (summary.deselected or 0)
+
+
+def collected_test_ids(report: PytestReport) -> List[str]:
+    """List the selected test IDs from the collectors, in collection order.
+
+    Items that are themselves collectors (modules, classes) and deselected
+    items are dropped. Item types are not filtered, so coroutines and
+    doctests are kept.
+
+    Returns:
+        The test node IDs, or [] when the report has no collectors.
+    """
+    collectors = report.collectors or []
+    collector_ids = {collector.nodeid for collector in collectors}
+    return [
+        item.nodeid
+        for collector in collectors
+        for item in collector.result
+        if item.nodeid not in collector_ids and not item.deselected
+    ]
+
+
+def did_not_run_line(report: PytestReport) -> str:
+    """Render how many selected tests did not run.
+
+    Returns:
+        A line such as "N of M selected tests did not run", or an empty
+        string when every selected test ran.
+    """
+    selected = selected_count(report.summary)
+    missing = selected - report.summary.total
+    if missing <= 0:
+        return ""
+    return f"{missing} of {selected} selected tests did not run"
+
+
 def get_test_summary(test_session_result: PytestReport) -> str:
     """Generate a human-readable summary of the test results.
 
@@ -544,7 +588,7 @@ def get_test_summary(test_session_result: PytestReport) -> str:
     summary = test_session_result.summary
 
     deselected = summary.deselected or 0
-    header = f"Collected {summary.collected - deselected} tests"
+    header = f"Collected {selected_count(summary)} tests"
     if deselected > 0:
         header += f" ({deselected} deselected)"
     header += f" in {test_session_result.duration:.2f} seconds"

@@ -389,6 +389,34 @@ def test_run_tests_default_test_folder_appended(mock_execute: MagicMock) -> None
     assert test_folder_path in called_command
 
 
+@patch("mcp_tools_py.code_checker_pytest.runners.execute_command")
+def test_run_tests_default_test_folder_before_extra_args(
+    mock_execute: MagicMock,
+) -> None:
+    """The default test folder comes before extra_args, so no option takes it."""
+    mock_result = MagicMock()
+    mock_result.return_code = 5
+    mock_result.stdout = "collected 0 items"
+    mock_result.stderr = ""
+    mock_result.execution_error = None
+    mock_result.timed_out = False
+    mock_execute.return_value = mock_result
+
+    with pytest.raises(ValueError, match="No Tests Found"):
+        run_tests(
+            "/test/project",
+            "tests",
+            python_executable=sys.executable,
+            extra_args=["--cov"],
+        )
+
+    called_command = mock_execute.call_args[1].get(
+        "command", mock_execute.call_args[0][0] if mock_execute.call_args[0] else []
+    )
+    test_folder_path = os.path.join("/test/project", "tests")
+    assert called_command.index(test_folder_path) < called_command.index("--cov")
+
+
 @pytest.mark.parametrize(
     "case_id, returncode, execution_error, timed_out, report_exists, "
     "label, exc_cls, log_substring",

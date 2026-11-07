@@ -180,3 +180,4 @@ class SanitizedArgs:
     has_path_args: bool = False
     show_output: bool = False
     path_args: List[str] = field(default_factory=list)
+    collect_only: bool = False

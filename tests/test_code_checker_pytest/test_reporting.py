@@ -2,14 +2,23 @@
 
 import json
 from pathlib import Path
-from typing import Any, Dict, List
+from typing import Any, Dict, List, Optional
+
+import pytest
 
 from mcp_tools_py.checker_tools import CheckerTools
-from mcp_tools_py.code_checker_pytest.models import PytestReport
+from mcp_tools_py.code_checker_pytest.models import (
+    Collector,
+    CollectorResult,
+    PytestReport,
+    Summary,
+)
 from mcp_tools_py.code_checker_pytest.parsers import parse_pytest_report
 from mcp_tools_py.code_checker_pytest.reporting import (
     NO_CAPTURED_OUTPUT_NOTE,
+    collected_test_ids,
     create_prompt_for_passing_output,
+    did_not_run_line,
 )
 from mcp_tools_py.code_checker_pytest.verdict import classify_run
 from mcp_tools_py.server import ToolServer
@@ -619,3 +628,85 @@ class TestPassingOutput:
 
         assert "[Output truncated" in result
         assert "LINE_19" not in result
+
+
+@pytest.mark.parametrize(
+    ("collected", "total", "deselected", "expected"),
+    [
+        (4, 2, None, "2 of 4 selected tests did not run"),
+        (4, 1, 2, "1 of 2 selected tests did not run"),
+        (2, 2, None, ""),
+        (4, 2, 2, ""),
+        (2, 3, None, ""),
+    ],
+    ids=["stopped", "stopped_deselected", "xdist_k", "all_ran", "more_ran"],
+)
+def test_did_not_run_line(
+    collected: int, total: int, deselected: Optional[int], expected: str
+) -> None:
+    """The line counts the selected tests that did not run, or is empty."""
+    report = PytestReport(
+        created=0.0,
+        duration=0.1,
+        exitcode=1,
+        root="/project",
+        environment={},
+        summary=Summary(collected=collected, total=total, deselected=deselected),
+    )
+    assert did_not_run_line(report) == expected
+
+
+def _ids_report(collectors: Optional[List[Collector]]) -> PytestReport:
+    return PytestReport(
+        created=0.0,
+        duration=0.1,
+        exitcode=0,
+        root="/project",
+        environment={},
+        summary=Summary(collected=0, total=0),
+        collectors=collectors,
+    )
+
+
+def test_collected_test_ids_keeps_selected_items_only() -> None:
+    """Deselected items and nested collectors are dropped; item types are kept."""
+    collectors = [
+        Collector(
+            nodeid="",
+            outcome="passed",
+            result=[CollectorResult(nodeid="test_x.py", type="Module")],
+        ),
+        Collector(
+            nodeid="test_x.py",
+            outcome="passed",
+            result=[
+                CollectorResult(nodeid="test_x.py::test_a", type="Function"),
+                CollectorResult(
+                    nodeid="test_x.py::test_b", type="Function", deselected=True
+                ),
+                CollectorResult(nodeid="test_x.py::test_async", type="Coroutine"),
+                CollectorResult(nodeid="test_x.py::test_x", type="DoctestItem"),
+                CollectorResult(nodeid="test_x.py::TestK", type="Class"),
+                CollectorResult(nodeid="test_x.py::TestEmpty", type="Class"),
+            ],
+        ),
+        Collector(
+            nodeid="test_x.py::TestK",
+            outcome="passed",
+            result=[
+                CollectorResult(nodeid="test_x.py::TestK::test_c", type="Function")
+            ],
+        ),
+        Collector(nodeid="test_x.py::TestEmpty", outcome="passed", result=[]),
+    ]
+    assert collected_test_ids(_ids_report(collectors)) == [
+        "test_x.py::test_a",
+        "test_x.py::test_async",
+        "test_x.py::test_x",
+        "test_x.py::TestK::test_c",
+    ]
+
+
+def test_collected_test_ids_without_collectors() -> None:
+    """A report without collectors gives no IDs."""
+    assert collected_test_ids(_ids_report(None)) == []
