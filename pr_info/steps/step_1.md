@@ -2,11 +2,19 @@
 
 ## LLM prompt
 
-> Read `pr_info/steps/summary.md` and this file, then implement this step only. Write the tests first, then the code. Run pylint, pytest (`extra_args=["-n", "auto", "-m", "not integration"]`) and mypy until they pass, format the code, and make exactly one commit.
+> Read `pr_info/steps/summary.md` and this file, then implement this step only. Do the rebase and force-push under "First action: rebase" before anything else. Write the tests first, then the code. Run pylint, pytest (`extra_args=["-n", "auto", "-m", "not integration"]`) and mypy until they pass, format the code, and make exactly one commit.
 
-## Precondition
+## First action: rebase
 
-Rebase onto `origin/main` first, which includes #49 step 1 as 330d139 (#279). After the rebase, check that `src/mcp_tools_py/code_checker_pytest/utils.py` no longer contains `if arg in ("tests", "tests/"):`. If it still does, the rebase didn't happen: write one line to `pr_info/.blocked.txt` saying so and stop.
+The branch was not rebased before handoff. Before writing any code:
+
+1. `git fetch origin`
+2. `git rebase origin/main`. This brings in #49 step 1 as 330d139 (#279), plus #275, #277, #278 and #280.
+3. `git push --force-with-lease`, straight after the rebase and before this step's single commit. If you push the commit together with the rebase instead, still use `--force-with-lease`: the rebase rewrites the already-pushed plan commits, so a plain push is rejected.
+
+## Precondition guard (after the rebase only)
+
+Once the rebase has finished, check that `src/mcp_tools_py/code_checker_pytest/utils.py` no longer contains `if arg in ("tests", "tests/"):`. If it still does, the rebase failed: write one line to `pr_info/.blocked.txt` saying so and stop.
 
 ## WHERE
 

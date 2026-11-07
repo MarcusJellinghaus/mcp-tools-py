@@ -13,7 +13,7 @@ Which tests to run, in order:
 
 ## Precondition
 
-**First action, before step 1: rebase this branch onto `origin/main`.** #49 step 1 is met by `origin/main` commit 330d139 (#279): it stops removing a positional `tests`, stops reading option values as paths, and adds the default folder before `extra_args`, which step 2 edits. The rebase also brings in #275, #277, #278 and #280. #280 rewrites `toolkit.py` and `tests/test_toolkit_test.py`, which step 2 edits. The line references in these steps are taken from `origin/main` at 1cdb593. Step 1 checks that the rebase happened.
+**First action, before step 1: rebase this branch onto `origin/main`.** The branch was not rebased before handoff; it still sits on 417f8cd. Run `git fetch origin`, then `git rebase origin/main`, then `git push --force-with-lease` straight after the rebase, before step 1's single commit (or together with that commit's push, using `--force-with-lease` rather than a plain push). A plain push is rejected because the rebase rewrites the already-pushed plan commits. #49 step 1 is met by `origin/main` commit 330d139 (#279): it stops removing a positional `tests`, stops reading option values as paths, and adds the default folder before `extra_args`, which step 2 edits. The rebase also brings in #275, #277, #278 and #280. #280 rewrites `toolkit.py` and `tests/test_toolkit_test.py`, which step 2 edits. The line references in these steps are taken from `origin/main` at 1cdb593. Step 1 checks that the rebase happened.
 
 ## Architectural / design changes
 
