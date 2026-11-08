@@ -259,6 +259,9 @@ def _registered_markers(context: ToolContext) -> list[str] | str:
             "pytest",
             "--markers",
             "--color=no",
+            # Same rootdir as the real run, so both find the same config.
+            "--rootdir",
+            str(context.project_dir),
         ],
         cwd=str(context.project_dir),
         timeout_seconds=timeout_seconds,

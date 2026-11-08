@@ -127,7 +127,28 @@ class TestQuickMarkerSelection:
 
 
 class TestMarkerReadPath:
-    """The marker read gets the real run's venv_bin on PATH."""
+    """The marker read gets the real run's venv_bin on PATH and rootdir."""
+
+    def test_marker_read_passes_project_dir_as_rootdir(self, tmp_path: Path) -> None:
+        request = ActionRequest(
+            action="test", depth="quick", project_dir=tmp_path, params={}
+        )
+        with (
+            patch(
+                "mcp_tools_py.toolkit.execute_command",
+                return_value=make_command_result(stdout=_stdout(_SKIP_LINE)),
+            ) as mock_execute,
+            patch(
+                "mcp_tools_py.toolkit.check_code_with_pytest",
+                return_value=_passed_results(),
+            ) as mock_pytest,
+        ):
+            PythonToolkit().run(request)
+
+        project_dir = mock_pytest.call_args.args[0]
+        command = mock_execute.call_args.args[0]
+        rootdir_index = command.index("--rootdir")
+        assert command[rootdir_index + 1] == project_dir
 
     def test_marker_read_prepends_venv_bin_to_path(self, tmp_path: Path) -> None:
         request = ActionRequest(
