@@ -92,6 +92,16 @@ def all_modules_importable() -> Iterator[MagicMock]:
 
 
 @pytest.fixture(autouse=True)
+def _clear_virtual_env(monkeypatch: pytest.MonkeyPatch) -> None:
+    """Keep a VIRTUAL_ENV inherited from the shell or CI out of every test.
+
+    PythonToolkit builds its project environment from VIRTUAL_ENV when set;
+    tests that need it set it explicitly.
+    """
+    monkeypatch.delenv("VIRTUAL_ENV", raising=False)
+
+
+@pytest.fixture(autouse=True)
 def _clear_environment_info_cache() -> Iterator[None]:
     """Keep the process-wide probe cache from leaking between tests.
 

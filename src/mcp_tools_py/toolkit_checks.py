@@ -521,8 +521,17 @@ _CHECK_RUNNERS: dict[str, Callable[[ToolContext, str], ActionResult]] = {
 }
 
 
+# mypy has no cache on a fresh checkout.
+_LONG_CHECK_TIMEOUT = 600  # seconds; mypy and pylint at every check depth
+_LONG_CHECK_TOOLS = frozenset({"mypy", "pylint"})
+
+
 def _run_check(context: ToolContext, depth: str) -> ActionResult:
     """Run the check tools declared for `depth` and merge their outcomes.
+
+    mypy and pylint default to a 600 s timeout; the other tools keep the
+    usual default. `[tool.mcp-tools-py]` `<tool>-timeout` and
+    `check-timeout` still win over both.
 
     Returns:
         "error" immediately if any tool declared for `depth` is
@@ -535,5 +544,11 @@ def _run_check(context: ToolContext, depth: str) -> ActionResult:
             return ActionResult(
                 status="error", summary=context.unavailable_message(tool)
             )
-    results = [_CHECK_RUNNERS[tool](context, depth) for tool in tools]
+    long_context = replace(context, check_timeout=_LONG_CHECK_TIMEOUT)
+    results = [
+        _CHECK_RUNNERS[tool](
+            long_context if tool in _LONG_CHECK_TOOLS else context, depth
+        )
+        for tool in tools
+    ]
     return _merge(results)

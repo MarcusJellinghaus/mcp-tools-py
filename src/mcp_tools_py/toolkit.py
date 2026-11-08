@@ -8,6 +8,8 @@ instead of returning structured data.
 """
 
 import json
+import os
+import re
 import shutil
 import tempfile
 from dataclasses import replace
@@ -68,6 +70,7 @@ from mcp_tools_py.utils.project_config import (
     resolve_target_directories,
 )
 from mcp_tools_py.utils.python_environment import PythonEnvironment
+from mcp_tools_py.utils.subprocess_runner import execute_command
 from mcp_tools_py.utils.tool_context import ToolContext
 
 _FAILED_OUTCOMES = ("failed", "error")
@@ -88,34 +91,66 @@ UNATTENDED_EXCLUDED_MARKERS: list[str] = [
 # Stops --strict-markers projects rejecting marker names they don't register.
 _STRICT_MARKERS_OFF: list[str] = ["-o", "strict_markers=false"]
 _LONG_TEST_TIMEOUT = 1800  # seconds; test@standard, @unattended and @full
+# One line per marker in `pytest --markers`: "@pytest.mark.<name>[(<args>)]: <desc>"
+_MARKER_LINE = re.compile(r"^@pytest\.mark\.([^(:\s]+)", re.MULTILINE)
+_MARKER_READ_FAILED = "Could not read the project's pytest markers"
 
 _FIX_CHECK_PROMPT = """\
-Fix the mypy type errors shown in the output below.
+Fix the findings reported by the checkers in the output below \
+(type checker, linter or other static checks).
 
-Focus only on resolving the type errors - do not make unnecessary changes to the code.
+Fix only the reported findings - do not make unnecessary changes to the code.
 
-For each error:
-1. Understand the type mismatch or missing annotation
-2. Add appropriate type hints or fix incorrect types
-3. Use proper typing imports (List, Dict, Optional, etc.) from typing module
-4. Ensure all function parameters and return types are properly annotated
+For each finding:
+1. Read the message and the code it points at
+2. Fix the cause in the code rather than silencing the checker
 
-Keep changes minimal and focused on type correctness.
+Keep changes minimal and focused.
 
-Expected output: Code changes that resolve all type errors while maintaining functionality.
+Expected output: Code changes that resolve all reported findings while maintaining functionality.
+"""
+
+_FIX_TEST_PROMPT = """\
+Fix the failing tests named in the output below.
+
+For each failure, find the cause and fix whichever is wrong - the code or the test.
+Keep changes minimal and focused; do not change unrelated code or tests.
+
+Re-run only the failing tests named in the output to confirm the fix, not the whole suite.
+
+Expected output: Code or test changes that make the failing tests pass while maintaining functionality.
 """
 
 
 def _build_context(project_dir: Path) -> ToolContext:
     """Build the ToolContext PythonToolkit runs its actions against.
 
-    Mirrors the old mcp_coder/mcp_tools_py.py shim: no python_executable or
-    venv_path override, since mcp-coder runs inside the project's own venv.
+    The project environment comes from VIRTUAL_ENV when it is set and
+    non-empty, else from sys.executable: mcp-coder can run from its own tool
+    env, while the shell's activated venv is the project's. A VIRTUAL_ENV
+    without an interpreter is an error, never a fallback. `tool_environment`
+    keeps its sys.executable default.
 
     Returns:
-        A context over `project_dir`'s own resolved Python environment.
+        A context over the resolved project Python environment.
+
+    Raises:
+        FileNotFoundError: VIRTUAL_ENV is set but has no interpreter; the
+            message names VIRTUAL_ENV.
     """
-    return ToolContext(project_dir=project_dir, environment=PythonEnvironment.resolve())
+    venv = os.environ.get("VIRTUAL_ENV")
+    if not venv:
+        return ToolContext(
+            project_dir=project_dir, environment=PythonEnvironment.resolve()
+        )
+    try:
+        environment = PythonEnvironment.resolve(venv_path=venv)
+    except FileNotFoundError as exc:
+        raise FileNotFoundError(
+            f"VIRTUAL_ENV is set to {venv}, but it has no Python interpreter. "
+            "Activate the project's environment or unset VIRTUAL_ENV."
+        ) from exc
+    return ToolContext(project_dir=project_dir, environment=environment)
 
 
 def _tool_item(context: ToolContext, tool: str) -> VerifyItem:
@@ -205,6 +240,45 @@ def _with_note(result: ActionResult, note: str | None) -> ActionResult:
     return result
 
 
+def _registered_markers(context: ToolContext) -> list[str] | str:
+    """Names of the markers registered in the project, read via `pytest --markers`.
+
+    Returns:
+        The marker names, or an error message when the list can't be read:
+        timeout, run failure, non-zero exit, or exit 0 with no marker lines
+        (pytest's built-in markers always print, so no lines means the output
+        wasn't understood).
+    """
+    timeout_seconds = context.resolve_timeout("pytest")
+    # Same PATH as the real run's venv_bin, so conftest.py loads alike.
+    venv_bin = str(context.environment.bin_dir)
+    result = execute_command(
+        [
+            str(context.environment.interpreter),
+            "-m",
+            "pytest",
+            "--markers",
+            "--color=no",
+            # Same rootdir as the real run, so both find the same config.
+            "--rootdir",
+            str(context.project_dir),
+        ],
+        cwd=str(context.project_dir),
+        timeout_seconds=timeout_seconds,
+        env={"PATH": f"{venv_bin}{os.pathsep}{os.environ.get('PATH', '')}"},
+    )
+    if result.timed_out:
+        return f"{_MARKER_READ_FAILED}: timed out after {timeout_seconds} seconds."
+    if result.execution_error:
+        return f"{_MARKER_READ_FAILED}: {result.execution_error}"
+    if result.return_code != 0:
+        output = (result.stderr or result.stdout).strip()
+        tail = "\n".join(output.splitlines()[-20:])
+        return f"{_MARKER_READ_FAILED}: exit code {result.return_code}\n{tail}"
+    names = [name.strip() for name in _MARKER_LINE.findall(result.stdout)]
+    return names or f"{_MARKER_READ_FAILED}: no marker lines in the output."
+
+
 def _run_test(context: ToolContext, depth: str) -> ActionResult:
     """Run pytest at `depth` and map the outcome onto an ActionResult.
 
@@ -212,6 +286,10 @@ def _run_test(context: ToolContext, depth: str) -> ActionResult:
     data, and sets `raw` to the digest (mirroring
     `run_pytest_check(coverage=True)`); a `fail_under` miss is informational
     only and never changes `status`.
+
+    `quick` excludes every registered marker whose name ends in
+    `integration`, read via `_registered_markers`; with none registered it
+    runs unfiltered. A failed marker read is `error`, never an unfiltered run.
 
     Every depth but `quick` defaults the pytest timeout to
     `_LONG_TEST_TIMEOUT`; `pytest-timeout` and `check-timeout` in
@@ -221,7 +299,8 @@ def _run_test(context: ToolContext, depth: str) -> ActionResult:
     alone made the verdict ERROR (exit 1, or exit 2 "during collection").
 
     Returns:
-        "error" if pytest is unavailable, the verdict is ERROR (other than
+        "error" if pytest is unavailable, `quick` can't read the registered
+        markers, the verdict is ERROR (other than
         "no tests found" or one caused by failed collectors), or FAILED
         without any failing/erroring test or collector; "skipped" for no
         tests found; "findings" with one Finding per failing/erroring test
@@ -237,10 +316,12 @@ def _run_test(context: ToolContext, depth: str) -> ActionResult:
 
     project_dir = str(context.project_dir)
     interpreter = str(context.environment.interpreter)
-    markers = {
-        "quick": ["not integration"],
-        "unattended": list(UNATTENDED_EXCLUDED_MARKERS),
-    }.get(depth)
+    markers = list(UNATTENDED_EXCLUDED_MARKERS) if depth == "unattended" else None
+    if depth == "quick":
+        names = _registered_markers(context)
+        if isinstance(names, str):
+            return ActionResult(status="error", summary=names)
+        markers = [f"not {n}" for n in names if n.endswith("integration")] or None
 
     extra_args = list(_STRICT_MARKERS_OFF) if depth == "unattended" else []
     env_vars: dict[str, str] = {}
@@ -504,7 +585,8 @@ class PythonToolkit(Toolkit):
 
         Returns:
             The action outcome; status "error" for an action or depth that
-            `describe` doesn't declare.
+            `describe` doesn't declare, or when VIRTUAL_ENV is set but has no
+            interpreter.
         """
         actions = self.describe().actions
         depths = actions.get(request.action)
@@ -520,7 +602,10 @@ class PythonToolkit(Toolkit):
                 summary=f"Unknown depth '{request.depth}' for action "
                 f"'{request.action}'; declared: {', '.join(depths)}.",
             )
-        context = _build_context(request.project_dir)
+        try:
+            context = _build_context(request.project_dir)
+        except FileNotFoundError as exc:
+            return ActionResult(status="error", summary=str(exc))
         if request.action == "test":
             return _run_test(context, request.depth)
         if request.action == "format":
@@ -539,7 +624,9 @@ class PythonToolkit(Toolkit):
         Returns:
             One VerifyItem per tool, plus one named "formatter" for whether a
             formatter can be resolved for `project_dir`; a single "error"
-            item named after `action` when `describe` doesn't declare it.
+            item named after `action` when `describe` doesn't declare it; a
+            single "error" item named "environment" when VIRTUAL_ENV is set
+            but has no interpreter.
         """
         actions = self.describe().actions
         if action is not None and action not in actions:
@@ -551,7 +638,10 @@ class PythonToolkit(Toolkit):
                     f"declared: {', '.join(actions)}.",
                 )
             ]
-        context = _build_context(project_dir)
+        try:
+            context = _build_context(project_dir)
+        except FileNotFoundError as exc:
+            return [VerifyItem(name="environment", status="error", message=str(exc))]
         per_action = {"test": ["pytest"], "check": list(_CHECK_DEPTHS["full"])}
         tools = per_action.get(action or "", sorted(TOOL_MODULES))
         formatter_items: list[VerifyItem] = []
@@ -575,9 +665,10 @@ class PythonToolkit(Toolkit):
         Returns:
             `language_context`, `check_instructions`,
             `check_instructions.unattended` — the pytest marker filter of the
-            `unattended` test depth — and `fix.check` — the Mypy Fix prompt,
-            with its `[mypy_output]` placeholder dropped since the actual
-            output now travels via `ActionResult.fix_text`.
+            `unattended` test depth — `fix.check` — fix the findings of any
+            checker — and `fix.test` — fix the failing tests and re-run only
+            those. Neither fix prompt has a placeholder: the actual output
+            travels via `ActionResult.fix_text`.
         """
         names = ", ".join(m.removeprefix("not ") for m in UNATTENDED_EXCLUDED_MARKERS)
         return {
@@ -595,4 +686,5 @@ class PythonToolkit(Toolkit):
                 "register."
             ),
             "fix.check": _FIX_CHECK_PROMPT,
+            "fix.test": _FIX_TEST_PROMPT,
         }

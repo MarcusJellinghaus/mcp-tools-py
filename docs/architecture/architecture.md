@@ -251,8 +251,12 @@ See [README.md](../../README.md) for installation, CLI parameters, and MCP clien
 ### Name Resolution
 
 > Any tool that resolves a Python name — module, symbol, or installed package — resolves
-> it through `ToolContext.environment`. Never through the ambient process, never through
-> `VIRTUAL_ENV`.
+> it through `ToolContext.environment`. Never through the ambient process.
+
+The one exception is `PythonToolkit._build_context`, which builds that environment from
+`VIRTUAL_ENV` when it is set and non-empty (else `sys.executable`), because mcp-coder can
+run from its own tool env. A `VIRTUAL_ENV` with no interpreter is an error, never a
+fallback.
 
 All six registrars take one `ToolContext`, which carries that environment; `UtilityTools`
 accepts it without needing it, so the signature stays uniform. `get_library_source`

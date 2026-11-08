@@ -63,7 +63,7 @@ class TestDescribe:
 
 
 class TestPromptFragments:
-    """prompt_fragments() must contribute the four Python-specific slots."""
+    """prompt_fragments() must contribute the five Python-specific slots."""
 
     def test_contains_required_keys(self) -> None:
         fragments = PythonToolkit().prompt_fragments()
@@ -73,6 +73,7 @@ class TestPromptFragments:
             "check_instructions",
             "check_instructions.unattended",
             "fix.check",
+            "fix.test",
         }
         assert fragments["language_context"]
         assert fragments["check_instructions"]
@@ -90,7 +91,20 @@ class TestPromptFragments:
 
         assert "[mypy_output]" not in fragments["fix.check"]
         assert "Mypy output" not in fragments["fix.check"]
-        assert "mypy type errors" in fragments["fix.check"]
+        assert "findings" in fragments["fix.check"]
+
+    def test_fix_check_is_checker_agnostic(self) -> None:
+        text = PythonToolkit().prompt_fragments()["fix.check"]
+
+        assert "mypy" not in text.lower()
+
+    def test_fix_test_reruns_only_failing_tests(self) -> None:
+        text = PythonToolkit().prompt_fragments()["fix.test"]
+
+        assert text
+        assert "[" not in text
+        assert "failing tests" in text
+        assert "not the whole suite" in text
 
 
 class TestResultFromFindings:
