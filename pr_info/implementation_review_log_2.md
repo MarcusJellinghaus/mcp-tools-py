@@ -18,3 +18,14 @@ Supervisor-driven review after rebase onto `main` (0552518).
 **Changes**: `_registered_markers` passes `--rootdir <project_dir>`; new test `test_marker_read_passes_project_dir_as_rootdir` in `tests/test_toolkit_markers.py`.
 **Status**: committed
 
+## Round 2 — 2026-11-08
+**Findings**: none new. Verified: conftest markers under `testpaths` still load with `--rootdir`; multi-marker exclusion joins with `and`; 600 s check timeout yields to `[tool.mcp-tools-py]` settings; `_build_context` guards catch every `PythonEnvironment.resolve` failure; the autouse `VIRTUAL_ENV` fixture only clears inherited state.
+**Decisions**: n/a
+**Changes**: none
+**Status**: no changes needed
+
+## Final Status
+- Rounds: 2 (1 with code changes: `--rootdir` on the marker read, `f9bfb8c`).
+- Vulture: one false positive (autouse fixture `_clear_virtual_env`) → added to `vulture_whitelist.py`; now clean.
+- lint-imports: 4 contracts kept, 0 broken.
+- CI passed on `f9bfb8c`; branch up to date with `main`; no open issues remain.
