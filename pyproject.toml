@@ -154,6 +154,9 @@ disable = ["W", "C", "R", "W1203"]
 [tool.mcp-tools-py]
 formatter = "black"   # isort + black
 
+[tool.mcp-coder]
+format_code = true
+
 [tool.mcp-coder.install-from-github]
 # All installed together WITH deps — uv resolves siblings in one pass
 packages = [
@@ -165,8 +168,10 @@ packages = [
 packages-no-deps = []
 
 [tool.mcp-coder.implement]
-format_code = true
 check_type_hints = true
+
+[tool.mcp-coder.toolkit]
+toolkit = "mcp-tools-py"
 
 # Include tools directory in the distribution
 [tool.setuptools]
