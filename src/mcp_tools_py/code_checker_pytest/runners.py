@@ -128,7 +128,7 @@ def run_tests(
     temp_dir = tempfile.mkdtemp(prefix="pytest_runner_")
     temp_report_file = os.path.join(temp_dir, "pytest_result.json")
 
-    logger.info(
+    logger.debug(
         "Starting pytest execution",
         extra={
             "project_dir": project_dir,
@@ -422,7 +422,7 @@ def run_tests(
             # Add error context to the results
             parsed_results.error_context = error_context
 
-            logger.info(
+            logger.debug(
                 "Pytest execution completed successfully",
                 extra={
                     "passed": parsed_results.summary.passed,
@@ -502,7 +502,7 @@ def check_code_with_pytest(
         - test_results: Complete PytestReport object with detailed test information
         - test_paths_note: Note when `testpaths` is set but no entry exists, else None; present on every return
     """
-    logger.info(
+    logger.debug(
         "Starting pytest code check",
         extra={
             "project_dir": project_dir,
@@ -544,7 +544,7 @@ def check_code_with_pytest(
             "duration": test_results.duration,
         }
 
-        logger.info(
+        logger.debug(
             "Pytest code check completed",
             extra={
                 "passed": test_results.summary.passed,

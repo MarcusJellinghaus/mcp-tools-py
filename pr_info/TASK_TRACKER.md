@@ -23,9 +23,9 @@ This tracks **Feature Implementation** consisting of multiple **Tasks**.
 
 ### Step 1: Lower internal checker INFO logs to DEBUG — [step_1.md](./steps/step_1.md)
 
-- [ ] Implementation: change the 15 listed `logger.info` calls in 8 files to `logger.debug`, re-sweep `code_checker_*/` and `utils/ruff_parsing.py`
-- [ ] Quality checks: pylint, pytest, mypy — fix all issues
-- [ ] Commit message prepared: `refactor(logging): log checker internals at DEBUG (#67)`
+- [x] Implementation: change the 15 listed `logger.info` calls in 8 files to `logger.debug`, re-sweep `code_checker_*/` and `utils/ruff_parsing.py`
+- [x] Quality checks: pylint, pytest, mypy — fix all issues
+- [x] Commit message prepared: `refactor(logging): log checker internals at DEBUG (#67)`
 
 ## Pull Request
 

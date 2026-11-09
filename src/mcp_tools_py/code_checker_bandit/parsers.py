@@ -42,7 +42,7 @@ def parse_bandit_json_output(
     file_errors: list[str] = []
 
     if not raw_output or raw_output.strip() == "":
-        logger.info("Bandit produced no output")
+        logger.debug("Bandit produced no output")
         return messages, file_errors, None
 
     try:
