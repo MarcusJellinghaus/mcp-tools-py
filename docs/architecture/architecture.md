@@ -42,6 +42,7 @@ Compared to a general-purpose bash MCP tool, this server offers a more controlle
 - **MCP Protocol** via STDIO transport, using `mcp` (FastMCP)
 - **Subprocess Execution**: All tools run as separate processes
 - **JSON Report**: Pytest results via `pytest-json-report` plugin
+- **No git operations**: git belongs to `mcp-workspace`. The one exception is the untracked-file pre-check in `move_module` (`refactoring/rope_tools.py`): rope moves files with `git mv` inside git repos and ignores failures, so the check runs `git` directly to fail early.
 
 ### Dependencies
 
