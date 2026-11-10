@@ -255,17 +255,18 @@ class TestFormatRuffFixReport:
         ]
         result = format_ruff_fix_report(changed, remaining)
 
-        assert "Ruff applied fixes to 2 files:" in result
+        assert "Ruff applied fixes to 2 files (src: 2):" in result
         assert "- src/a.py" in result
         assert "- src/b.py" in result
         assert "3 remaining issues (2 rule types) not auto-fixable:" in result
-        assert "- E501: 2 occurrences" in result
-        assert "- D100: 1 occurrences" in result
+        assert "- E501 undocumented-public-module: 2 occurrences (src: 2)" in result
+        assert "- D100 undocumented-public-module: 1 occurrence (src: 1)" in result
+        assert result.splitlines()[-1] == "Use run_ruff_check to see their locations."
 
     def test_no_remaining(self) -> None:
         changed = ["src/a.py"]
         result = format_ruff_fix_report(changed, [])
 
-        assert "Ruff applied fixes to 1 files:" in result
+        assert "Ruff applied fixes to 1 file (src: 1):" in result
         assert "- src/a.py" in result
         assert "remaining" not in result

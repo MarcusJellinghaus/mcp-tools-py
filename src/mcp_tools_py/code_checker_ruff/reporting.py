@@ -8,6 +8,7 @@ from collections import defaultdict
 from typing import List, NamedTuple, Optional
 
 from mcp_tools_py.utils.report_budget import (
+    SUMMARY_TOP,
     Location,
     render_locations,
     render_summary,
@@ -27,6 +28,9 @@ RULE_PREFIX_PRIORITY: dict[str, int] = {
     "D": 3,  # pydocstyle
     "DOC": 4,  # pydoclint
 }
+
+FIX_HINT = "Use run_ruff_check(max_issues=0) to list all remaining rules."
+FILES_HINT = "narrow target_directories to list fewer changed files"
 
 
 class RuffIssueGroup(NamedTuple):
@@ -160,20 +164,30 @@ def format_ruff_fix_report(
     Returns:
         Multi-line report listing fixes and any unfixed issues.
     """
-    lines: list[str] = [f"Ruff applied fixes to {len(changed_files)} files:"]
-    for filepath in changed_files:
-        lines.append(f"- {filepath}")
+    count = len(changed_files)
+    header = f"Ruff applied fixes to {plural(count, 'file')}"
+    if changed_files:
+        header += f" {format_dir_split(changed_files)}"
+    lines: list[str] = [header + ":"]
+    lines.extend(f"- {filepath}" for filepath in changed_files[:SUMMARY_TOP])
+    hidden = count - SUMMARY_TOP
+    if hidden > 0:
+        lines.append(f"... and {hidden} more files — {FILES_HINT}")
 
     if remaining_messages:
         groups = group_and_sort_issues(remaining_messages)
-        total_count = len(remaining_messages)
-        rule_count = len(groups)
-        lines.append("")
-        lines.append(
-            f"{total_count} remaining issues ({rule_count} rule types) "
+        title = (
+            f"{len(remaining_messages)} remaining issues ({len(groups)} rule types) "
             f"not auto-fixable:"
         )
-        for group in groups:
-            lines.append(f"- {group.code}: {len(group.messages)} occurrences")
+        lines.append("")
+        lines.extend(
+            render_summary(
+                _summary_rows(groups),
+                title=title,
+                hint=FIX_HINT,
+                detail_hint="Use run_ruff_check to see their locations.",
+            )
+        )
 
     return "\n".join(lines)
