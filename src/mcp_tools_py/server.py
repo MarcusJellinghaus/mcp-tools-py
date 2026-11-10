@@ -11,7 +11,7 @@ from mcp_tools_py.library_search import LibrarySearchTools
 from mcp_tools_py.log_utils import log_function_call
 from mcp_tools_py.refactoring import RefactoringTools
 from mcp_tools_py.utility_tools import UtilityTools
-from mcp_tools_py.utils.mcp_protocols import FastMCPProtocol
+from mcp_tools_py.utils.mcp_protocols import FastMCPProtocol, GuardedMCP
 from mcp_tools_py.utils.python_environment import PythonEnvironment
 from mcp_tools_py.utils.tool_context import CONSOLE_SCRIPT_TOOLS, ToolContext
 
@@ -61,12 +61,13 @@ class ToolServer:
             check_timeout=check_timeout,
         )
         self._warn_missing_console_scripts()
-        CheckerTools(self.context).register(self.mcp)
-        FormatterTools(self.context).register(self.mcp)
-        RefactoringTools(self.context, timeout=refactoring_timeout).register(self.mcp)
-        UtilityTools(self.context).register(self.mcp)
-        InspectTools(self.context).register(self.mcp)
-        LibrarySearchTools(self.context).register(self.mcp)
+        guarded = GuardedMCP(self.mcp)
+        CheckerTools(self.context).register(guarded)
+        FormatterTools(self.context).register(guarded)
+        RefactoringTools(self.context, timeout=refactoring_timeout).register(guarded)
+        UtilityTools(self.context).register(guarded)
+        InspectTools(self.context).register(guarded)
+        LibrarySearchTools(self.context).register(guarded)
 
     def _warn_missing_console_scripts(self) -> None:
         """Warn at startup about console scripts missing from the tool env.
