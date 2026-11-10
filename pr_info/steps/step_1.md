@@ -76,6 +76,7 @@ class GuardedMCP:
 lines = [l if len(l) <= LINE_CHARS else l[:LINE_CHARS] + f" [line truncated: {len(l)} chars]" for l in text.splitlines()]
 if len(lines) <= max_lines and len(joined lines) <= max_chars: return joined lines (no hint)
 room = max_lines - 2 (marker + hint) - 2 (reserved: one closing fence for head, one reopening fence for tail)
+if room < 1: return marker (+ "\n" + hint if hint), char-capped to max_chars   # no head/tail slicing
 head_n = 0 if keep == "tail" else room * 2 // 3; tail_n = room - head_n
 head, tail = lines[:head_n], lines[len(lines) - tail_n:]
 def fenced(head, tail): add "```" to the end of head if head has an odd number of lines starting with "```";
@@ -105,6 +106,8 @@ never exceeds `max_lines` or `max_chars`, fences included.
 - A fenced block of 1000 char-heavy lines cut with small limits (e.g. `max_lines=20`,
   `max_chars=2000`): the result, fences included, has ≤ `max_lines` lines and
   ≤ `max_chars` chars.
+- Parametrised over `max_lines` 1–4 with a 100-line text: no exception, the result holds
+  only the omitted marker (and the hint when given), with no head or tail lines.
 
 `tests/test_output_guard.py`:
 - Build `ToolServer(tmp_path)` (copy the setup used in `tests/test_server_params.py`).

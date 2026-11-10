@@ -51,8 +51,9 @@ compares key sets).
 7. **Toolkit `fix_text`.** `_result_from_findings` renders findings grouped by
    rule with `render_locations` and bounds the text at `TOOL_LINES`. `_merge`
    splits the budget evenly across the results that have a `fix_text`. vulture
-   and tach now go through `_result_from_findings`; mypy's and lint-imports'
-   direct setters are bounded by `_merge`, which every check depth goes through.
+   and tach now go through `_result_from_findings`; mypy's direct setter renders
+   through `_render_fix_text` (hint lines as `Location.details`) and is bounded
+   there; lint-imports' report is bounded by step 9 and split by `_merge`.
 
 ## Decisions taken for this plan
 

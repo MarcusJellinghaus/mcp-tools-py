@@ -12,6 +12,11 @@ and mypy until they pass, run `run_format_code`, and make one commit.
   `_get_failed_tests`)
 - `src/mcp_tools_py/utils/report_budget.py`: add `MAX_FAILURES`, `FAILED_IDS`
 - `src/mcp_tools_py/checker_tools/__init__.py`: update the call
+- `src/mcp_tools_py/code_checker_pytest/runners.py:562`: delete the
+  `create_prompt_for_failed_tests(test_results)` call and the `failed_tests_prompt` key of
+  the returned dict (and its docstring line). No source code reads that key; it relied on
+  the old default of 1 reported test. Update `tests/test_code_checker/test_runners.py`
+  (lines 189 and 319–320), which only assert on that key.
 - New test: `tests/test_code_checker_pytest/test_failure_budget.py`; update the existing
   failure-prompt tests in `tests/test_code_checker_pytest/test_reporting.py` (keep that
   file under 750 lines; move tests out if needed)
@@ -38,7 +43,9 @@ def _fenced(label: str, text: str, max_lines: int, max_chars: int) -> str: ...
 ## HOW
 - `_fenced(label, text, n, c)` returns
   `f"  {label}:\n```\n{bound_text(text, n - 3, c, keep='tail')}\n```"`. The fences are
-  written outside the bounded body, so they are always closed.
+  written outside the bounded body, so they are always closed. When `n - 3` is below
+  `bound_text`'s overhead, it relies on step 1's lower bound (marker and hint only, no
+  slicing), so a small leftover budget never raises.
 - `_render_test` writes sections in this order, each taking the budget left over:
   1. `Test ID: <nodeid> - outcome <outcome>`, then `  Error Message: <crash.message>`
   2. longrepr if present (`_fenced("Longrepr", ...)`), else the traceback entries

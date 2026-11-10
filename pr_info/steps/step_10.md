@@ -61,8 +61,9 @@ report: error → error text; no messages and unparsed → raw unparsed text (pa
 - `__init__.py` exports `run_vulture_check`, `VultureResult`, `format_vulture_report`.
 - `toolkit_checks._run_vulture` drops the string sentinels:
   - `result.error` → `ActionResult(status="error", summary=result.error)`;
-  - no messages and unparsed lines → `status="error"`, summary `bound_text` of the
-    unparsed text;
+  - no messages and unparsed lines → `status="error"`, summary
+    `_one_line(bound_text(raw, max_lines=5))` with `raw = "\n".join(result.unparsed)`
+    (one line, as in step 11);
   - otherwise `_result_from_findings(None, findings, "vulture found no issues.", f"vulture found {n} issue(s).", locations=[f"{m.file}:{m.line}" ...])`,
     with findings keyed `f"vulture|{m.file}|{m.kind}|{m.name or m.message}"`,
     `rule=m.kind`, `path=m.file`.
