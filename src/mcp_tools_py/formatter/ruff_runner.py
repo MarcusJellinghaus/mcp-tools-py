@@ -11,7 +11,6 @@ from mcp_tools_py.formatter.common import (
     combine_output,
     formatter_binary,
     relative_path,
-    truncate_output,
     version_line,
 )
 from mcp_tools_py.formatter.models import FormatterResult
@@ -129,7 +128,7 @@ def run_ruff_format(
         if parse_error:
             body = "\n".join(part for part in (parse_error, result.stderr) if part)
             return FormatterResult(
-                output=truncate_output(f"{banner}\n{body}"),
+                output=f"{banner}\n{body}",
                 success=False,
                 files_changed=[],
             )
@@ -142,7 +141,7 @@ def run_ruff_format(
         combined = combine_output(result)
 
     return FormatterResult(
-        output=truncate_output(f"{banner}\n{combined}"),
+        output=f"{banner}\n{combined}",
         success=result.return_code == 0,
         files_changed=_dedup([relative_path(p, project_dir) for p in changed]),
         unparsable_files=_dedup(
@@ -311,7 +310,7 @@ def run_ruff_imports(
         ]
         output = "\n".join(part for part in (*header, combined) if part)
         return FormatterResult(
-            output=truncate_output(output),
+            output=output,
             success=success,
             files_changed=changed or [],
             unparsable_files=unparsable or [],

@@ -9,7 +9,6 @@ import time
 from mcp_tools_py.formatter.common import (
     combine_output,
     formatter_binary,
-    truncate_output,
     version_line,
 )
 from mcp_tools_py.formatter.models import FormatterResult
@@ -115,7 +114,7 @@ def run_isort(
     banner = version_line("isort", binary, remaining)
 
     return FormatterResult(
-        output=truncate_output(f"{banner}\n{output}"),
+        output=f"{banner}\n{output}",
         success=result.return_code == 0 and not unparsable_files,
         files_changed=_parse_isort_changed_files(output),
         unparsable_files=unparsable_files,

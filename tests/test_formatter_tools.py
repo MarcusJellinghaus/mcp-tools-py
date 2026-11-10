@@ -7,6 +7,8 @@ import pytest
 
 from mcp_tools_py.formatter.formatter_tools import FormatterTools, _format_results
 from mcp_tools_py.formatter.models import FormatterResult
+from mcp_tools_py.utils.mcp_protocols import GuardedMCP
+from mcp_tools_py.utils.report_budget import GUARD_HINT, GUARD_LINES
 from mcp_tools_py.utils.tool_context import ToolContext
 
 
@@ -18,8 +20,11 @@ def _declare_formatter(tool_context: ToolContext) -> None:
     )
 
 
-def _capture_run_format_code(tool_context: ToolContext) -> Any:
-    """Register FormatterTools and capture the run_format_code function."""
+def _capture_run_format_code(tool_context: ToolContext, guarded: bool = False) -> Any:
+    """Register FormatterTools and capture the run_format_code function.
+
+    With `guarded`, registration goes through GuardedMCP as in ToolServer.
+    """
     captured_fns: dict[str, Any] = {}
 
     def capture(fn: Any) -> Any:
@@ -28,7 +33,7 @@ def _capture_run_format_code(tool_context: ToolContext) -> Any:
 
     mock_mcp = MagicMock()
     mock_mcp.tool.return_value = capture
-    FormatterTools(tool_context).register(mock_mcp)
+    FormatterTools(tool_context).register(GuardedMCP(mock_mcp) if guarded else mock_mcp)
     return captured_fns["run_format_code"]
 
 
@@ -311,6 +316,23 @@ class TestOutput:
         assert "ERROR: ruff_imports could not read 1 file(s)" in result
         assert "ERROR: ruff_format could not read 1 file(s)" in result
         assert "Formatting stopped" not in result
+
+    def test_large_output_bounded_by_guard(self, tool_context: ToolContext) -> None:
+        """1000 output lines reach the caller bounded by the global guard."""
+        run_format = _capture_run_format_code(tool_context, guarded=True)
+        big = "\n".join(f"would reformat src/m{i}.py" for i in range(1000))
+
+        mock_runner = MagicMock(
+            return_value={"black": _make_formatter_result(output=big, success=False)}
+        )
+
+        with patch(_RUNNER_PATCH, mock_runner):
+            result = run_format(
+                steps=["black"], target_directories=["src"], check_only=True
+            )
+
+        assert len(result.splitlines()) <= GUARD_LINES
+        assert result.endswith(GUARD_HINT)
 
 
 class TestTimeouts:
