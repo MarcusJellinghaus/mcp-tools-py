@@ -5,40 +5,60 @@ from unittest.mock import patch
 
 import pytest
 
-from mcp_tools_py.code_checker_tach.runners import run_tach_check
+from mcp_tools_py.code_checker_tach.runners import TachResult, run_tach_check
 from tests.conftest import make_command_result
+from tests.test_code_checker_tach.test_parsers import (
+    CONFIG_ERROR_TEXT,
+    VIOLATIONS_JSON,
+)
 
 MODULE_PATH = "mcp_tools_py.code_checker_tach.runners"
 
 
 @pytest.mark.parametrize(
-    ("return_code", "stdout", "stderr", "expected"),
+    ("return_code", "stdout", "stderr", "raw"),
     [
-        (0, '{"errors": []}\n', "", 'tach check passed:\n{"errors": []}'),
-        (
-            0,
-            '{"errors": []}',
-            "warning: deprecated",
-            'tach check passed:\n{"errors": []}\nwarning: deprecated',
-        ),
-        (0, "", "", "tach check passed (no output)."),
-        (1, '{"errors": []}', "", 'tach check failed:\n{"errors": []}'),
-        (1, "", "error: bad config", "tach check failed:\nerror: bad config"),
-        (1, "", "", "tach check failed (exit code 1, no output)."),
+        (0, '{"errors": []}\n', "", '{"errors": []}'),
+        (0, "", "warning: deprecated", "warning: deprecated"),
+        (1, CONFIG_ERROR_TEXT, "", CONFIG_ERROR_TEXT.strip()),
+        (1, "not json", "error: bad config", "not json\nerror: bad config"),
     ],
 )
 @patch(f"{MODULE_PATH}.execute_command")
-def test_run_tach_status_line_follows_exit_code(
-    mock_exec: Any, return_code: int, stdout: str, stderr: str, expected: str
+def test_run_tach_unparsed_output_is_raw(
+    mock_exec: Any, return_code: int, stdout: str, stderr: str, raw: str
 ) -> None:
-    """The status line depends on the exit code; tach's output follows it."""
+    """Output that is not tach's JSON is kept, combined, in `raw`."""
     mock_exec.return_value = make_command_result(
         return_code=return_code, stdout=stdout, stderr=stderr
     )
 
     result = run_tach_check(tach_binary="/usr/bin/tach", project_dir="/project")
 
-    assert result == expected
+    assert result == TachResult(None, return_code, [], raw)
+
+
+@pytest.mark.parametrize("return_code", [0, 1])
+@patch(f"{MODULE_PATH}.execute_command")
+def test_run_tach_no_output(mock_exec: Any, return_code: int) -> None:
+    """No output parses to no diagnostics and keeps the exit code."""
+    mock_exec.return_value = make_command_result(return_code=return_code)
+
+    result = run_tach_check(tach_binary="/usr/bin/tach", project_dir="/project")
+
+    assert result == TachResult(None, return_code, [], None)
+
+
+@patch(f"{MODULE_PATH}.execute_command")
+def test_run_tach_parses_json(mock_exec: Any) -> None:
+    """tach's JSON parses into diagnostics."""
+    mock_exec.return_value = make_command_result(return_code=1, stdout=VIOLATIONS_JSON)
+
+    result = run_tach_check(tach_binary="/usr/bin/tach", project_dir="/project")
+
+    assert result.raw is None
+    assert result.return_code == 1
+    assert [d.severity for d in result.diagnostics] == ["error", "error", "warning"]
 
 
 @patch(f"{MODULE_PATH}.execute_command")
@@ -65,9 +85,7 @@ def test_run_tach_timeout_reports_timeout(mock_exec: Any) -> None:
         tach_binary="/usr/bin/tach", project_dir="/project", timeout_seconds=45
     )
 
-    assert "timed out" in result
-    assert "45" in result
-    assert "passed" not in result
+    assert result.error == "tach check timed out after 45 seconds."
 
 
 @patch(f"{MODULE_PATH}.execute_command")
@@ -79,8 +97,7 @@ def test_run_tach_execution_error_reports_failure(mock_exec: Any) -> None:
 
     result = run_tach_check(tach_binary="/usr/bin/tach", project_dir="/project")
 
-    assert "FileNotFoundError: tach" in result
-    assert "passed" not in result
+    assert result.error == "tach check failed to run: FileNotFoundError: tach"
 
 
 @patch(f"{MODULE_PATH}.execute_command")

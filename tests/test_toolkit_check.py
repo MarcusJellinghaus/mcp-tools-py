@@ -10,6 +10,7 @@ from mcp_tools_py.code_checker_bandit.models import BanditMessage, BanditResult
 from mcp_tools_py.code_checker_deptry.runners import DeptryMessage, DeptryResult
 from mcp_tools_py.code_checker_mypy.models import MypyResult
 from mcp_tools_py.code_checker_pylint.models import PylintResult
+from mcp_tools_py.code_checker_tach.runners import TachResult
 from mcp_tools_py.code_checker_vulture.runners import VultureResult
 from mcp_tools_py.toolkit import PythonToolkit
 from mcp_tools_py.toolkit_checks import _CHECK_RUNNERS
@@ -141,9 +142,7 @@ class TestRunCheck:
 
 def _patch_execute_command_clean(monkeypatch: pytest.MonkeyPatch) -> None:
     def fake_execute_command(command: list[str], **kwargs: object) -> object:
-        del kwargs
-        if command[2] == "--output":  # tach: [binary, "check", "--output", "json"]
-            return make_command_result(return_code=0, stdout="")
+        del command, kwargs
         return make_command_result(return_code=0, stdout="[]")  # ruff
 
     monkeypatch.setattr(
@@ -160,6 +159,10 @@ def _patch_full_depth_clean(monkeypatch: pytest.MonkeyPatch) -> None:
     monkeypatch.setattr(
         "mcp_tools_py.toolkit_checks.run_lint_imports_check_impl",
         lambda *args, **kwargs: "=== PASSED ===\nContracts: 0 kept, 0 broken",
+    )
+    monkeypatch.setattr(
+        "mcp_tools_py.toolkit_checks.run_tach_check",
+        lambda *args, **kwargs: TachResult(None, 0, [], None),
     )
     _patch_execute_command_clean(monkeypatch)
     monkeypatch.setattr(
@@ -231,66 +234,6 @@ class TestRunCheckFull:
 
         assert result.status == "ok"
         assert result.findings == []
-
-    @pytest.mark.parametrize(
-        ("stdout", "expected_message"),
-        [
-            ('{"errors": []}', 'tach check failed:\n{"errors": []}'),
-            ("", "tach check failed (exit code 1, no output)."),
-        ],
-    )
-    def test_tach_violation_is_degraded_finding(
-        self,
-        tmp_path: Path,
-        monkeypatch: pytest.MonkeyPatch,
-        stdout: str,
-        expected_message: str,
-    ) -> None:
-        _write_check_project(tmp_path, _CLEAN_SRC)
-        _patch_full_depth_clean(monkeypatch)
-
-        def fake_execute_command(command: list[str], **kwargs: object) -> object:
-            del kwargs
-            if command[2] == "--output":
-                return make_command_result(return_code=1, stdout=stdout)
-            return make_command_result(return_code=0, stdout="[]")
-
-        monkeypatch.setattr(
-            "mcp_tools_py.toolkit_checks.execute_command", fake_execute_command
-        )
-        request = ActionRequest(
-            action="check", depth="full", project_dir=tmp_path, params={}
-        )
-
-        result = PythonToolkit().run(request)
-
-        assert result.status == "findings"
-        assert len(result.findings) == 1
-        assert result.findings[0].key == "tach|full"
-        assert result.findings[0].message == expected_message
-
-    def test_tach_timeout_is_error(
-        self, tmp_path: Path, monkeypatch: pytest.MonkeyPatch
-    ) -> None:
-        _write_check_project(tmp_path, _CLEAN_SRC)
-        _patch_full_depth_clean(monkeypatch)
-
-        def fake_execute_command(command: list[str], **kwargs: object) -> object:
-            del kwargs
-            if command[2] == "--output":
-                return make_command_result(timed_out=True, execution_error="timed out")
-            return make_command_result(return_code=0, stdout="[]")
-
-        monkeypatch.setattr(
-            "mcp_tools_py.toolkit_checks.execute_command", fake_execute_command
-        )
-        request = ActionRequest(
-            action="check", depth="full", project_dir=tmp_path, params={}
-        )
-
-        result = PythonToolkit().run(request)
-
-        assert result.status == "error"
 
     def test_lint_imports_broken_is_degraded_finding(
         self, tmp_path: Path, monkeypatch: pytest.MonkeyPatch

@@ -83,9 +83,9 @@ See [step_10.md](./steps/step_10.md)
 
 ### Step 11: tach structured output
 See [step_11.md](./steps/step_11.md)
-- [ ] Implementation (tests + production code)
-- [ ] Quality checks: pylint, pytest, mypy — fix all issues
-- [ ] Commit message prepared
+- [x] Implementation (tests + production code)
+- [x] Quality checks: pylint, pytest, mypy — fix all issues
+- [x] Commit message prepared
 
 ### Step 12: ruff fix report
 See [step_12.md](./steps/step_12.md)

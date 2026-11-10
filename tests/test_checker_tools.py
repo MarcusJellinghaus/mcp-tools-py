@@ -9,6 +9,8 @@ import pytest
 
 from mcp_tools_py.checker_tools import CheckerTools
 from mcp_tools_py.code_checker_mypy.reporting import MYPY_SUCCESS_TEXT
+from mcp_tools_py.code_checker_tach.parsers import TachDiagnostic
+from mcp_tools_py.code_checker_tach.runners import TachResult
 from mcp_tools_py.code_checker_vulture.parsers import VultureMessage
 from mcp_tools_py.code_checker_vulture.runners import VultureResult
 from mcp_tools_py.utils.python_environment import PythonEnvironment
@@ -697,13 +699,13 @@ def test_tach_unavailable_returns_error(tool_context: ToolContext) -> None:
     assert "tach is not available" in result
 
 
-def test_tach_success_returns_raw_output(tool_context: ToolContext) -> None:
-    """When tach succeeds, return the runner's output."""
+def test_tach_success_returns_report(tool_context: ToolContext) -> None:
+    """When tach succeeds, return the formatted report."""
     run_tach_check = _capture_tool(tool_context, "run_tach_check")
 
     with patch(
         "mcp_tools_py.checker_tools.tach_tool.run_tach",
-        return_value="tach check passed (no output).",
+        return_value=TachResult(None, 0, [], None),
     ) as mock_runner:
         result = run_tach_check()
 
@@ -713,3 +715,18 @@ def test_tach_success_returns_raw_output(tool_context: ToolContext) -> None:
         project_dir=str(tool_context.project_dir),
         timeout_seconds=120,
     )
+
+
+def test_tach_max_issues_reaches_the_report(tool_context: ToolContext) -> None:
+    """max_issues=0 renders counts only."""
+    run_tach_check = _capture_tool(tool_context, "run_tach_check")
+    diagnostic = TachDiagnostic("a/x.py", 1, "error", "K", "a", "b", "K: a -> b")
+
+    with patch(
+        "mcp_tools_py.checker_tools.tach_tool.run_tach",
+        return_value=TachResult(None, 1, [diagnostic], None),
+    ):
+        result = run_tach_check(max_issues=0)
+
+    assert "Locations:" not in result
+    assert "- [error] K: a -> b: 1 occurrence" in result

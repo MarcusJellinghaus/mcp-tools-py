@@ -4,6 +4,7 @@ from pathlib import Path
 from typing import Any
 from unittest.mock import patch
 
+from mcp_tools_py.code_checker_tach.runners import TachResult
 from tests._pytest_results import make_pytest_results
 from tests.conftest import make_environment_info
 from tests.test_tool_availability._helpers import (
@@ -198,8 +199,9 @@ class TestToolHandlerShortCircuit:
                 )
 
             with patch(
-                "mcp_tools_py.checker_tools.tach_tool.run_tach", return_value="ok"
+                "mcp_tools_py.checker_tools.tach_tool.run_tach",
+                return_value=TachResult(None, 0, [], None),
             ):
                 result = tools["run_tach_check"]()
 
-        assert result == "ok"
+        assert result == "tach check passed (no output)."

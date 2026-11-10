@@ -11,7 +11,8 @@ from mcp_tools_py.code_checker_lint_imports.runners import run_lint_imports_chec
 from mcp_tools_py.code_checker_mypy.reporting import format_hint_lines, run_signals
 from mcp_tools_py.code_checker_mypy.runners import MYPY_EXIT_PREFIX, run_mypy_check
 from mcp_tools_py.code_checker_pylint.runners import get_pylint_results
-from mcp_tools_py.code_checker_tach.runners import format_tach_result
+from mcp_tools_py.code_checker_tach.reporting import format_tach_report
+from mcp_tools_py.code_checker_tach.runners import run_tach_check
 from mcp_tools_py.code_checker_vulture.runners import run_vulture_check
 from mcp_tools_py.utils.project_config import (
     resolve_source_directories,
@@ -313,47 +314,63 @@ def _run_lint_imports(context: ToolContext, depth: str) -> ActionResult:
 def _run_tach(context: ToolContext, depth: str) -> ActionResult:
     """Run tach and map the outcome onto an ActionResult.
 
-    `code_checker_tach.runners.run_tach_check` returns only text, so this
-    builds and runs the same command itself to read the return code, and
-    shares that runner's `format_tach_result` for the finding's message.
-    tach's output has no stable per-location key, so a finding is reported
-    once, keyed `tach|{depth}`.
+    Error diagnostics become findings keyed
+    `tach|<file>|<usage_module>|<dependency>`; warnings are named in the
+    summary only. Output that is not tach's JSON has no stable key, so on a
+    non-zero exit it is reported once, keyed `tach|{depth}`.
 
     Returns:
         "error" if tach timed out or failed to run; "findings" with one
-        degraded Finding on a non-zero exit; else "ok".
+        Finding per error diagnostic, or one degraded Finding when a failed
+        run's output could not be parsed; else "ok".
     """
     binary = context.tool_environment.binary("tach")
     if binary is None:
         return ActionResult(status="error", summary=context.unavailable_message("tach"))
 
-    timeout_seconds = context.resolve_timeout("tach")
-    result = execute_command(
-        [str(binary), "check", "--output", "json"],
-        cwd=str(context.project_dir),
-        timeout_seconds=timeout_seconds,
+    result = run_tach_check(
+        tach_binary=str(binary),
+        project_dir=str(context.project_dir),
+        timeout_seconds=context.resolve_timeout("tach"),
     )
-    if result.timed_out:
+    if result.error is not None:
+        return ActionResult(status="error", summary=result.error)
+    if result.raw is not None and result.return_code == 0:
+        unparsed = _one_line(bound_text(result.raw, max_lines=5))
         return ActionResult(
-            status="error",
-            summary=f"tach check timed out after {timeout_seconds} seconds.",
+            status="ok", summary=f"tach check passed; unparsed output: {unparsed}"
         )
-    if result.execution_error:
+    if result.raw is not None or (result.return_code and not result.diagnostics):
+        report = format_tach_report(result)
+        finding = Finding(key=f"tach|{depth}", message=report)
         return ActionResult(
-            status="error",
-            summary=f"tach check failed to run: {result.execution_error}",
+            status="findings",
+            summary="tach found architecture boundary violations.",
+            findings=[finding],
+            fix_text=report,
         )
 
-    if result.return_code == 0:
-        return ActionResult(status="ok", summary="tach found no issues.")
-
-    message = format_tach_result(result)
-    finding = Finding(key=f"tach|{depth}", message=message)
-    return ActionResult(
-        status="findings",
-        summary="tach found architecture boundary violations.",
-        findings=[finding],
-        fix_text=message,
+    errors = [d for d in result.diagnostics if d.severity == "error"]
+    warnings = [d.message for d in result.diagnostics if d.severity != "error"]
+    suffix = ""
+    if warnings:
+        suffix = f"; tach: {len(warnings)} warning(s): {', '.join(warnings[:3])}"
+    findings = [
+        Finding(
+            key=f"tach|{d.file}|{d.usage_module}|{d.dependency}",
+            message=d.message,
+            path=d.file,
+            rule=d.kind,
+            severity=d.severity,
+        )
+        for d in errors
+    ]
+    return _result_from_findings(
+        None,
+        findings,
+        f"tach found no issues.{suffix}",
+        f"tach found {len(findings)} issue(s).{suffix}",
+        locations=[f"{d.file}:{d.line}" if d.file else None for d in errors],
     )
 
 
