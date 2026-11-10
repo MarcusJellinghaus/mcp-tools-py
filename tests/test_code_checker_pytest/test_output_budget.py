@@ -6,6 +6,7 @@ from unittest.mock import MagicMock, patch
 
 import pytest
 
+from mcp_tools_py.checker_tools.pytest_tool import DIGEST_HINT
 from mcp_tools_py.code_checker_pytest.models import (
     Collector,
     CollectorResult,
@@ -26,9 +27,16 @@ from mcp_tools_py.code_checker_pytest.verdict import (
     cap_problems,
     format_collect_only_text,
 )
-from mcp_tools_py.utils.report_budget import GUARD_HINT, GUARD_LINES, TOOL_LINES
+from mcp_tools_py.utils.report_budget import (
+    GUARD_CHARS,
+    GUARD_HINT,
+    GUARD_LINES,
+    TOOL_LINES,
+)
 from tests._pytest_results import make_pytest_results
 from tests.conftest import make_environment_info
+from tests.test_code_checker_pytest._coverage_report import _file
+from tests.test_code_checker_pytest._coverage_report import _report as _coverage_report
 
 _PYTEST_TOOL = "mcp_tools_py.checker_tools.pytest_tool"
 _COVERAGE_DATA: dict[str, Any] = {
@@ -167,3 +175,56 @@ def test_coverage_digest_and_failures_fit_under_the_guard(
     assert "Failed tests without details" in result
     assert "tests/t.py::test_14" in result
     assert digest in result
+
+
+def _wide_failed(i: int) -> Test:
+    longrepr = "\n".join(f"    frame {j} " + "x" * 200 for j in range(200))
+    call = StageInfo(
+        duration=0.1,
+        outcome="failed",
+        crash=Crash(path="tests/t.py", lineno=3, message=f"AssertionError {i}"),
+        longrepr=f"{longrepr}\nE   assert {i} == -1",
+    )
+    return Test(
+        nodeid=f"tests/t.py::test_{i}",
+        lineno=1,
+        keywords=[],
+        outcome="failed",
+        call=call,
+    )
+
+
+def test_large_digest_and_long_failures_are_not_cut_by_the_guard(
+    run_pytest_check: Any,
+) -> None:
+    """A large max_modules digest is bounded itself; failures keep their details."""
+    functions = {f"func_{k}": list(range(k * 20, k * 20 + 15, 2)) for k in range(6)}
+    files = {
+        f"src/package_{n}/very_long_module_name_{n}.py": _file(
+            400, list(range(1, 300, 2)), functions
+        )
+        for n in range(200)
+    }
+    failed = [_wide_failed(i) for i in range(3)]
+    report = _report(failed, Summary(collected=3, total=3, failed=3))
+    with (
+        patch(f"{_PYTEST_TOOL}.check_code_with_pytest") as mock_check,
+        patch(
+            f"{_PYTEST_TOOL}.read_coverage_report", return_value=_coverage_report(files)
+        ),
+    ):
+        mock_check.return_value = make_pytest_results(
+            RunStatus.FAILED,
+            summary={"failed": 3, "collected": 3},
+            test_results=report,
+        )
+        result = run_pytest_check(
+            coverage=True, coverage_source=["src"], max_modules=200
+        )
+
+    assert GUARD_HINT not in result
+    assert len(result.splitlines()) < GUARD_LINES
+    assert len(result) < GUARD_CHARS
+    for i in range(3):
+        assert f"E   assert {i} == -1" in result
+    assert DIGEST_HINT in result

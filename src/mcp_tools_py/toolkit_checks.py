@@ -364,7 +364,8 @@ def _run_tach(context: ToolContext, depth: str) -> ActionResult:
     """Run tach and map the outcome onto an ActionResult.
 
     Error diagnostics become findings keyed
-    `tach|<file>|<usage_module>|<dependency>`; warnings are named in the
+    `tach|<kind>|<file>|<usage_module>|<dependency>`, so diagnostics with no
+    module pair still differ by kind; warnings are named in the
     summary only. Output that is not tach's JSON has no stable key, so on a
     non-zero exit it is reported once, keyed `tach|{depth}`.
 
@@ -406,7 +407,7 @@ def _run_tach(context: ToolContext, depth: str) -> ActionResult:
         suffix = f"; tach: {len(warnings)} warning(s): {', '.join(warnings[:3])}"
     findings = [
         Finding(
-            key=f"tach|{d.file}|{d.usage_module}|{d.dependency}",
+            key=f"tach|{d.kind}|{d.file}|{d.usage_module}|{d.dependency}",
             message=d.message,
             path=d.file,
             rule=d.kind,

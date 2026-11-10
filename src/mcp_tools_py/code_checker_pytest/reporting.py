@@ -31,6 +31,9 @@ CLOSING_QUESTION = (
 TESTS_HEADER = "The following tests failed during the test session:"
 SEPARATOR = "=" * 79
 MIN_TEST_LINES = 6
+MIN_FENCED_LINES = 8
+DROPPED_NOTICE = "  Not shown, budget used up:"
+DROPPED_NOTICE_CHARS = 200
 FENCE = "```"
 NO_CAPTURED_OUTPUT_NOTE = "Note: no passing test produced captured output."
 XDIST_MARKER = "Different tests were collected"
@@ -205,20 +208,31 @@ def _traceback(label: str, entries: List[TracebackEntry]) -> str:
 
 
 class _Sections:
-    """Sections kept in order while they fit in what is left of a budget."""
+    """Sections kept in order while they fit in what is left of a budget.
+
+    One line and DROPPED_NOTICE_CHARS are held back for the notice naming
+    the fenced sections that did not fit.
+    """
 
     def __init__(self, max_lines: int, max_chars: int) -> None:
         self.parts: List[str] = []
-        self.lines = max_lines
-        self.chars = max_chars
+        self.dropped: List[str] = []
+        self.lines = max_lines - 1
+        self.chars = max_chars - DROPPED_NOTICE_CHARS
 
-    def add(self, text: str) -> None:
-        """Append `text` if it fits; otherwise skip it."""
+    def add(self, text: str) -> bool:
+        """Append `text` if it fits; otherwise skip it.
+
+        Returns:
+            Whether `text` was appended.
+        """
         lines, chars = _line_count(text), len(text) + 1
-        if lines <= self.lines and chars <= self.chars:
-            self.parts.append(text)
-            self.lines -= lines
-            self.chars -= chars
+        if lines > self.lines or chars > self.chars:
+            return False
+        self.parts.append(text)
+        self.lines -= lines
+        self.chars -= chars
+        return True
 
     def bounded(self, text: str, share: int = 1) -> None:
         """Append `text` bounded to 1/`share` of the budget left."""
@@ -229,9 +243,28 @@ class _Sections:
         )
 
     def fenced(self, label: str, text: Optional[str]) -> None:
-        """Append `text` as a tail-kept fenced section, if there is any."""
-        if text:
-            self.add(_fenced(label, text, self.lines, self.chars - 1))
+        """Append `text` as a tail-kept fenced section, if there is any.
+
+        A section left too little room to show its text is recorded as dropped.
+        """
+        if not text:
+            return
+        count = _line_count(text)
+        roomy = self.lines >= min(count + 3, MIN_FENCED_LINES)
+        if not (roomy and self.add(_fenced(label, text, self.lines, self.chars - 1))):
+            self.dropped.append(f"{label} ({count} {plural(count, 'line')})")
+
+    def text(self) -> str:
+        """Join the sections, then the notice naming any dropped ones.
+
+        Returns:
+            The rendered sections.
+        """
+        parts = list(self.parts)
+        if self.dropped:
+            notice = f"{DROPPED_NOTICE} {', '.join(self.dropped)}"
+            parts.append(notice[:DROPPED_NOTICE_CHARS])
+        return "\n".join(parts)
 
 
 def _render_setup(out: _Sections, setup: StageInfo, include_print_output: bool) -> None:
@@ -280,7 +313,7 @@ def _render_test(
             out.fenced("Stdout", call.stdout)
     if test.setup and test.setup.outcome == "failed":
         _render_setup(out, test.setup, include_print_output)
-    return "\n".join(out.parts)
+    return out.text()
 
 
 def _collector_part(report: PytestReport, max_lines: int, max_chars: int) -> str:
@@ -385,7 +418,7 @@ def create_prompt_for_failed_tests(
 
 @log_function_call
 def create_prompt_for_passing_output(
-    report: PytestReport, max_lines: int = TOOL_LINES
+    report: PytestReport, max_lines: int = TOOL_LINES, max_chars: int = TOOL_CHARS
 ) -> str:
     """List the captured stdout and stderr of tests that did not fail.
 
@@ -394,6 +427,7 @@ def create_prompt_for_passing_output(
     Args:
         report: The test session result to read output from
         max_lines: Line budget; a cut ends with SHOW_OUTPUT_HINT
+        max_chars: Character budget
 
     Returns:
         The captured output per test, or NO_CAPTURED_OUTPUT_NOTE if no test printed
@@ -427,7 +461,7 @@ def create_prompt_for_passing_output(
     if not parts:
         return NO_CAPTURED_OUTPUT_NOTE
     output = "Captured output of passing tests:\n" + "".join(parts)
-    return bound_text(output, max_lines, hint=SHOW_OUTPUT_HINT)
+    return bound_text(output, max_lines, max_chars, hint=SHOW_OUTPUT_HINT)
 
 
 def get_detailed_test_summary(

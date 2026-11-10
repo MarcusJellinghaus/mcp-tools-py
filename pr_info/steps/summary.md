@@ -40,7 +40,7 @@ compares key sets).
    strings, which removes the vulture string sentinels and the duplicated tach
    command in `toolkit_checks`. Both tools gain `max_issues`. Toolkit keys
    become precise: `vulture|<file>|<kind>|<name-or-message>` and
-   `tach|<file>|<usage_module>|<dependency>`. tach warnings go into `summary`
+   `tach|<kind>|<file>|<usage_module>|<dependency>`. tach warnings go into `summary`
    only. Unparseable output passes through raw, bounded by the guard.
 6. **pytest failure rendering.** Each test gets its own share of the budget,
    in this order: message → longrepr (tail-kept) → stderr → stdout (tail-kept).

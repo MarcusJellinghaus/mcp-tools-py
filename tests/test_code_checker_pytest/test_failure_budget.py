@@ -136,3 +136,21 @@ def test_print_output_can_be_excluded() -> None:
 
     assert prompt is not None
     assert "hello from stdout" not in prompt
+
+
+def test_sections_dropped_after_a_long_longrepr_are_named() -> None:
+    longrepr = "\n".join(f"    frame {i}" for i in range(1000)) + "\nE   assert 0"
+    test = _failed_test(
+        "tests/t.py::test_0",
+        longrepr=longrepr,
+        stdout="\n".join(f"print {i}" for i in range(40)),
+    )
+    assert test.call is not None
+    test.call.stderr = "warn 1\nwarn 2"
+
+    prompt = create_prompt_for_failed_tests(_report([test]))
+
+    assert prompt is not None
+    assert "E   assert 0" in prompt
+    assert "Not shown, budget used up: Stderr (2 lines), Stdout (40 lines)" in prompt
+    assert len(prompt.splitlines()) <= TOOL_LINES

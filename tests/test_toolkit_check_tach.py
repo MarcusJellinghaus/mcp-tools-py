@@ -51,13 +51,39 @@ def test_errors_are_findings_and_warnings_are_summary(
 
     assert result.status == "findings"
     assert [finding.key for finding in result.findings] == [
-        "tach|a/x.py|a|b",
-        "tach|a/w.py|a|b",
+        "tach|UndeclaredDependency|a/x.py|a|b",
+        "tach|UndeclaredDependency|a/w.py|a|b",
     ]
     assert result.findings[0].rule == "UndeclaredDependency"
     assert "tach found 2 issue(s)." in result.summary
     assert "tach: 1 warning(s): DeprecatedDependency: c -> b" in result.summary
     assert "- a/x.py: 1 — " in result.fix_text
+
+
+def test_new_kind_without_module_pair_is_a_new_key(
+    tmp_path: Path, monkeypatch: pytest.MonkeyPatch
+) -> None:
+    """A new error of another kind in the same file shows up in the key diff."""
+    first = _parsed(VIOLATIONS_JSON, 1).diagnostics[0]
+    old = first._replace(
+        kind="UnusedIgnoreDirective", usage_module=None, dependency=None
+    )
+    new = old._replace(kind="MissingIgnoreDirectiveReason")
+    (tmp_path / "before").mkdir()
+    (tmp_path / "after").mkdir()
+    baseline = _run_full(
+        tmp_path / "before", monkeypatch, TachResult(None, 1, [old], None)
+    )
+    after = _run_full(
+        tmp_path / "after", monkeypatch, TachResult(None, 1, [old, new], None)
+    )
+
+    before_keys = {finding.key for finding in baseline.findings}
+    after_keys = {finding.key for finding in after.findings}
+
+    assert after_keys - before_keys == {
+        "tach|MissingIgnoreDirectiveReason|a/x.py|None|None"
+    }
 
 
 def test_warnings_only_is_ok(tmp_path: Path, monkeypatch: pytest.MonkeyPatch) -> None:

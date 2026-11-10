@@ -29,13 +29,17 @@ from mcp_tools_py.utils.project_config import (
     get_pytest_addopts,
     resolve_coverage_source,
 )
-from mcp_tools_py.utils.report_budget import TOOL_LINES
+from mcp_tools_py.utils.report_budget import TOOL_CHARS, TOOL_LINES, bound_text
 
 if TYPE_CHECKING:
     from mcp_tools_py.checker_tools import CheckerTools
     from mcp_tools_py.utils.mcp_protocols import FastMCPProtocol
 
 logger = logging.getLogger(__name__)
+
+DIGEST_HINT = (
+    "Use a smaller max_modules or narrow coverage_source to see the digest in full."
+)
 
 
 def register(mcp: "FastMCPProtocol", checker_tools: "CheckerTools") -> None:
@@ -275,9 +279,14 @@ def register(mcp: "FastMCPProtocol", checker_tools: "CheckerTools") -> None:
                     )
                 digest = "\n".join([digest, *finished.notes])
 
-            max_lines = TOOL_LINES
+            # Digest and failures share the per-tool budget, so the guard never cuts them
+            max_lines, max_chars = TOOL_LINES, TOOL_CHARS
             if digest is not None:
-                max_lines = max(TOOL_LINES // 2, TOOL_LINES - digest.count("\n") - 1)
+                digest = bound_text(
+                    digest, TOOL_LINES // 2, TOOL_CHARS // 2, hint=DIGEST_HINT
+                )
+                max_lines -= digest.count("\n") + 1
+                max_chars -= len(digest)
 
             # Always show detailed failure output
             result = checker_tools._format_pytest_result_with_details(
@@ -286,6 +295,7 @@ def register(mcp: "FastMCPProtocol", checker_tools: "CheckerTools") -> None:
                 show_output=sanitized.show_output,
                 collect_only=sanitized.collect_only,
                 max_lines=max_lines,
+                max_chars=max_chars,
             )
 
             # Prepend the test-paths and deduplication notes so LLM can self-correct
