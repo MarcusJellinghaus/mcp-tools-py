@@ -101,9 +101,9 @@ See [step_13.md](./steps/step_13.md)
 
 ### Step 14: Documentation
 See [step_14.md](./steps/step_14.md)
-- [ ] Implementation (documentation updates)
-- [ ] Quality checks: pylint, pytest, mypy — fix all issues
-- [ ] Commit message prepared
+- [x] Implementation (documentation updates)
+- [x] Quality checks: pylint, pytest, mypy — fix all issues
+- [x] Commit message prepared
 
 ## Pull Request
 - [ ] PR review: review full branch diff against `main`, address findings

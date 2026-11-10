@@ -1,6 +1,6 @@
 # MCP Tools Py Architecture Documentation
 
-**Framework**: Arc42 Template | **Version**: 1.3 | **Last Updated**: 2026-09-01
+**Framework**: Arc42 Template | **Version**: 1.4 | **Last Updated**: 2026-11-10
 **Maintainer**: Marcus Jellinghaus | **Review Frequency**: On major changes
 
 ---
@@ -12,7 +12,7 @@ MCP server providing automated code quality checking (pylint, pytest, mypy, dept
 
 **Scope:** This server covers Python projects only. Support for other languages can be provided through separate, dedicated MCP servers with similar functionality.
 
-Compared to a general-purpose bash MCP tool, this server offers a more controlled approach: only a defined set of tools can be executed, all operations are sandboxed within `project_dir`, output is size-limited to reduce context load, and behavior is transparent via open source code and detailed structured logging.
+Compared to a general-purpose bash MCP tool, this server offers a more controlled approach: only a defined set of tools can be executed, all operations are sandboxed within `project_dir`, output is size-limited to reduce context load (see [output-conventions.md](output-conventions.md)), and behavior is transparent via open source code and detailed structured logging.
 
 ### Key Features
 - **Checker Integrations**: Nine checkers exposed as ten tools — pylint, pytest, mypy, deptry, ruff (check and fix), bandit, vulture, tach, import-linter — each formatting findings as an LLM-actionable prompt
@@ -99,6 +99,7 @@ See `pyproject.toml` for version constraints.
 - **Consistent Checker Pattern**: Each checker package follows the same `models`/`parsers`/`reporting`/`runners` structure, using only the files its tool needs
 - **Subprocess Isolation**: File-based STDIO redirection to prevent MCP transport conflicts
 - **LLM Prompt Generation**: Results transformed into actionable prompts, not raw output
+- **Bounded Output**: Every response is size-limited at the presentation layer, with counted cuts and drill-in hints — see [output-conventions.md](output-conventions.md)
 
 ### Architecture Patterns
 - **Module Pattern**: Each checker is a self-contained package
@@ -143,14 +144,16 @@ See `pyproject.toml` for version constraints.
 ### Checker Module Pattern
 
 Each checker is a package following the same internal structure. Files are present only
-when the tool needs them — simple checkers (`vulture`, `tach`, `lint_imports`) are
-`runners.py` alone.
+when the tool needs them — `vulture` and `tach` keep their NamedTuple models in
+`parsers.py` beside `reporting.py` and `runners.py`; `lint_imports` is `runners.py` alone.
+Output size, grouping and drill-in hints follow
+[output-conventions.md](output-conventions.md).
 
 | File | Responsibility |
 |------|---------------|
 | `models.py` | Data classes for tool output (e.g., `PylintMessage`, `PytestReport`) |
 | `parsers.py` | Parse raw tool output into model objects |
-| `reporting.py` | Format parsed results into LLM-optimized prompts |
+| `reporting.py` | Format parsed results into bounded, LLM-optimized prompts ([output-conventions.md](output-conventions.md)) |
 | `runners.py` | Construct commands, execute subprocesses, orchestrate parse → report |
 | `utils.py` | Module-specific helpers (optional; pytest and pylint only) |
 
@@ -162,7 +165,7 @@ registrar modules: `code_checker_ruff` backs two of them, `ruff_check_tool.py` a
 ### Module Overview
 
 - **`main.py`** — CLI entry point: argument parsing (`argparse`), logging setup, server creation
-- **`server.py`** — `ToolServer`: creates the FastMCP instance, builds the one `ToolContext`, and delegates registration to six registrars that each take it — `CheckerTools`, `FormatterTools`, `RefactoringTools`, `UtilityTools`, `InspectTools`, `LibrarySearchTools`. Exposes 19 tools total (10 checker + 1 formatter + 5 refactoring + 1 utility + 1 inspection + 1 library search)
+- **`server.py`** — `ToolServer`: creates the FastMCP instance, wraps it in `GuardedMCP`, builds the one `ToolContext`, and delegates registration to six registrars that each take it — `CheckerTools`, `FormatterTools`, `RefactoringTools`, `UtilityTools`, `InspectTools`, `LibrarySearchTools`. Exposes 19 tools total (10 checker + 1 formatter + 5 refactoring + 1 utility + 1 inspection + 1 library search)
 - **`checker_tools/`** — `CheckerTools`: registers the 10 checker MCP tools, one `<tool>_tool.py` module each
 - **`formatter/`** — `FormatterTools`: registers `run_format_code`; `black_runner.py`, `isort_runner.py` and `ruff_runner.py` (`ruff_format`, `ruff_imports`) sequenced by `runner.py`, which also resolves the default steps; shared binary lookup, output and version helpers in `common.py`
 - **`refactoring/`** — `RefactoringTools`: registers 5 refactoring MCP tools (`list_symbols`, `find_references`, `move_symbol`, `rename_symbol`, `move_module`) powered by jedi and rope
@@ -175,12 +178,13 @@ registrar modules: `code_checker_ruff` backs two of them, `ruff_check_tool.py` a
 - **`utils/environment_info.py`** — `EnvironmentInfo` and the cached one-shot probe: Python version, `sys.path`, installed distributions, and which of the `python -m` tools import. Also `locate_packages`, which asks the target interpreter where named packages live and splits the answer into directories safe to put on `PYTHONPATH`, ones that are its own site-packages, and names it could not locate — uncached, because that answer can change while the server runs
 - **`utils/target_scripts/probe.py`** — the script that probe runs, with four subcommands: `info` (the cached environment probe), `source` (library source for `get_library_source`), `locate` (where a package lives, for the lint-imports `PYTHONPATH` bridge) and `scope` (the directory a `search_library_files` scope names: the standard library for `stdlib`, otherwise a package's own directory). Executed under the *target* interpreter by absolute path and stdlib-only, so it works in an environment that has never heard of `mcp_tools_py` (enforced by the `target-scripts-stdlib-only` contract). Not interchangeable with `refactoring/rope_cli.py`, which runs under `sys.executable` with `-m` precisely because it must import `mcp_tools_py`
 - **`utils/tool_context.py`** — `ToolContext`: the single argument every registrar takes — project directory and both environments (`environment`, the configured project env used by pytest, pylint, mypy and deptry; `tool_environment`, where mcp-tools-py runs, used by the seven console-script tools), plus the two questions a tool asks about its environment: is this tool there, and what to say when it is not
-- **`utils/mcp_protocols.py`** — `FastMCPProtocol`: the structural type of the server object a registrar registers against, so no tool module imports FastMCP
+- **`utils/mcp_protocols.py`** — `FastMCPProtocol`: the structural type of the server object a registrar registers against, so no tool module imports FastMCP; and `GuardedMCP`, which wraps `tool()` so every registered tool's string return passes through `guard_output` (outermost, above `@log_function_call`, so logs keep the full output)
 - **`utils/subprocess_runner.py`** — thin re-export shim over `mcp_coder_utils.subprocess_runner`: `execute_command()`, `CommandResult`, STDIO isolation for Python commands, cross-platform process termination
 - **`utils/file_utils.py`** — thin re-export shim over `mcp_coder_utils.fs`: `read_file()` with encoding fallback
 - **`utils/project_config.py`** — target-directory auto-detection from `pyproject.toml`, the pytest test-path resolver, the source-only coverage lookup, the pytest `addopts` accessor, plus subprocess timeout resolution from `[tool.mcp-tools-py]` (per-tool key, shared key, CLI value, built-in default). `read_pyproject_tool_tables` is the single reader of `pyproject.toml`'s `[tool]` tables, shared by timeout resolution, formatter resolution (the `[tool.mcp-tools-py] formatter` key) and the `ruff_imports` per-file-ignores notice
 - **`utils/ruff_parsing.py`** — `RuffMessage` and `parse_ruff_json_output`, shared by `code_checker_ruff` and `formatter/ruff_runner.py`
 - **`utils/report_counts.py`** — shared per-rule report helpers (directory split, total line, plural) for the ruff, pylint, bandit and mypy reports
+- **`utils/report_budget.py`** — the shared output limits, `bound_text`, the global `guard_output`, and the `Location`/`render_locations`/`render_summary` renderers; see [output-conventions.md](output-conventions.md)
 - **`log_utils.py`** — thin re-export shim over `mcp_coder_utils.log_utils`: `setup_logging()` (console/JSON file), `@log_function_call` decorator
 
 ---
@@ -212,7 +216,7 @@ MCP Client       pytest_tool.py            runners.py           subprocess_runne
     │◄──────────────────│                      │                        │
 ```
 
-All checker tools follow this same pattern, each entered through its own registrar module (`checker_tools/<tool>_tool.py`). Only pylint, pytest and mypy use the shared result formatters on `CheckerTools`; the other seven return a string their own package produced — from its `reporting.py`, or straight from `runners.py` for the simple checkers that have none. Pytest, bandit and deptry write a JSON report to a temporary file and parse that; the rest work from the command's stdout.
+All checker tools follow this same pattern, each entered through its own registrar module (`checker_tools/<tool>_tool.py`). Only pylint, pytest and mypy use the shared result formatters on `CheckerTools`; the other seven return a string their own package produced — from its `reporting.py`, or straight from `runners.py` for `lint_imports`, which has none. `GuardedMCP` passes every returned string through the global output guard. Pytest, bandit and deptry write a JSON report to a temporary file and parse that; the rest work from the command's stdout.
 
 ### STDIO Isolation (Python Subprocess)
 
