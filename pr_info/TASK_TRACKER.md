@@ -41,9 +41,9 @@ See [step_3.md](./steps/step_3.md)
 
 ### Step 4: ruff check
 See [step_4.md](./steps/step_4.md)
-- [ ] Implementation (tests + production code)
-- [ ] Quality checks: pylint, pytest, mypy — fix all issues
-- [ ] Commit message prepared
+- [x] Implementation (tests + production code)
+- [x] Quality checks: pylint, pytest, mypy — fix all issues
+- [x] Commit message prepared
 
 ### Step 5: bandit + deptry
 See [step_5.md](./steps/step_5.md)
