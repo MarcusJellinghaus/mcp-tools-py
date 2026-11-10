@@ -29,12 +29,17 @@ from mcp_tools_py.utils.project_config import (
     get_pytest_addopts,
     resolve_coverage_source,
 )
+from mcp_tools_py.utils.report_budget import TOOL_CHARS, TOOL_LINES, bound_text
 
 if TYPE_CHECKING:
     from mcp_tools_py.checker_tools import CheckerTools
     from mcp_tools_py.utils.mcp_protocols import FastMCPProtocol
 
 logger = logging.getLogger(__name__)
+
+DIGEST_HINT = (
+    "Use a smaller max_modules or narrow coverage_source to see the digest in full."
+)
 
 
 def register(mcp: "FastMCPProtocol", checker_tools: "CheckerTools") -> None:
@@ -249,23 +254,10 @@ def register(mcp: "FastMCPProtocol", checker_tools: "CheckerTools") -> None:
                 timeout_seconds=run_timeout,
             )
 
-            # Always show detailed failure output
-            result = checker_tools._format_pytest_result_with_details(
-                test_results,
-                show_details=True,
-                show_output=sanitized.show_output,
-                collect_only=sanitized.collect_only,
-            )
-
-            # Prepend the test-paths and deduplication notes so LLM can self-correct
-            test_paths_note = test_results.get("test_paths_note")
-            notes = [*([test_paths_note] if test_paths_note else []), *sanitized.notes]
-            if notes:
-                notes_text = "\n".join(notes)
-                result = f"{notes_text}\n\n{result}"
-
             summary = test_results.get("summary", {})
             verdict = test_results["verdict"]
+            # The digest is built first so the failure section gets what is left
+            digest: Optional[str] = None
             if coverage_run is not None:
                 report = test_results.get("test_results")
                 # Without a parsed report, JSON from import-time lines proves nothing.
@@ -286,6 +278,33 @@ def register(mcp: "FastMCPProtocol", checker_tools: "CheckerTools") -> None:
                         **finished.outcome,
                     )
                 digest = "\n".join([digest, *finished.notes])
+
+            # Digest and failures share the per-tool budget, so the guard never cuts them
+            max_lines, max_chars = TOOL_LINES, TOOL_CHARS
+            if digest is not None:
+                digest = bound_text(
+                    digest, TOOL_LINES // 2, TOOL_CHARS // 2, hint=DIGEST_HINT
+                )
+                max_lines -= digest.count("\n") + 1
+                max_chars -= len(digest)
+
+            # Always show detailed failure output
+            result = checker_tools._format_pytest_result_with_details(
+                test_results,
+                show_details=True,
+                show_output=sanitized.show_output,
+                collect_only=sanitized.collect_only,
+                max_lines=max_lines,
+                max_chars=max_chars,
+            )
+
+            # Prepend the test-paths and deduplication notes so LLM can self-correct
+            test_paths_note = test_results.get("test_paths_note")
+            notes = [*([test_paths_note] if test_paths_note else []), *sanitized.notes]
+            if notes:
+                notes_text = "\n".join(notes)
+                result = f"{notes_text}\n\n{result}"
+            if digest is not None:
                 result = f"{result}\n\n{digest}"
 
             if verdict.status in (RunStatus.PASSED, RunStatus.FAILED):

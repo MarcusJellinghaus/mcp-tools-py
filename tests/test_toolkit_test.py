@@ -473,7 +473,7 @@ class TestRunTestVerdictMapping:
         result = _run_with(tmp_path, results)
 
         assert result.status == "error"
-        assert result.summary == ("Collected 0 tests in 0.0 seconds\n\nsome problem\n")
+        assert result.summary == "Collected 0 tests in 0.0 seconds\n\nsome problem"
 
     def test_passed_is_ok(self, tmp_path: Path) -> None:
         results = make_pytest_results(

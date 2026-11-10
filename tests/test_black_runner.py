@@ -90,16 +90,16 @@ def test_run_black_failure(mock_exec: MagicMock) -> None:
 
 
 @patch("mcp_tools_py.formatter.black_runner.execute_command")
-def test_run_black_truncates_output(mock_exec: MagicMock) -> None:
+def test_run_black_keeps_long_output(mock_exec: MagicMock) -> None:
+    """The runner no longer cuts at 200 lines; the global guard bounds output."""
     long_stdout = "\n".join(f"line {i}" for i in range(250))
     mock_exec.return_value = _make_result(stdout=long_stdout)
 
     result = run_black("/usr/bin/python", ["src"], "/project")
 
     lines = result.output.splitlines()
-    assert len(lines) == 201  # 200 lines + truncation notice
-    assert "truncated" in lines[-1]
-    assert "51 more lines" in lines[-1]
+    assert len(lines) == 251  # version banner + 250 lines
+    assert lines[-1] == "line 249"
 
 
 @patch("mcp_tools_py.formatter.black_runner.execute_command")

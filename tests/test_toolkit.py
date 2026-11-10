@@ -9,7 +9,7 @@ import pytest
 from mcp_coder_utils.toolkit import ActionResult, Finding
 
 from mcp_tools_py.toolkit import UNATTENDED_EXCLUDED_MARKERS, PythonToolkit
-from mcp_tools_py.toolkit_checks import _finding_line, _merge, _result_from_findings
+from mcp_tools_py.toolkit_checks import _merge, _result_from_findings
 
 _EXPECTED_ACTIONS = {
     "format": ["apply", "check"],
@@ -148,8 +148,10 @@ class TestResultFromFindings:
         )
 
         assert result.fix_text.splitlines() == [
-            "- a.py:12: E1: broke",
-            "- b.py: E2: also",
+            "E1 (1 finding) ((root): 1)",
+            "- a.py: 12 — broke",
+            "E2 (1 finding) ((root): 1)",
+            "- b.py — also",
         ]
 
     def test_no_error_no_findings_is_ok(self) -> None:
@@ -160,28 +162,6 @@ class TestResultFromFindings:
         assert result.status == "ok"
         assert result.summary == "all good"
         assert result.findings == []
-
-
-class TestFindingLine:
-    """Unit tests for `_finding_line`'s optional location."""
-
-    def test_without_location_uses_path(self) -> None:
-        finding = Finding(key="a", message="broke", path="a.py", rule="E1")
-
-        assert _finding_line(finding) == "- a.py: E1: broke"
-
-    def test_location_replaces_path(self) -> None:
-        finding = Finding(key="a", message="broke", path="a.py", rule="E1")
-
-        assert _finding_line(finding, "a.py:12") == "- a.py:12: E1: broke"
-
-    def test_location_without_path_or_rule(self) -> None:
-        finding = Finding(key="t", message="assert 1 == 2")
-
-        assert (
-            _finding_line(finding, "tests/test_a.py::test_x")
-            == "- tests/test_a.py::test_x: assert 1 == 2"
-        )
 
 
 class TestMerge:
@@ -209,7 +189,7 @@ class TestMerge:
 
         assert merged.status == "findings"
         assert merged.findings == [finding]
-        assert merged.fix_text == "- a.py: broke"
+        assert merged.fix_text == "1 finding ((root): 1)\n- a.py — broke"
 
     def test_custom_fix_text_is_kept_exactly(self) -> None:
         finding = Finding(key="f1", message="broke", path="a.py")
@@ -226,7 +206,7 @@ class TestMerge:
 
         assert merged.fix_text == "custom\n  report"
 
-    def test_findings_without_fix_text_are_rebuilt(self) -> None:
+    def test_findings_without_fix_text_are_rendered(self) -> None:
         first = Finding(key="f1", message="broke", path="a.py", rule="E1")
         second = Finding(key="f2", message="also broke")
         merged = _merge(
@@ -235,7 +215,12 @@ class TestMerge:
             ]
         )
 
-        assert merged.fix_text == "- a.py: E1: broke\n- also broke"
+        assert merged.fix_text.splitlines() == [
+            "E1 (1 finding) ((root): 1)",
+            "- a.py — broke",
+            "1 finding",
+            "- also broke",
+        ]
 
     def test_ok_results_add_no_blank_lines(self) -> None:
         finding = Finding(key="f1", message="broke", path="a.py")
@@ -247,7 +232,7 @@ class TestMerge:
             ]
         )
 
-        assert merged.fix_text == "- a.py: broke"
+        assert merged.fix_text == "1 finding ((root): 1)\n- a.py — broke"
 
     def test_custom_and_rebuilt_text_are_joined_in_result_order(self) -> None:
         finding = Finding(key="f1", message="broke", path="a.py")
@@ -264,7 +249,7 @@ class TestMerge:
             ]
         )
 
-        assert merged.fix_text == "- a.py: broke\ncustom report"
+        assert merged.fix_text == "1 finding ((root): 1)\n- a.py — broke\ncustom report"
 
     def test_all_ok_has_empty_fix_text(self) -> None:
         merged = _merge(

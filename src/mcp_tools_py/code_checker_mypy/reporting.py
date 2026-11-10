@@ -4,6 +4,13 @@ import logging
 
 from mcp_tools_py.code_checker_mypy.models import MypyMessage, MypyResult
 from mcp_tools_py.utils.project_config import DEFAULT_CHECK_TIMEOUT
+from mcp_tools_py.utils.report_budget import (
+    HINT_LINES,
+    LOCATIONS_PER_RULE,
+    Location,
+    render_locations,
+    render_summary,
+)
 from mcp_tools_py.utils.report_counts import format_dir_split, format_total_line, plural
 
 logger = logging.getLogger(__name__)
@@ -12,8 +19,6 @@ logger = logging.getLogger(__name__)
 MYPY_FAILURE_PREFIX = "Mypy execution failed:"
 
 MYPY_SUCCESS_TEXT = "Mypy check completed. No type errors found."
-
-MAX_LOCATIONS_PER_CODE = 5
 
 
 def run_signals(result: MypyResult) -> list[str]:
@@ -36,36 +41,62 @@ def run_signals(result: MypyResult) -> list[str]:
 
 
 def format_hint_lines(hint: str | None) -> list[str]:
-    """Indent a message's hint for display under its message.
+    """Indent a message's hint for display under its message, capped at HINT_LINES.
 
     Args:
         hint: The message's hint, newline-separated, or None
 
     Returns:
-        One indented line per hint line; empty when there is no hint.
+        One indented line per kept hint line, then a count of the hidden ones;
+        empty when there is no hint.
     """
     if not hint:
         return []
-    return [f"    {line}" for line in hint.splitlines()]
+    hint_lines = hint.splitlines()
+    out = [f"    {line}" for line in hint_lines[:HINT_LINES]]
+    if len(hint_lines) > HINT_LINES:
+        hidden = len(hint_lines) - HINT_LINES
+        out.append(f"    ... and {plural(hidden, 'more hint line')}")
+    return out
 
 
-def _format_message(msg: MypyMessage) -> list[str]:
-    """Format one mypy message.
+def _location(msg: MypyMessage, prefix: str = "") -> Location:
+    """Build the `Location` of one mypy message; a negative line is file-level.
 
     Returns:
-        The location line followed by the message's indented hint lines.
+        The message's location, with its hint lines as details.
     """
-    location = msg.file if msg.line < 0 else f"{msg.file}:{msg.line}:{msg.column}"
-    return [f"- {location} - {msg.message}", *format_hint_lines(msg.hint)]
+    line = msg.line if msg.line >= 0 else None
+    details = tuple(format_hint_lines(msg.hint))
+    return Location(msg.file, line, prefix + msg.message, details)
 
 
-def create_mypy_prompt(result: MypyResult, max_issues: int | None = None) -> str | None:
+def _group_items(
+    messages: list[MypyMessage], last_error: MypyMessage | None
+) -> list[Location]:
+    """Build a group's locations, moving the last error first if it would be cut.
+
+    Returns:
+        The group's locations in display order.
+    """
+    items = [_location(m) for m in messages]
+    if last_error is None or last_error not in messages:
+        return items
+    target = _location(last_error)
+    rows = list(dict.fromkeys((item.path, item.message) for item in items))
+    if (target.path, target.message) not in rows[:LOCATIONS_PER_RULE]:
+        items.remove(target)
+        items.insert(0, target)
+    return items
+
+
+def create_mypy_prompt(result: MypyResult, max_issues: int = 3) -> str | None:
     """Generate LLM-friendly prompt from mypy results.
 
     Args:
         result: MypyResult from type checking
         max_issues: Number of error codes to show in detail; the rest get one
-            summary line each. None shows all; 0 or less shows counts only.
+            summary line each. 0 or less shows counts only.
             When mypy exits with code 2, the code holding the last error is also
             shown in detail without counting against max_issues, including at 0.
 
@@ -75,6 +106,7 @@ def create_mypy_prompt(result: MypyResult, max_issues: int | None = None) -> str
     if not result.messages:
         return None
 
+    max_issues = max(0, max_issues)
     issues = [m for m in result.messages if m.severity != "note"]
     notes = [m for m in result.messages if m.severity == "note"]
 
@@ -82,16 +114,26 @@ def create_mypy_prompt(result: MypyResult, max_issues: int | None = None) -> str
     for msg in issues:
         by_code.setdefault(msg.code or "other", []).append(msg)
     groups = sorted(by_code.items(), key=lambda kv: (-len(kv[1]), kv[0]))
-    limit = len(groups) if max_issues is None else max(0, max_issues)
 
     # No field identifies a blocker, so use the last error on rc 2
     errors = [m for m in issues if m.severity == "error"]
     last_error = errors[-1] if result.return_code == 2 and errors else None
     last_code = (last_error.code or "other") if last_error else None
     # The last-error group does not count against the limit
-    others = [g for g in groups if g[0] != last_code][:limit]
+    others = [g for g in groups if g[0] != last_code][:max_issues]
     detailed = [g for g in groups if g[0] == last_code or g in others]
     summarised = [g for g in groups if g not in detailed]
+
+    # Notes join a detailed group of their code; the rest get their own section
+    detailed_codes = {code for code, _ in detailed}
+    group_notes: dict[str, list[Location]] = {}
+    loose_notes: list[Location] = []
+    for note in notes:
+        code = note.code or "misc"
+        if code in detailed_codes:
+            group_notes.setdefault(code, []).append(_location(note, "note: "))
+        else:
+            loose_notes.append(_location(note))
 
     lines: list[str] = []
     for signal in run_signals(result):
@@ -103,25 +145,28 @@ def create_mypy_prompt(result: MypyResult, max_issues: int | None = None) -> str
     for code, messages in detailed:
         split = format_dir_split(m.file for m in messages)
         lines.append(f"**{code} ({plural(len(messages), 'issue')}) {split}**")
-        shown = messages[:MAX_LOCATIONS_PER_CODE]
-        if last_error in messages and last_error not in shown:
-            shown.append(last_error)
-        for msg in shown:
-            lines.extend(_format_message(msg))
-        if len(messages) > len(shown):
-            lines.append(f"  ... and {len(messages) - len(shown)} more")
-        lines.append("")
+        items = _group_items(messages, last_error) + group_notes.get(code, [])
+        lines += [*render_locations(items), ""]
+
+    if loose_notes and max_issues == 0:
+        lines += [f"Notes ({len(loose_notes)}): not shown with max_issues=0", ""]
+    elif loose_notes:
+        lines += [f"Notes ({len(loose_notes)}):", *render_locations(loose_notes), ""]
 
     if summarised:
-        for code, messages in summarised:
-            split = format_dir_split(m.file for m in messages)
-            lines.append(f"- {code}: {plural(len(messages), 'occurrence')} {split}")
-        lines.append("")
-
-    if notes and (max_issues is None or max_issues > 0):
-        lines.append("Notes:")
-        for msg in notes:
-            lines.extend(_format_message(msg))
+        rows = [
+            (code, len(messages), format_dir_split(m.file for m in messages))
+            for code, messages in summarised
+        ]
+        if max_issues == 0:
+            lines += render_summary(rows, top=None)
+        else:
+            total = sum(count for _, count, _ in rows)
+            title = (
+                f"--- {plural(len(rows), 'additional rule')} found "
+                f"({plural(total, 'occurrence')}) ---"
+            )
+            lines += render_summary(rows, title=title)
         lines.append("")
 
     if issues and result.return_code != 2:
@@ -146,7 +191,7 @@ def get_mypy_prompt(
     follow_imports: str | None = None,
     cache_dir: str | None = None,
     timeout_seconds: int = DEFAULT_CHECK_TIMEOUT,
-    max_issues: int | None = None,
+    max_issues: int = 3,
 ) -> str | None:
     """Run mypy and generate an LLM prompt if issues are found.
 

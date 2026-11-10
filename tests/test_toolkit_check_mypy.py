@@ -248,10 +248,12 @@ class TestHints:
         )
 
         assert result.fix_text.splitlines() == [
-            "- src/mod.py:3: return-value: Bad return type",
-            "    First hint",
-            "    Second hint",
-            "- src/mod.py:3: arg-type: Other error",
+            "return-value (1 finding) (src: 1)",
+            "- src/mod.py: 3 — Bad return type",
+            "        First hint",
+            "        Second hint",
+            "arg-type (1 finding) (src: 1)",
+            "- src/mod.py: 3 — Other error",
         ]
 
     def test_negative_line_has_no_line_number(
@@ -264,7 +266,8 @@ class TestHints:
         )
 
         assert result.fix_text.splitlines() == [
-            "- src/mod.py: return-value: Bad return type",
+            "return-value (1 finding) (src: 1)",
+            "- src/mod.py — Bad return type",
         ]
 
     def test_hint_keeps_its_own_indentation(
@@ -278,8 +281,8 @@ class TestHints:
             tmp_path, monkeypatch, MypyResult(return_code=2, messages=[hinted])
         )
 
-        assert result.fix_text.splitlines()[1:] == [
-            "    Source file found twice:",
-            "      pkg.mod: first",
-            "      mod: second",
+        assert result.fix_text.splitlines()[2:] == [
+            "        Source file found twice:",
+            "          pkg.mod: first",
+            "          mod: second",
         ]

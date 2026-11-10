@@ -11,29 +11,85 @@ from mcp_tools_py.code_checker_lint_imports.runners import run_lint_imports_chec
 from mcp_tools_py.code_checker_mypy.reporting import format_hint_lines, run_signals
 from mcp_tools_py.code_checker_mypy.runners import MYPY_EXIT_PREFIX, run_mypy_check
 from mcp_tools_py.code_checker_pylint.runners import get_pylint_results
-from mcp_tools_py.code_checker_tach.runners import format_tach_result
+from mcp_tools_py.code_checker_tach.reporting import format_tach_report
+from mcp_tools_py.code_checker_tach.runners import run_tach_check
 from mcp_tools_py.code_checker_vulture.runners import run_vulture_check
 from mcp_tools_py.utils.project_config import (
     resolve_source_directories,
     resolve_target_directories,
 )
+from mcp_tools_py.utils.report_budget import (
+    FAILED_IDS,
+    LOCATIONS_PER_RULE,
+    TOOL_CHARS,
+    TOOL_LINES,
+    Location,
+    bound_text,
+    render_locations,
+)
+from mcp_tools_py.utils.report_counts import format_dir_split, plural
 from mcp_tools_py.utils.ruff_parsing import parse_ruff_json_output
 from mcp_tools_py.utils.subprocess_runner import execute_command
 from mcp_tools_py.utils.tool_context import ToolContext
 
+FIX_TEXT_HINT = "Fix these and rerun the check to see the rest."
 
-def _finding_line(finding: Finding, location: str | None = None) -> str:
-    """One bullet line for `finding`, used to build `ActionResult.fix_text`.
 
-    `location` (e.g. "path:line" or a test node id) replaces `finding.path`
-    when given.
+def _location(
+    finding: Finding, location: str | None, details: tuple[str, ...]
+) -> tuple[Location, bool]:
+    """Build the rendered `Location` of one finding.
+
+    `location` is "path:line" or a whole test node id; without it the
+    finding's path is used. A finding with neither shows its message alone.
 
     Returns:
-        "- location: rule: message", omitting location/rule when absent.
+        The Location, and whether it names a real path.
     """
-    where = location or finding.path
-    prefix = ": ".join(part for part in (where, finding.rule) if part)
-    return f"- {prefix}: {finding.message}" if prefix else f"- {finding.message}"
+    if location:
+        path, sep, line = location.rpartition(":")
+        if sep and path and line.isdigit():
+            return Location(path, int(line), finding.message, details), True
+        return Location(location, None, finding.message, details), True
+    if finding.path:
+        return Location(finding.path, None, finding.message, details), True
+    return Location(finding.message, None, None, details), False
+
+
+def _render_fix_text(
+    findings: list[Finding],
+    locations: list[str | None],
+    details: list[tuple[str, ...]] | None = None,
+) -> str:
+    """Render findings grouped by rule, largest group first.
+
+    `locations` and `details` (extra lines under a row) run parallel to
+    `findings`.
+
+    Findings without a rule (failing tests, collectors) are distinct items,
+    not hits of one rule, so their group shows up to FAILED_IDS rows.
+
+    Returns:
+        Per rule a header line with its count and directory split, then its
+        rows from `render_locations`; unbounded.
+    """
+    groups: dict[str, list[tuple[Location, bool]]] = {}
+    for i, (finding, location) in enumerate(zip(findings, locations)):
+        item = _location(finding, location, details[i] if details else ())
+        groups.setdefault(finding.rule or "", []).append(item)
+    lines: list[str] = []
+    for rule, items in sorted(groups.items(), key=lambda group: -len(group[1])):
+        count = plural(len(items), "finding")
+        header = f"{rule} ({count})" if rule else count
+        paths = [item.path for item, has_path in items if has_path]
+        if paths:
+            header += f" {format_dir_split(paths)}"
+        lines.append(header)
+        max_rows = LOCATIONS_PER_RULE if rule else FAILED_IDS
+        lines.extend(
+            render_locations([item for item, _ in items], FIX_TEXT_HINT, max_rows)
+        )
+    return "\n".join(lines)
 
 
 def _result_from_findings(
@@ -45,22 +101,19 @@ def _result_from_findings(
 ) -> ActionResult:
     """Map a tool's error/findings outcome onto ActionResult's status rules.
 
-    `locations`, when given, runs parallel to `findings` and is passed to
-    `_finding_line` for each one.
+    `locations`, when given, runs parallel to `findings`: "path:line" or a
+    test node id replacing the finding's path.
 
     Returns:
         status="error" when `error` is set; "findings" (with `fix_text`
-        built from `findings`, one bullet line each) when findings is
-        non-empty; otherwise "ok".
+        rendered by rule and bounded at TOOL_LINES/TOOL_CHARS) when findings
+        is non-empty; otherwise "ok".
     """
     if error is not None:
         return ActionResult(status="error", summary=error, findings=findings)
     if findings:
         locs = locations or [None] * len(findings)
-        fix_text = "\n".join(
-            _finding_line(finding, location)
-            for finding, location in zip(findings, locs)
-        )
+        fix_text = bound_text(_render_fix_text(findings, locs), hint=FIX_TEXT_HINT)
         return ActionResult(
             status="findings",
             summary=findings_summary,
@@ -79,8 +132,9 @@ def _merge(results: list[ActionResult]) -> ActionResult:
     Returns:
         One ActionResult: status is the worst across `results` ("error" >
         "findings" > "ok" > "skipped"), findings and non-empty raw outputs
-        concatenated. fix_text joins each result's own fix_text, rebuilt from
-        that result's findings when not set; empty parts are skipped.
+        concatenated. fix_text joins each result's own fix_text, rendered
+        from that result's findings when not set; empty parts are skipped.
+        Each part gets an even share of the TOOL_LINES/TOOL_CHARS budget.
     """
     worst = max(results, key=lambda result: _STATUS_RANK[result.status])
     findings = [finding for result in results for finding in result.findings]
@@ -88,10 +142,18 @@ def _merge(results: list[ActionResult]) -> ActionResult:
     raw = "\n\n".join(result.raw for result in results if result.raw)
     parts = [
         result.fix_text
-        or "\n".join(_finding_line(finding) for finding in result.findings)
+        or _render_fix_text(result.findings, [None] * len(result.findings))
         for result in results
     ]
-    fix_text = "\n".join(part for part in parts if part)
+    parts = [part for part in parts if part]
+    share = max(len(parts), 1)
+    fix_text = bound_text(
+        "\n".join(
+            bound_text(part, TOOL_LINES // share, TOOL_CHARS // share, FIX_TEXT_HINT)
+            for part in parts
+        ),
+        hint=FIX_TEXT_HINT,
+    )
     return ActionResult(
         status=worst.status,
         summary=summary,
@@ -146,16 +208,13 @@ def _run_mypy(context: ToolContext, depth: str) -> ActionResult:
         )
         for message in issues
     ]
-    fix_text = "\n".join(
-        line
-        for message, finding in zip(issues, findings)
-        for line in [
-            _finding_line(
-                finding,
-                f"{message.file}:{message.line}" if message.line >= 0 else None,
-            ),
-            *format_hint_lines(message.hint),
-        ]
+    fix_text = bound_text(
+        _render_fix_text(
+            findings,
+            [f"{m.file}:{m.line}" if m.line >= 0 else None for m in issues],
+            details=[tuple(format_hint_lines(m.hint)) for m in issues],
+        ),
+        hint=FIX_TEXT_HINT,
     )
     suffix = "".join(f" {_one_line(signal)}" for signal in run_signals(result))
     error = result.error
@@ -213,14 +272,18 @@ def _run_pylint(context: ToolContext, depth: str) -> ActionResult:
 def _run_vulture(context: ToolContext, depth: str) -> ActionResult:
     """Run vulture and map the outcome onto an ActionResult.
 
-    vulture's output has no stable per-location key, so a finding is
-    reported once, keyed `vulture|{depth}`.
+    `depth` is accepted but unused, so the signature matches every other
+    `_CHECK_RUNNERS` entry. Finding keys are line-insensitive:
+    `vulture|<file>|<kind>|<name-or-message>`.
 
     Returns:
-        "error" if target directories cannot be resolved or vulture timed
-        out/failed to run; "findings" with one degraded Finding when it
-        reports dead code; else "ok".
+        "error" if target directories cannot be resolved, vulture timed
+        out/failed to run, or its output parsed to no messages but had
+        other lines; "findings" with one Finding per message, naming any
+        unparsed lines (e.g. a syntax-error skip) in summary and fix_text;
+        else "ok".
     """
+    del depth
     project_dir = context.project_dir
     dirs = resolve_target_directories(str(project_dir), None)
     if isinstance(dirs, str):
@@ -235,27 +298,48 @@ def _run_vulture(context: ToolContext, depth: str) -> ActionResult:
     whitelist_path = project_dir / context.vulture_whitelist
     whitelist = str(whitelist_path) if whitelist_path.exists() else None
 
-    output = run_vulture_check(
+    result = run_vulture_check(
         vulture_binary=str(binary),
         project_dir=str(project_dir),
         target_directories=dirs,
         whitelist_path=whitelist,
         timeout_seconds=context.resolve_timeout("vulture"),
     )
-    if output.startswith("vulture timed out") or output.startswith(
-        "vulture failed to run:"
-    ):
-        return ActionResult(status="error", summary=output)
-    if output == "vulture produced no output.":
-        return ActionResult(status="ok", summary="vulture found no issues.")
+    if result.error is not None:
+        return ActionResult(status="error", summary=result.error)
+    if not result.messages and result.unparsed:
+        raw = "\n".join(result.unparsed)
+        return ActionResult(
+            status="error", summary=_one_line(bound_text(raw, max_lines=5))
+        )
 
-    finding = Finding(key=f"vulture|{depth}", message=output)
-    return ActionResult(
-        status="findings",
-        summary="vulture found unused code.",
-        findings=[finding],
-        fix_text=output,
+    findings = [
+        Finding(
+            key=(
+                f"vulture|{message.file}|{message.kind}|"
+                f"{message.name or message.message}"
+            ),
+            message=message.message,
+            path=message.file,
+            rule=message.kind,
+        )
+        for message in result.messages
+    ]
+    unparsed = len(result.unparsed)
+    suffix = f" Plus {unparsed} unparsed output line(s)." if unparsed else ""
+    action = _result_from_findings(
+        None,
+        findings,
+        "vulture found no issues.",
+        f"vulture found {len(findings)} issue(s).{suffix}",
+        locations=[f"{message.file}:{message.line}" for message in result.messages],
     )
+    if not unparsed:
+        return action
+    fix_text = "\n".join(
+        [action.fix_text, "", "Unparsed vulture output:", *result.unparsed]
+    )
+    return replace(action, fix_text=bound_text(fix_text, hint=FIX_TEXT_HINT))
 
 
 def _run_lint_imports(context: ToolContext, depth: str) -> ActionResult:
@@ -297,47 +381,64 @@ def _run_lint_imports(context: ToolContext, depth: str) -> ActionResult:
 def _run_tach(context: ToolContext, depth: str) -> ActionResult:
     """Run tach and map the outcome onto an ActionResult.
 
-    `code_checker_tach.runners.run_tach_check` returns only text, so this
-    builds and runs the same command itself to read the return code, and
-    shares that runner's `format_tach_result` for the finding's message.
-    tach's output has no stable per-location key, so a finding is reported
-    once, keyed `tach|{depth}`.
+    Error diagnostics become findings keyed
+    `tach|<kind>|<file>|<usage_module>|<dependency>`, so diagnostics with no
+    module pair still differ by kind; warnings are named in the
+    summary only. Output that is not tach's JSON has no stable key, so on a
+    non-zero exit it is reported once, keyed `tach|{depth}`.
 
     Returns:
         "error" if tach timed out or failed to run; "findings" with one
-        degraded Finding on a non-zero exit; else "ok".
+        Finding per error diagnostic, or one degraded Finding when a failed
+        run's output could not be parsed; else "ok".
     """
     binary = context.tool_environment.binary("tach")
     if binary is None:
         return ActionResult(status="error", summary=context.unavailable_message("tach"))
 
-    timeout_seconds = context.resolve_timeout("tach")
-    result = execute_command(
-        [str(binary), "check", "--output", "json"],
-        cwd=str(context.project_dir),
-        timeout_seconds=timeout_seconds,
+    result = run_tach_check(
+        tach_binary=str(binary),
+        project_dir=str(context.project_dir),
+        timeout_seconds=context.resolve_timeout("tach"),
     )
-    if result.timed_out:
+    if result.error is not None:
+        return ActionResult(status="error", summary=result.error)
+    if result.raw is not None and result.return_code == 0:
+        unparsed = _one_line(bound_text(result.raw, max_lines=5))
         return ActionResult(
-            status="error",
-            summary=f"tach check timed out after {timeout_seconds} seconds.",
+            status="ok", summary=f"tach check passed; unparsed output: {unparsed}"
         )
-    if result.execution_error:
+    if result.raw is not None or (result.return_code and not result.diagnostics):
+        report = format_tach_report(result)
+        finding = Finding(key=f"tach|{depth}", message=report)
         return ActionResult(
-            status="error",
-            summary=f"tach check failed to run: {result.execution_error}",
+            status="findings",
+            summary="tach found architecture boundary violations.",
+            findings=[finding],
+            fix_text=report,
         )
 
-    if result.return_code == 0:
-        return ActionResult(status="ok", summary="tach found no issues.")
-
-    message = format_tach_result(result)
-    finding = Finding(key=f"tach|{depth}", message=message)
-    return ActionResult(
-        status="findings",
-        summary="tach found architecture boundary violations.",
-        findings=[finding],
-        fix_text=message,
+    errors = [d for d in result.diagnostics if d.severity == "error"]
+    warnings = [d.message for d in result.diagnostics if d.severity != "error"]
+    suffix = ""
+    if warnings:
+        suffix = f"; tach: {len(warnings)} warning(s): {', '.join(warnings[:3])}"
+    findings = [
+        Finding(
+            key=f"tach|{d.kind}|{d.file}|{d.usage_module}|{d.dependency}",
+            message=d.message,
+            path=d.file,
+            rule=d.kind,
+            severity=d.severity,
+        )
+        for d in errors
+    ]
+    return _result_from_findings(
+        None,
+        findings,
+        f"tach found no issues.{suffix}",
+        f"tach found {len(findings)} issue(s).{suffix}",
+        locations=[f"{d.file}:{d.line}" if d.file else None for d in errors],
     )
 
 

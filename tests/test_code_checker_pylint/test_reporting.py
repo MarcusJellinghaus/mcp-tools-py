@@ -1,16 +1,21 @@
 """Unit tests for pylint reporting module."""
 
+import os
 import sys
 from unittest.mock import patch
 
 from mcp_tools_py.code_checker_pylint.models import PylintMessage, PylintResult
 from mcp_tools_py.code_checker_pylint.reporting import (
-    MAX_LOCATIONS_PER_ISSUE,
     _group_and_sort_issues,
     get_direct_instruction_for_pylint_code,
     get_prompt_for_known_pylint_code,
     get_prompt_for_unknown_pylint_code,
     get_pylint_prompt,
+)
+from mcp_tools_py.utils.report_budget import (
+    DETAIL_HINT,
+    LOCATION_HINT,
+    LOCATIONS_PER_RULE,
 )
 
 
@@ -179,16 +184,13 @@ class TestGetPromptForKnownPylintCode:
         assert prompt is not None
         assert prompt.startswith("HEADER LINE\n")
         assert "use the variable or remove" in prompt
-        # Check that the normalized path appears in the prompt
-        # The path could be represented as src/test.py or src\\\\test.py in JSON
-        assert any(
-            path in prompt for path in ["src/test.py", "src\\\\test.py", "src\\test.py"]
+        path = os.path.join("src", "test.py")
+        assert prompt.endswith(
+            "Locations:\n"
+            f"- {path}: 10 — Unused variable 'x'\n"
+            f"- {path}: 20 — Unused variable 'y'"
         )
-        assert "test_function" in prompt
-        assert "another_function" in prompt
-        assert "line" in prompt
-        assert "10" in prompt
-        assert "20" in prompt
+        assert '"module"' not in prompt
 
     def test_unknown_code_returns_none(self) -> None:
         """Test that unknown codes return None."""
@@ -243,13 +245,8 @@ class TestGetPromptForUnknownPylintCode:
         assert "Please do two things:" in prompt
         assert "provide 1 direct instruction" in prompt
         assert "apply that instruction" in prompt
-        # Check that the normalized path appears in the prompt
-        # The path could be represented as src/test.py or src\\\\test.py in JSON
-        assert any(
-            path in prompt for path in ["src/test.py", "src\\\\test.py", "src\\test.py"]
-        )
-        assert "test_function" in prompt
-        assert "Some unknown issue" in prompt
+        path = os.path.join("src", "test.py")
+        assert prompt.endswith(f"Locations:\n- {path}: 10 — Some unknown issue")
 
     def test_multiple_messages_same_code(self) -> None:
         """Test generating prompt for multiple messages with the same unknown code."""
@@ -284,20 +281,8 @@ class TestGetPromptForUnknownPylintCode:
         assert prompt is not None
         assert "Z0001" in prompt
         assert "custom-check" in prompt
-        assert "module1" in prompt
-        assert "module2" in prompt
-        assert "func1" in prompt
-        assert "func2" in prompt
-        # Check that normalized paths appear in the prompt
-        # The paths could be represented as src/file.py or src\\\\file.py in JSON
-        assert any(
-            path in prompt
-            for path in ["src/file1.py", "src\\\\file1.py", "src\\file1.py"]
-        )
-        assert any(
-            path in prompt
-            for path in ["src/file2.py", "src\\\\file2.py", "src\\file2.py"]
-        )
+        assert f"- {os.path.join('src', 'file1.py')}: 10 — Issue 1" in prompt
+        assert f"- {os.path.join('src', 'file2.py')}: 20 — Issue 2" in prompt
 
 
 class TestGetPylintPrompt:
@@ -393,8 +378,8 @@ class TestGetPylintPromptMaxIssues:
         # Summary section for remaining types
         assert "- W0613 unused-argument: 4 occurrences (src: 4)" in prompt
         assert "- C0411 wrong-import-order: 2 occurrences (src: 2)" in prompt
-        # Hint to see more
-        assert "max_issues=" in prompt
+        assert "--- 2 additional rules found (6 occurrences) ---" in prompt
+        assert prompt.endswith(DETAIL_HINT)
 
     def test_max_issues_zero_stats_only(self) -> None:
         """max_issues=0: only stats, no detailed output."""
@@ -541,12 +526,12 @@ class TestGetPylintPromptMaxIssues:
         assert "E0602" in prompt
         assert "W0613" in prompt
         # No summary section
-        assert "additional issue type" not in prompt
+        assert "additional rule" not in prompt
         # No hint
         assert "Use max_issues=" not in prompt
 
-    def test_location_cap_at_50(self) -> None:
-        """Issue type with 60 occurrences: only 50 shown, overflow note appended."""
+    def test_location_rows_capped(self) -> None:
+        """Rule with 60 occurrences in 60 files: 10 rows, then the overflow count."""
         messages = self._make_messages(
             [
                 ("W0613", "unused-argument", "warning", 60),
@@ -568,10 +553,11 @@ class TestGetPylintPromptMaxIssues:
             "pylint found 60 issues with rule W0613 unused-argument (src: 60)."
             in prompt
         )
-        # Overflow note
-        assert "10 more occurrences" in prompt
-        # Verify the cap constant is 50
-        assert MAX_LOCATIONS_PER_ISSUE == 50
+        rows = [line for line in prompt.splitlines() if line.startswith("- ")]
+        assert len(rows) == LOCATIONS_PER_RULE
+        assert prompt.endswith(
+            f"... and 50 more locations in 50 more rows — {LOCATION_HINT}"
+        )
 
     def test_error_passthrough_unchanged(self) -> None:
         """Pylint error returns error string (unchanged behavior)."""

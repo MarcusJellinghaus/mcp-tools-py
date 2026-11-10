@@ -27,7 +27,7 @@ def register(mcp: "FastMCPProtocol", checker_tools: "CheckerTools") -> None:
         follow_imports: str | None = None,
         cache_dir: str | None = None,
         timeout_seconds: int | None = None,
-        max_issues: int | None = None,
+        max_issues: int = 3,
     ) -> str:
         """Run mypy type checking on the project code.
 
@@ -70,8 +70,8 @@ def register(mcp: "FastMCPProtocol", checker_tools: "CheckerTools") -> None:
                 configured limit for this call. Must be a positive integer.
                 Defaults to `[tool.mcp-tools-py]` config, then `--check-timeout`,
                 then 120.
-            max_issues: Number of error codes shown in detail (5 locations each).
-                None (default) details every code. 0 = counts only: one line per code
+            max_issues: Number of error codes shown in detail (10 location rows each).
+                Default 3. 0 = counts only: one line per code
                 with count and directory split, no file paths. Remaining codes get one
                 summary line each. When mypy exits with code 2, the code holding the
                 last error is also shown in detail without counting against

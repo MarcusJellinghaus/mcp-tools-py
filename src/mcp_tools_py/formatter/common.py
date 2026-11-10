@@ -6,7 +6,6 @@ import re
 from mcp_tools_py.utils.python_environment import PythonEnvironment
 from mcp_tools_py.utils.subprocess_runner import CommandResult, execute_command
 
-MAX_LINES = 200
 _VERSION_RE = re.compile(r"\d+(\.\d+)+")
 
 
@@ -26,21 +25,6 @@ def formatter_binary(
     env = environment or PythonEnvironment.resolve()
     binary = env.binary(name)
     return str(binary) if binary is not None else None
-
-
-def truncate_output(text: str) -> str:
-    """Truncate output to a maximum number of lines.
-
-    Returns:
-        Original text, or text capped at `MAX_LINES` with a marker.
-    """
-    lines = text.splitlines()
-    if len(lines) <= MAX_LINES:
-        return text
-    truncated = lines[:MAX_LINES]
-    remaining = len(lines) - MAX_LINES
-    truncated.append(f"... (truncated, {remaining} more lines)")
-    return "\n".join(truncated)
 
 
 def combine_output(result: CommandResult) -> str:

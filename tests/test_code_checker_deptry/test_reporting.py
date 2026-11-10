@@ -1,11 +1,16 @@
 """Unit tests for the deptry reporting module."""
 
 from mcp_tools_py.code_checker_deptry.reporting import (
-    MAX_LOCATIONS_PER_ISSUE,
     _location,
     format_deptry_report,
 )
 from mcp_tools_py.code_checker_deptry.runners import DeptryMessage
+from mcp_tools_py.utils.report_budget import (
+    DETAIL_HINT,
+    LOCATION_HINT,
+    LOCATIONS_PER_RULE,
+    Location,
+)
 
 _DEP001_TEXT = "'yaml' imported but missing from the dependency definitions"
 
@@ -38,10 +43,10 @@ class TestLocation:
     """Test cases for _location."""
 
     def test_source_location(self) -> None:
-        assert _location(_dep001()) == f"- src/a.py:3:1 yaml {_DEP001_TEXT}"
+        assert _location(_dep001()) == Location("src/a.py", 3, f"yaml {_DEP001_TEXT}")
 
     def test_dep002_location(self) -> None:
-        assert _location(_dep002()) == "- pyproject.toml: 'requests'"
+        assert _location(_dep002()) == Location("pyproject.toml", None, "'requests'")
 
 
 class TestFormatDeptryReport:
@@ -64,14 +69,20 @@ class TestFormatDeptryReport:
         assert sections[1].startswith(
             "deptry found 2 issues with rule DEP002 ((root): 2)."
         )
-        assert sections[2] == "- DEP001: 1 occurrence (src: 1)"
+        assert sections[2] == "\n".join(
+            [
+                "--- 1 additional rule found (1 occurrences) ---",
+                "- DEP001: 1 occurrence (src: 1)",
+                DETAIL_HINT,
+            ]
+        )
 
     def test_ties_broken_by_code(self) -> None:
         report = format_deptry_report([_dep002(), _dep001()], max_issues=1)
         assert report is not None
         sections = report.split("\n\n")
         assert "with rule DEP001" in sections[1]
-        assert sections[2] == "- DEP002: 1 occurrence ((root): 1)"
+        assert "- DEP002: 1 occurrence ((root): 1)" in sections[2].splitlines()
 
     def test_detail_section(self) -> None:
         report = format_deptry_report(
@@ -83,17 +94,22 @@ class TestFormatDeptryReport:
             [
                 "deptry found 2 issues with rule DEP001 (src: 2).",
                 "Locations:",
-                f"- src/a.py:3:1 yaml {_DEP001_TEXT}",
-                f"- src/b.py:7:1 yaml {_DEP001_TEXT}",
+                f"- src/a.py: 3 — yaml {_DEP001_TEXT}",
+                f"- src/b.py: 7 — yaml {_DEP001_TEXT}",
             ]
         )
         assert sections[2] == "\n".join(
             [
                 "deptry found 1 issue with rule DEP002 ((root): 1).",
                 "Locations:",
-                "- pyproject.toml: 'requests'",
+                "- pyproject.toml — 'requests'",
             ]
         )
+
+    def test_same_message_collapses_per_file(self) -> None:
+        report = format_deptry_report([_dep001(line=n) for n in (3, 7, 9)])
+        assert report is not None
+        assert f"- src/a.py: 3, 7, 9 — yaml {_DEP001_TEXT}" in report
 
     def test_max_issues_zero_counts_only(self) -> None:
         report = format_deptry_report(
@@ -121,11 +137,13 @@ class TestFormatDeptryReport:
         assert all("Locations:" in section for section in sections[1:])
 
     def test_overflow_line(self) -> None:
-        count = MAX_LOCATIONS_PER_ISSUE + 5
-        messages = [_dep001(line=i + 1) for i in range(count)]
+        count = LOCATIONS_PER_RULE + 5
+        messages = [_dep001(file=f"src/f{i}.py") for i in range(count)]
         report = format_deptry_report(messages)
         assert report is not None
         lines = report.splitlines()
-        location_lines = [line for line in lines if line.startswith("- src/a.py:")]
-        assert len(location_lines) == MAX_LOCATIONS_PER_ISSUE
-        assert lines[-1] == "... and 5 more occurrences"
+        location_lines = [line for line in lines if line.startswith("- src/f")]
+        assert len(location_lines) == LOCATIONS_PER_RULE
+        assert lines[-1] == (
+            f"... and 5 more locations in 5 more rows — {LOCATION_HINT}"
+        )

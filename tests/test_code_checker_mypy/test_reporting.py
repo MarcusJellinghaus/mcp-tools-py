@@ -78,7 +78,7 @@ def test_create_mypy_prompt_with_messages() -> None:
     misc = prompt.index("**misc (1 issue) (tests: 1)**")
     assert arg < attr < misc
 
-    assert "- src/a.py:1:1 - problem" in prompt
+    assert "- src/a.py: 1 — problem" in prompt
     assert "To fix these issues:" in prompt
 
 
@@ -92,18 +92,18 @@ def test_create_mypy_prompt_code_none_grouped_as_other() -> None:
 
 
 def test_create_mypy_prompt_many_messages_same_code() -> None:
-    """Only the first five locations of a code are listed."""
-    messages = [_msg(f"src/file{i}.py", i * 10, "type-error") for i in range(10)]
+    """Only the first ten location rows of a code are listed."""
+    messages = [_msg(f"src/file{i}.py", i * 10, "type-error") for i in range(15)]
 
     result = MypyResult(return_code=1, messages=messages)
     prompt = create_mypy_prompt(result)
 
     assert prompt is not None
-    assert "**type-error (10 issues) (src: 10)**" in prompt
-    assert "src/file0.py:0:1" in prompt
-    assert "src/file4.py:40:1" in prompt
-    assert "src/file5.py:50:1" not in prompt
-    assert "... and 5 more" in prompt
+    assert "**type-error (15 issues) (src: 15)**" in prompt
+    assert "- src/file0.py: 0 — problem" in prompt
+    assert "- src/file9.py: 90 — problem" in prompt
+    assert "src/file10.py" not in prompt
+    assert "... and 5 more locations in 5 more rows" in prompt
 
 
 def test_create_mypy_prompt_max_issues_one() -> None:
@@ -115,7 +115,7 @@ def test_create_mypy_prompt_max_issues_one() -> None:
     assert "**attr-defined" not in prompt
     assert "- attr-defined: 1 occurrence (src: 1)" in prompt
     assert "- misc: 1 occurrence (tests: 1)" in prompt
-    assert "tests/t.py:3:1" not in prompt
+    assert "tests/t.py: 3" not in prompt
 
 
 @pytest.mark.parametrize("max_issues", [0, -3])
@@ -146,11 +146,11 @@ def test_create_mypy_prompt_hint_lines_indented() -> None:
     prompt = create_mypy_prompt(result)
 
     assert prompt is not None
-    assert "- src/a.py:1:1 - problem\n    hint one\n    hint two" in prompt
+    assert "- src/a.py: 1 — problem\n        hint one\n        hint two" in prompt
 
 
 def test_create_mypy_prompt_notes_section_at_end() -> None:
-    """Standalone notes go in one Notes section and are not counted."""
+    """Notes of undetailed codes go in one Notes section and are not counted."""
     result = MypyResult(
         return_code=1,
         messages=[
@@ -169,10 +169,10 @@ def test_create_mypy_prompt_notes_section_at_end() -> None:
 
     assert prompt is not None
     assert "mypy found 1 issue across 1 rule" in prompt
-    notes_at = prompt.index("Notes:")
+    notes_at = prompt.index("Notes (2):")
     assert prompt.index("**arg-type") < notes_at
-    assert prompt.index("- src/a.py:9:1 - Revealed A") > notes_at
-    assert prompt.index("- src/b.py:2:1 - Revealed B") > notes_at
+    assert prompt.index("- src/a.py: 9 — Revealed A") > notes_at
+    assert prompt.index("- src/b.py: 2 — Revealed B") > notes_at
     assert notes_at < prompt.index("To fix these issues:")
     assert "**misc" not in prompt
     assert "**annotation-unchecked" not in prompt
@@ -196,11 +196,13 @@ def test_create_mypy_prompt_notes_only() -> None:
     assert create_mypy_prompt(result) == (
         "mypy found 0 issues across 0 rules\n"
         "\n"
-        "Notes:\n"
-        '- src/a.py:9:1 - Revealed type is "builtins.int"'
+        "Notes (1):\n"
+        '- src/a.py: 9 — Revealed type is "builtins.int"'
     )
     assert create_mypy_prompt(result, max_issues=0) == (
-        "mypy found 0 issues across 0 rules"
+        "mypy found 0 issues across 0 rules\n"
+        "\n"
+        "Notes (1): not shown with max_issues=0"
     )
 
 
@@ -392,8 +394,8 @@ def test_create_mypy_prompt_shows_warning_with_notes_only() -> None:
         "\n"
         "mypy found 0 issues across 0 rules\n"
         "\n"
-        "Notes:\n"
-        "- src/a.py:9:1 - Revealed"
+        "Notes (1):\n"
+        "- src/a.py: 9 — Revealed"
     )
 
 
@@ -420,7 +422,7 @@ def test_create_mypy_prompt_negative_line_prints_file_only(severity: str) -> Non
     prompt = create_mypy_prompt(result)
 
     assert prompt is not None
-    assert "- f.py - msg" in prompt
+    assert "- f.py — msg" in prompt
     assert ":-1" not in prompt
 
 
@@ -430,7 +432,7 @@ def test_create_mypy_prompt_line_zero_keeps_location() -> None:
     prompt = create_mypy_prompt(result)
 
     assert prompt is not None
-    assert "- f.py:0:1 - problem" in prompt
+    assert "- f.py: 0 — problem" in prompt
 
 
 def _blocked_result(return_code: int = 2) -> MypyResult:
@@ -455,7 +457,7 @@ def test_create_mypy_prompt_rc2_details_last_error_group() -> None:
     assert prompt is not None
     assert "**arg-type (3 issues) (src: 3)**" in prompt
     assert "**misc (1 issue) (src: 1)**" in prompt
-    assert "- src/c.py:6:1 - blocker" in prompt
+    assert "- src/c.py: 6 — blocker" in prompt
     assert "**attr-defined" not in prompt
     summary_at = prompt.index("- attr-defined: 2 occurrences (src: 2)")
     assert prompt.index("**arg-type") < prompt.index("**misc") < summary_at
@@ -471,7 +473,7 @@ def test_create_mypy_prompt_rc2_counts_only_details_last_error_group() -> None:
 
     assert prompt is not None
     assert "**misc (1 issue) (src: 1)**" in prompt
-    assert "- src/c.py:6:1 - blocker" in prompt
+    assert "- src/c.py: 6 — blocker" in prompt
     assert "- arg-type: 3 occurrences (src: 3)" in prompt
     assert "- attr-defined: 2 occurrences (src: 2)" in prompt
     assert "**arg-type" not in prompt
@@ -495,7 +497,7 @@ def test_create_mypy_prompt_rc2_last_error_in_top_group_keeps_slot() -> None:
 
     assert prompt is not None
     assert prompt.count("**arg-type (3 issues) (src: 3)**") == 1
-    assert prompt.count("- src/a.py:3:1 - blocker") == 1
+    assert prompt.count("- src/a.py: 3 — blocker") == 1
     assert "**attr-defined (2 issues) (src: 2)**" in prompt
     assert "**misc" not in prompt
     assert "- misc: 1 occurrence (src: 1)" in prompt
@@ -515,24 +517,25 @@ def test_create_mypy_prompt_counts_only_without_rc2_has_no_detail(
 
 
 def test_create_mypy_prompt_rc2_lists_last_error_beyond_location_cap() -> None:
-    """The last error follows the first five locations, then the hidden count."""
-    messages = [_msg(f"src/file{i}.py", i, "misc") for i in range(7)]
+    """A last error beyond the row cap is listed first; the rest follow."""
+    messages = [_msg(f"src/file{i}.py", i, "misc") for i in range(12)]
     prompt = create_mypy_prompt(MypyResult(return_code=2, messages=messages))
 
     assert prompt is not None
-    assert "src/file4.py:4:1" in prompt
-    assert "src/file5.py:5:1" not in prompt
-    assert "- src/file6.py:6:1 - problem\n  ... and 1 more" in prompt
+    assert "**misc (12 issues) (src: 12)**\n- src/file11.py: 11 — problem\n" in prompt
+    assert "- src/file8.py: 8 — problem" in prompt
+    assert "src/file9.py" not in prompt
+    assert "... and 2 more locations in 2 more rows" in prompt
 
 
 def test_create_mypy_prompt_rc1_does_not_list_last_error_beyond_cap() -> None:
     """Without rc 2 the location cap applies to the last error too."""
-    messages = [_msg(f"src/file{i}.py", i, "misc") for i in range(7)]
+    messages = [_msg(f"src/file{i}.py", i, "misc") for i in range(12)]
     prompt = create_mypy_prompt(MypyResult(return_code=1, messages=messages))
 
     assert prompt is not None
-    assert "src/file6.py" not in prompt
-    assert "... and 2 more" in prompt
+    assert "src/file11.py" not in prompt
+    assert "... and 2 more locations in 2 more rows" in prompt
 
 
 @pytest.mark.parametrize("trailing_severity", ["note", "warning"])

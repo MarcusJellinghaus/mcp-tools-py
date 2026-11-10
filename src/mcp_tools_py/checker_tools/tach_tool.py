@@ -3,6 +3,7 @@
 import logging
 from typing import TYPE_CHECKING
 
+from mcp_tools_py.code_checker_tach import format_tach_report
 from mcp_tools_py.code_checker_tach import run_tach_check as run_tach
 from mcp_tools_py.log_utils import log_function_call
 
@@ -19,13 +20,19 @@ def register(mcp: "FastMCPProtocol", checker_tools: "CheckerTools") -> None:
 
     @mcp.tool()
     @log_function_call
-    def run_tach_check() -> str:
+    def run_tach_check(max_issues: int = 1) -> str:
         """Run tach check on the project to validate architectural boundaries.
+
+        Args:
+            max_issues: Number of rules (kind + module pair, errors first) to
+                show in detail (default: 1). Remaining rules shown as summary
+                counts. 0 = counts only: one line per rule with count and
+                directory split, no file paths.
 
         Returns:
             A status line saying whether `tach check` passed or failed, by its
-            exit code, followed by tach's output. The output is JSON, or plain
-            text when the config fails to load.
+            exit code, then the grouped report. Output tach prints that is not
+            its JSON (e.g. a config error) follows the status line as-is.
         """
         tach_binary = context.tool_environment.binary("tach")
         if not context.is_tool_available("tach") or tach_binary is None:
@@ -36,14 +43,18 @@ def register(mcp: "FastMCPProtocol", checker_tools: "CheckerTools") -> None:
                 "Starting tach check",
                 extra={"project_dir": str(context.project_dir)},
             )
-            output = run_tach(
+            result = run_tach(
                 tach_binary=str(tach_binary),
                 project_dir=str(context.project_dir),
                 timeout_seconds=context.resolve_timeout("tach"),
             )
+            output = format_tach_report(result, max_issues=max_issues)
             logger.info(
                 "tach check completed",
-                extra={"output_length": len(output)},
+                extra={
+                    "issues_found": len(result.diagnostics),
+                    "output_length": len(output),
+                },
             )
             return output
 

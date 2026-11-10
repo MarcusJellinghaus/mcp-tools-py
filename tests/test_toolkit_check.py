@@ -10,6 +10,8 @@ from mcp_tools_py.code_checker_bandit.models import BanditMessage, BanditResult
 from mcp_tools_py.code_checker_deptry.runners import DeptryMessage, DeptryResult
 from mcp_tools_py.code_checker_mypy.models import MypyResult
 from mcp_tools_py.code_checker_pylint.models import PylintResult
+from mcp_tools_py.code_checker_tach.runners import TachResult
+from mcp_tools_py.code_checker_vulture.runners import VultureResult
 from mcp_tools_py.toolkit import PythonToolkit
 from mcp_tools_py.toolkit_checks import _CHECK_RUNNERS
 from mcp_tools_py.utils.project_config import DEFAULT_CHECK_TIMEOUT, ToolName
@@ -95,7 +97,8 @@ class TestRunCheck:
 
         assert result.status == "findings"
         assert len(result.findings) == 1
-        assert "mod.py:3: W0611: " in result.fix_text
+        assert "W0611 (1 finding)" in result.fix_text
+        assert "mod.py: 3 — " in result.fix_text
 
     def test_standard_both_tools_failing_concatenates_findings(
         self, tmp_path: Path
@@ -140,9 +143,7 @@ class TestRunCheck:
 
 def _patch_execute_command_clean(monkeypatch: pytest.MonkeyPatch) -> None:
     def fake_execute_command(command: list[str], **kwargs: object) -> object:
-        del kwargs
-        if command[2] == "--output":  # tach: [binary, "check", "--output", "json"]
-            return make_command_result(return_code=0, stdout="")
+        del command, kwargs
         return make_command_result(return_code=0, stdout="[]")  # ruff
 
     monkeypatch.setattr(
@@ -154,11 +155,15 @@ def _patch_full_depth_clean(monkeypatch: pytest.MonkeyPatch) -> None:
     """Make every `check@full` tool other than mypy/pylint report clean."""
     monkeypatch.setattr(
         "mcp_tools_py.toolkit_checks.run_vulture_check",
-        lambda *args, **kwargs: "vulture produced no output.",
+        lambda *args, **kwargs: VultureResult(error=None, messages=[], unparsed=[]),
     )
     monkeypatch.setattr(
         "mcp_tools_py.toolkit_checks.run_lint_imports_check_impl",
         lambda *args, **kwargs: "=== PASSED ===\nContracts: 0 kept, 0 broken",
+    )
+    monkeypatch.setattr(
+        "mcp_tools_py.toolkit_checks.run_tach_check",
+        lambda *args, **kwargs: TachResult(None, 0, [], None),
     )
     _patch_execute_command_clean(monkeypatch)
     monkeypatch.setattr(
@@ -231,85 +236,6 @@ class TestRunCheckFull:
         assert result.status == "ok"
         assert result.findings == []
 
-    def test_vulture_finding_is_degraded_finding(
-        self, tmp_path: Path, monkeypatch: pytest.MonkeyPatch
-    ) -> None:
-        _write_check_project(tmp_path, _CLEAN_SRC)
-        _patch_full_depth_clean(monkeypatch)
-        monkeypatch.setattr(
-            "mcp_tools_py.toolkit_checks.run_vulture_check",
-            lambda *args, **kwargs: "mod.py:5: unused function '_x' (60% confidence)",
-        )
-        request = ActionRequest(
-            action="check", depth="full", project_dir=tmp_path, params={}
-        )
-
-        result = PythonToolkit().run(request)
-
-        assert result.status == "findings"
-        assert len(result.findings) == 1
-        assert result.findings[0].key == "vulture|full"
-
-    @pytest.mark.parametrize(
-        ("stdout", "expected_message"),
-        [
-            ('{"errors": []}', 'tach check failed:\n{"errors": []}'),
-            ("", "tach check failed (exit code 1, no output)."),
-        ],
-    )
-    def test_tach_violation_is_degraded_finding(
-        self,
-        tmp_path: Path,
-        monkeypatch: pytest.MonkeyPatch,
-        stdout: str,
-        expected_message: str,
-    ) -> None:
-        _write_check_project(tmp_path, _CLEAN_SRC)
-        _patch_full_depth_clean(monkeypatch)
-
-        def fake_execute_command(command: list[str], **kwargs: object) -> object:
-            del kwargs
-            if command[2] == "--output":
-                return make_command_result(return_code=1, stdout=stdout)
-            return make_command_result(return_code=0, stdout="[]")
-
-        monkeypatch.setattr(
-            "mcp_tools_py.toolkit_checks.execute_command", fake_execute_command
-        )
-        request = ActionRequest(
-            action="check", depth="full", project_dir=tmp_path, params={}
-        )
-
-        result = PythonToolkit().run(request)
-
-        assert result.status == "findings"
-        assert len(result.findings) == 1
-        assert result.findings[0].key == "tach|full"
-        assert result.findings[0].message == expected_message
-
-    def test_tach_timeout_is_error(
-        self, tmp_path: Path, monkeypatch: pytest.MonkeyPatch
-    ) -> None:
-        _write_check_project(tmp_path, _CLEAN_SRC)
-        _patch_full_depth_clean(monkeypatch)
-
-        def fake_execute_command(command: list[str], **kwargs: object) -> object:
-            del kwargs
-            if command[2] == "--output":
-                return make_command_result(timed_out=True, execution_error="timed out")
-            return make_command_result(return_code=0, stdout="[]")
-
-        monkeypatch.setattr(
-            "mcp_tools_py.toolkit_checks.execute_command", fake_execute_command
-        )
-        request = ActionRequest(
-            action="check", depth="full", project_dir=tmp_path, params={}
-        )
-
-        result = PythonToolkit().run(request)
-
-        assert result.status == "error"
-
     def test_lint_imports_broken_is_degraded_finding(
         self, tmp_path: Path, monkeypatch: pytest.MonkeyPatch
     ) -> None:
@@ -374,7 +300,10 @@ class TestRunCheckFull:
         assert finding.key == "mod.py|F401|'os' imported but unused"
         assert finding.path == "mod.py"
         assert finding.rule == "F401"
-        assert "- mod.py:1: F401: 'os' imported but unused" in result.fix_text
+        assert result.fix_text.splitlines() == [
+            "F401 (1 finding) ((root): 1)",
+            "- mod.py: 1 — 'os' imported but unused",
+        ]
 
     def test_bandit_finding_is_finding_per_message(
         self, tmp_path: Path, monkeypatch: pytest.MonkeyPatch
@@ -400,7 +329,10 @@ class TestRunCheckFull:
         assert finding.path == "mod.py"
         assert finding.rule == "B102"
         assert finding.severity == "MEDIUM"
-        assert "- mod.py:3: B102: Use of exec detected." in result.fix_text
+        assert result.fix_text.splitlines() == [
+            "B102 (1 finding) ((root): 1)",
+            "- mod.py: 3 — Use of exec detected.",
+        ]
 
     def test_deptry_findings_have_one_key_per_module(
         self, tmp_path: Path, monkeypatch: pytest.MonkeyPatch
@@ -427,7 +359,8 @@ class TestRunCheckFull:
         ]
         assert result.findings[0].path == "pyproject.toml"
         assert result.findings[0].rule == "DEP002"
-        assert "- pyproject.toml: DEP002: 'requests'" in result.fix_text
+        assert "DEP002 (2 findings) ((root): 2)" in result.fix_text
+        assert "- pyproject.toml — 'requests'" in result.fix_text
 
     def test_deptry_finding_with_line_shows_it(
         self, tmp_path: Path, monkeypatch: pytest.MonkeyPatch
@@ -448,7 +381,8 @@ class TestRunCheckFull:
         result = PythonToolkit().run(request)
 
         assert result.status == "findings"
-        assert "- src/mod.py:4: DEP001: " in result.fix_text
+        assert "DEP001 (1 finding) (src: 1)" in result.fix_text
+        assert "- src/mod.py: 4 — " in result.fix_text
 
     def test_deptry_error_is_error(
         self, tmp_path: Path, monkeypatch: pytest.MonkeyPatch

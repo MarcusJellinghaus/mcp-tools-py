@@ -16,6 +16,7 @@ from mcp_tools_py.code_checker_pytest.models import (
 from mcp_tools_py.code_checker_pytest.parsers import parse_pytest_report
 from mcp_tools_py.code_checker_pytest.reporting import (
     NO_CAPTURED_OUTPUT_NOTE,
+    SHOW_OUTPUT_HINT,
     collected_test_ids,
     create_prompt_for_passing_output,
     did_not_run_line,
@@ -616,7 +617,7 @@ class TestPassingOutput:
         assert create_prompt_for_passing_output(_report([])) == NO_CAPTURED_OUTPUT_NOTE
 
     def test_output_is_truncated(self) -> None:
-        """Many printing tests are cut at max_output_lines."""
+        """Many printing tests are cut at max_lines and end with the hint."""
         report = _report(
             [
                 _test(f"t.py::test_{i}", "passed", call=_stage(stdout=f"LINE_{i}"))
@@ -624,10 +625,11 @@ class TestPassingOutput:
             ]
         )
 
-        result = create_prompt_for_passing_output(report, max_output_lines=10)
+        result = create_prompt_for_passing_output(report, max_lines=10)
 
-        assert "[Output truncated" in result
-        assert "LINE_19" not in result
+        assert "omitted ...]" in result
+        assert "LINE_10" not in result
+        assert result.endswith(SHOW_OUTPUT_HINT)
 
 
 @pytest.mark.parametrize(

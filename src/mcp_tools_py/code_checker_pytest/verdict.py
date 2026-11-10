@@ -5,9 +5,7 @@ from enum import Enum
 
 from mcp_tools_py.code_checker_pytest.models import PytestReport, Summary
 from mcp_tools_py.code_checker_pytest.reporting import (
-    MAX_OUTPUT_LINES,
     XDIST_MARKER,
-    OutputBuilder,
     collected_test_ids,
     collectors_failed_line,
     failed_collector_count,
@@ -17,13 +15,17 @@ from mcp_tools_py.code_checker_pytest.reporting import (
     selected_count,
 )
 from mcp_tools_py.code_checker_pytest.utils import get_pytest_exit_code_info
+from mcp_tools_py.utils.report_budget import ERROR_TAIL_LINES, TOOL_LINES, bound_text
 
 XDIST_HINT = (
     "Hint: pytest-xdist workers collected different tests. Parametrize values "
     "must be identical across workers (no `datetime.now()` or random values). "
     "Pass `-n 0` to disable xdist and run the tests anyway."
 )
-_ERROR_TAIL_LINES = 50
+COLLECT_HINT = "Narrow the selection (a path or -k in extra_args) to list fewer tests."
+PROBLEMS_HINT = (
+    "Narrow the selection (a path or -k in extra_args) and rerun to see the rest."
+)
 
 
 class RunStatus(str, Enum):
@@ -115,21 +117,19 @@ def format_collect_only_text(report: PytestReport) -> str:
         report: The parsed pytest report
 
     Returns:
-        The selected count, then one test ID per line, capped at
-        MAX_OUTPUT_LINES with a truncation marker.
+        The selected count, then one test ID per line, bounded at TOOL_LINES
+        and ending with COLLECT_HINT when cut.
     """
     selected = selected_count(report.summary)
     deselected = report.summary.deselected or 0
     header = f"Collected {selected} {plural(selected, 'test')}"
     if deselected:
         header += f" ({deselected} deselected)"
-    output = OutputBuilder(MAX_OUTPUT_LINES)
-    output.add(f"{header} in {report.duration:.2f} seconds. No tests were run.\n")
+    text = f"{header} in {report.duration:.2f} seconds. No tests were run.\n"
     ids = collected_test_ids(report)
     if ids:
-        # One add, so the truncation marker is written when the IDs hit the cap
-        output.add("\n".join(ids) + "\n")
-    return output.get_result()
+        text += "\n".join(ids) + "\n"
+    return bound_text(text, TOOL_LINES, hint=COLLECT_HINT)
 
 
 def format_collection_problems(verdict: RunVerdict) -> str:
@@ -146,19 +146,15 @@ def format_collection_problems(verdict: RunVerdict) -> str:
 
 
 def cap_problems(problems: list[str]) -> str:
-    """Join problems, capped at MAX_OUTPUT_LINES with a truncation marker.
+    """Join problems, bounded at TOOL_LINES.
 
     Args:
         problems: Problem texts
 
     Returns:
-        The joined, capped text.
+        The joined, bounded text, ending with PROBLEMS_HINT when cut.
     """
-    output = OutputBuilder(MAX_OUTPUT_LINES)
-    for problem in problems:
-        if not output.add(problem + "\n"):
-            break
-    return output.get_result()
+    return bound_text("\n".join(problems), hint=PROBLEMS_HINT)
 
 
 def _merge_problems(report: PytestReport, with_tail: bool) -> list[str]:
@@ -171,7 +167,7 @@ def _merge_problems(report: PytestReport, with_tail: bool) -> list[str]:
     items = group_failed_collectors(report)
     # ErrorContext holds the full output on every non-zero exit, so the tail is only used for ERROR
     if with_tail and not items and ctx and ctx.error_message.strip():
-        items.append("\n".join(ctx.error_message.splitlines()[-_ERROR_TAIL_LINES:]))
+        items.append("\n".join(ctx.error_message.splitlines()[-ERROR_TAIL_LINES:]))
     return items
 
 

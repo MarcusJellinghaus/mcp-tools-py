@@ -9,7 +9,7 @@ from mcp_tools_py.code_checker_pytest.models import (
     Summary,
 )
 from mcp_tools_py.code_checker_pytest.reporting import (
-    MAX_COLLECTOR_IDS,
+    PYTEST_HINT,
     XDIST_MARKER,
     collectors_failed_line,
     create_prompt_for_failed_tests,
@@ -17,6 +17,7 @@ from mcp_tools_py.code_checker_pytest.reporting import (
     group_failed_collectors,
 )
 from mcp_tools_py.code_checker_pytest.verdict import classify_run, format_error_text
+from mcp_tools_py.utils.report_budget import MAX_COLLECTOR_IDS
 
 IMPORTLIB_FRAME = (
     "importlib\\__init__.py:126: in import_module\n    return _bootstrap()"
@@ -251,15 +252,16 @@ def test_failed_path_has_count_line() -> None:
     assert "same error in 1 more collector: tests/b.py\n\n" in prompt
 
 
-def test_failed_path_stops_on_truncation() -> None:
+def test_failed_path_bounds_collector_part() -> None:
     report = _report(
         [_collector(f"tests/t{i}.py", f"E   ImportError: {i}") for i in range(20)],
         exit_code=1,
     )
 
-    prompt = create_prompt_for_failed_tests(report, max_output_lines=7)
+    prompt = create_prompt_for_failed_tests(report, max_lines=30)
 
     assert prompt is not None
-    assert "Output truncated" in prompt
-    assert "ImportError: 19" not in prompt
-    assert "Can you provide an explanation" not in prompt
+    assert "lines /" in prompt and "omitted" in prompt
+    assert "ImportError: 10" not in prompt
+    assert len(prompt.splitlines()) <= 30
+    assert prompt.endswith(PYTEST_HINT)

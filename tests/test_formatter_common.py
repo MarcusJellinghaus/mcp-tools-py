@@ -8,12 +8,10 @@ from unittest.mock import MagicMock, patch
 import pytest
 
 from mcp_tools_py.formatter.common import (
-    MAX_LINES,
     combine_output,
     formatter_binary,
     formatter_version,
     relative_path,
-    truncate_output,
     version_line,
 )
 from tests.conftest import make_command_result
@@ -36,21 +34,6 @@ _ISORT_VERSION_STDOUT = (
     "\n"
 )
 _RUFF_VERSION_STDOUT = "ruff 0.16.9\n"
-
-
-def test_truncate_output_under_cap_unchanged() -> None:
-    text = "\n".join(f"line {i}" for i in range(MAX_LINES))
-
-    assert truncate_output(text) == text
-
-
-def test_truncate_output_over_cap_appends_marker() -> None:
-    text = "\n".join(f"line {i}" for i in range(MAX_LINES + 30))
-
-    lines = truncate_output(text).splitlines()
-
-    assert len(lines) == MAX_LINES + 1
-    assert lines[-1] == "... (truncated, 30 more lines)"
 
 
 @pytest.mark.parametrize(

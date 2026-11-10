@@ -1,13 +1,13 @@
 """Unit tests for ruff reporting module."""
 
 from mcp_tools_py.code_checker_ruff.reporting import (
-    MAX_LOCATIONS_PER_ISSUE,
     _rule_label,
     format_ruff_check_report,
     format_ruff_fix_report,
     get_rule_prefix,
     group_and_sort_issues,
 )
+from mcp_tools_py.utils.report_budget import DETAIL_HINT, LOCATIONS_PER_RULE
 from mcp_tools_py.utils.ruff_parsing import RuffMessage
 
 
@@ -121,14 +121,16 @@ class TestFormatRuffCheckReport:
             "ruff found 1 issue with rule E501 undocumented-public-module "
             "((root): 1)." in result
         )
-        assert "a.py:10:89" in result
+        assert "- a.py: 10 — Missing docstring in public module" in result
 
         # Remaining should be summary only
+        assert "--- 2 additional rules found (2 occurrences) ---" in result
         assert "- W291 undocumented-public-module: 1 occurrence ((root): 1)" in result
         assert "- D100 undocumented-public-module: 1 occurrence ((root): 1)" in result
+        assert result.split("\n")[-1] == DETAIL_HINT
 
         # No detailed locations for remaining
-        assert "b.py:5:0" not in result
+        assert "- b.py" not in result
 
     def test_total_line_singular(self) -> None:
         result = format_ruff_check_report([_make_ruff_message()])
@@ -194,21 +196,29 @@ class TestFormatRuffCheckReport:
         assert "((outside): 1)" in result
 
     def test_locations_capped(self) -> None:
-        """More than MAX_LOCATIONS_PER_ISSUE locations should be capped."""
-        count = MAX_LOCATIONS_PER_ISSUE + 10
+        """More than LOCATIONS_PER_RULE location rows should be capped."""
+        count = LOCATIONS_PER_RULE + 10
         msgs = [
             _make_ruff_message(code="E501", filename=f"file{i}.py", line=i)
             for i in range(count)
         ]
         result = format_ruff_check_report(msgs, max_issues=1)
         assert result is not None
-        assert f"... and 10 more occurrences" in result
+        assert "... and 10 more locations in 10 more rows" in result
 
-        # Only MAX_LOCATIONS_PER_ISSUE locations should appear
         location_lines = [
             line for line in result.split("\n") if line.startswith("- file")
         ]
-        assert len(location_lines) == MAX_LOCATIONS_PER_ISSUE
+        assert len(location_lines) == LOCATIONS_PER_RULE
+
+    def test_same_message_collapses_per_file(self) -> None:
+        msgs = [
+            _make_ruff_message(code="E501", filename="src/a.py", line=n)
+            for n in (3, 7, 9)
+        ]
+        result = format_ruff_check_report(msgs, max_issues=1)
+        assert result is not None
+        assert "- src/a.py: 3, 7, 9 — Missing docstring in public module" in result
 
 
 class TestRuleLabel:
@@ -245,17 +255,18 @@ class TestFormatRuffFixReport:
         ]
         result = format_ruff_fix_report(changed, remaining)
 
-        assert "Ruff applied fixes to 2 files:" in result
+        assert "Ruff applied fixes to 2 files (src: 2):" in result
         assert "- src/a.py" in result
         assert "- src/b.py" in result
         assert "3 remaining issues (2 rule types) not auto-fixable:" in result
-        assert "- E501: 2 occurrences" in result
-        assert "- D100: 1 occurrences" in result
+        assert "- E501 undocumented-public-module: 2 occurrences (src: 2)" in result
+        assert "- D100 undocumented-public-module: 1 occurrence (src: 1)" in result
+        assert result.splitlines()[-1] == "Use run_ruff_check to see their locations."
 
     def test_no_remaining(self) -> None:
         changed = ["src/a.py"]
         result = format_ruff_fix_report(changed, [])
 
-        assert "Ruff applied fixes to 1 files:" in result
+        assert "Ruff applied fixes to 1 file (src: 1):" in result
         assert "- src/a.py" in result
         assert "remaining" not in result

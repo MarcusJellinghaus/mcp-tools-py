@@ -3,7 +3,7 @@
 from typing import Any
 from unittest.mock import patch
 
-from mcp_tools_py.code_checker_vulture.runners import run_vulture_check
+from mcp_tools_py.code_checker_vulture.runners import VultureResult, run_vulture_check
 from tests.conftest import make_command_result
 
 MODULE_PATH = "mcp_tools_py.code_checker_vulture.runners"
@@ -11,8 +11,10 @@ MODULE_PATH = "mcp_tools_py.code_checker_vulture.runners"
 
 @patch(f"{MODULE_PATH}.execute_command")
 def test_run_vulture_success(mock_exec: Any) -> None:
-    """Mock execute_command returning stdout, verify output returned."""
-    mock_exec.return_value = make_command_result(stdout="unused code found\n")
+    """Mock execute_command returning stdout, verify it is parsed."""
+    mock_exec.return_value = make_command_result(
+        stdout="src/a.py:3: unused function 'foo' (60% confidence)\n"
+    )
 
     result = run_vulture_check(
         vulture_binary="/usr/bin/vulture",
@@ -20,7 +22,11 @@ def test_run_vulture_success(mock_exec: Any) -> None:
         target_directories=["src"],
     )
 
-    assert result == "unused code found"
+    assert result.error is None
+    assert [(m.file, m.line, m.name) for m in result.messages] == [
+        ("src/a.py", 3, "foo")
+    ]
+    assert result.unparsed == []
     mock_exec.assert_called_once()
     cmd = mock_exec.call_args[0][0]
     assert cmd[0] == "/usr/bin/vulture"
@@ -29,9 +35,10 @@ def test_run_vulture_success(mock_exec: Any) -> None:
 
 @patch(f"{MODULE_PATH}.execute_command")
 def test_run_vulture_combines_stderr(mock_exec: Any) -> None:
-    """Mock with both stdout and stderr, verify combined output."""
+    """Mock with both stdout and stderr, verify both are parsed."""
     mock_exec.return_value = make_command_result(
-        stdout="unused import", stderr="warning: something"
+        stdout="src/a.py:1: unused import 'os' (90% confidence)",
+        stderr="warning: something",
     )
 
     result = run_vulture_check(
@@ -40,13 +47,13 @@ def test_run_vulture_combines_stderr(mock_exec: Any) -> None:
         target_directories=["src"],
     )
 
-    assert "unused import" in result
-    assert "warning: something" in result
+    assert [m.name for m in result.messages] == ["os"]
+    assert result.unparsed == ["warning: something"]
 
 
 @patch(f"{MODULE_PATH}.execute_command")
 def test_run_vulture_no_output(mock_exec: Any) -> None:
-    """Mock empty output, verify fallback message returned."""
+    """Mock empty output, verify an empty result."""
     mock_exec.return_value = make_command_result(stdout="", stderr="")
 
     result = run_vulture_check(
@@ -55,7 +62,7 @@ def test_run_vulture_no_output(mock_exec: Any) -> None:
         target_directories=["src"],
     )
 
-    assert result == "vulture produced no output."
+    assert result == VultureResult(error=None, messages=[], unparsed=[])
 
 
 @patch(f"{MODULE_PATH}.os.path.exists", return_value=True)
@@ -141,9 +148,8 @@ def test_run_vulture_timeout_reports_timeout(mock_exec: Any) -> None:
         timeout_seconds=45,
     )
 
-    assert "timed out" in result
-    assert "45" in result
-    assert "produced no output" not in result
+    assert result.error == "vulture timed out after 45 seconds."
+    assert result.messages == []
 
 
 @patch(f"{MODULE_PATH}.execute_command")
@@ -159,8 +165,8 @@ def test_run_vulture_execution_error_reports_failure(mock_exec: Any) -> None:
         target_directories=["src"],
     )
 
-    assert "PermissionError: vulture" in result
-    assert "produced no output" not in result
+    assert result.error == "vulture failed to run: PermissionError: vulture"
+    assert result.messages == []
 
 
 @patch(f"{MODULE_PATH}.execute_command")

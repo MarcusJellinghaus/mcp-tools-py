@@ -8,7 +8,6 @@ import time
 from mcp_tools_py.formatter.common import (
     combine_output,
     formatter_binary,
-    truncate_output,
     version_line,
 )
 from mcp_tools_py.formatter.models import FormatterResult
@@ -96,7 +95,7 @@ def run_black(
     banner = version_line("black", binary, remaining)
 
     return FormatterResult(
-        output=truncate_output(f"{banner}\n{output}"),
+        output=f"{banner}\n{output}",
         success=result.return_code == 0,
         files_changed=_parse_black_changed_files(output),
     )

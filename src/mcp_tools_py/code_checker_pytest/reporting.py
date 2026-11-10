@@ -6,65 +6,37 @@ from typing import Any, Dict, List, Optional, Tuple
 from mcp_tools_py.code_checker_pytest.models import (
     Collector,
     PytestReport,
+    StageInfo,
     Summary,
     Test,
+    TracebackEntry,
 )
 from mcp_tools_py.log_utils import log_function_call
+from mcp_tools_py.utils.report_budget import (
+    FAILED_IDS,
+    MAX_COLLECTOR_IDS,
+)
+from mcp_tools_py.utils.report_budget import MAX_FAILURES as MAX_FAILURES
+from mcp_tools_py.utils.report_budget import TOOL_CHARS, TOOL_LINES, bound_text
 
 logger = logging.getLogger(__name__)
 # Constants to avoid magic numbers
-MAX_OUTPUT_LINES = 300
-MAX_FAILURES = 10
 FAILED_OUTCOMES = ["failed", "error"]
+PYTEST_HINT = "Use extra_args=['<nodeid>', '-vv'] to see one test in full."
+SHOW_OUTPUT_HINT = "Use extra_args=['<nodeid>', '-s'] to see one test's output."
+CLOSING_QUESTION = (
+    "Can you provide an explanation for why these tests failed"
+    " and suggest how they could be fixed?"
+)
+TESTS_HEADER = "The following tests failed during the test session:"
+SEPARATOR = "=" * 79
+MIN_TEST_LINES = 6
+MIN_FENCED_LINES = 8
+DROPPED_NOTICE = "  Not shown, budget used up:"
+DROPPED_NOTICE_CHARS = 200
+FENCE = "```"
 NO_CAPTURED_OUTPUT_NOTE = "Note: no passing test produced captured output."
 XDIST_MARKER = "Different tests were collected"
-MAX_COLLECTOR_IDS = 10
-
-
-class OutputBuilder:
-    """Helper class to manage output building with line counting and truncation."""
-
-    def __init__(self, max_lines: int = MAX_OUTPUT_LINES):
-        self.parts: List[str] = []
-        self.line_count = 0
-        self.max_lines = max_lines
-        self.truncated = False
-
-    def add(self, content: str) -> bool:
-        """Add content to the output, checking line limits.
-
-        Args:
-            content: Content to add
-
-        Returns:
-            True if content was added, False if truncated
-        """
-        if self.truncated:
-            return False
-
-        lines = content.count("\n")
-        if self.line_count + lines > self.max_lines:
-            remaining_lines = self.max_lines - self.line_count
-            if remaining_lines > 0:
-                content_lines = content.split("\n")
-                self.parts.append("\n".join(content_lines[:remaining_lines]))
-                self.parts.append(
-                    f"\n\n[Output truncated at {self.max_lines} lines...]\n"
-                )
-            self.truncated = True
-            return False
-
-        self.parts.append(content)
-        self.line_count += lines
-        return True
-
-    def get_result(self) -> str:
-        """Get the final output string.
-
-        Returns:
-            All appended parts concatenated.
-        """
-        return "".join(self.parts)
 
 
 def should_show_details(_test_results: Dict[str, Any], show_details: bool) -> bool:
@@ -204,277 +176,264 @@ def collectors_failed_line(report: PytestReport) -> str:
     return f"{line} ({distinct} distinct {plural(distinct, 'error')})"
 
 
-def _get_failed_tests(
-    test_session_result: PytestReport, max_failures: int
-) -> List[Test]:
-    """Extract and limit failed tests from test session result.
-
-    Returns:
-        Up to `max_failures` failed/errored tests.
-    """
-    if not test_session_result.tests:
-        return []
-
-    failed_tests = [
-        test for test in test_session_result.tests if test.outcome in FAILED_OUTCOMES
+def _get_failed_tests(test_session_result: PytestReport) -> List[Test]:
+    """Return every failed or errored test, in report order."""
+    return [
+        test
+        for test in test_session_result.tests or []
+        if test.outcome in FAILED_OUTCOMES
     ]
 
-    return failed_tests[:max_failures]
+
+def _line_count(text: str) -> int:
+    return len(text.splitlines())
 
 
-def _format_test_output(
-    test: Test, output: OutputBuilder, include_print_output: bool
-) -> bool:
-    """Format stdout, stderr, and longrepr output for a test.
+def _fenced(label: str, text: str, max_lines: int, max_chars: int) -> str:
+    """Render `text` as a fenced section, keeping its tail within the budget.
 
-    Args:
-        test: The test to format output for
-        output: OutputBuilder instance
-        include_print_output: Whether to include print output
+    The fences sit outside the bounded body, so they are always closed.
 
     Returns:
-        True if successful, False if truncated
+        The label line followed by the fenced body.
     """
-    if not include_print_output or not test.call:
+    body_chars = max(0, max_chars - len(label) - 16)
+    body = bound_text(text.rstrip("\n"), max_lines - 3, body_chars, keep="tail")
+    return f"  {label}:\n{FENCE}\n{body}\n{FENCE}"
+
+
+def _traceback(label: str, entries: List[TracebackEntry]) -> str:
+    rows = [f"   - {entry.path}:{entry.lineno} - {entry.message}" for entry in entries]
+    return "\n".join([f"  {label}:"] + rows)
+
+
+class _Sections:
+    """Sections kept in order while they fit in what is left of a budget.
+
+    One line and DROPPED_NOTICE_CHARS are held back for the notice naming
+    the fenced sections that did not fit.
+    """
+
+    def __init__(self, max_lines: int, max_chars: int) -> None:
+        self.parts: List[str] = []
+        self.dropped: List[str] = []
+        self.lines = max_lines - 1
+        self.chars = max_chars - DROPPED_NOTICE_CHARS
+
+    def add(self, text: str) -> bool:
+        """Append `text` if it fits; otherwise skip it.
+
+        Returns:
+            Whether `text` was appended.
+        """
+        lines, chars = _line_count(text), len(text) + 1
+        if lines > self.lines or chars > self.chars:
+            return False
+        self.parts.append(text)
+        self.lines -= lines
+        self.chars -= chars
         return True
 
-    if test.call.stdout:
-        if not output.add(f"  Stdout:\n```\n{test.call.stdout}\n```\n"):
-            return False
+    def bounded(self, text: str, share: int = 1) -> None:
+        """Append `text` bounded to 1/`share` of the budget left."""
+        self.add(
+            bound_text(
+                text, max(1, self.lines // share), max(0, self.chars // share - 1)
+            )
+        )
 
-    if test.call.stderr:
-        if not output.add(f"  Stderr:\n```\n{test.call.stderr}\n```\n"):
-            return False
+    def fenced(self, label: str, text: Optional[str]) -> None:
+        """Append `text` as a tail-kept fenced section, if there is any.
 
-    if test.call.longrepr:
-        if not output.add(f"  Longrepr:\n```\n{test.call.longrepr}\n```\n"):
-            return False
+        A section left too little room to show its text is recorded as dropped.
+        """
+        if not text:
+            return
+        count = _line_count(text)
+        roomy = self.lines >= min(count + 3, MIN_FENCED_LINES)
+        if not (roomy and self.add(_fenced(label, text, self.lines, self.chars - 1))):
+            self.dropped.append(f"{label} ({count} {plural(count, 'line')})")
 
-    return True
+    def text(self) -> str:
+        """Join the sections, then the notice naming any dropped ones.
+
+        Returns:
+            The rendered sections.
+        """
+        parts = list(self.parts)
+        if self.dropped:
+            notice = f"{DROPPED_NOTICE} {', '.join(self.dropped)}"
+            parts.append(notice[:DROPPED_NOTICE_CHARS])
+        return "\n".join(parts)
 
 
-def _format_test_setup_info(
-    test: Test, output: OutputBuilder, include_print_output: bool
-) -> bool:
-    """Format setup information for a failed test.
-
-    Args:
-        test: The test with failed setup
-        output: OutputBuilder instance
-        include_print_output: Whether to include print output
-
-    Returns:
-        True if successful, False if truncated
-    """
-    if not test.setup or test.setup.outcome != "failed":
-        return True
-
-    if not output.add(f"  Test Setup Outcome: {test.setup.outcome}\n"):
-        return False
-
-    if test.setup.crash:
-        if not output.add(
-            f"  Test Setup Crash Error Message: {test.setup.crash.message}\n"
-        ):
-            return False
-        if not output.add(f"  Test Setup Crash Error Path: {test.setup.crash.path}\n"):
-            return False
-        if not output.add(f"  Setup Crash Error Line: {test.setup.crash.lineno}\n"):
-            return False
-
-    if test.setup.traceback:
-        if not output.add("  Test Setup Traceback:\n"):
-            return False
-        for entry in test.setup.traceback:
-            if not output.add(f"   - {entry.path}:{entry.lineno} - {entry.message}\n"):
-                return False
-
-    # Include setup output sections only if include_print_output is True
+def _render_setup(out: _Sections, setup: StageInfo, include_print_output: bool) -> None:
+    out.add(f"  Test Setup Outcome: {setup.outcome}")
+    if setup.crash:
+        out.bounded(
+            f"  Test Setup Crash Error Message: {setup.crash.message}\n"
+            f"  Test Setup Crash Error Path: {setup.crash.path}\n"
+            f"  Setup Crash Error Line: {setup.crash.lineno}",
+            share=3,
+        )
+    if setup.longrepr:
+        out.fenced("Test Setup Longrepr", setup.longrepr)
+    elif setup.traceback:
+        out.bounded(_traceback("Test Setup Traceback", setup.traceback))
     if include_print_output:
-        if test.setup.stdout:
-            if not output.add(f"  Test Setup Stdout:\n```\n{test.setup.stdout}\n```\n"):
-                return False
-        if test.setup.stderr:
-            if not output.add(f"  Test Setup Stderr:\n```\n{test.setup.stderr}\n```\n"):
-                return False
-        if test.setup.longrepr:
-            if not output.add(
-                f"  Test Setup Longrepr:\n```\n{test.setup.longrepr}\n```\n"
-            ):
-                return False
-
-    return True
+        out.fenced("Test Setup Stderr", setup.stderr)
+        out.fenced("Test Setup Stdout", setup.stdout)
 
 
-def _format_test_info(
-    test: Test, output: OutputBuilder, include_print_output: bool
-) -> bool:
-    """Format information about a failed test.
+def _render_test(
+    test: Test, include_print_output: bool, max_lines: int, max_chars: int
+) -> str:
+    """Render one failed test; each section takes from the budget left over.
 
-    Args:
-        test: The failed test to format
-        output: OutputBuilder instance
-        include_print_output: Whether to include print output
+    Order: header and message, longrepr (else traceback), stderr, stdout,
+    then setup info when setup failed. A section that does not fit is skipped.
 
     Returns:
-        True if successful, False if truncated
+        The rendered test, or "" when not even the header fits.
     """
-    if not output.add(f"Test ID: {test.nodeid} - outcome {test.outcome}\n"):
-        return False
-
-    # Format crash information
-    if test.call and test.call.crash:
-        if not output.add(f"  Error Message: {test.call.crash.message}\n"):
-            return False
-
-    # Format traceback
-    if test.call and test.call.traceback:
-        if not output.add("  Traceback:\n"):
-            return False
-        for entry in test.call.traceback:
-            if not output.add(f"   - {entry.path}:{entry.lineno} - {entry.message}\n"):
-                return False
-
-    # Format test output (stdout, stderr, longrepr)
-    if not _format_test_output(test, output, include_print_output):
-        return False
-
-    # Format setup information if setup failed
-    if not _format_test_setup_info(test, output, include_print_output):
-        return False
-
-    return True
+    out = _Sections(max_lines, max_chars)
+    out.add(f"Test ID: {test.nodeid} - outcome {test.outcome}")
+    if not out.parts:
+        return ""
+    call = test.call
+    if call:
+        if call.crash:
+            out.bounded(f"  Error Message: {call.crash.message}", share=3)
+        if call.longrepr:
+            out.fenced("Longrepr", call.longrepr)
+        elif call.traceback:
+            out.bounded(_traceback("Traceback", call.traceback))
+        if include_print_output:
+            out.fenced("Stderr", call.stderr)
+            out.fenced("Stdout", call.stdout)
+    if test.setup and test.setup.outcome == "failed":
+        _render_setup(out, test.setup, include_print_output)
+    return out.text()
 
 
-def _process_failed_collectors(report: PytestReport, output: OutputBuilder) -> bool:
-    """Add the count line and one group per distinct collector error.
-
-    Args:
-        report: The parsed pytest report
-        output: OutputBuilder instance
+def _collector_part(report: PytestReport, max_lines: int, max_chars: int) -> str:
+    """Render the count line and one group per distinct collector error.
 
     Returns:
-        True if successful or no collector failed, False if truncated
+        The bounded collector text, or "" when no collector failed.
     """
     line = collectors_failed_line(report)
     if not line:
-        return True
-
-    if not output.add(f"{line}\n\n"):
-        return False
-
-    return all(output.add(f"{group}\n\n") for group in group_failed_collectors(report))
+        return ""
+    return bound_text(
+        "\n\n".join([line] + group_failed_collectors(report)), max_lines, max_chars
+    )
 
 
-def _process_failed_tests(
-    failed_tests: List[Test],
-    output: OutputBuilder,
-    include_print_output: bool,
-    max_number_of_tests_reported: int,
-) -> bool:
-    """Process and format failed tests.
+def _undetailed(tests: List[Test]) -> str:
+    lines = [f"Failed tests without details ({len(tests)}):"]
+    lines += [f"- {test.nodeid}" for test in tests[:FAILED_IDS]]
+    hidden = len(tests) - FAILED_IDS
+    if hidden > 0:
+        lines.append(f"... and {hidden} more")
+    return "\n".join(lines)
 
-    Args:
-        failed_tests: List of failed tests
-        output: OutputBuilder instance
-        include_print_output: Whether to include print output
-        max_number_of_tests_reported: Maximum number of tests to report
+
+def _render_tests(
+    candidates: List[Test], include_print_output: bool, max_lines: int, max_chars: int
+) -> List[str]:
+    """Render the candidates in order, each with an even share of what is left.
 
     Returns:
-        True if successful, False if truncated
+        One block per rendered test; stops at the first test whose share is
+        too small.
     """
-    if not failed_tests:
-        return True
-
-    if not output.add("The following tests failed during the test session:\n"):
-        return False
-
-    test_count = 0
-    for test in failed_tests:
-        if not _format_test_info(test, output, include_print_output):
-            return False
-
-        if not output.add("\n"):
-            return False
-
-        test_count += 1
-        if test_count >= max_number_of_tests_reported:
+    separator_chars = len(SEPARATOR) + 4
+    blocks: List[str] = []
+    for index, test in enumerate(candidates):
+        remaining = len(candidates) - index
+        lines = max_lines // remaining
+        if lines < MIN_TEST_LINES:
             break
-
-        if not output.add(
-            "===============================================================================\n"
-        ):
-            return False
-        if not output.add("\n"):
-            return False
-
-    return True
+        chars = max_chars // remaining - separator_chars
+        block = _render_test(test, include_print_output, lines - 3, chars)
+        if not block:
+            break
+        blocks.append(block)
+        max_lines -= _line_count(block) + 3
+        max_chars -= len(block) + separator_chars
+    return blocks
 
 
 @log_function_call
 def create_prompt_for_failed_tests(
     test_session_result: PytestReport,
-    max_number_of_tests_reported: int = 1,
     include_print_output: bool = True,
     max_failures: int = MAX_FAILURES,
-    max_output_lines: int = MAX_OUTPUT_LINES,
+    max_lines: int = TOOL_LINES,
+    max_chars: int = TOOL_CHARS,
 ) -> Optional[str]:
     """Creates a prompt for an LLM based on the failed tests from a test session result.
 
+    Failed collectors come first. Up to `max_failures` tests then get an even
+    share of the budget left; a reserved list names every failed test that got
+    no detail. The prompt ends with the closing question and PYTEST_HINT.
+
     Args:
         test_session_result: The test session result to analyze
-        max_number_of_tests_reported: Maximum number of tests to include in the prompt
-        include_print_output: Whether to include stdout/stderr/longrepr output
-        max_failures: Maximum number of failures to report
-        max_output_lines: Overall output line limit with truncation indicator
+        include_print_output: Whether to include stdout/stderr output
+        max_failures: Maximum number of tests rendered in detail
+        max_lines: Line budget of the whole prompt
+        max_chars: Character budget of the whole prompt
 
     Returns:
         A prompt string, or None if no tests failed
     """
-    output = OutputBuilder(max_output_lines)
+    failed = _get_failed_tests(test_session_result)
+    collectors = _collector_part(test_session_result, max_lines // 3, max_chars // 3)
+    if not failed and not collectors:
+        return None
 
-    failed_tests = _get_failed_tests(test_session_result, max_failures)
+    closing = f"{CLOSING_QUESTION}\n{PYTEST_HINT}"
+    reserved = _undetailed(failed) if len(failed) > 1 else ""
+    reserve = min(len(failed), FAILED_IDS) + 3 if reserved else 0
+    collector_lines = _line_count(collectors) + 1 if collectors else 0
+    lines_left = max_lines - collector_lines - reserve - 4
+    chars_left = max_chars - sum(
+        len(part) + 2 for part in (collectors, TESTS_HEADER, reserved, closing)
+    )
+    blocks = _render_tests(
+        failed[:max_failures], include_print_output, lines_left, chars_left
+    )
 
-    # Process failed collectors (always shown - critical setup issues)
-    if not _process_failed_collectors(test_session_result, output):
-        return output.get_result()
-
-    # Process failed tests
-    if not _process_failed_tests(
-        failed_tests, output, include_print_output, max_number_of_tests_reported
-    ):
-        return output.get_result()
-
-    # Add closing question if we have content
-    if output.parts:
-        output.add(
-            "Can you provide an explanation for why these tests failed and suggest how they could be fixed?"
-        )
-        return output.get_result()
-
-    return None
+    sections = [collectors] if collectors else []
+    if blocks:
+        sections.append(TESTS_HEADER + "\n" + f"\n\n{SEPARATOR}\n\n".join(blocks))
+    undetailed = failed[len(blocks) :]
+    if undetailed:
+        sections.append(_undetailed(undetailed))
+    sections.append(closing)
+    return "\n\n".join(sections)
 
 
 @log_function_call
 def create_prompt_for_passing_output(
-    test_session_result: PytestReport,
-    max_output_lines: int = MAX_OUTPUT_LINES,
+    report: PytestReport, max_lines: int = TOOL_LINES, max_chars: int = TOOL_CHARS
 ) -> str:
     """List the captured stdout and stderr of tests that did not fail.
 
     Covers the setup, call and teardown stages. Longrepr is never shown.
 
     Args:
-        test_session_result: The test session result to read output from
-        max_output_lines: Overall output line limit with truncation indicator
+        report: The test session result to read output from
+        max_lines: Line budget; a cut ends with SHOW_OUTPUT_HINT
+        max_chars: Character budget
 
     Returns:
         The captured output per test, or NO_CAPTURED_OUTPUT_NOTE if no test printed
     """
-    output = OutputBuilder(max_output_lines)
-    any_added = False
-
-    for test in test_session_result.tests or []:
+    parts: List[str] = []
+    for test in report.tests or []:
         if test.outcome in FAILED_OUTCOMES:
             continue
         stages = [
@@ -494,19 +453,15 @@ def create_prompt_for_passing_output(
         ]
         if not blocks:
             continue
+        parts.append(f"Test ID: {test.nodeid} - outcome {test.outcome}\n")
+        parts.extend(
+            f"  {label}:\n{FENCE}\n{text}\n{FENCE}\n" for label, text in blocks
+        )
 
-        if not any_added:
-            any_added = True
-            if not output.add("Captured output of passing tests:\n"):
-                break
-        if not output.add(f"Test ID: {test.nodeid} - outcome {test.outcome}\n"):
-            break
-        if not all(
-            output.add(f"  {label}:\n```\n{text}\n```\n") for label, text in blocks
-        ):
-            break
-
-    return output.get_result() if any_added else NO_CAPTURED_OUTPUT_NOTE
+    if not parts:
+        return NO_CAPTURED_OUTPUT_NOTE
+    output = "Captured output of passing tests:\n" + "".join(parts)
+    return bound_text(output, max_lines, max_chars, hint=SHOW_OUTPUT_HINT)
 
 
 def get_detailed_test_summary(

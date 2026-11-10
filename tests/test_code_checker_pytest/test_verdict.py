@@ -11,8 +11,10 @@ from mcp_tools_py.code_checker_pytest.models import (
     PytestReport,
     Summary,
 )
-from mcp_tools_py.code_checker_pytest.reporting import MAX_OUTPUT_LINES, XDIST_MARKER
+from mcp_tools_py.code_checker_pytest.reporting import XDIST_MARKER
 from mcp_tools_py.code_checker_pytest.verdict import (
+    COLLECT_HINT,
+    PROBLEMS_HINT,
     XDIST_HINT,
     RunStatus,
     RunVerdict,
@@ -22,6 +24,7 @@ from mcp_tools_py.code_checker_pytest.verdict import (
     format_error_text,
     format_suspicious_text,
 )
+from mcp_tools_py.utils.report_budget import TOOL_LINES
 
 
 def _summary(collected: int = 0, **counts: Optional[int]) -> Summary:
@@ -154,12 +157,12 @@ def test_same_first_line_with_different_last_lines_stay_separate() -> None:
 
 
 def test_format_error_text_truncates_and_keeps_hint() -> None:
-    block = "\n".join(f"line {j}" for j in range(MAX_OUTPUT_LINES // 2))
+    block = "\n".join(f"line {j}" for j in range(TOOL_LINES // 2))
     problems = [f"p{i}\n{block}" for i in range(3)] + [f"{XDIST_MARKER} on gw1"]
     text = format_error_text(None, RunVerdict(RunStatus.ERROR, problems, 1))
-    assert "Output truncated" in text
+    assert "omitted ...]" in text
     assert XDIST_HINT in text
-    assert text.index("Output truncated") < text.index(XDIST_HINT)
+    assert text.index(PROBLEMS_HINT) < text.index(XDIST_HINT)
 
 
 def test_format_error_text_exit2_with_collector_omits_interrupted() -> None:
@@ -291,7 +294,8 @@ def test_format_collect_only_text_truncates_ids() -> None:
     ids = [f"tests/test_x.py::test_{n}" for n in range(400)]
     text = format_collect_only_text(_collect_only_report(ids, 400))
     assert text.splitlines()[0].startswith("Collected 400 tests")
-    assert f"[Output truncated at {MAX_OUTPUT_LINES} lines" in text
+    assert "omitted ...]" in text
+    assert text.endswith(COLLECT_HINT)
 
 
 def test_format_collect_only_text_without_collectors() -> None:

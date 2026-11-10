@@ -9,9 +9,15 @@ import pytest
 
 from mcp_tools_py.checker_tools import CheckerTools
 from mcp_tools_py.code_checker_mypy.reporting import MYPY_SUCCESS_TEXT
+from mcp_tools_py.code_checker_tach.parsers import TachDiagnostic
+from mcp_tools_py.code_checker_tach.runners import TachResult
+from mcp_tools_py.code_checker_vulture.parsers import VultureMessage
+from mcp_tools_py.code_checker_vulture.runners import VultureResult
 from mcp_tools_py.utils.python_environment import PythonEnvironment
 from mcp_tools_py.utils.tool_context import ToolContext
 from tests.test_tool_availability._helpers import _dummy_python
+
+_VULTURE_CLEAN = VultureResult(error=None, messages=[], unparsed=[])
 
 
 def _remove_console_script(context: ToolContext, tool_name: str) -> None:
@@ -49,14 +55,14 @@ def test_vulture_unavailable_returns_error(tool_context: ToolContext) -> None:
     assert "vulture is not available" in result
 
 
-def test_vulture_success_returns_raw_output(tool_context: ToolContext) -> None:
-    """When vulture succeeds, return raw stdout."""
+def test_vulture_success_reports_no_issues(tool_context: ToolContext) -> None:
+    """When vulture finds nothing, say so."""
     run_vulture = _capture_vulture(tool_context)
 
     with (
         patch(
             "mcp_tools_py.checker_tools.vulture_tool.run_vulture",
-            return_value="No dead code found!",
+            return_value=_VULTURE_CLEAN,
         ),
         patch(
             "mcp_tools_py.checker_tools.vulture_tool.resolve_target_directories",
@@ -66,17 +72,44 @@ def test_vulture_success_returns_raw_output(tool_context: ToolContext) -> None:
     ):
         result = run_vulture()
 
-    assert "No dead code found!" in result
+    assert result == "vulture found no issues."
+
+
+def test_vulture_max_issues_controls_detail(tool_context: ToolContext) -> None:
+    """max_issues=0 lists every kind without locations."""
+    run_vulture = _capture_vulture(tool_context)
+    messages = [
+        VultureMessage("src/a.py", 1, "unused import", "os", "unused import 'os'", 90),
+        VultureMessage("src/a.py", 2, "unused class", "C", "unused class 'C'", 60),
+    ]
+
+    with (
+        patch(
+            "mcp_tools_py.checker_tools.vulture_tool.run_vulture",
+            return_value=VultureResult(None, messages, []),
+        ),
+        patch(
+            "mcp_tools_py.checker_tools.vulture_tool.resolve_target_directories",
+            return_value=["src"],
+        ),
+        patch.object(Path, "exists", return_value=False),
+    ):
+        detailed = run_vulture()
+        summary = run_vulture(max_issues=0)
+
+    assert "src/a.py: 1 — unused import 'os'" in detailed
+    assert "Locations:" not in summary
+    assert "- unused class: 1 occurrence" in summary
 
 
 def test_vulture_failure_returns_raw_output(tool_context: ToolContext) -> None:
-    """When vulture fails, return raw stdout+stderr."""
+    """Unparseable vulture output is returned raw."""
     run_vulture = _capture_vulture(tool_context)
 
     with (
         patch(
             "mcp_tools_py.checker_tools.vulture_tool.run_vulture",
-            return_value="vulture: error: invalid config",
+            return_value=VultureResult(None, [], ["vulture: error: invalid config"]),
         ),
         patch(
             "mcp_tools_py.checker_tools.vulture_tool.resolve_target_directories",
@@ -96,7 +129,7 @@ def test_vulture_passes_whitelist_to_runner(tool_context: ToolContext) -> None:
     with (
         patch(
             "mcp_tools_py.checker_tools.vulture_tool.run_vulture",
-            return_value="ok",
+            return_value=_VULTURE_CLEAN,
         ) as mock_runner,
         patch(
             "mcp_tools_py.checker_tools.vulture_tool.resolve_target_directories",
@@ -117,7 +150,7 @@ def test_vulture_passes_resolved_timeout(tool_context: ToolContext) -> None:
     with (
         patch(
             "mcp_tools_py.checker_tools.vulture_tool.run_vulture",
-            return_value="ok",
+            return_value=_VULTURE_CLEAN,
         ) as mock_runner,
         patch(
             "mcp_tools_py.checker_tools.vulture_tool.resolve_target_directories",
@@ -448,8 +481,8 @@ def test_mypy_passes_max_issues(tool_context: ToolContext) -> None:
     assert mock_prompt.call_args[1]["max_issues"] == 2
 
 
-def test_mypy_max_issues_defaults_to_none(tool_context: ToolContext) -> None:
-    """Without max_issues, None reaches get_mypy_prompt."""
+def test_mypy_max_issues_defaults_to_three(tool_context: ToolContext) -> None:
+    """Without max_issues, 3 reaches get_mypy_prompt."""
     run_mypy = _capture_tool(tool_context, "run_mypy_check")
 
     with (
@@ -464,7 +497,7 @@ def test_mypy_max_issues_defaults_to_none(tool_context: ToolContext) -> None:
     ):
         run_mypy()
 
-    assert mock_prompt.call_args[1]["max_issues"] is None
+    assert mock_prompt.call_args[1]["max_issues"] == 3
 
 
 def test_mypy_invalid_timeout_returns_message(tool_context: ToolContext) -> None:
@@ -545,7 +578,7 @@ def test_vulture_auto_detects_directories(tool_context: ToolContext) -> None:
         ),
         patch(
             "mcp_tools_py.checker_tools.vulture_tool.run_vulture",
-            return_value="ok",
+            return_value=_VULTURE_CLEAN,
         ) as mock_runner,
         patch.object(Path, "exists", return_value=False),
     ):
@@ -666,13 +699,13 @@ def test_tach_unavailable_returns_error(tool_context: ToolContext) -> None:
     assert "tach is not available" in result
 
 
-def test_tach_success_returns_raw_output(tool_context: ToolContext) -> None:
-    """When tach succeeds, return the runner's output."""
+def test_tach_success_returns_report(tool_context: ToolContext) -> None:
+    """When tach succeeds, return the formatted report."""
     run_tach_check = _capture_tool(tool_context, "run_tach_check")
 
     with patch(
         "mcp_tools_py.checker_tools.tach_tool.run_tach",
-        return_value="tach check passed (no output).",
+        return_value=TachResult(None, 0, [], None),
     ) as mock_runner:
         result = run_tach_check()
 
@@ -682,3 +715,18 @@ def test_tach_success_returns_raw_output(tool_context: ToolContext) -> None:
         project_dir=str(tool_context.project_dir),
         timeout_seconds=120,
     )
+
+
+def test_tach_max_issues_reaches_the_report(tool_context: ToolContext) -> None:
+    """max_issues=0 renders counts only."""
+    run_tach_check = _capture_tool(tool_context, "run_tach_check")
+    diagnostic = TachDiagnostic("a/x.py", 1, "error", "K", "a", "b", "K: a -> b")
+
+    with patch(
+        "mcp_tools_py.checker_tools.tach_tool.run_tach",
+        return_value=TachResult(None, 1, [diagnostic], None),
+    ):
+        result = run_tach_check(max_issues=0)
+
+    assert "Locations:" not in result
+    assert "- [error] K: a -> b: 1 occurrence" in result

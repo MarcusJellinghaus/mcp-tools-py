@@ -5,6 +5,7 @@ from typing import Any
 from unittest.mock import patch
 
 from mcp_tools_py.code_checker_lint_imports.runners import (
+    _CONTRACT_HINT,
     _classify_state,
     _format_report,
     _parse_broken_contracts,
@@ -266,7 +267,7 @@ class TestFormatReport:
         assert "Broken contracts:" not in result
         assert "raw error text" in result
 
-    def test_line_cap_appends_truncation_marker(self) -> None:
+    def test_line_cap_appends_contract_hint(self) -> None:
         large_body = "\n".join(f"line {i}" for i in range(1000))
         result = _format_report(
             state="PASSED",
@@ -277,8 +278,8 @@ class TestFormatReport:
             info_lines=[],
         )
         last_line = result.splitlines()[-1]
-        assert "[output truncated" in last_line
-        assert "--contract <name>" in last_line
+        assert last_line == _CONTRACT_HINT
+        assert "omitted ...]" in result
 
     def test_empty_body_substituted(self) -> None:
         result = _format_report(
@@ -380,7 +381,8 @@ class TestRunLintImportsCheckImpl:
             python_executable=sys.executable,
         )
         last = result.splitlines()[-1]
-        assert "[output truncated" in last
+        assert last == _CONTRACT_HINT
+        assert result.splitlines()[0] == "=== PASSED ==="
 
     @patch(f"{MODULE_PATH}.execute_command")
     def test_empty_output_does_not_crash(self, mock_exec: Any) -> None:
