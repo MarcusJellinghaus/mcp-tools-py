@@ -1,6 +1,5 @@
 """Functions for generating reports and prompts from pylint analysis results."""
 
-import json
 import logging
 from collections import defaultdict
 from typing import NamedTuple, Optional
@@ -13,13 +12,16 @@ from mcp_tools_py.code_checker_pylint.runners import get_pylint_results
 from mcp_tools_py.code_checker_pylint.utils import normalize_path
 from mcp_tools_py.log_utils import log_function_call
 from mcp_tools_py.utils.project_config import DEFAULT_CHECK_TIMEOUT
+from mcp_tools_py.utils.report_budget import (
+    Location,
+    render_locations,
+    render_summary,
+)
 from mcp_tools_py.utils.report_counts import (
     format_dir_split,
     format_total_line,
     plural,
 )
-
-MAX_LOCATIONS_PER_ISSUE = 50
 
 # Severity priority: lower = more severe
 SEVERITY_PRIORITY: dict[str, int] = {
@@ -77,17 +79,37 @@ def _dir_split(group: IssueGroup, project_dir: str) -> str:
     )
 
 
-def _summary_line(group: IssueGroup, project_dir: str) -> str:
-    """Format one rule line.
+def _summary_rows(
+    groups: list[IssueGroup], project_dir: str
+) -> list[tuple[str, int, str]]:
+    """Build the summary rows for `render_summary`.
 
     Returns:
-        The line with message id, symbol, count and directory split.
+        One (``<id> <symbol>``, count, directory split) row per group.
     """
-    return (
-        f"- {group.message_id} {group.symbol}: "
-        f"{plural(len(group.messages), 'occurrence')} "
-        f"{_dir_split(group, project_dir)}"
+    return [
+        (
+            f"{group.message_id} {group.symbol}",
+            len(group.messages),
+            _dir_split(group, project_dir),
+        )
+        for group in groups
+    ]
+
+
+def _location_lines(messages: list[PylintMessage], project_dir: str) -> str:
+    """Render the messages as capped location rows.
+
+    Returns:
+        ``Locations:`` followed by the rendered rows.
+    """
+    rows = render_locations(
+        [
+            Location(normalize_path(m.path, project_dir), m.line, m.message)
+            for m in messages
+        ]
     )
+    return "\n".join(["Locations:", *rows])
 
 
 logger = logging.getLogger(__name__)
@@ -149,29 +171,8 @@ def get_prompt_for_known_pylint_code(
     if not instruction:
         return None
 
-    pylint_results_filtered = pylint_results.get_messages_filtered_by_message_id(code)
-    details_lines = []
-
-    for message in pylint_results_filtered:
-        path = normalize_path(message.path, project_dir)
-        # Create a dictionary and dump the entire structure
-        issue_dict = {
-            "module": message.module,
-            "obj": message.obj,
-            "line": message.line,
-            "column": message.column,
-            "path": path,
-            "message": message.message,
-        }
-        # Get JSON string for the whole object and add comma for the list format
-        details_lines.append(json.dumps(issue_dict, indent=4) + ",")
-
-    details_str = "\n".join(details_lines)
-    query = f"""{header}
-    {instruction}
-    Please consider especially the following locations in the source code:
-    {details_str}"""
-    return query
+    messages = pylint_results.get_messages_filtered_by_message_id(code)
+    return f"{header}\n{instruction}\n{_location_lines(messages, project_dir)}"
 
 
 def get_prompt_for_unknown_pylint_code(
@@ -188,38 +189,16 @@ def get_prompt_for_unknown_pylint_code(
     Returns:
         A formatted prompt string requesting instructions for this code
     """
-    pylint_results_filtered = pylint_results.get_messages_filtered_by_message_id(code)
+    messages = pylint_results.get_messages_filtered_by_message_id(code)
+    symbol = messages[0].symbol
 
-    first_result = next(iter(pylint_results_filtered))
-    symbol = first_result.symbol
+    return f"""{header}
 
-    details_lines = []
-    for message in pylint_results_filtered:
-        path = normalize_path(message.path, project_dir)
-        # Create a dictionary and dump the entire structure
-        issue_dict = {
-            "module": message.module,
-            "obj": message.obj,
-            "line": message.line,
-            "column": message.column,
-            "path": path,
-            "message": message.message,
-        }
-        # Get JSON string for the whole object and add comma for the list format
-        details_lines.append(json.dumps(issue_dict, indent=4) + ",")
+Please do two things:
+1. Please provide 1 direct instruction on how to fix pylint code "{code}" ({symbol}) in the general comment of the response.
 
-    # Store the entire details section in a variable first
-    details_str = "\n".join(details_lines)
-
-    query = f"""{header}
-    
-    Please do two things:
-    1. Please provide 1 direct instruction on how to fix pylint code "{code}" ({symbol}) in the general comment of the response.
-    
-    2. Please apply that instruction   
-    Please consider especially the following locations in the source code:
-    {details_str}"""
-    return query
+2. Please apply that instruction
+{_location_lines(messages, project_dir)}"""
 
 
 @log_function_call
@@ -282,8 +261,11 @@ def get_pylint_prompt(
 
     # Stats-only mode
     if max_issues == 0:
-        lines = [total_line, ""]
-        lines.extend(_summary_line(group, project_dir) for group in groups)
+        lines = [
+            total_line,
+            "",
+            *render_summary(_summary_rows(groups, project_dir), top=None),
+        ]
         lines.append("\nUse max_issues>=1 to see details for one or more issue types.")
         return "\n".join(lines)
 
@@ -295,48 +277,31 @@ def get_pylint_prompt(
     # Detailed sections for top N issue types
     sections: list[str] = [total_line]
     for group in groups[:max_issues]:
-        capped_messages = group.messages[:MAX_LOCATIONS_PER_ISSUE]
-        overflow = len(group.messages) - len(capped_messages)
-
-        capped_result = PylintResult(
-            return_code=pylint_results.return_code,
-            messages=capped_messages,
-        )
-
-        # Built from the full group so the count is the true total
         header = (
             f"pylint found {plural(len(group.messages), 'issue')} with rule "
             f"{group.message_id} {group.symbol} {_dir_split(group, project_dir)}."
         )
         prompt = get_prompt_for_known_pylint_code(
-            group.message_id, project_dir, capped_result, header
+            group.message_id, project_dir, pylint_results, header
         )
         if prompt is None:
             prompt = get_prompt_for_unknown_pylint_code(
                 group.message_id,
                 project_dir=project_dir,
-                pylint_results=capped_result,
+                pylint_results=pylint_results,
                 header=header,
             )
-
-        if overflow > 0:
-            prompt += f"\n... and {overflow} more occurrences"
-
         sections.append(prompt)
 
     # Summary for remaining issue types
     remaining = groups[max_issues:]
     if remaining:
         remaining_count = sum(len(g.messages) for g in remaining)
-        summary_lines = [
-            f"\n--- {len(remaining)} additional issue type"
-            f"{'s' if len(remaining) != 1 else ''} found "
-            f"({remaining_count} occurrences) ---",
-        ]
-        summary_lines.extend(_summary_line(group, project_dir) for group in remaining)
-        summary_lines.append(
-            f"\nUse max_issues={total_types} to see details for all issue types."
+        title = (
+            f"--- {plural(len(remaining), 'additional rule')} found "
+            f"({remaining_count} occurrences) ---"
         )
-        sections.append("\n".join(summary_lines))
+        summary = render_summary(_summary_rows(remaining, project_dir), title=title)
+        sections.append("\n".join(summary))
 
     return "\n\n".join(sections)
