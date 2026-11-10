@@ -57,7 +57,7 @@ def test_errors_are_findings_and_warnings_are_summary(
     assert result.findings[0].rule == "UndeclaredDependency"
     assert "tach found 2 issue(s)." in result.summary
     assert "tach: 1 warning(s): DeprecatedDependency: c -> b" in result.summary
-    assert "a/x.py:1" in result.fix_text
+    assert "- a/x.py: 1 — " in result.fix_text
 
 
 def test_warnings_only_is_ok(tmp_path: Path, monkeypatch: pytest.MonkeyPatch) -> None:

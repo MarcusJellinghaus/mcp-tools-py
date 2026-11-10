@@ -97,7 +97,8 @@ class TestRunCheck:
 
         assert result.status == "findings"
         assert len(result.findings) == 1
-        assert "mod.py:3: W0611: " in result.fix_text
+        assert "W0611 (1 finding)" in result.fix_text
+        assert "mod.py: 3 — " in result.fix_text
 
     def test_standard_both_tools_failing_concatenates_findings(
         self, tmp_path: Path
@@ -299,7 +300,10 @@ class TestRunCheckFull:
         assert finding.key == "mod.py|F401|'os' imported but unused"
         assert finding.path == "mod.py"
         assert finding.rule == "F401"
-        assert "- mod.py:1: F401: 'os' imported but unused" in result.fix_text
+        assert result.fix_text.splitlines() == [
+            "F401 (1 finding) ((root): 1)",
+            "- mod.py: 1 — 'os' imported but unused",
+        ]
 
     def test_bandit_finding_is_finding_per_message(
         self, tmp_path: Path, monkeypatch: pytest.MonkeyPatch
@@ -325,7 +329,10 @@ class TestRunCheckFull:
         assert finding.path == "mod.py"
         assert finding.rule == "B102"
         assert finding.severity == "MEDIUM"
-        assert "- mod.py:3: B102: Use of exec detected." in result.fix_text
+        assert result.fix_text.splitlines() == [
+            "B102 (1 finding) ((root): 1)",
+            "- mod.py: 3 — Use of exec detected.",
+        ]
 
     def test_deptry_findings_have_one_key_per_module(
         self, tmp_path: Path, monkeypatch: pytest.MonkeyPatch
@@ -352,7 +359,8 @@ class TestRunCheckFull:
         ]
         assert result.findings[0].path == "pyproject.toml"
         assert result.findings[0].rule == "DEP002"
-        assert "- pyproject.toml: DEP002: 'requests'" in result.fix_text
+        assert "DEP002 (2 findings) ((root): 2)" in result.fix_text
+        assert "- pyproject.toml — 'requests'" in result.fix_text
 
     def test_deptry_finding_with_line_shows_it(
         self, tmp_path: Path, monkeypatch: pytest.MonkeyPatch
@@ -373,7 +381,8 @@ class TestRunCheckFull:
         result = PythonToolkit().run(request)
 
         assert result.status == "findings"
-        assert "- src/mod.py:4: DEP001: " in result.fix_text
+        assert "DEP001 (1 finding) (src: 1)" in result.fix_text
+        assert "- src/mod.py: 4 — " in result.fix_text
 
     def test_deptry_error_is_error(
         self, tmp_path: Path, monkeypatch: pytest.MonkeyPatch

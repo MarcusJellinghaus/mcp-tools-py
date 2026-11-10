@@ -57,7 +57,7 @@ def test_one_finding_per_message_with_unique_keys(
     assert result.findings[0].rule == "unused function"
     assert result.findings[0].path == "src/mod.py"
     assert "vulture found 3 issue(s)." in result.summary
-    assert "src/mod.py:5" in result.fix_text
+    assert "- src/mod.py: 5 — unused function '_x'" in result.fix_text
 
 
 def test_keys_do_not_change_when_lines_shift(

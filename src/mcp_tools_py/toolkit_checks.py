@@ -18,24 +18,70 @@ from mcp_tools_py.utils.project_config import (
     resolve_source_directories,
     resolve_target_directories,
 )
-from mcp_tools_py.utils.report_budget import bound_text
+from mcp_tools_py.utils.report_budget import (
+    TOOL_CHARS,
+    TOOL_LINES,
+    Location,
+    bound_text,
+    render_locations,
+)
+from mcp_tools_py.utils.report_counts import format_dir_split, plural
 from mcp_tools_py.utils.ruff_parsing import parse_ruff_json_output
 from mcp_tools_py.utils.subprocess_runner import execute_command
 from mcp_tools_py.utils.tool_context import ToolContext
 
+FIX_TEXT_HINT = "Fix these and rerun the check to see the rest."
 
-def _finding_line(finding: Finding, location: str | None = None) -> str:
-    """One bullet line for `finding`, used to build `ActionResult.fix_text`.
 
-    `location` (e.g. "path:line" or a test node id) replaces `finding.path`
-    when given.
+def _location(
+    finding: Finding, location: str | None, details: tuple[str, ...]
+) -> tuple[Location, bool]:
+    """Build the rendered `Location` of one finding.
+
+    `location` is "path:line" or a whole test node id; without it the
+    finding's path is used. A finding with neither shows its message alone.
 
     Returns:
-        "- location: rule: message", omitting location/rule when absent.
+        The Location, and whether it names a real path.
     """
-    where = location or finding.path
-    prefix = ": ".join(part for part in (where, finding.rule) if part)
-    return f"- {prefix}: {finding.message}" if prefix else f"- {finding.message}"
+    if location:
+        path, sep, line = location.rpartition(":")
+        if sep and path and line.isdigit():
+            return Location(path, int(line), finding.message, details), True
+        return Location(location, None, finding.message, details), True
+    if finding.path:
+        return Location(finding.path, None, finding.message, details), True
+    return Location(finding.message, None, None, details), False
+
+
+def _render_fix_text(
+    findings: list[Finding],
+    locations: list[str | None],
+    details: list[tuple[str, ...]] | None = None,
+) -> str:
+    """Render findings grouped by rule, largest group first.
+
+    `locations` and `details` (extra lines under a row) run parallel to
+    `findings`.
+
+    Returns:
+        Per rule a header line with its count and directory split, then its
+        rows from `render_locations`; unbounded.
+    """
+    groups: dict[str, list[tuple[Location, bool]]] = {}
+    for i, (finding, location) in enumerate(zip(findings, locations)):
+        item = _location(finding, location, details[i] if details else ())
+        groups.setdefault(finding.rule or "", []).append(item)
+    lines: list[str] = []
+    for rule, items in sorted(groups.items(), key=lambda group: -len(group[1])):
+        count = plural(len(items), "finding")
+        header = f"{rule} ({count})" if rule else count
+        paths = [item.path for item, has_path in items if has_path]
+        if paths:
+            header += f" {format_dir_split(paths)}"
+        lines.append(header)
+        lines.extend(render_locations([item for item, _ in items], FIX_TEXT_HINT))
+    return "\n".join(lines)
 
 
 def _result_from_findings(
@@ -47,22 +93,19 @@ def _result_from_findings(
 ) -> ActionResult:
     """Map a tool's error/findings outcome onto ActionResult's status rules.
 
-    `locations`, when given, runs parallel to `findings` and is passed to
-    `_finding_line` for each one.
+    `locations`, when given, runs parallel to `findings`: "path:line" or a
+    test node id replacing the finding's path.
 
     Returns:
         status="error" when `error` is set; "findings" (with `fix_text`
-        built from `findings`, one bullet line each) when findings is
-        non-empty; otherwise "ok".
+        rendered by rule and bounded at TOOL_LINES/TOOL_CHARS) when findings
+        is non-empty; otherwise "ok".
     """
     if error is not None:
         return ActionResult(status="error", summary=error, findings=findings)
     if findings:
         locs = locations or [None] * len(findings)
-        fix_text = "\n".join(
-            _finding_line(finding, location)
-            for finding, location in zip(findings, locs)
-        )
+        fix_text = bound_text(_render_fix_text(findings, locs), hint=FIX_TEXT_HINT)
         return ActionResult(
             status="findings",
             summary=findings_summary,
@@ -81,8 +124,9 @@ def _merge(results: list[ActionResult]) -> ActionResult:
     Returns:
         One ActionResult: status is the worst across `results` ("error" >
         "findings" > "ok" > "skipped"), findings and non-empty raw outputs
-        concatenated. fix_text joins each result's own fix_text, rebuilt from
-        that result's findings when not set; empty parts are skipped.
+        concatenated. fix_text joins each result's own fix_text, rendered
+        from that result's findings when not set; empty parts are skipped.
+        Each part gets an even share of the TOOL_LINES/TOOL_CHARS budget.
     """
     worst = max(results, key=lambda result: _STATUS_RANK[result.status])
     findings = [finding for result in results for finding in result.findings]
@@ -90,10 +134,18 @@ def _merge(results: list[ActionResult]) -> ActionResult:
     raw = "\n\n".join(result.raw for result in results if result.raw)
     parts = [
         result.fix_text
-        or "\n".join(_finding_line(finding) for finding in result.findings)
+        or _render_fix_text(result.findings, [None] * len(result.findings))
         for result in results
     ]
-    fix_text = "\n".join(part for part in parts if part)
+    parts = [part for part in parts if part]
+    share = max(len(parts), 1)
+    fix_text = bound_text(
+        "\n".join(
+            bound_text(part, TOOL_LINES // share, TOOL_CHARS // share, FIX_TEXT_HINT)
+            for part in parts
+        ),
+        hint=FIX_TEXT_HINT,
+    )
     return ActionResult(
         status=worst.status,
         summary=summary,
@@ -148,16 +200,13 @@ def _run_mypy(context: ToolContext, depth: str) -> ActionResult:
         )
         for message in issues
     ]
-    fix_text = "\n".join(
-        line
-        for message, finding in zip(issues, findings)
-        for line in [
-            _finding_line(
-                finding,
-                f"{message.file}:{message.line}" if message.line >= 0 else None,
-            ),
-            *format_hint_lines(message.hint),
-        ]
+    fix_text = bound_text(
+        _render_fix_text(
+            findings,
+            [f"{m.file}:{m.line}" if m.line >= 0 else None for m in issues],
+            details=[tuple(format_hint_lines(m.hint)) for m in issues],
+        ),
+        hint=FIX_TEXT_HINT,
     )
     suffix = "".join(f" {_one_line(signal)}" for signal in run_signals(result))
     error = result.error
