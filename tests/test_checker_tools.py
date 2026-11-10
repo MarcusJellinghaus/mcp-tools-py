@@ -448,8 +448,8 @@ def test_mypy_passes_max_issues(tool_context: ToolContext) -> None:
     assert mock_prompt.call_args[1]["max_issues"] == 2
 
 
-def test_mypy_max_issues_defaults_to_none(tool_context: ToolContext) -> None:
-    """Without max_issues, None reaches get_mypy_prompt."""
+def test_mypy_max_issues_defaults_to_three(tool_context: ToolContext) -> None:
+    """Without max_issues, 3 reaches get_mypy_prompt."""
     run_mypy = _capture_tool(tool_context, "run_mypy_check")
 
     with (
@@ -464,7 +464,7 @@ def test_mypy_max_issues_defaults_to_none(tool_context: ToolContext) -> None:
     ):
         run_mypy()
 
-    assert mock_prompt.call_args[1]["max_issues"] is None
+    assert mock_prompt.call_args[1]["max_issues"] == 3
 
 
 def test_mypy_invalid_timeout_returns_message(tool_context: ToolContext) -> None:
