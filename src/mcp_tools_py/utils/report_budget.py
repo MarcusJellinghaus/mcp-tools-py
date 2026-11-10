@@ -13,6 +13,8 @@ TOOL_CHARS = 16_000
 LOCATIONS_PER_RULE = 10
 LINES_PER_LOCATION = 10
 SUMMARY_TOP = 20
+MAX_FAILURES = 10
+FAILED_IDS = 50
 HINT_LINES = 5
 GUARD_HINT = "Output was cut: narrow the request (fewer targets, a smaller selection) to see the rest."
 SUMMARY_HINT = "Use max_issues=0 to list all rules."

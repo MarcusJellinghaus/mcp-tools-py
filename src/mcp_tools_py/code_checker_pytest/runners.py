@@ -8,10 +8,7 @@ from typing import Any, Dict, List, Optional
 
 from mcp_tools_py.code_checker_pytest.models import PytestReport
 from mcp_tools_py.code_checker_pytest.parsers import parse_pytest_report
-from mcp_tools_py.code_checker_pytest.reporting import (
-    create_prompt_for_failed_tests,
-    get_test_summary,
-)
+from mcp_tools_py.code_checker_pytest.reporting import get_test_summary
 from mcp_tools_py.code_checker_pytest.utils import create_error_context, read_file
 from mcp_tools_py.code_checker_pytest.verdict import (
     RunStatus,
@@ -498,7 +495,6 @@ def check_code_with_pytest(
         Dictionary with test results containing the following keys:
         - verdict: RunVerdict (status, problems, exit_code); ERROR on any exception, with the message in problems
         - summary: Summary of test results as a formatted string
-        - failed_tests_prompt: Formatted prompt for failed tests (if any)
         - test_results: Complete PytestReport object with detailed test information
         - test_paths_note: Note when `testpaths` is set but no entry exists, else None; present on every return
     """
@@ -554,19 +550,11 @@ def check_code_with_pytest(
             },
         )
 
-        failed_tests_prompt = None
-        failed_count = test_results.summary.failed or 0
-        error_count = test_results.summary.error or 0
-
-        if failed_count > 0 or error_count > 0:
-            failed_tests_prompt = create_prompt_for_failed_tests(test_results)
-
         # Return both summary dict and formatted text
         return {
             "verdict": classify_run(test_results),
             "summary": summary_dict,  # Dictionary for server.py compatibility
             "summary_text": summary_text,  # Formatted string for display
-            "failed_tests_prompt": failed_tests_prompt,
             "test_results": test_results,
             "test_paths_note": note,
         }

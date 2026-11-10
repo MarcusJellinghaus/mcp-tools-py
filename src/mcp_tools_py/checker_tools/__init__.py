@@ -18,7 +18,6 @@ from mcp_tools_py.checker_tools import (
 from mcp_tools_py.code_checker_mypy.reporting import MYPY_SUCCESS_TEXT
 from mcp_tools_py.code_checker_pytest.reporting import (
     MAX_FAILURES,
-    MAX_OUTPUT_LINES,
     create_prompt_for_failed_tests,
     create_prompt_for_passing_output,
     did_not_run_line,
@@ -104,11 +103,7 @@ class CheckerTools:
             if report is None or not should_show_details(test_results, show_details):
                 return f"Pytest found failures. {test_results.get('summary_text') or ''}".rstrip()
             failed_tests_prompt = create_prompt_for_failed_tests(
-                report,
-                max_number_of_tests_reported=MAX_FAILURES,
-                include_print_output=True,
-                max_failures=MAX_FAILURES,
-                max_output_lines=MAX_OUTPUT_LINES,
+                report, include_print_output=True, max_failures=MAX_FAILURES
             )
             counts = "\n".join(
                 filter(

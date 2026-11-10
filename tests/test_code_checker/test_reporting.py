@@ -406,7 +406,7 @@ def test_create_prompt_with_print_output_enabled(
     """Test enhanced formatting with print output enabled."""
     # Test the current behavior (this will be enhanced in step 2)
     prompt = create_prompt_for_failed_tests(
-        mock_pytest_report_with_prints, max_number_of_tests_reported=10
+        mock_pytest_report_with_prints, max_failures=10
     )
 
     assert prompt is not None
@@ -457,7 +457,7 @@ def test_create_prompt_with_print_output_disabled() -> None:
     """
 
     report = parse_pytest_report(json_simple_failure)
-    prompt = create_prompt_for_failed_tests(report, max_number_of_tests_reported=1)
+    prompt = create_prompt_for_failed_tests(report, max_failures=1)
 
     assert prompt is not None
     assert "test_simple.py::test_fail" in prompt
@@ -515,7 +515,7 @@ def test_create_prompt_respects_max_failures_limit() -> None:
     report = parse_pytest_report(json_many_failures)
 
     # Test with limit of 5
-    prompt = create_prompt_for_failed_tests(report, max_number_of_tests_reported=5)
+    prompt = create_prompt_for_failed_tests(report, max_failures=5)
 
     assert prompt is not None
 
@@ -524,12 +524,13 @@ def test_create_prompt_respects_max_failures_limit() -> None:
     assert test_id_count == 5, f"Expected 5 test failures, got {test_id_count}"
 
     # Verify first 5 tests are included
-    assert "test_fail_0" in prompt
-    assert "test_fail_4" in prompt
+    assert "Test ID: test_many.py::test_fail_0 " in prompt
+    assert "Test ID: test_many.py::test_fail_4 " in prompt
 
-    # Verify later tests are not included due to limit
-    assert "test_fail_5" not in prompt
-    assert "test_fail_14" not in prompt
+    # Later tests are only named in the list without details
+    assert "Test ID: test_many.py::test_fail_5 " not in prompt
+    assert "Failed tests without details (10):" in prompt
+    assert "- test_many.py::test_fail_14" in prompt
 
 
 def test_create_prompt_with_collection_errors() -> None:
@@ -610,7 +611,7 @@ def test_create_prompt_output_length_limits() -> None:
     """Test that output respects length limitations."""
     # Create a large report to test length limits
     report = parse_pytest_report(SAMPLE_JSON)
-    prompt = create_prompt_for_failed_tests(report, max_number_of_tests_reported=10)
+    prompt = create_prompt_for_failed_tests(report, max_failures=10)
 
     if prompt:
         # Count lines in the output
@@ -628,7 +629,7 @@ def test_future_parameter_compatibility() -> None:
 
     # Test current function works with keyword arguments (important for future compatibility)
     prompt_kwargs = create_prompt_for_failed_tests(
-        test_session_result=report, max_number_of_tests_reported=2
+        test_session_result=report, max_failures=2
     )
 
     assert prompt_kwargs is not None
@@ -646,9 +647,7 @@ def test_backward_compatibility() -> None:
 
     # Current function signature should still work
     prompt_old = create_prompt_for_failed_tests(report)
-    prompt_with_limit = create_prompt_for_failed_tests(
-        report, max_number_of_tests_reported=1
-    )
+    prompt_with_limit = create_prompt_for_failed_tests(report, max_failures=1)
 
     assert prompt_old is not None
     assert prompt_with_limit is not None
@@ -683,13 +682,9 @@ def test_enhanced_formatting_structure() -> None:
     """Test that enhanced formatting maintains proper structure for future enhancements."""
     report = parse_pytest_report(SAMPLE_JSON)
 
-    # Test current function behavior with different max_number_of_tests_reported values
-    prompt_single = create_prompt_for_failed_tests(
-        report, max_number_of_tests_reported=1
-    )
-    prompt_multiple = create_prompt_for_failed_tests(
-        report, max_number_of_tests_reported=5
-    )
+    # Test current function behavior with different max_failures values
+    prompt_single = create_prompt_for_failed_tests(report, max_failures=1)
+    prompt_multiple = create_prompt_for_failed_tests(report, max_failures=5)
 
     assert prompt_single is not None
     assert prompt_multiple is not None
@@ -756,16 +751,14 @@ def test_max_failures_limit_enforcement() -> None:
     report = parse_pytest_report(json_ten_failures)
 
     # Test with limit of 10 (all should be included)
-    prompt = create_prompt_for_failed_tests(report, max_number_of_tests_reported=10)
+    prompt = create_prompt_for_failed_tests(report, max_failures=10)
     assert prompt is not None
 
     test_id_count = prompt.count("Test ID:")
     assert test_id_count == 10, f"Expected 10 test failures, got {test_id_count}"
 
     # Test with limit of 3 (only 3 should be included)
-    prompt_limited = create_prompt_for_failed_tests(
-        report, max_number_of_tests_reported=3
-    )
+    prompt_limited = create_prompt_for_failed_tests(report, max_failures=3)
     assert prompt_limited is not None
 
     test_id_count_limited = prompt_limited.count("Test ID:")
