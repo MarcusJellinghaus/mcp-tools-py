@@ -75,14 +75,20 @@ class GuardedMCP:
 ```
 lines = [l if len(l) <= LINE_CHARS else l[:LINE_CHARS] + f" [line truncated: {len(l)} chars]" for l in text.splitlines()]
 if len(lines) <= max_lines and len(joined lines) <= max_chars: return joined lines (no hint)
-room = max_lines - 2 (marker + hint); head_n = 0 if keep == "tail" else room * 2 // 3; tail_n = room - head_n
+room = max_lines - 2 (marker + hint) - 2 (reserved: one closing fence for head, one reopening fence for tail)
+head_n = 0 if keep == "tail" else room * 2 // 3; tail_n = room - head_n
 head, tail = lines[:head_n], lines[len(lines) - tail_n:]
-while chars(head + tail) + len(marker) + len(hint) > max_chars: drop head[-1] if len(head) > len(tail) else tail[0]
-if head has an odd number of lines starting with "```": head.append("```"); if tail does: tail.insert(0, "```")
-return head + [f"[... {omitted_lines} lines / {omitted_chars} chars omitted ...]"] + tail + ([hint] if hint)
+def fenced(head, tail): add "```" to the end of head if head has an odd number of lines starting with "```";
+                        add "```" to the start of tail if tail does
+out_head, out_tail = fenced(head, tail)
+while chars(out_head + out_tail) + len(marker) + len(hint) + newlines > max_chars:
+    drop head[-1] if len(head) > len(tail) else tail[0]; out_head, out_tail = fenced(head, tail)
+return out_head + [f"[... {omitted_lines} lines / {omitted_chars} chars omitted ...]"] + out_tail + ([hint] if hint)
 ```
 `omitted_*` counts the original lines/chars that are not in head or tail. The text is
-returned unchanged (apart from per-line caps) when it is within budget.
+returned unchanged (apart from per-line caps) when it is within budget. The two fence
+lines are reserved up front and the char check runs on the fenced parts, so the result
+never exceeds `max_lines` or `max_chars`, fences included.
 
 ## DATA
 - `bound_text` returns a `str` of at most `max_lines` lines and `max_chars` chars.
@@ -96,6 +102,9 @@ returned unchanged (apart from per-line caps) when it is within budget.
 - A char-heavy text stays ≤ `max_chars`.
 - `keep="tail"` keeps no head lines.
 - A cut inside a fenced block leaves an even number of fence lines in each part.
+- A fenced block of 1000 char-heavy lines cut with small limits (e.g. `max_lines=20`,
+  `max_chars=2000`): the result, fences included, has ≤ `max_lines` lines and
+  ≤ `max_chars` chars.
 
 `tests/test_output_guard.py`:
 - Build `ToolServer(tmp_path)` (copy the setup used in `tests/test_server_params.py`).

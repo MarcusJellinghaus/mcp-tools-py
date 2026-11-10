@@ -21,7 +21,7 @@ and mypy until they pass, run `run_format_code`, and make one commit.
 ## WHAT
 ```python
 def create_prompt_for_passing_output(report: PytestReport, max_lines: int = TOOL_LINES) -> str
-def cap_problems(problems: list[str]) -> str              # bound_text("\n".join(problems))
+def cap_problems(problems: list[str]) -> str              # bound_text("\n".join(problems), hint=PROBLEMS_HINT)
 def format_collect_only_text(report: PytestReport) -> str # bound_text(..., hint=COLLECT_HINT)
 CheckerTools._format_pytest_result_with_details(test_results, show_details, show_output=False,
                                                 collect_only=False, max_lines=TOOL_LINES) -> str
@@ -29,6 +29,7 @@ CheckerTools._format_pytest_result_with_details(test_results, show_details, show
 Hints:
 - `SHOW_OUTPUT_HINT = "Use extra_args=['<nodeid>', '-s'] to see one test's output."`
 - `COLLECT_HINT = "Narrow the selection (a path or -k in extra_args) to list fewer tests."`
+- `PROBLEMS_HINT = "Narrow the selection (a path or -k in extra_args) and rerun to see the rest."`
 
 ## HOW
 - Passing output: build the same text as today, then return
@@ -62,7 +63,7 @@ Unchanged return types.
 - `show_output` with 50 passing tests × 50 lines of stdout → ≤ `TOOL_LINES` lines, even
   fence count, ends with `SHOW_OUTPUT_HINT`.
 - `--collect-only` with 2000 IDs → ≤ `TOOL_LINES` lines, keeps the header line, ends with `COLLECT_HINT`.
-- `cap_problems` with 1000 lines of problems → ≤ `TOOL_LINES` lines.
+- `cap_problems` with 1000 lines of problems → ≤ `TOOL_LINES` lines, ends with `PROBLEMS_HINT`.
 - `coverage=True` with 15 failures and a digest → the whole response is < `GUARD_LINES`
   lines (the guard does not fire), contains the failed-ID list and the full digest
   (patch the runner and coverage helpers as in `tests/test_pytest_tool_coverage.py`).

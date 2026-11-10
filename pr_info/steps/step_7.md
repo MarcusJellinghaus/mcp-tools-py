@@ -55,8 +55,10 @@ def _fenced(label: str, text: str, max_lines: int, max_chars: int) -> str: ...
 failed = all failed/error tests; candidates = failed[:max_failures]
 reserve = min(len(failed), FAILED_IDS) + 3 if len(failed) > 1 else 0
 left = max_lines - lines(collector part) - reserve - 3      # closing question + hint
+chars_left = max_chars - chars(collector part) - chars(reserved ID list) - chars(closing question + hint)
 for i, test in enumerate(candidates): per = left // (len(candidates) - i); if per < 6: break
-    block = _render_test(test, per, chars_left // (len(candidates) - i)); append; left -= lines(block)
+    block = _render_test(test, per, chars_left // (len(candidates) - i)); append
+    left -= lines(block); chars_left -= chars(block)
 undetailed = failed tests without a block → if any: "Failed tests without details (N):" + first FAILED_IDS ids + "... and K more"
 append closing question, then PYTEST_HINT
 ```

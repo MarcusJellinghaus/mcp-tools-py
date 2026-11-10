@@ -23,6 +23,7 @@ class Location(NamedTuple):
     details: tuple[str, ...] = ()   # extra indented lines under the row (mypy hints)
 
 SUMMARY_HINT = "Use max_issues=0 to list all rules."
+DETAIL_HINT = "Use max_issues=N to see locations for the top N rules."
 LOCATION_HINT = "narrow target_directories or fix these and rerun"
 
 def render_locations(items: Sequence[Location], hint: str = LOCATION_HINT) -> list[str]: ...
@@ -31,6 +32,7 @@ def render_summary(
     title: str | None = None,
     top: int | None = SUMMARY_TOP,
     hint: str = SUMMARY_HINT,
+    detail_hint: str | None = DETAIL_HINT,
 ) -> list[str]: ...
 ```
 
@@ -48,10 +50,14 @@ if hidden: emit f"... and {hidden} more {plural('location')} in {len(rest)} more
 ```
 out = [title] if title; shown = rows if top is None else rows[:top]
 out += [f"- {label}: {plural(count, 'occurrence')} {split}" for shown]
+if rows and top is not None and detail_hint: out.append(detail_hint)   # summarised rows have no locations
 rest = rows[len(shown):]
 if rest: largest = 3 largest of rest by count → "S101 3444, COM812 1037"
   out += [f"... and {len(rest)} more rules ({sum} occurrences), largest: {largest}", hint]
 ```
+So the summary always ends with a drill-in hint when rows are summarised: `hint` when the
+list overflows `top`, else `detail_hint`. `top=None` (`max_issues=0`, counts only by
+request) adds neither; callers keep their existing `Use max_issues>=1 ...` line there.
 
 ## HOW (pylint)
 - Replace the JSON-blob detail in both `get_prompt_for_known_pylint_code` and
@@ -73,7 +79,9 @@ Both renderers return `list[str]` lines; callers join them with `"\n"`.
 - Renderers: one row per (file, message); 25 hits in one file with the same message →
   10 numbers + `(+15)`; 15 files → 10 rows + overflow line with hint; summary with 30 rows
   → 20 rows + "largest:" naming the largest hidden ones + hint; `top=None` → all rows,
-  no hint.
+  no hint; 5 summarised rows (1–20 case) → 5 rows, no "largest:" line, ends with
+  `DETAIL_HINT`.
+- pylint with 5 rules and `max_issues=1` → the report ends with `DETAIL_HINT`.
 - pylint budget test: synthetic `PylintResult` with 1 rule × 500 messages in 60 files, plus
   40 other rules. The report from `get_pylint_prompt` (patch `get_pylint_results`) has
   < `TOOL_LINES` lines, contains no `{`/`"module"` JSON, and ends with `SUMMARY_HINT`.
