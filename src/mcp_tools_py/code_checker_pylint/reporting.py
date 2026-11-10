@@ -245,7 +245,7 @@ def get_pylint_prompt(
         A prompt string with issue details and instructions, or None if no issues were found.
         Returns the error message as a prompt if pylint execution failed (e.g., timeout).
     """
-    logger.info(
+    logger.debug(
         "Starting pylint prompt generation",
         extra={"project_dir": project_dir, "extra_args": extra_args},
     )
@@ -273,7 +273,7 @@ def get_pylint_prompt(
     groups = _group_and_sort_issues(pylint_results.messages)
 
     if not groups:
-        logger.info("No pylint issues found", extra={"project_dir": project_dir})
+        logger.debug("No pylint issues found", extra={"project_dir": project_dir})
         return None
 
     total_types = len(groups)
@@ -287,7 +287,7 @@ def get_pylint_prompt(
         lines.append("\nUse max_issues>=1 to see details for one or more issue types.")
         return "\n".join(lines)
 
-    logger.info(
+    logger.debug(
         "Pylint issues found, generating prompt",
         extra={"total_codes": total_types, "max_issues": max_issues},
     )

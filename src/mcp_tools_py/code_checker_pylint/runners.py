@@ -75,7 +75,7 @@ def get_pylint_results(
             raw_output=None,
         )
 
-    logger.info(
+    logger.debug(
         "Starting pylint analysis",
         extra={
             "project_dir": project_dir,
@@ -134,7 +134,7 @@ def get_pylint_results(
         )
 
     # Log subprocess results
-    logger.info(
+    logger.debug(
         "Pylint subprocess completed",
         extra={
             "return_code": subprocess_result.return_code,
@@ -167,7 +167,7 @@ def get_pylint_results(
         raw_output=raw_output,
     )
 
-    logger.info(
+    logger.debug(
         "Pylint analysis completed",
         extra={
             "return_code": subprocess_result.return_code,

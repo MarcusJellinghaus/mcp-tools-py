@@ -43,7 +43,7 @@ def parse_pylint_json_output(
 
     # Check if we have any output to parse
     if not raw_output or raw_output.strip() == "":
-        logger.info("Pylint produced no output")
+        logger.debug("Pylint produced no output")
         return messages, None
 
     try:

@@ -55,7 +55,7 @@ def parse_mypy_json_output(output: str) -> tuple[list[MypyMessage], str | None]:
         error_msg = f"Failed to parse mypy output: {'; '.join(parse_errors)}"
         return [], error_msg
 
-    logger.info(
+    logger.debug(
         "Parsed mypy output",
         extra={
             "total_messages": len(messages),

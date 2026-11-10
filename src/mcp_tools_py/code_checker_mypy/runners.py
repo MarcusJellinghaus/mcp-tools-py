@@ -230,7 +230,7 @@ def run_mypy_check(
     # Add target directories
     command.extend(mypy_targets)
 
-    logger.info(
+    logger.debug(
         "Starting mypy check",
         extra={
             "project_dir": project_dir,
@@ -349,7 +349,7 @@ def run_mypy_check(
         stderr=stderr_text or None,
     )
 
-    logger.info(
+    logger.debug(
         "Mypy check completed",
         extra={
             "return_code": result.return_code,

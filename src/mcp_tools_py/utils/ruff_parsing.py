@@ -64,7 +64,7 @@ def parse_ruff_json_output(
     messages: List[RuffMessage] = []
 
     if not raw_output or raw_output.strip() == "":
-        logger.info("Ruff produced no output")
+        logger.debug("Ruff produced no output")
         return messages, None
 
     try:
