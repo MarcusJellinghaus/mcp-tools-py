@@ -103,7 +103,6 @@ See `pyproject.toml` for version constraints.
 ### Architecture Patterns
 - **Module Pattern**: Each checker is a self-contained package
 - **Adapter Pattern**: `ProcessResult` bridges `CommandResult` to `subprocess.CompletedProcess`
-- **Builder Pattern**: `OutputBuilder` manages line-counted, truncatable output
 - **Decorator Pattern**: `@log_function_call` for function call logging with timing
 
 ---
@@ -171,7 +170,7 @@ registrar modules: `code_checker_ruff` backs two of them, `ruff_check_tool.py` a
 - **`inspect_library.py`** — `InspectTools`: registers `get_library_source`, resolving a dotted import path to its source
 - **`library_search.py`** — `LibrarySearchTools`: registers `search_library_files`, greping/globbing inside an installed package's source files anywhere in the project's configured Python environment, including the standard library
 - **`code_checker_*`** — nine checker packages, one per external tool (pytest, pylint, mypy, deptry, ruff, bandit, vulture, tach, lint_imports), each following the Checker Module Pattern above
-- **`code_checker_pytest`** — the most complex of them: JSON report parsing, `OutputBuilder`, `show_details` logic, `ProcessResult` adapter, and the coverage digest (`coverage.py`: pytest-cov flags, coverage JSON, selection echo). `coverage_store.py` owns the saved coverage data of the last run, stored in `.mcp-tools-py/coverage/` in the target project
+- **`code_checker_pytest`** — the most complex of them: JSON report parsing, `show_details` logic, `ProcessResult` adapter, and the coverage digest (`coverage.py`: pytest-cov flags, coverage JSON, selection echo). `coverage_store.py` owns the saved coverage data of the last run, stored in `.mcp-tools-py/coverage/` in the target project
 - **`utils/python_environment.py`** — `PythonEnvironment`: the target interpreter, its script directory, and existence-checked console scripts. Pure path work, no subprocess
 - **`utils/environment_info.py`** — `EnvironmentInfo` and the cached one-shot probe: Python version, `sys.path`, installed distributions, and which of the `python -m` tools import. Also `locate_packages`, which asks the target interpreter where named packages live and splits the answer into directories safe to put on `PYTHONPATH`, ones that are its own site-packages, and names it could not locate — uncached, because that answer can change while the server runs
 - **`utils/target_scripts/probe.py`** — the script that probe runs, with four subcommands: `info` (the cached environment probe), `source` (library source for `get_library_source`), `locate` (where a package lives, for the lint-imports `PYTHONPATH` bridge) and `scope` (the directory a `search_library_files` scope names: the standard library for `stdlib`, otherwise a package's own directory). Executed under the *target* interpreter by absolute path and stdlib-only, so it works in an environment that has never heard of `mcp_tools_py` (enforced by the `target-scripts-stdlib-only` contract). Not interchangeable with `refactoring/rope_cli.py`, which runs under `sys.executable` with `-m` precisely because it must import `mcp_tools_py`

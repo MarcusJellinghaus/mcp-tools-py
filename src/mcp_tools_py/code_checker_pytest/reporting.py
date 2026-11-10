@@ -12,15 +12,18 @@ from mcp_tools_py.code_checker_pytest.models import (
     TracebackEntry,
 )
 from mcp_tools_py.log_utils import log_function_call
-from mcp_tools_py.utils.report_budget import FAILED_IDS
+from mcp_tools_py.utils.report_budget import (
+    FAILED_IDS,
+    MAX_COLLECTOR_IDS,
+)
 from mcp_tools_py.utils.report_budget import MAX_FAILURES as MAX_FAILURES
 from mcp_tools_py.utils.report_budget import TOOL_CHARS, TOOL_LINES, bound_text
 
 logger = logging.getLogger(__name__)
 # Constants to avoid magic numbers
-MAX_OUTPUT_LINES = 300
 FAILED_OUTCOMES = ["failed", "error"]
 PYTEST_HINT = "Use extra_args=['<nodeid>', '-vv'] to see one test in full."
+SHOW_OUTPUT_HINT = "Use extra_args=['<nodeid>', '-s'] to see one test's output."
 CLOSING_QUESTION = (
     "Can you provide an explanation for why these tests failed"
     " and suggest how they could be fixed?"
@@ -31,53 +34,6 @@ MIN_TEST_LINES = 6
 FENCE = "```"
 NO_CAPTURED_OUTPUT_NOTE = "Note: no passing test produced captured output."
 XDIST_MARKER = "Different tests were collected"
-MAX_COLLECTOR_IDS = 10
-
-
-class OutputBuilder:
-    """Helper class to manage output building with line counting and truncation."""
-
-    def __init__(self, max_lines: int = MAX_OUTPUT_LINES):
-        self.parts: List[str] = []
-        self.line_count = 0
-        self.max_lines = max_lines
-        self.truncated = False
-
-    def add(self, content: str) -> bool:
-        """Add content to the output, checking line limits.
-
-        Args:
-            content: Content to add
-
-        Returns:
-            True if content was added, False if truncated
-        """
-        if self.truncated:
-            return False
-
-        lines = content.count("\n")
-        if self.line_count + lines > self.max_lines:
-            remaining_lines = self.max_lines - self.line_count
-            if remaining_lines > 0:
-                content_lines = content.split("\n")
-                self.parts.append("\n".join(content_lines[:remaining_lines]))
-                self.parts.append(
-                    f"\n\n[Output truncated at {self.max_lines} lines...]\n"
-                )
-            self.truncated = True
-            return False
-
-        self.parts.append(content)
-        self.line_count += lines
-        return True
-
-    def get_result(self) -> str:
-        """Get the final output string.
-
-        Returns:
-            All appended parts concatenated.
-        """
-        return "".join(self.parts)
 
 
 def should_show_details(_test_results: Dict[str, Any], show_details: bool) -> bool:
@@ -429,24 +385,21 @@ def create_prompt_for_failed_tests(
 
 @log_function_call
 def create_prompt_for_passing_output(
-    test_session_result: PytestReport,
-    max_output_lines: int = MAX_OUTPUT_LINES,
+    report: PytestReport, max_lines: int = TOOL_LINES
 ) -> str:
     """List the captured stdout and stderr of tests that did not fail.
 
     Covers the setup, call and teardown stages. Longrepr is never shown.
 
     Args:
-        test_session_result: The test session result to read output from
-        max_output_lines: Overall output line limit with truncation indicator
+        report: The test session result to read output from
+        max_lines: Line budget; a cut ends with SHOW_OUTPUT_HINT
 
     Returns:
         The captured output per test, or NO_CAPTURED_OUTPUT_NOTE if no test printed
     """
-    output = OutputBuilder(max_output_lines)
-    any_added = False
-
-    for test in test_session_result.tests or []:
+    parts: List[str] = []
+    for test in report.tests or []:
         if test.outcome in FAILED_OUTCOMES:
             continue
         stages = [
@@ -466,19 +419,15 @@ def create_prompt_for_passing_output(
         ]
         if not blocks:
             continue
+        parts.append(f"Test ID: {test.nodeid} - outcome {test.outcome}\n")
+        parts.extend(
+            f"  {label}:\n{FENCE}\n{text}\n{FENCE}\n" for label, text in blocks
+        )
 
-        if not any_added:
-            any_added = True
-            if not output.add("Captured output of passing tests:\n"):
-                break
-        if not output.add(f"Test ID: {test.nodeid} - outcome {test.outcome}\n"):
-            break
-        if not all(
-            output.add(f"  {label}:\n```\n{text}\n```\n") for label, text in blocks
-        ):
-            break
-
-    return output.get_result() if any_added else NO_CAPTURED_OUTPUT_NOTE
+    if not parts:
+        return NO_CAPTURED_OUTPUT_NOTE
+    output = "Captured output of passing tests:\n" + "".join(parts)
+    return bound_text(output, max_lines, hint=SHOW_OUTPUT_HINT)
 
 
 def get_detailed_test_summary(

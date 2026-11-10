@@ -17,7 +17,6 @@ from mcp_tools_py.checker_tools import (
 )
 from mcp_tools_py.code_checker_mypy.reporting import MYPY_SUCCESS_TEXT
 from mcp_tools_py.code_checker_pytest.reporting import (
-    MAX_FAILURES,
     create_prompt_for_failed_tests,
     create_prompt_for_passing_output,
     did_not_run_line,
@@ -30,6 +29,7 @@ from mcp_tools_py.code_checker_pytest.verdict import (
     format_error_text,
     format_suspicious_text,
 )
+from mcp_tools_py.utils.report_budget import MAX_FAILURES, TOOL_LINES
 
 if TYPE_CHECKING:
     from mcp_tools_py.utils.mcp_protocols import FastMCPProtocol
@@ -73,12 +73,14 @@ class CheckerTools:
         show_details: bool,
         show_output: bool = False,
         collect_only: bool = False,
+        max_lines: int = TOOL_LINES,
     ) -> str:
         """Format a pytest run by its verdict status; only PASSED reads as completed.
 
         With show_output, a passing run also lists the captured output of passing tests.
         With collect_only, a run with no outcomes lists the selected test IDs.
         ERROR and unknown statuses fail closed and render the shared error text.
+        `max_lines` bounds the failure prompt and the passing output.
 
         Returns:
             User-facing summary of the pytest outcome.
@@ -97,13 +99,16 @@ class CheckerTools:
                 passed_count = summary.get("passed") or 0
                 result = f"Pytest check completed. All {passed_count} tests passed successfully."
             if show_output and report:
-                result += "\n\n" + create_prompt_for_passing_output(report)
+                result += "\n\n" + create_prompt_for_passing_output(report, max_lines)
             return result
         if verdict.status is RunStatus.FAILED:
             if report is None or not should_show_details(test_results, show_details):
                 return f"Pytest found failures. {test_results.get('summary_text') or ''}".rstrip()
             failed_tests_prompt = create_prompt_for_failed_tests(
-                report, include_print_output=True, max_failures=MAX_FAILURES
+                report,
+                include_print_output=True,
+                max_failures=MAX_FAILURES,
+                max_lines=max_lines,
             )
             counts = "\n".join(
                 filter(

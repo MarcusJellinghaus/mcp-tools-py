@@ -9,7 +9,6 @@ from mcp_tools_py.code_checker_pytest.models import (
     Summary,
 )
 from mcp_tools_py.code_checker_pytest.reporting import (
-    MAX_COLLECTOR_IDS,
     PYTEST_HINT,
     XDIST_MARKER,
     collectors_failed_line,
@@ -18,6 +17,7 @@ from mcp_tools_py.code_checker_pytest.reporting import (
     group_failed_collectors,
 )
 from mcp_tools_py.code_checker_pytest.verdict import classify_run, format_error_text
+from mcp_tools_py.utils.report_budget import MAX_COLLECTOR_IDS
 
 IMPORTLIB_FRAME = (
     "importlib\\__init__.py:126: in import_module\n    return _bootstrap()"

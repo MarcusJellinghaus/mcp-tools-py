@@ -29,6 +29,7 @@ from mcp_tools_py.utils.project_config import (
     get_pytest_addopts,
     resolve_coverage_source,
 )
+from mcp_tools_py.utils.report_budget import TOOL_LINES
 
 if TYPE_CHECKING:
     from mcp_tools_py.checker_tools import CheckerTools
@@ -249,23 +250,10 @@ def register(mcp: "FastMCPProtocol", checker_tools: "CheckerTools") -> None:
                 timeout_seconds=run_timeout,
             )
 
-            # Always show detailed failure output
-            result = checker_tools._format_pytest_result_with_details(
-                test_results,
-                show_details=True,
-                show_output=sanitized.show_output,
-                collect_only=sanitized.collect_only,
-            )
-
-            # Prepend the test-paths and deduplication notes so LLM can self-correct
-            test_paths_note = test_results.get("test_paths_note")
-            notes = [*([test_paths_note] if test_paths_note else []), *sanitized.notes]
-            if notes:
-                notes_text = "\n".join(notes)
-                result = f"{notes_text}\n\n{result}"
-
             summary = test_results.get("summary", {})
             verdict = test_results["verdict"]
+            # The digest is built first so the failure section gets what is left
+            digest: Optional[str] = None
             if coverage_run is not None:
                 report = test_results.get("test_results")
                 # Without a parsed report, JSON from import-time lines proves nothing.
@@ -286,6 +274,27 @@ def register(mcp: "FastMCPProtocol", checker_tools: "CheckerTools") -> None:
                         **finished.outcome,
                     )
                 digest = "\n".join([digest, *finished.notes])
+
+            max_lines = TOOL_LINES
+            if digest is not None:
+                max_lines = max(TOOL_LINES // 2, TOOL_LINES - digest.count("\n") - 1)
+
+            # Always show detailed failure output
+            result = checker_tools._format_pytest_result_with_details(
+                test_results,
+                show_details=True,
+                show_output=sanitized.show_output,
+                collect_only=sanitized.collect_only,
+                max_lines=max_lines,
+            )
+
+            # Prepend the test-paths and deduplication notes so LLM can self-correct
+            test_paths_note = test_results.get("test_paths_note")
+            notes = [*([test_paths_note] if test_paths_note else []), *sanitized.notes]
+            if notes:
+                notes_text = "\n".join(notes)
+                result = f"{notes_text}\n\n{result}"
+            if digest is not None:
                 result = f"{result}\n\n{digest}"
 
             if verdict.status in (RunStatus.PASSED, RunStatus.FAILED):
