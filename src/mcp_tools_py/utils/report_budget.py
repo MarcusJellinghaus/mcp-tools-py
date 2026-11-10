@@ -130,21 +130,25 @@ def _location_row(group: list[Location]) -> list[str]:
     return [text] + [f"    {detail}" for detail in first.details]
 
 
-def render_locations(items: Sequence[Location], hint: str = LOCATION_HINT) -> list[str]:
+def render_locations(
+    items: Sequence[Location],
+    hint: str = LOCATION_HINT,
+    max_rows: int = LOCATIONS_PER_RULE,
+) -> list[str]:
     """Render locations as rows grouped by (path, message), capped per rule.
 
     Returns:
-        At most LOCATIONS_PER_RULE rows, then a count line naming `hint` when
-        rows were hidden.
+        At most `max_rows` rows, then a count line naming `hint` when rows
+        were hidden.
     """
     rows: dict[tuple[str, str | None], list[Location]] = {}
     for item in items:
         rows.setdefault((item.path, item.message), []).append(item)
     groups = list(rows.values())
     out: list[str] = []
-    for group in groups[:LOCATIONS_PER_RULE]:
+    for group in groups[:max_rows]:
         out.extend(_location_row(group))
-    rest = groups[LOCATIONS_PER_RULE:]
+    rest = groups[max_rows:]
     if rest:
         hidden = sum(len(group) for group in rest)
         out.append(

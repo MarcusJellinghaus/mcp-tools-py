@@ -128,7 +128,7 @@ def create_mypy_prompt(result: MypyResult, max_issues: int = 3) -> str | None:
     detailed_codes = {code for code, _ in detailed}
     group_notes: dict[str, list[Location]] = {}
     loose_notes: list[Location] = []
-    for note in notes if max_issues > 0 else []:
+    for note in notes:
         code = note.code or "misc"
         if code in detailed_codes:
             group_notes.setdefault(code, []).append(_location(note, "note: "))
@@ -148,7 +148,9 @@ def create_mypy_prompt(result: MypyResult, max_issues: int = 3) -> str | None:
         items = _group_items(messages, last_error) + group_notes.get(code, [])
         lines += [*render_locations(items), ""]
 
-    if loose_notes:
+    if loose_notes and max_issues == 0:
+        lines += [f"Notes ({len(loose_notes)}): not shown with max_issues=0", ""]
+    elif loose_notes:
         lines += [f"Notes ({len(loose_notes)}):", *render_locations(loose_notes), ""]
 
     if summarised:

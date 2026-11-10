@@ -93,3 +93,17 @@ def test_unparsed_only_output_is_one_line_error(
     assert result.status == "error"
     assert "vulture: error: invalid config" in result.summary
     assert "\n" not in result.summary
+
+
+def test_unparsed_lines_next_to_findings_are_reported(
+    tmp_path: Path, monkeypatch: pytest.MonkeyPatch
+) -> None:
+    """A syntax-error skip on stderr is named in summary and fix_text."""
+    skipped = 'src/broken.py:3: invalid syntax at "def ("'
+    result = _run_full(tmp_path, monkeypatch, _parsed(f"{_OUTPUT}{skipped}\n"))
+
+    assert result.status == "findings"
+    assert len(result.findings) == 3
+    assert "Plus 1 unparsed output line(s)." in result.summary
+    assert "Unparsed vulture output:" in result.fix_text
+    assert skipped in result.fix_text

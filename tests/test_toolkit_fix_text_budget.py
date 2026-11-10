@@ -111,6 +111,26 @@ def test_pytest_node_ids_render_one_row_per_failing_test() -> None:
     ]
 
 
+def test_fifteen_failing_tests_are_all_named() -> None:
+    """Rule-less findings are not capped at LOCATIONS_PER_RULE rows."""
+    findings = [
+        Finding(
+            key=f"tests/test_a.py::test_{i}",
+            message="assert False",
+            path="tests/test_a.py",
+        )
+        for i in range(15)
+    ]
+
+    result = _result_from_findings(
+        None, findings, "ok", "15 failed", locations=[f.key for f in findings]
+    )
+
+    for finding in findings:
+        assert f"- {finding.key} — assert False" in result.fix_text
+    assert "more location" not in result.fix_text
+
+
 def test_finding_without_path_shows_its_message() -> None:
     finding = Finding(key="pytest|collection|xdist", message="xdist differs")
 

@@ -110,7 +110,28 @@ def test_counts_only_lists_every_code() -> None:
     assert prompt is not None
     assert ".py" not in prompt
     assert "**" not in prompt
-    assert "Notes" not in prompt
+    assert "Notes (200): not shown with max_issues=0" in prompt
     for i in range(30):
         assert f"- code{i:02d}: 100 occurrences (src: 100)" in prompt
     assert SUMMARY_HINT not in prompt
+
+
+def test_counts_only_keeps_notes_of_the_last_error_group() -> None:
+    """On rc 2 the last-error group keeps its notes; the rest are counted."""
+    result = MypyResult(
+        return_code=2,
+        messages=[
+            _msg("src/a.py", 1, "misc"),
+            _msg("src/a.py", 2, "arg-type"),
+            _msg("src/a.py", 3, "arg-type", severity="note", message="in group"),
+            _msg("src/b.py", 4, "misc", severity="note", message="elsewhere"),
+            _msg("src/b.py", 5, "other", severity="note", message="elsewhere 2"),
+        ],
+    )
+    prompt = create_mypy_prompt(result, max_issues=0)
+
+    assert prompt is not None
+    assert "**arg-type (1 issue)" in prompt
+    assert "- src/a.py: 3 — note: in group" in prompt
+    assert "Notes (2): not shown with max_issues=0" in prompt
+    assert "elsewhere" not in prompt

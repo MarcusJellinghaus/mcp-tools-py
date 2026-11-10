@@ -51,9 +51,10 @@ Functions and types:
   marker, balances a code fence left open at the cut, and ends with `hint`.
 - **`guard_output(text)`** — `bound_text` at the guard limits with `GUARD_HINT`.
 - **`Location`** — one finding location: `path`, `line`, `message`, `details`.
-- **`render_locations(items, hint)`** — rows grouped by (path, message), such as
-  `- f.py: 57, 63, 73 (+12) — <message>`, capped at `LOCATIONS_PER_RULE` with a count
-  line naming `hint`.
+- **`render_locations(items, hint, max_rows)`** — rows grouped by (path, message), such as
+  `- f.py: 57, 63, 73 (+12) — <message>`, capped at `max_rows` (default
+  `LOCATIONS_PER_RULE`) with a count line naming `hint`. Toolkit `fix_text` lists
+  findings with no rule (failing tests) up to `FAILED_IDS` rows.
 - **`render_summary(rows, title, top, hint, detail_hint)`** — top `SUMMARY_TOP` rule
   rows, then `... and N more rules (M occurrences), largest: ...` and the hint.
   `top=None` lists every row (`max_issues=0`).

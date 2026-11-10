@@ -19,6 +19,8 @@ from mcp_tools_py.utils.project_config import (
     resolve_target_directories,
 )
 from mcp_tools_py.utils.report_budget import (
+    FAILED_IDS,
+    LOCATIONS_PER_RULE,
     TOOL_CHARS,
     TOOL_LINES,
     Location,
@@ -64,6 +66,9 @@ def _render_fix_text(
     `locations` and `details` (extra lines under a row) run parallel to
     `findings`.
 
+    Findings without a rule (failing tests, collectors) are distinct items,
+    not hits of one rule, so their group shows up to FAILED_IDS rows.
+
     Returns:
         Per rule a header line with its count and directory split, then its
         rows from `render_locations`; unbounded.
@@ -80,7 +85,10 @@ def _render_fix_text(
         if paths:
             header += f" {format_dir_split(paths)}"
         lines.append(header)
-        lines.extend(render_locations([item for item, _ in items], FIX_TEXT_HINT))
+        max_rows = LOCATIONS_PER_RULE if rule else FAILED_IDS
+        lines.extend(
+            render_locations([item for item, _ in items], FIX_TEXT_HINT, max_rows)
+        )
     return "\n".join(lines)
 
 
@@ -271,7 +279,9 @@ def _run_vulture(context: ToolContext, depth: str) -> ActionResult:
     Returns:
         "error" if target directories cannot be resolved, vulture timed
         out/failed to run, or its output parsed to no messages but had
-        other lines; "findings" with one Finding per message; else "ok".
+        other lines; "findings" with one Finding per message, naming any
+        unparsed lines (e.g. a syntax-error skip) in summary and fix_text;
+        else "ok".
     """
     del depth
     project_dir = context.project_dir
@@ -315,13 +325,21 @@ def _run_vulture(context: ToolContext, depth: str) -> ActionResult:
         )
         for message in result.messages
     ]
-    return _result_from_findings(
+    unparsed = len(result.unparsed)
+    suffix = f" Plus {unparsed} unparsed output line(s)." if unparsed else ""
+    action = _result_from_findings(
         None,
         findings,
         "vulture found no issues.",
-        f"vulture found {len(findings)} issue(s).",
+        f"vulture found {len(findings)} issue(s).{suffix}",
         locations=[f"{message.file}:{message.line}" for message in result.messages],
     )
+    if not unparsed:
+        return action
+    fix_text = "\n".join(
+        [action.fix_text, "", "Unparsed vulture output:", *result.unparsed]
+    )
+    return replace(action, fix_text=bound_text(fix_text, hint=FIX_TEXT_HINT))
 
 
 def _run_lint_imports(context: ToolContext, depth: str) -> ActionResult:
