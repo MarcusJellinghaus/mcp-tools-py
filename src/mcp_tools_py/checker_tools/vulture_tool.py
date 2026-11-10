@@ -3,6 +3,7 @@
 import logging
 from typing import TYPE_CHECKING, List, Optional
 
+from mcp_tools_py.code_checker_vulture import format_vulture_report
 from mcp_tools_py.code_checker_vulture import run_vulture_check as run_vulture
 from mcp_tools_py.log_utils import log_function_call
 from mcp_tools_py.utils.project_config import resolve_target_directories
@@ -24,6 +25,7 @@ def register(mcp: "FastMCPProtocol", checker_tools: "CheckerTools") -> None:
         target_directories: Optional[List[str]] = None,
         min_confidence: int = 60,
         extra_args: Optional[List[str]] = None,
+        max_issues: int = 1,
     ) -> str:
         """Run vulture on the project to find unused code.
 
@@ -32,9 +34,14 @@ def register(mcp: "FastMCPProtocol", checker_tools: "CheckerTools") -> None:
                 Auto-detected from pyproject.toml when None.
             extra_args: Additional vulture arguments.
             min_confidence: Minimum confidence for reporting (default: 60).
+            max_issues: Number of kinds (unused function, unused import, ...)
+                to show in detail (default: 1). Remaining kinds shown as
+                summary counts. 0 = counts only: one line per kind with count
+                and directory split, no file paths.
 
         Returns:
-            Raw vulture output (stdout + stderr combined)
+            Formatted vulture report. Output vulture prints that is not a
+            finding (e.g. --make-whitelist) is returned as-is.
         """
         vulture_binary = context.tool_environment.binary("vulture")
         if not context.is_tool_available("vulture") or vulture_binary is None:
@@ -61,7 +68,7 @@ def register(mcp: "FastMCPProtocol", checker_tools: "CheckerTools") -> None:
             whitelist_path = project_dir / context.vulture_whitelist
             whitelist = str(whitelist_path) if whitelist_path.exists() else None
 
-            output = run_vulture(
+            result = run_vulture(
                 vulture_binary=str(vulture_binary),
                 project_dir=str(project_dir),
                 target_directories=resolved,
@@ -70,10 +77,12 @@ def register(mcp: "FastMCPProtocol", checker_tools: "CheckerTools") -> None:
                 whitelist_path=whitelist,
                 timeout_seconds=context.resolve_timeout("vulture"),
             )
+            output = format_vulture_report(result, max_issues=max_issues)
 
             logger.info(
                 "vulture check completed",
                 extra={
+                    "issues_found": len(result.messages),
                     "output_length": len(output),
                 },
             )

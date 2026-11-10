@@ -17,6 +17,7 @@ from mcp_tools_py.utils.project_config import (
     resolve_source_directories,
     resolve_target_directories,
 )
+from mcp_tools_py.utils.report_budget import bound_text
 from mcp_tools_py.utils.ruff_parsing import parse_ruff_json_output
 from mcp_tools_py.utils.subprocess_runner import execute_command
 from mcp_tools_py.utils.tool_context import ToolContext
@@ -213,14 +214,16 @@ def _run_pylint(context: ToolContext, depth: str) -> ActionResult:
 def _run_vulture(context: ToolContext, depth: str) -> ActionResult:
     """Run vulture and map the outcome onto an ActionResult.
 
-    vulture's output has no stable per-location key, so a finding is
-    reported once, keyed `vulture|{depth}`.
+    `depth` is accepted but unused, so the signature matches every other
+    `_CHECK_RUNNERS` entry. Finding keys are line-insensitive:
+    `vulture|<file>|<kind>|<name-or-message>`.
 
     Returns:
-        "error" if target directories cannot be resolved or vulture timed
-        out/failed to run; "findings" with one degraded Finding when it
-        reports dead code; else "ok".
+        "error" if target directories cannot be resolved, vulture timed
+        out/failed to run, or its output parsed to no messages but had
+        other lines; "findings" with one Finding per message; else "ok".
     """
+    del depth
     project_dir = context.project_dir
     dirs = resolve_target_directories(str(project_dir), None)
     if isinstance(dirs, str):
@@ -235,26 +238,39 @@ def _run_vulture(context: ToolContext, depth: str) -> ActionResult:
     whitelist_path = project_dir / context.vulture_whitelist
     whitelist = str(whitelist_path) if whitelist_path.exists() else None
 
-    output = run_vulture_check(
+    result = run_vulture_check(
         vulture_binary=str(binary),
         project_dir=str(project_dir),
         target_directories=dirs,
         whitelist_path=whitelist,
         timeout_seconds=context.resolve_timeout("vulture"),
     )
-    if output.startswith("vulture timed out") or output.startswith(
-        "vulture failed to run:"
-    ):
-        return ActionResult(status="error", summary=output)
-    if output == "vulture produced no output.":
-        return ActionResult(status="ok", summary="vulture found no issues.")
+    if result.error is not None:
+        return ActionResult(status="error", summary=result.error)
+    if not result.messages and result.unparsed:
+        raw = "\n".join(result.unparsed)
+        return ActionResult(
+            status="error", summary=_one_line(bound_text(raw, max_lines=5))
+        )
 
-    finding = Finding(key=f"vulture|{depth}", message=output)
-    return ActionResult(
-        status="findings",
-        summary="vulture found unused code.",
-        findings=[finding],
-        fix_text=output,
+    findings = [
+        Finding(
+            key=(
+                f"vulture|{message.file}|{message.kind}|"
+                f"{message.name or message.message}"
+            ),
+            message=message.message,
+            path=message.file,
+            rule=message.kind,
+        )
+        for message in result.messages
+    ]
+    return _result_from_findings(
+        None,
+        findings,
+        "vulture found no issues.",
+        f"vulture found {len(findings)} issue(s).",
+        locations=[f"{message.file}:{message.line}" for message in result.messages],
     )
 
 

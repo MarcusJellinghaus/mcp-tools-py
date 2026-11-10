@@ -10,6 +10,7 @@ from mcp_tools_py.code_checker_bandit.models import BanditMessage, BanditResult
 from mcp_tools_py.code_checker_deptry.runners import DeptryMessage, DeptryResult
 from mcp_tools_py.code_checker_mypy.models import MypyResult
 from mcp_tools_py.code_checker_pylint.models import PylintResult
+from mcp_tools_py.code_checker_vulture.runners import VultureResult
 from mcp_tools_py.toolkit import PythonToolkit
 from mcp_tools_py.toolkit_checks import _CHECK_RUNNERS
 from mcp_tools_py.utils.project_config import DEFAULT_CHECK_TIMEOUT, ToolName
@@ -154,7 +155,7 @@ def _patch_full_depth_clean(monkeypatch: pytest.MonkeyPatch) -> None:
     """Make every `check@full` tool other than mypy/pylint report clean."""
     monkeypatch.setattr(
         "mcp_tools_py.toolkit_checks.run_vulture_check",
-        lambda *args, **kwargs: "vulture produced no output.",
+        lambda *args, **kwargs: VultureResult(error=None, messages=[], unparsed=[]),
     )
     monkeypatch.setattr(
         "mcp_tools_py.toolkit_checks.run_lint_imports_check_impl",
@@ -230,25 +231,6 @@ class TestRunCheckFull:
 
         assert result.status == "ok"
         assert result.findings == []
-
-    def test_vulture_finding_is_degraded_finding(
-        self, tmp_path: Path, monkeypatch: pytest.MonkeyPatch
-    ) -> None:
-        _write_check_project(tmp_path, _CLEAN_SRC)
-        _patch_full_depth_clean(monkeypatch)
-        monkeypatch.setattr(
-            "mcp_tools_py.toolkit_checks.run_vulture_check",
-            lambda *args, **kwargs: "mod.py:5: unused function '_x' (60% confidence)",
-        )
-        request = ActionRequest(
-            action="check", depth="full", project_dir=tmp_path, params={}
-        )
-
-        result = PythonToolkit().run(request)
-
-        assert result.status == "findings"
-        assert len(result.findings) == 1
-        assert result.findings[0].key == "vulture|full"
 
     @pytest.mark.parametrize(
         ("stdout", "expected_message"),

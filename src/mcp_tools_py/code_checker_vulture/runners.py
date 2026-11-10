@@ -1,9 +1,26 @@
 """Functions for running vulture dead-code analysis."""
 
 import os
+from typing import NamedTuple
 
+from mcp_tools_py.code_checker_vulture.parsers import (
+    VultureMessage,
+    parse_vulture_output,
+)
 from mcp_tools_py.utils.project_config import DEFAULT_CHECK_TIMEOUT
 from mcp_tools_py.utils.subprocess_runner import execute_command
+
+
+class VultureResult(NamedTuple):
+    """Outcome of a vulture run.
+
+    `error` is set when vulture timed out or failed to run; `unparsed` holds
+    output lines that are not findings (stderr, --make-whitelist output).
+    """
+
+    error: str | None
+    messages: list[VultureMessage]
+    unparsed: list[str]
 
 
 def run_vulture_check(
@@ -14,8 +31,8 @@ def run_vulture_check(
     extra_args: list[str] | None = None,
     whitelist_path: str | None = None,
     timeout_seconds: int = DEFAULT_CHECK_TIMEOUT,
-) -> str:
-    """Run vulture on the specified project directory and return raw output.
+) -> VultureResult:
+    """Run vulture on the specified project directory and parse its output.
 
     Args:
         vulture_binary: Path to the vulture binary.
@@ -27,7 +44,7 @@ def run_vulture_check(
         timeout_seconds: Maximum seconds to wait for vulture.
 
     Returns:
-        Raw vulture output string (stdout + stderr combined), or fallback message.
+        The parsed result of stdout + stderr, or one carrying `error`.
     """
     paths: list[str] = list(target_directories)
     if whitelist_path and os.path.exists(whitelist_path):
@@ -43,12 +60,11 @@ def run_vulture_check(
     result = execute_command(command, cwd=project_dir, timeout_seconds=timeout_seconds)
 
     if result.timed_out:
-        return f"vulture timed out after {timeout_seconds} seconds."
+        return VultureResult(
+            f"vulture timed out after {timeout_seconds} seconds.", [], []
+        )
     if result.execution_error:
-        return f"vulture failed to run: {result.execution_error}"
+        return VultureResult(f"vulture failed to run: {result.execution_error}", [], [])
 
-    output = result.stdout
-    if result.stderr:
-        output = output + "\n" + result.stderr if output else result.stderr
-
-    return output.strip() or "vulture produced no output."
+    messages, unparsed = parse_vulture_output(f"{result.stdout}\n{result.stderr}")
+    return VultureResult(error=None, messages=messages, unparsed=unparsed)
