@@ -10,16 +10,14 @@ from pathlib import Path
 from mcp_tools_py.log_utils import log_function_call
 from mcp_tools_py.utils.environment_info import locate_packages
 from mcp_tools_py.utils.project_config import DEFAULT_CHECK_TIMEOUT
+from mcp_tools_py.utils.report_budget import bound_text
 from mcp_tools_py.utils.subprocess_runner import execute_command
 
 logger = logging.getLogger(__name__)
 
 _VERBOSE_FLAGS: tuple[str, ...] = ("-v", "--verbose")
 _CONFIG_CANDIDATES: tuple[str, ...] = ("setup.cfg", ".importlinter", "pyproject.toml")
-MAX_OUTPUT_LINES: int = 300
-_TRUNCATION_MARKER: str = (
-    "[output truncated — run with --contract <name> for individual results]"
-)
+_CONTRACT_HINT: str = "Run with --contract <name> for individual results."
 
 _SUMMARY_RE = re.compile(r"Contracts:\s+(\d+)\s+kept,\s+(\d+)\s+broken")
 _BROKEN_LINE_RE = re.compile(r"^(?P<name>.+?)\s+BROKEN\s+\[", re.MULTILINE)
@@ -385,10 +383,11 @@ def _format_report(
     raw_body: str,
     info_lines: list[str],
 ) -> str:
-    """Assemble the final string and apply the line cap.
+    """Assemble the final string and bound it at the per-tool budget.
 
     Returns:
-        Multi-line report text, truncated to `MAX_OUTPUT_LINES`.
+        Multi-line report text; the head (info lines and state header) is kept
+        when cut, which ends with `_CONTRACT_HINT`.
     """
     lines: list[str] = list(info_lines)
 
@@ -414,10 +413,7 @@ def _format_report(
     body = raw_body if raw_body.strip() else "(no output)"
     lines.extend(body.splitlines())
 
-    if len(lines) > MAX_OUTPUT_LINES:
-        lines = lines[:MAX_OUTPUT_LINES] + [_TRUNCATION_MARKER]
-
-    return "\n".join(lines)
+    return bound_text("\n".join(lines), hint=_CONTRACT_HINT)
 
 
 @log_function_call
