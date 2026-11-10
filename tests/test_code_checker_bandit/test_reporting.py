@@ -2,9 +2,13 @@
 
 from mcp_tools_py.code_checker_bandit.models import BanditMessage
 from mcp_tools_py.code_checker_bandit.reporting import (
-    MAX_LOCATIONS_PER_ISSUE,
     format_bandit_report,
     group_and_sort_issues,
+)
+from mcp_tools_py.utils.report_budget import (
+    DETAIL_HINT,
+    LOCATION_HINT,
+    LOCATIONS_PER_RULE,
 )
 
 
@@ -173,14 +177,16 @@ class TestFormatBanditReport:
 
         # First group (HIGH severity B201) should be detailed
         assert "bandit found 1 issue with B201 assert_used ((root): 1)" in result
-        assert "a.py:10" in result
+        assert "- a.py: 10" in result
 
         # Remaining should be summary only
+        assert "--- 2 additional rules found (2 occurrences) ---" in result
         assert "- B105 assert_used (MEDIUM): 1 occurrence ((root): 1)" in result
         assert "- B101 assert_used (LOW): 1 occurrence ((root): 1)" in result
+        assert result.split("\n")[-1] == DETAIL_HINT
 
         # No detailed locations for remaining
-        assert "b.py:" not in result
+        assert "- b.py" not in result
 
     def test_format_includes_cwe_reference(self) -> None:
         msgs = [
@@ -200,20 +206,26 @@ class TestFormatBanditReport:
         assert "CWE-" not in result
 
     def test_format_locations_capped(self) -> None:
-        """>50 locations -> capped with '... and N more'."""
-        count = MAX_LOCATIONS_PER_ISSUE + 10
+        """More than LOCATIONS_PER_RULE location rows should be capped."""
+        count = LOCATIONS_PER_RULE + 10
         msgs = [
             _make_bandit_message(test_id="B101", filename=f"file{i}.py", line_number=i)
             for i in range(count)
         ]
         result = format_bandit_report(msgs, [], max_issues=1)
         assert result is not None
-        assert "... and 10 more occurrences" in result
+        assert f"... and 10 more locations in 10 more rows — {LOCATION_HINT}" in result
 
         location_lines = [
             line for line in result.split("\n") if line.startswith("- file")
         ]
-        assert len(location_lines) == MAX_LOCATIONS_PER_ISSUE
+        assert len(location_lines) == LOCATIONS_PER_RULE
+
+    def test_format_locations_collapse_per_file(self) -> None:
+        msgs = [_make_bandit_message(line_number=n) for n in (3, 7, 9)]
+        result = format_bandit_report(msgs, [], max_issues=1)
+        assert result is not None
+        assert result.split("\n")[-1] == "- src/foo.py: 3, 7, 9"
 
     def test_format_errors_at_top(self) -> None:
         """Errors section appears before findings."""

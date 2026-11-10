@@ -8,13 +8,16 @@ from collections import defaultdict
 from typing import NamedTuple
 
 from mcp_tools_py.code_checker_bandit.models import BanditMessage
+from mcp_tools_py.utils.report_budget import (
+    Location,
+    render_locations,
+    render_summary,
+)
 from mcp_tools_py.utils.report_counts import (
     format_dir_split,
     format_total_line,
     plural,
 )
-
-MAX_LOCATIONS_PER_ISSUE: int = 50
 
 # Lower number = higher priority
 SEVERITY_PRIORITY: dict[str, int] = {"HIGH": 0, "MEDIUM": 1, "LOW": 2}
@@ -55,6 +58,23 @@ def group_and_sort_issues(
     return issue_groups
 
 
+def _summary_rows(groups: list[BanditIssueGroup]) -> list[tuple[str, int, str]]:
+    """Build the summary rows for `render_summary`.
+
+    Returns:
+        One (rule label, count, directory split) row per group.
+    """
+    return [
+        (
+            f"{group.test_id} {group.messages[0].test_name} "
+            f"({group.messages[0].issue_severity})",
+            len(group.messages),
+            format_dir_split(msg.filename for msg in group.messages),
+        )
+        for group in groups
+    ]
+
+
 def format_bandit_report(
     messages: list[BanditMessage],
     errors: list[str],
@@ -80,6 +100,11 @@ def format_bandit_report(
 
     max_issues = max(0, max_issues)
 
+    if max_issues == 0:
+        if groups:
+            sections.append("\n".join(render_summary(_summary_rows(groups), top=None)))
+        return "\n\n".join(sections)
+
     # Detailed sections for top N issue types
     for group in groups[:max_issues]:
         first = group.messages[0]
@@ -96,28 +121,22 @@ def format_bandit_report(
             lines.append(f"CWE-{first.cwe_id}: {first.cwe_link}")
         lines.append(first.issue_text)
         lines.append("Locations:")
-
-        capped = group.messages[:MAX_LOCATIONS_PER_ISSUE]
-        for msg in capped:
-            lines.append(f"- {msg.filename}:{msg.line_number}")
-
-        overflow = count - len(capped)
-        if overflow > 0:
-            lines.append(f"... and {overflow} more occurrences")
-
+        lines.extend(
+            render_locations(
+                [Location(msg.filename, msg.line_number) for msg in group.messages]
+            )
+        )
         sections.append("\n".join(lines))
 
     # Summary for remaining issue types
     remaining = groups[max_issues:]
     if remaining:
-        summary_lines: list[str] = []
-        for group in remaining:
-            first = group.messages[0]
-            split = format_dir_split(msg.filename for msg in group.messages)
-            summary_lines.append(
-                f"- {group.test_id} {first.test_name} ({first.issue_severity}): "
-                f"{plural(len(group.messages), 'occurrence')} {split}"
-            )
-        sections.append("\n".join(summary_lines))
+        remaining_count = sum(len(g.messages) for g in remaining)
+        title = (
+            f"--- {plural(len(remaining), 'additional rule')} found "
+            f"({remaining_count} occurrences) ---"
+        )
+        summary = render_summary(_summary_rows(remaining), title=title)
+        sections.append("\n".join(summary))
 
     return "\n\n".join(sections)
