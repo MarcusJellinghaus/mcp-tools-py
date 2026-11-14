@@ -44,7 +44,7 @@ into the project. Affected probe modes:
 | `src/mcp_tools_py/utils/environment_info.py` | Modify — add `run_probe`; route `locate_packages`, `resolve_scope`, `get_environment_info` through it |
 | `src/mcp_tools_py/inspect_library.py` | Modify — route `_get_library_source` through `run_probe`; drop two imports |
 | `tests/conftest.py` | Modify — add `side_effect_package` fixture |
-| `tests/test_environment_info.py` | Modify — relax one assertion; add one real-child test; add one parametrized test that all four probe callers pass a temp `cwd` |
+| `tests/test_environment_info.py` | Modify — relax one assertion; add one real-child test; add one parametrized test that all four probe callers pass a temp `cwd`; add one test that `run_probe` creates its temp dir with `ignore_cleanup_errors=True` |
 | `tests/test_inspect_library.py` | Modify — retarget six patch strings; add one real-child test |
 | `docs/architecture/architecture.md` | Modify — `probe.py` bullet |
 | `README.md` | Modify — one sentence in the project-env paragraph |

@@ -93,6 +93,23 @@ with `encoding="utf-8"`.
    for `info`/`locate`, a directory string for `scope`, verbatim source for
    `source`). New imports: `os`, `Callable` (`collections.abc`), and
    `_get_library_source` from `mcp_tools_py.inspect_library`.
+4. Second test in `TestRunProbeWorkingDirectory`, guarding the cleanup flag the
+   issue requires:
+   ```python
+   def test_temporary_directory_ignores_cleanup_errors(self) -> None:
+   ```
+   ```
+   with (
+       patch("mcp_tools_py.utils.environment_info.tempfile.TemporaryDirectory") as mock_tmp,
+       patch("mcp_tools_py.utils.environment_info.execute_command") as mock_exec,
+   ):
+       mock_tmp.return_value.__enter__.return_value = "/probe-workdir"
+       mock_exec.return_value = make_command_result()
+       run_probe("/cleanup/python", "info")
+   mock_tmp.assert_called_once_with(ignore_cleanup_errors=True)
+   assert mock_exec.call_args.kwargs["cwd"] == "/probe-workdir"
+   ```
+   New import: `run_probe` from `mcp_tools_py.utils.environment_info`.
 
 ### WHERE: `tests/test_inspect_library.py`
 
@@ -117,6 +134,8 @@ with `encoding="utf-8"`.
 
 Run the new tests now: both real-child tests must fail (marker lands in
 `fake_project`), and all four parametrized cases must fail (no `cwd` kwarg).
+`test_environment_info.py` fails at collection until `run_probe` exists
+(import error); that counts as the expected red.
 
 ## B. Implementation
 
