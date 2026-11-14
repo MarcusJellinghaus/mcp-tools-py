@@ -21,6 +21,14 @@ This tracks **Feature Implementation** consisting of multiple **Tasks**.
 
 ## Tasks
 
-<!-- Tasks populated from pr_info/steps/ by prepare_task_tracker -->
+### Step 1: Run every probe in a fresh temporary working directory
+See [step_1.md](./steps/step_1.md)
+
+- [ ] Implementation: `side_effect_package` fixture and tests first (see them fail), then `run_probe` in `environment_info.py`, route all four probe callers through it, update architecture doc and README
+- [ ] Quality checks: pylint, pytest (`-n auto`), mypy, lint-imports — fix all issues
+- [ ] Commit message prepared
 
 ## Pull Request
+
+- [ ] PR review: review the full branch diff against the summary and step plan
+- [ ] PR summary prepared
