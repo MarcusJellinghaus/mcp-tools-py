@@ -3,8 +3,7 @@
 from typing import TYPE_CHECKING
 
 from mcp_tools_py.log_utils import log_function_call
-from mcp_tools_py.utils.environment_info import STDERR_SNIPPET, probe_script_path
-from mcp_tools_py.utils.subprocess_runner import execute_command
+from mcp_tools_py.utils.environment_info import STDERR_SNIPPET, run_probe
 from mcp_tools_py.utils.tool_context import ToolContext
 
 if TYPE_CHECKING:
@@ -32,14 +31,11 @@ def _get_library_source(import_path: str, max_lines: int, interpreter: str) -> s
     if max_lines < 1:
         return f"max_lines must be a positive integer (>= 1), got: {max_lines}"
 
-    result = execute_command(
-        [
-            interpreter,
-            str(probe_script_path()),
-            "source",
-            import_path,
-            str(max_lines),
-        ],
+    result = run_probe(
+        interpreter,
+        "source",
+        import_path,
+        str(max_lines),
         timeout_seconds=SOURCE_TIMEOUT_SECONDS,
     )
     if result.timed_out:

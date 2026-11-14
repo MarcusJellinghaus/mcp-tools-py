@@ -12,12 +12,13 @@ call.  `resolve_scope` also probes `stdlib` afresh after a cached failure.
 
 import json
 import logging
+import tempfile
 from dataclasses import dataclass
 from functools import lru_cache
 from pathlib import Path
 from typing import Mapping, Optional
 
-from mcp_tools_py.utils.subprocess_runner import execute_command
+from mcp_tools_py.utils.subprocess_runner import CommandResult, execute_command
 
 logger = logging.getLogger(__name__)
 
@@ -104,6 +105,32 @@ def probe_script_path() -> Path:
     return Path(__file__).parent / "target_scripts" / "probe.py"
 
 
+def run_probe(
+    interpreter: str, *args: str, timeout_seconds: int = PROBE_TIMEOUT_SECONDS
+) -> CommandResult:
+    """Run the probe script under `interpreter` in a fresh temporary directory.
+
+    The working directory is a throwaway one, so files a probed library writes
+    on import never land in the project.  Relative ``PYTHONPATH`` entries
+    therefore resolve against that directory.  Failing to remove it afterwards
+    is ignored: a grandchild process may still hold it open on Windows.
+
+    Args:
+        interpreter: Path to the Python interpreter to run the probe under.
+        *args: The probe mode and its arguments.
+        timeout_seconds: How long the probe may run.
+
+    Returns:
+        The finished probe run.
+    """
+    with tempfile.TemporaryDirectory(ignore_cleanup_errors=True) as workdir:
+        return execute_command(
+            [interpreter, str(probe_script_path()), *args],
+            cwd=workdir,
+            timeout_seconds=timeout_seconds,
+        )
+
+
 def locate_packages(
     interpreter: str, names: list[str]
 ) -> tuple[list[str], dict[str, list[str]], list[str]] | str:
@@ -128,10 +155,7 @@ def locate_packages(
     if not names:
         return [], {}, []
 
-    result = execute_command(
-        [interpreter, str(probe_script_path()), "locate", *names],
-        timeout_seconds=PROBE_TIMEOUT_SECONDS,
-    )
+    result = run_probe(interpreter, "locate", *names)
     if result.timed_out:
         return f"probe of {interpreter} timed out after {PROBE_TIMEOUT_SECONDS} seconds"
     if result.execution_error or result.return_code != 0:
@@ -179,10 +203,7 @@ def resolve_scope(interpreter: str, scope: str) -> ScopeResolution:
         if not info.error:
             return ScopeResolution(directory=info.stdlib)
 
-    result = execute_command(
-        [interpreter, str(probe_script_path()), "scope", scope],
-        timeout_seconds=PROBE_TIMEOUT_SECONDS,
-    )
+    result = run_probe(interpreter, "scope", scope)
     if result.timed_out:
         return ScopeResolution(
             error=f"resolving scope '{scope}' timed out after {PROBE_TIMEOUT_SECONDS} seconds"
@@ -288,10 +309,7 @@ def get_environment_info(interpreter: str) -> EnvironmentInfo:
         The probe result, or a fail-open EnvironmentInfo whose `error` says
         why the probe could not be trusted.
     """
-    result = execute_command(
-        [interpreter, str(probe_script_path()), "info", *PROBED_MODULES],
-        timeout_seconds=PROBE_TIMEOUT_SECONDS,
-    )
+    result = run_probe(interpreter, "info", *PROBED_MODULES)
     if result.timed_out:
         return _failed(
             f"probe of {interpreter} timed out after {PROBE_TIMEOUT_SECONDS} seconds"
