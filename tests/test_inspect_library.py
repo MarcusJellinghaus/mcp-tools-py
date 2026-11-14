@@ -49,7 +49,7 @@ class TestChildProcess:
 
     def test_timeout_names_the_import_path(self) -> None:
         """A child that times out yields a message, not an exception."""
-        with patch("mcp_tools_py.inspect_library.execute_command") as mock_exec:
+        with patch("mcp_tools_py.utils.environment_info.execute_command") as mock_exec:
             mock_exec.return_value = make_command_result(
                 return_code=-1,
                 timed_out=True,
@@ -64,7 +64,7 @@ class TestChildProcess:
 
     def test_non_zero_exit_reports_code_and_stderr(self) -> None:
         """A child that crashes yields its exit code and a stderr snippet."""
-        with patch("mcp_tools_py.inspect_library.execute_command") as mock_exec:
+        with patch("mcp_tools_py.utils.environment_info.execute_command") as mock_exec:
             mock_exec.return_value = make_command_result(
                 return_code=1, stderr="Traceback: boom"
             )
@@ -77,7 +77,7 @@ class TestChildProcess:
 
     def test_missing_interpreter_names_the_interpreter(self) -> None:
         """An interpreter that cannot be run is named in the message."""
-        with patch("mcp_tools_py.inspect_library.execute_command") as mock_exec:
+        with patch("mcp_tools_py.utils.environment_info.execute_command") as mock_exec:
             mock_exec.return_value = make_command_result(
                 return_code=-1, execution_error="No such file or directory"
             )
@@ -89,7 +89,7 @@ class TestChildProcess:
 
     def test_stdout_returned_verbatim(self) -> None:
         """The child's output is the tool's output, unchanged."""
-        with patch("mcp_tools_py.inspect_library.execute_command") as mock_exec:
+        with patch("mcp_tools_py.utils.environment_info.execute_command") as mock_exec:
             mock_exec.return_value = make_command_result(
                 stdout="def foo():\n    return 42\n"
             )
@@ -100,7 +100,7 @@ class TestChildProcess:
 
     def test_invalid_max_lines_runs_no_child(self) -> None:
         """Argument validation needs no environment, so it costs no subprocess."""
-        with patch("mcp_tools_py.inspect_library.execute_command") as mock_exec:
+        with patch("mcp_tools_py.utils.environment_info.execute_command") as mock_exec:
             _get_library_source("json.encoder", 0, "/some/python")
 
             mock_exec.assert_not_called()
@@ -124,9 +124,22 @@ class TestChildProcess:
         assert "BANNER" not in result
         assert result.startswith("def thing()")
 
+    def test_import_side_effects_stay_out_of_the_working_directory(
+        self, side_effect_package: tuple[Path, Path]
+    ) -> None:
+        """Files a library writes on import land in a throwaway directory."""
+        fake_project, cwd_record = side_effect_package
+
+        result = _get_library_source("fake_pkg.thing", 200, sys.executable)
+
+        assert "def thing" in result
+        assert cwd_record.is_file()
+        assert not (fake_project / "marker.txt").exists()
+        assert not Path(cwd_record.read_text(encoding="utf-8")).exists()
+
     def test_command_uses_the_given_interpreter(self) -> None:
         """The command runs the probe under the interpreter passed in."""
-        with patch("mcp_tools_py.inspect_library.execute_command") as mock_exec:
+        with patch("mcp_tools_py.utils.environment_info.execute_command") as mock_exec:
             mock_exec.return_value = make_command_result(stdout="source")
 
             _get_library_source("json.encoder", 50, "/some/python")

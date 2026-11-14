@@ -91,6 +91,40 @@ def all_modules_importable() -> Iterator[MagicMock]:
         yield patched
 
 
+@pytest.fixture
+def side_effect_package(
+    tmp_path: Path, monkeypatch: pytest.MonkeyPatch
+) -> tuple[Path, Path]:
+    """A fake package that writes into its working directory when imported.
+
+    `fake_pkg` is importable from PYTHONPATH and the test runs inside a fake
+    project directory, so a probe that inherits the working directory leaves
+    `marker.txt` there.
+
+    Returns:
+        `(fake_project, cwd_record)` — the directory that must stay untouched,
+        and the absolute file the import writes its working directory to.
+    """
+    package = tmp_path / "fake_pkg"
+    (package / "sub").mkdir(parents=True)
+    (package / "sub" / "__init__.py").write_text("", encoding="utf-8")
+    (package / "thing.py").write_text(
+        "def thing() -> int:\n    return 42\n", encoding="utf-8"
+    )
+    cwd_record = tmp_path / "cwd.txt"
+    (package / "__init__.py").write_text(
+        "import os, pathlib\n"
+        "pathlib.Path('marker.txt').write_text('x', encoding='utf-8')\n"
+        f"pathlib.Path({str(cwd_record)!r}).write_text(os.getcwd(), encoding='utf-8')\n",
+        encoding="utf-8",
+    )
+    fake_project = tmp_path / "fake_project"
+    fake_project.mkdir()
+    monkeypatch.setenv("PYTHONPATH", str(tmp_path))
+    monkeypatch.chdir(fake_project)
+    return fake_project, cwd_record
+
+
 @pytest.fixture(autouse=True)
 def _clear_virtual_env(monkeypatch: pytest.MonkeyPatch) -> None:
     """Keep a VIRTUAL_ENV inherited from the shell or CI out of every test.

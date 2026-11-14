@@ -24,9 +24,9 @@ This tracks **Feature Implementation** consisting of multiple **Tasks**.
 ### Step 1: Run every probe in a fresh temporary working directory
 See [step_1.md](./steps/step_1.md)
 
-- [ ] Implementation: `side_effect_package` fixture and tests first (see them fail), then `run_probe` in `environment_info.py`, route all four probe callers through it, update architecture doc and README
-- [ ] Quality checks: pylint, pytest (`-n auto`), mypy, lint-imports — fix all issues
-- [ ] Commit message prepared
+- [x] Implementation: `side_effect_package` fixture and tests first (see them fail), then `run_probe` in `environment_info.py`, route all four probe callers through it, update architecture doc and README
+- [x] Quality checks: pylint, pytest (`-n auto`), mypy, lint-imports — fix all issues
+- [x] Commit message prepared
 
 ## Pull Request
 
