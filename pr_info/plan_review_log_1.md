@@ -9,3 +9,11 @@ pr_info/steps/step_1.md:120 — low — `locate_packages` and `get_environment_i
 Verdict(decision='tasks', tasks=['In pr_info/steps/step_1.md (around line 120), add one parametrized mocked test covering all four probe callers (`source`, `scope`, `locate_packages`, `get_environment_info`). Have it patch the subprocess call used by `run_probe` and assert that `call_args.kwargs["cwd"]` is set and differs from `os.getcwd()`. This proves `locate_packages` and `get_environment_info` also run in a temporary directory.'], escalate_reason=None)
 **Changes**:
 applied
+
+## Round 2 — 2026-11-14
+**Findings**:
+Checking the README/architecture anchors and the `execute_command` shim next, then I'll write the report.pr_info/steps/step_1.md:141 — low — Nothing tests that `run_probe` passes `ignore_cleanup_errors=True`, though the issue calls it required. If someone drops the flag later, no test fails; the regression only appears on Windows when a lingering grandchild process holds the temp directory open. Possible fix: in the `TestRunProbeWorkingDirectory` class, patch `mcp_tools_py.utils.environment_info.tempfile.TemporaryDirectory` and assert it was called with `ignore_cleanup_errors=True`.
+**Decisions**:
+Verdict(decision='tasks', tasks=['In pr_info/steps/step_1.md (around line 141), add a test to the `TestRunProbeWorkingDirectory` class. It should patch `mcp_tools_py.utils.environment_info.tempfile.TemporaryDirectory`, call `run_probe`, and assert that `TemporaryDirectory` was called with `ignore_cleanup_errors=True`. The issue requires this flag, and the test stops it from being dropped without notice.'], escalate_reason=None)
+**Changes**:
+applied
