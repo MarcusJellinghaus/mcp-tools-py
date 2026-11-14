@@ -3,8 +3,8 @@
 ## LLM prompt
 
 > Read `pr_info/steps/summary.md`, then implement `pr_info/steps/step_1.md`
-> exactly. Follow TDD: write the tests first (part A), run them and see the two
-> new real-child tests fail, then implement (part B) and docs (part C). Keep the
+> exactly. Follow TDD: write the tests first (part A), run them and see the
+> new tests fail, then implement (part B) and docs (part C). Keep the
 > change minimal; do not touch `target_scripts/probe.py` or any non-probe
 > subprocess call. Run pylint, pytest (`-n auto`), mypy and lint-imports via the
 > MCP tools; all must pass. Run `run_format_code`, then make exactly one commit.
@@ -64,6 +64,35 @@ with `encoding="utf-8"`.
    assert not Path(cwd_record.read_text(encoding="utf-8")).exists()  # temp dir removed
    ```
    `side_effect_package` comes from `conftest.py` as a fixture; no import needed.
+3. New class `TestRunProbeWorkingDirectory` with one parametrized mocked test
+   proving all four probe callers run outside the current working directory:
+   ```python
+   @pytest.mark.parametrize(
+       "call_probe",
+       [
+           lambda: _get_library_source("json.encoder", 50, "/cwd-source/python"),
+           lambda: resolve_scope("/cwd-scope/python", "json"),
+           lambda: locate_packages("/cwd-locate/python", ["json"]),
+           lambda: get_environment_info("/cwd-info/python"),
+       ],
+       ids=["source", "scope", "locate", "info"],
+   )
+   def test_every_probe_runs_outside_the_working_directory(
+       self, call_probe: Callable[[], object]
+   ) -> None:
+   ```
+   ```
+   with patch("mcp_tools_py.utils.environment_info.execute_command") as mock_exec:
+       mock_exec.return_value = make_command_result(stdout="{}")
+       call_probe()
+   cwd = mock_exec.call_args.kwargs["cwd"]
+   assert cwd
+   assert Path(cwd) != Path(os.getcwd())
+   ```
+   `stdout="{}"` makes every caller take a non-raising path (unparsable blob
+   for `info`/`locate`, a directory string for `scope`, verbatim source for
+   `source`). New imports: `os`, `Callable` (`collections.abc`), and
+   `_get_library_source` from `mcp_tools_py.inspect_library`.
 
 ### WHERE: `tests/test_inspect_library.py`
 
@@ -86,7 +115,8 @@ with `encoding="utf-8"`.
    assert not Path(cwd_record.read_text(encoding="utf-8")).exists()
    ```
 
-Run the two new tests now: both must fail (marker lands in `fake_project`).
+Run the new tests now: both real-child tests must fail (marker lands in
+`fake_project`), and all four parametrized cases must fail (no `cwd` kwarg).
 
 ## B. Implementation
 
