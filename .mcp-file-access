@@ -1,0 +1,8 @@
+# mcp-workspace file access rules - see mcp-workspace docs/file-access.md
+# <level> <gitignore pattern>; levels: read-only, read-write; last match wins
+read-only   /.vscodeclaude_status.txt
+read-only   /.mcp.json
+read-only   /.mcp.macos.json
+read-only   /.claude/settings.json
+read-only   /.claude/settings.local.json
+read-write  /.scratch/
