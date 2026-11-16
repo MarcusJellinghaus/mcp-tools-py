@@ -47,8 +47,7 @@
       "mcp__mcp-workspace__github_issue_list",
       "mcp__mcp-workspace__github_pr_view",
       "mcp__mcp-workspace__github_search",
-      "Bash(mcp-coder gh-tool:*)",
-      "Bash(start docs/architecture/dependency_graph.html)",
+      "Bash(mcp-coder gh-tool checkout-issue-branch:*)",
       "Skill(commit_push)",
       "Skill(discuss)",
       "Skill(implementation_approve)",
@@ -74,7 +73,9 @@
       "mcp__mcp-workspace__search_reference_files",
       "mcp__mcp-tools-py__run_tach_check",
       "mcp__mcp-workspace__github_label_list",
-      "mcp__mcp-tools-py__search_library_files"
+      "mcp__mcp-tools-py__search_library_files",
+      "mcp__mcp-tools-py__run_deptry_check",
+      "mcp__mcp-workspace__github_subissue_list"
     ]
   },
   "enableAllProjectMcpServers": true,
@@ -82,5 +83,6 @@
     "mcp-tools-py",
     "mcp-workspace",
     "obsidian-wiki"
-  ]
+  ],
+  "autoMemoryEnabled": false
 }

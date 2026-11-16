@@ -27,7 +27,9 @@ This is enforced by the `mcp_coder_utils_isolation` contract in `.importlinter`.
 - *What it does* — one sentence.
 - *Why MCP doesn't* — which tool you'd have used, and what stops it.
 
-If you can't name the gap, use the MCP tool. Exempt: the approved git/gh commands under Git operations.
+If you can't name the gap, use the MCP tool. Exempt: the approved commands under Git operations.
+
+**Protected files** (`.mcp*.json`, `.claude/settings*.json`, `.mcp-file-access`): MCP refuses writes to them by design. Stop and ask the user to edit the file — a refusal is not a gap, so never fall back to Edit/Write, Bash or PowerShell.
 
 **No session scratchpad.** MCP tools can't write outside the project. Temporary files go in `.scratch/`.
 
@@ -40,6 +42,7 @@ If you can't name the gap, use the MCP tool. Exempt: the approved git/gh command
 | Write file | `mcp__mcp-workspace__save_file` |
 | Append to file | `mcp__mcp-workspace__append_file` |
 | Delete file | `mcp__mcp-workspace__delete_this_file` |
+| Delete directory (`rmdir`; `rm -r` with `recursive=True`) | `mcp__mcp-workspace__delete_directory` |
 | Move file | `mcp__mcp-workspace__move_file` |
 | List directory | `mcp__mcp-workspace__list_directory` |
 | Search files | `mcp__mcp-workspace__search_files` |
@@ -47,9 +50,9 @@ If you can't name the gap, use the MCP tool. Exempt: the approved git/gh command
 | List reference dir | `mcp__mcp-workspace__list_reference_directory` |
 | Get reference projects | `mcp__mcp-workspace__get_reference_projects` |
 | Search reference files | `mcp__mcp-workspace__search_reference_files` |
+| Get base branch | `mcp__mcp-workspace__get_base_branch` |
 | Check file size | `mcp__mcp-workspace__check_file_size` |
 | Check branch status | `mcp__mcp-workspace__check_branch_status` |
-| Get base branch | `mcp__mcp-workspace__get_base_branch` |
 | Run pytest | `mcp__mcp-tools-py__run_pytest_check` |
 | Run pylint | `mcp__mcp-tools-py__run_pylint_check` |
 | Run mypy | `mcp__mcp-tools-py__run_mypy_check` |
@@ -58,17 +61,31 @@ If you can't name the gap, use the MCP tool. Exempt: the approved git/gh command
 | Run ruff check | `mcp__mcp-tools-py__run_ruff_check` |
 | Run ruff fix | `mcp__mcp-tools-py__run_ruff_fix` |
 | Run bandit | `mcp__mcp-tools-py__run_bandit_check` |
-| Format code (black+isort) | `mcp__mcp-tools-py__run_format_code` |
+| Run tach | `mcp__mcp-tools-py__run_tach_check` |
+| Format code (project's configured formatter) | `mcp__mcp-tools-py__run_format_code` |
 | Check a Python semantic before claiming it | scratch probe — see [Scratch probes](#scratch-probes) |
-| Get library source | `mcp__mcp-tools-py__get_library_source` |
+| Get library source of installed deps (never `python -c "__file__"` + cat site-packages) | `mcp__mcp-tools-py__get_library_source` |
+| Search installed deps / stdlib source | `mcp__mcp-tools-py__search_library_files` |
+| Run deptry | `mcp__mcp-tools-py__run_deptry_check` |
 | Refactoring | `mcp__mcp-tools-py__move_symbol`, `move_module`, `rename_symbol`, `list_symbols`, `find_references` |
-| Git (status, log, diff, fetch, etc.) | `mcp__mcp-workspace__git` |
-| `gh issue view` | `mcp__mcp-workspace__github_issue_view` |
-| `gh issue list` | `mcp__mcp-workspace__github_issue_list` |
-| `gh pr view` | `mcp__mcp-workspace__github_pr_view` |
-| `gh search` | `mcp__mcp-workspace__github_search` |
+| Git read-only (status, diff, log, show, fetch, ls_tree, ls_files, ls_remote, rev_parse, branch list) | `mcp__mcp-workspace__git` |
+| Git write (switch/create branch, delete branch, commit, push, force-push after rebase) | `mcp__mcp-workspace__git_branch`, `git_branch_delete`, `git_commit`, `git_push`, `git_push_force` |
+| View GitHub issue | `mcp__mcp-workspace__github_issue_view` |
+| List GitHub issues | `mcp__mcp-workspace__github_issue_list` |
+| View GitHub PR | `mcp__mcp-workspace__github_pr_view` |
+| Search GitHub issues/PRs | `mcp__mcp-workspace__github_search` |
+| Create GitHub issue | `mcp__mcp-workspace__github_issue_create` |
+| Edit GitHub issue | `mcp__mcp-workspace__github_issue_edit` |
+| Comment on GitHub issue | `mcp__mcp-workspace__github_issue_comment` |
+| Set issue workflow status | `mcp__mcp-workspace__github_issue_set_status` |
+| Sub-issues (list, link, unlink) | `mcp__mcp-workspace__github_subissue_list`, `github_subissue_add`, `github_subissue_remove` |
+| Create GitHub PR | `mcp__mcp-workspace__github_pr_create` |
+| Reply to / resolve PR review comment | `mcp__mcp-workspace__github_review_comment_reply`, `github_review_thread_resolve` |
+| List GitHub labels | `mcp__mcp-workspace__github_label_list` |
 
-Sibling repos are readable in full via the reference tools and `git` with `reference_name` (`get_reference_projects` lists them). Check there before asking about another repo.
+**`git_commit`:** always pass `paths`, never `all=True` — `all` is `git add -A`, which commits every untracked file that isn't gitignored (stray downloads, notes, files other sessions left behind).
+
+Sibling repos are readable in full via the reference tools and `git` with `reference_name` (`get_reference_projects` lists them). Check there before asking about another repo. The GitHub issue/PR read tools and the issue write tools also take `reference_name` for reference projects. That is the only cross-repo route; for repos that aren't reference projects, stop and report.
 
 ## Code quality checks
 
@@ -110,38 +127,29 @@ mcp__mcp-workspace__save_file(".scratch/test_probe.py", ...)
 mcp__mcp-tools-py__run_pytest_check(extra_args=["-p", "no:cacheprovider", ".scratch/test_probe.py"])
 ```
 
-A path argument scopes the run, so a probe costs seconds. Delete when done — `delete_directory(".scratch", recursive=True)`; CI blocks any PR carrying one. `.scratch/` is not gitignored: the MCP file tools refuse ignored paths.
+A path argument scopes the run, so a probe costs seconds. Delete when done — `delete_directory(".scratch", recursive=True)`; CI still blocks any PR carrying one. `.scratch/` is gitignored; the `read-write /.scratch/` rule in `.mcp-file-access` keeps it writable for the MCP file tools.
+
+Never use `python -c` via Bash. If you reason instead of running, label the conclusion analytical.
 
 ## Git operations
 
-**MCP tools (use these for read-only git and GitHub queries):**
+**Allowed commands via Bash tool.** These have no MCP equivalent — use Bash directly. Skills that instruct bash commands (e.g. `git rebase`) must also use Bash.
 
 ```
-mcp__mcp-workspace__git           (status, log, diff, fetch, show, merge_base, ls_files, ls_remote, etc.)
-mcp__mcp-workspace__github_issue_view
-mcp__mcp-workspace__github_issue_list
-mcp__mcp-workspace__github_pr_view
-mcp__mcp-workspace__github_search
-mcp__mcp-workspace__check_branch_status
-```
-
-**Bash-only (no MCP equivalent).** Use Bash directly. Skills that instruct bash commands (e.g. `git commit`) must also use Bash.
-
-```
-git commit / add / push / push --force-with-lease / checkout / checkout -b / branch
-git rebase / rm / restore / stash / remote get-url
-gh issue create / edit / comment (labels only via gh-tool set-status)
-gh issue view (cross-repo only — otherwise use the MCP tool)
+git add / rebase / push --force-with-lease
 gh run view
-mcp-coder gh-tool set-status <label>
 mcp-coder check file-size --max-lines 750
 ```
 
-**Before every commit:** run `mcp__mcp-tools-py__run_format_code`, then stage and commit.
+**Status labels:** `github_issue_create` and `github_issue_edit` reject `status-*` labels; use `mcp__mcp-workspace__github_issue_set_status` to change issue workflow status (`from_status` guards the current status; `reference_name` for reference projects).
 
-**Bash discipline:** no `cd` prefix, no `git -C`. Don't chain approved with unapproved commands. Run them separately.
+**Privileged agents:** `commit-pusher`, `issue-updater` and `issue-approver` each carry a frontmatter `PreToolUse` hook that allows their extra tools without a prompt — `git_commit` and `git_push` for `commit-pusher`, `github_issue_edit` for `issue-updater`, `github_issue_set_status` for `issue-approver`. No `bypassPermissions`. Frontmatter hooks are skipped in untrusted folders and under `-p` → there the tools prompt (interactive) or are denied (`-p`). That is an ergonomics device, not access control — any session can launch them. None of the three has `Bash`. Rationale and limits: `docs/repository-setup/agent-permissions.md` in the mcp-coder repository.
 
-**Slash-prefixed `gh` arguments:** prefix with `MSYS_NO_PATHCONV=1` — Git Bash rewrites a leading `/` into a Windows path. Without it `--body "/approve"` posts a path, the Action never fires, and the issue silently fails to transition.
+**Compact diff:** use `mcp__mcp-workspace__git` for code review. Has compact diff built-in with exclude pattern support.
+
+**Before every commit:** run `mcp__mcp-tools-py__run_format_code`, then `mcp__mcp-workspace__git_commit`.
+
+**Bash discipline:** no `cd` prefix, no `git -C` — commands already run in the project directory. Don't chain approved with unapproved commands. Run them separately.
 
 **Commit messages:** standard format. See Writing style for length. No attribution footers.
 
