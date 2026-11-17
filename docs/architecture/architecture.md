@@ -284,6 +284,9 @@ See [dependencies/readme.md](dependencies/readme.md) for tool comparison, curren
 
 ### CI Pipeline
 
-Matrix-based (`.github/workflows/ci.yml`, `fail-fast: false`):
-- **Always**: ruff-format, ruff, pylint (configured in `pyproject.toml`, incl. `R0401`), pytest, startup-budget, mypy
-- **PR only**: import-linter, tach, vulture, deptry
+`.github/workflows/ci.yml`, laid out as in mcp_coder:
+- **push-checks** (every push, not again on the PR): ruff-format, ruff, mypy, file-size, no-url-deps, import-linter, vulture
+- **pr-checks** (PR, main push, dispatch): pylint (configured in `pyproject.toml`, incl. `R0401`), tach, deptry
+- **unit-tests** and **integration-tests** (push and PR): pytest with `--cov`; unit-tests also runs the startup-budget test alone (`-n 0`)
+- **coverage** (PR and main push): combines both runs, diff-cover on PRs, badge on main. Reporting only, never a gate
+- **check-forbidden-folders** (PR only): `pr_info/`, `.scratch/` and the manual-test sample project

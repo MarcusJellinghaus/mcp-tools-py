@@ -56,6 +56,7 @@ dev = [
     # Pins the ruff the repo's own lint and format run on; the runtime
     # dependency above stays open for users.
     "ruff~=0.17.2",
+    "diff-cover",
     ]
 typecheck = ["mypy>=1.13.0"]
 
