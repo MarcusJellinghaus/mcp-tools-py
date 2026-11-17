@@ -809,6 +809,7 @@ def _is_git_repo(project_dir: Path) -> bool:
             cwd=str(project_dir),
             capture_output=True,
             timeout=5,
+            check=False,
         )
         return result.returncode == 0
     except (OSError, _subprocess.TimeoutExpired):
@@ -827,6 +828,7 @@ def _is_git_tracked(project_dir: Path, file_path: str) -> bool:
             cwd=str(project_dir),
             capture_output=True,
             timeout=5,
+            check=False,
         )
         return result.returncode == 0
     except (OSError, _subprocess.TimeoutExpired):

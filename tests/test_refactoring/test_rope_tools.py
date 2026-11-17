@@ -652,6 +652,7 @@ def test_rope_cli_returns_json_error_on_exception() -> None:
         ],
         capture_output=True,
         text=True,
+        check=False,
     )
     assert proc.returncode == 1
     output = json.loads(proc.stdout)
@@ -673,6 +674,7 @@ def test_rope_cli_unknown_operation() -> None:
         ],
         capture_output=True,
         text=True,
+        check=False,
     )
     assert proc.returncode == 1
     assert "Unknown operation" in proc.stderr

@@ -378,11 +378,13 @@ def test_move_module_in_git_repo_with_untracked_files(tmp_path: Path) -> None:
         ["git", "config", "user.email", "test@test.com"],
         cwd=str(root),
         capture_output=True,
+        check=False,
     )
     subprocess.run(
         ["git", "config", "user.name", "Test"],
         cwd=str(root),
         capture_output=True,
+        check=False,
     )
 
     # Create a package with untracked files (never git-added)
