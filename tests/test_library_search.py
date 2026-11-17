@@ -1,7 +1,9 @@
 """Tests for the library_search directory-search core and MCP tool."""
 
 import os
+from collections.abc import Callable
 from pathlib import Path
+from typing import Any
 from unittest.mock import MagicMock, patch
 
 import pytest
@@ -199,7 +201,7 @@ class TestLibrarySearchTools:
         mcp = MagicMock()
         captured = {}
 
-        def _capture(fn):  # type: ignore[no-untyped-def]
+        def _capture(fn: Callable[..., Any]) -> Callable[..., Any]:
             captured["fn"] = fn
             return fn
 
@@ -226,7 +228,7 @@ class TestLibrarySearchTools:
         mcp = MagicMock()
         captured = {}
 
-        def _capture(fn):  # type: ignore[no-untyped-def]
+        def _capture(fn: Callable[..., Any]) -> Callable[..., Any]:
             captured["fn"] = fn
             return fn
 
@@ -260,7 +262,7 @@ class TestLibrarySearchTools:
         mcp = MagicMock()
         captured = {}
 
-        def _capture(fn):  # type: ignore[no-untyped-def]
+        def _capture(fn: Callable[..., Any]) -> Callable[..., Any]:
             captured["fn"] = fn
             return fn
 
@@ -287,7 +289,7 @@ class TestLibrarySearchTools:
         mcp = MagicMock()
         captured = {}
 
-        def _capture(fn):  # type: ignore[no-untyped-def]
+        def _capture(fn: Callable[..., Any]) -> Callable[..., Any]:
             captured["fn"] = fn
             return fn
 
