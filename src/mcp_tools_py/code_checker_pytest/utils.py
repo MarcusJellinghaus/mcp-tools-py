@@ -11,24 +11,88 @@ _SWITCH_LETTERS = set("xvsql")
 
 # Hard-coded from pytest's parser with this repo's plugins. An option missing
 # from it takes no value, so a following token is read as a positional, as before.
-# A split string, not a list literal: ~85 one-per-line entries would bury it.
-_ONE_VALUE_OPTIONS = """
--W -c -k -m -n -o -p -r
---anyio-mode --assert --asyncio-mode --basetemp --cache-show --capture
---code-highlight --color --confcutdir --config-file --cov --cov-config
---cov-context --cov-fail-under --cov-precision --cov-report --debug --deselect
---dist --doctest-glob --doctest-report --durations --durations-min --ignore
---ignore-glob --import-mode --json-report-file --json-report-indent
---json-report-verbosity --junit-prefix --junit-xml --junitprefix --junitxml
---last-failed-no-failures --lfnf --log-auto-indent --log-cli-date-format
---log-cli-format --log-cli-level --log-date-format --log-disable --log-file
---log-file-date-format --log-file-format --log-file-level --log-file-mode
---log-format --log-level --max-warnings --max-worker-restart --maxfail
---maxprocesses --maxschedchunk --metadata-from-json --metadata-from-json-file
---numprocesses --override-ini --pastebin --pdbcls --px --pythonwarnings
---report-chars --rootdir --rsyncdir --rsyncignore --show-capture --tach-base
---tach-head --tb --testrunuid --tx --verbosity
-""".split()  # noqa: SIM905
+_ONE_VALUE_OPTIONS = [
+    "-W",
+    "-c",
+    "-k",
+    "-m",
+    "-n",
+    "-o",
+    "-p",
+    "-r",
+    "--anyio-mode",
+    "--assert",
+    "--asyncio-mode",
+    "--basetemp",
+    "--cache-show",
+    "--capture",
+    "--code-highlight",
+    "--color",
+    "--confcutdir",
+    "--config-file",
+    "--cov",
+    "--cov-config",
+    "--cov-context",
+    "--cov-fail-under",
+    "--cov-precision",
+    "--cov-report",
+    "--debug",
+    "--deselect",
+    "--dist",
+    "--doctest-glob",
+    "--doctest-report",
+    "--durations",
+    "--durations-min",
+    "--ignore",
+    "--ignore-glob",
+    "--import-mode",
+    "--json-report-file",
+    "--json-report-indent",
+    "--json-report-verbosity",
+    "--junit-prefix",
+    "--junit-xml",
+    "--junitprefix",
+    "--junitxml",
+    "--last-failed-no-failures",
+    "--lfnf",
+    "--log-auto-indent",
+    "--log-cli-date-format",
+    "--log-cli-format",
+    "--log-cli-level",
+    "--log-date-format",
+    "--log-disable",
+    "--log-file",
+    "--log-file-date-format",
+    "--log-file-format",
+    "--log-file-level",
+    "--log-file-mode",
+    "--log-format",
+    "--log-level",
+    "--max-warnings",
+    "--max-worker-restart",
+    "--maxfail",
+    "--maxprocesses",
+    "--maxschedchunk",
+    "--metadata-from-json",
+    "--metadata-from-json-file",
+    "--numprocesses",
+    "--override-ini",
+    "--pastebin",
+    "--pdbcls",
+    "--px",
+    "--pythonwarnings",
+    "--report-chars",
+    "--rootdir",
+    "--rsyncdir",
+    "--rsyncignore",
+    "--show-capture",
+    "--tach-base",
+    "--tach-head",
+    "--tb",
+    "--testrunuid",
+    "--tx",
+    "--verbosity",
+]
 
 # Option spelling -> most values it can take.
 _OPTION_VALUES: dict[str, int] = {

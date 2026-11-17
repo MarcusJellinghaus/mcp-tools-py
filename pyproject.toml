@@ -116,26 +116,23 @@ select = [
 ignore = [
     "D107",  # missing docstring in __init__ method (redundant with class docstring)
     "ANN401",  # Any is correct at library/CLI boundaries; mypy strict covers the rest
-    "E501",  # line length is owned by the formatter; not re-checked here
+    "E501",  # line length is owned by the formatter (ruff format); not re-checked here
+    "S404",  # importing subprocess is this tool's core function
+    "S603",  # subprocess without shell=True is the SAFE form; argv is internally built
 ]
 
 [tool.ruff.lint.per-file-ignores]
 # tests: assert is the pytest idiom (S101); S105/S106/S108 fire on fake
 # credentials and "/tmp/..." literals used as test data, never opened.
-# S603/S607: tests start sys.executable and git with a fixed argv. Scoped here
-# on purpose: mcp_coder's global S603 ignore is not copied, src stays checked.
-"tests/**/*.py" = ["D", "DOC", "SIM117", "S101", "S105", "S106", "S108", "S603", "S607"]
+"tests/**/*.py" = ["D", "DOC", "SIM117", "S101", "S105", "S106", "S108"]
 "src/mcp_tools_py/code_checker_ruff/*.py" = ["DOC502"]
-# Target scripts run under the project's own interpreter, which may predate
-# 3.10: a runtime X | Y union would raise there, so typing.Union stays.
-"src/mcp_tools_py/utils/target_scripts/*.py" = ["UP007"]
-# git is called by name (resolved via PATH) with a fixed argv plus a
-# project-relative path.
-"src/mcp_tools_py/refactoring/rope_tools.py" = ["S603", "S607"]
 # tools/: low-priority helper scripts that may move to an MCP server or be deleted;
-# Returns sections are not required there. S603/S607: the argv is built in the
-# script, git and tach are called by name.
-"tools/**" = ["DOC201", "S603", "S607"]
+# Returns sections are not required there.
+"tools/**" = ["DOC201"]
+# These call git by name on purpose (resolved via PATH).
+"src/mcp_tools_py/refactoring/rope_tools.py" = ["S607"]
+"tests/test_refactoring/test_integration.py" = ["S607"]
+"tools/check_file_size.py" = ["S607"]
 
 [tool.ruff.lint.pydocstyle]
 convention = "google"

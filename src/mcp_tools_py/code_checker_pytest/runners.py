@@ -340,8 +340,6 @@ def run_tests(
                 error_context = create_error_context(
                     process.returncode, combined_output
                 )
-            # Set for every non-zero exit, i.e. in all the error branches below
-            exit_meaning = error_context.exit_code_meaning if error_context else ""
 
             # Always continue on collection errors but log warnings
             report_exists = os.path.isfile(temp_report_file)
@@ -358,6 +356,8 @@ def run_tests(
 
             # Handle other error cases
             elif process.returncode == 3:
+                # error_context is guaranteed non-None here: returncode != 0 above.
+                assert error_context is not None  # noqa: S101
                 logger.warning("Pytest internal error (exit 3): %s", combined_output)
                 internal_lines = "\n".join(
                     line
@@ -366,13 +366,14 @@ def run_tests(
                 )
                 prefix = f"{internal_lines}\n" if internal_lines else ""
                 raise RuntimeError(
-                    f"{prefix}Internal Error: {exit_meaning}."
+                    f"{prefix}Internal Error: {error_context.exit_code_meaning}."
                     f"{_build_error_detail(output, error_output)}"
                 )
             elif process.returncode == 4:
+                assert error_context is not None  # noqa: S101
                 logger.warning("Pytest usage error (exit 4): %s", combined_output)
                 raise ValueError(
-                    f"Usage Error: {exit_meaning}."
+                    f"Usage Error: {error_context.exit_code_meaning}."
                     f"{_build_error_detail(output, error_output)}"
                 )
             elif process.returncode == 5 and report_exists:
@@ -382,13 +383,14 @@ def run_tests(
                 )
             elif process.returncode > 5:
                 # Handle plugin-specific exit codes
+                assert error_context is not None  # noqa: S101
                 logger.warning(
                     "Pytest plugin error (exit %s): %s",
                     process.returncode,
                     combined_output,
                 )
                 raise RuntimeError(
-                    f"Plugin Error: {exit_meaning}."
+                    f"Plugin Error: {error_context.exit_code_meaning}."
                     f"{_build_error_detail(output, error_output)}"
                 )
 

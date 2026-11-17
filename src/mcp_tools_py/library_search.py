@@ -273,8 +273,7 @@ class LibrarySearchTools:
             resolution = resolve_scope(interpreter, scope)
             if resolution.error is not None:
                 return {"error": resolution.error}
-            if resolution.directory is None:  # resolve_scope sets one or the other
-                return {"error": f"scope '{scope}' resolved to no directory"}
+            assert resolution.directory is not None  # noqa: S101
             if not os.path.isdir(resolution.directory):
                 return {
                     "error": f"scope '{scope}' resolved to "
