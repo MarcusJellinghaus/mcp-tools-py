@@ -106,13 +106,12 @@ jobs:
       fail-fast: false
       matrix:
         check:
-          - {name: "black", cmd: "black --version && black --check src tests"}
-          - {name: "isort", cmd: "isort --version && isort --check --profile=black --float-to-top src tests"}
+          - {name: "ruff-format", cmd: "ruff version && ruff format --check src tests tools"}
+          - {name: "ruff", cmd: "ruff version && ruff check src tests tools"}
           - {name: "pylint", cmd: "pylint --version && pylint ./src ./tests"}  # configuration via pyproject.toml
           - {name: "pytest", cmd: "pytest --version && pytest tests"}
           - {name: "startup-budget", cmd: "pytest -n 0 tests/test_startup_time.py"}
           - {name: "mypy", cmd: "mypy --version && mypy src tests"}
-          - {name: "ruff-docstrings", cmd: "ruff --version && ruff check src tests"}
           # mcp-coder declares mcp-workspace and mcp-tools-py as plain names, so uvx
           # resolves them from PyPI — too old for mcp-coder's imports. Pin both to git.
           - {name: "file-size", cmd: "uvx --from 'git+https://github.com/MarcusJellinghaus/mcp_coder.git' --with 'mcp-workspace @ git+https://github.com/MarcusJellinghaus/mcp-workspace.git' --with 'mcp-tools-py @ git+https://github.com/MarcusJellinghaus/mcp-tools-py.git' mcp-coder check file-size --max-lines 750 --allowlist-file .large-files-allowlist"}

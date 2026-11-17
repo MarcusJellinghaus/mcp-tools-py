@@ -56,7 +56,7 @@ See `pyproject.toml` for version constraints.
 - **Quality Gates**: All three checks (pylint, pytest, mypy) must pass before proceeding
 - **MCP Tool Usage**: No direct bash commands for code quality (documented in `.claude/CLAUDE.md`)
 - **Architecture Enforcement**: `tach.toml` and `.importlinter` enforce module boundaries
-- **Formatting**: the `run_format_code` MCP tool before commits, which runs isort and black here because this repo declares `[tool.black]` (`tools/black.bat` and `tools/iSort.bat` run them individually)
+- **Formatting**: the `run_format_code` MCP tool before commits, which runs ruff's import sort and `ruff format` here because this repo declares `[tool.mcp-tools-py] formatter = "ruff"`
 
 ---
 
@@ -285,5 +285,5 @@ See [dependencies/readme.md](dependencies/readme.md) for tool comparison, curren
 ### CI Pipeline
 
 Matrix-based (`.github/workflows/ci.yml`, `fail-fast: false`):
-- **Always**: black, isort, pylint (configured in `pyproject.toml`, incl. `R0401`), pytest, mypy
+- **Always**: ruff-format, ruff, pylint (configured in `pyproject.toml`, incl. `R0401`), pytest, startup-budget, mypy
 - **PR only**: import-linter, tach, vulture

@@ -84,18 +84,11 @@ markers = [
 [tool.coverage.run]
 patch = ["subprocess"]
 
-[tool.black]
-line-length = 88
-target-version = ["py311"]
-
-[tool.isort]
-profile = "black"
-line_length = 88
-float_to_top = true
-
 [tool.ruff]
 target-version = "py311"
 line-length = 88
+
+[tool.ruff.format]
 
 [tool.ruff.lint]
 # Rule selection — see the per-group comments below
@@ -120,6 +113,7 @@ select = [
     # PLE2502 bidirectional-unicode: covers bandit B613 (trojansource), which has no S port.
     "PLE2502",
     "UP",
+    "I",
 ]
 ignore = [
     "D107",  # missing docstring in __init__ method (redundant with class docstring)
@@ -140,6 +134,10 @@ ignore = [
 # git is called by name (resolved via PATH) with a fixed argv plus a
 # project-relative path.
 "src/mcp_tools_py/refactoring/rope_tools.py" = ["S603", "S607"]
+# tools/: low-priority helper scripts that may move to an MCP server or be deleted;
+# Returns sections are not required there. S603/S607: the argv is built in the
+# script, git and tach are called by name.
+"tools/**" = ["DOC201", "S603", "S607"]
 
 [tool.ruff.lint.pydocstyle]
 convention = "google"
@@ -186,7 +184,8 @@ disable = ["W", "C", "R", "W1203"]
 enable = ["R0401"]
 
 [tool.mcp-tools-py]
-formatter = "black"   # isort + black
+# Formatter for run_format_code and mcp-coder workflows: ruff (import sorting + ruff format)
+formatter = "ruff"
 
 [tool.mcp-coder]
 format_code = true

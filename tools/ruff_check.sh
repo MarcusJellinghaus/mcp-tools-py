@@ -1,5 +1,5 @@
 #!/bin/bash
-# Check docstrings using ruff (D + DOC rules)
+# Lint with ruff (rules from [tool.ruff.lint] in pyproject.toml)
 #
 # Usage from Git Bash: ./tools/ruff_check.sh
 
@@ -8,5 +8,5 @@ if ! command -v ruff &> /dev/null; then
     exit 1
 fi
 
-echo "Checking docstrings with ruff..."
-ruff check src tests "$@"
+echo "Linting with ruff..."
+ruff check src tests tools "$@"
