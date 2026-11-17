@@ -9,10 +9,10 @@ Practical guide for maintaining architectural boundary enforcement. For architec
 | Layer enforcement | Yes | Yes |
 | Third-party isolation | Yes (`forbidden` contracts) | No |
 | Submodule boundaries | Yes (`independence` contracts) | No |
-| Circular dependency detection | No | Yes |
+| Circular dependency detection | Partial (`acyclic_siblings` contracts, not used here; a cycle across `layers` breaks the layer order) | Yes (`forbid_circular_dependencies`) |
 | Explicit `depends_on` | No | Yes |
 
-Use both — tach for high-level layers with explicit dependencies, import-linter for fine-grained import rules.
+Use both — tach for high-level layers with explicit dependencies, import-linter for fine-grained import rules. Module-level import cycles are caught by pylint `R0401` (`cyclic-import`).
 
 ## How to Update
 
