@@ -48,7 +48,6 @@ dependencies = [
 dev = [
     "mcp-workspace",
     # Architecture and code quality tools
-    "pycycle>=0.0.8",
     "pydeps>=1.12.0",
     # Builds the wheel that tests/test_packaging.py inspects
     "build>=1.0",
@@ -150,6 +149,8 @@ ignore_missing_imports = true
 # W1203: logging-fstring-interpolation — redundant while W is disabled, but kept
 #        as documentation: f-strings in logging calls are acceptable for readability
 disable = ["W", "C", "R", "W1203"]
+# R0401 cyclic-import: the cycle guard since pycycle was removed (mcp_coder#1367)
+enable = ["R0401"]
 
 [tool.mcp-tools-py]
 formatter = "black"   # isort + black

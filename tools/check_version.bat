@@ -25,7 +25,6 @@ pytest --version
 echo.
 echo --- Architecture and Dependencies ---
 pydeps --version
-pycycle --version
 tach --version
 lint-imports --version
 echo.

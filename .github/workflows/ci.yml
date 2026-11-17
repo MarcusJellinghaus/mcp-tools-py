@@ -108,7 +108,7 @@ jobs:
         check:
           - {name: "black", cmd: "black --version && black --check src tests"}
           - {name: "isort", cmd: "isort --version && isort --check --profile=black --float-to-top src tests"}
-          - {name: "pylint", cmd: "pylint --version && pylint -E ./src ./tests"}
+          - {name: "pylint", cmd: "pylint --version && pylint ./src ./tests"}  # configuration via pyproject.toml
           - {name: "pytest", cmd: "pytest --version && pytest tests"}
           - {name: "mypy", cmd: "mypy --version && mypy src tests"}
           - {name: "ruff-docstrings", cmd: "ruff --version && ruff check src tests"}
@@ -152,7 +152,6 @@ jobs:
         check:
           - {name: "import-linter", cmd: "lint-imports --help > /dev/null && lint-imports"}
           - {name: "tach", cmd: "tach --version && tach check"}
-          - {name: "pycycle", cmd: "pycycle --version && pycycle --here"}
           - {name: "vulture", cmd: "vulture --version && vulture src tests vulture_whitelist.py --min-confidence 60"}
     name: ${{ matrix.check.name }}
     steps:

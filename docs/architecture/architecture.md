@@ -48,7 +48,7 @@ Compared to a general-purpose bash MCP tool, this server offers a more controlle
 
 **Runtime**: `mcp[cli]`, `pylint`, `pytest` + `pytest-json-report` + `pytest-asyncio` + `pytest-xdist`, `mypy`, `deptry`, `ruff`, `bandit`, `vulture`, `tach`, `import-linter`, `black`, `isort`, `jedi`, `rope`, `structlog` + `python-json-logger`, `pathspec`, `igittigitt`, `mcp-coder-utils`
 
-**Development**: `mcp-workspace`, `pycycle`, `pydeps`
+**Development**: `mcp-workspace`, `pydeps`
 
 See `pyproject.toml` for version constraints.
 
@@ -277,7 +277,7 @@ See [dependencies/readme.md](dependencies/readme.md) for tool comparison, curren
 |------|--------|---------|
 | tach | `tach.toml` | Layer boundary enforcement |
 | import-linter | `.importlinter` | Import contract validation |
-| pycycle | — | Circular dependency detection |
+| pylint `R0401` | `pyproject.toml` | Circular import detection (`cyclic-import`) |
 | vulture | `vulture_whitelist.py` | Dead code detection |
 
 `.importlinter` holds four contracts: the layer contract, a forbidden-imports contract keeping `utils` free of imports from the `code_checker_*` packages, the registrars (`checker_tools`, `formatter`, `refactoring`, `utility_tools`, `inspect_library`, `library_search`) and `server`, `mcp_coder_utils_isolation`, which confines `mcp_coder_utils` imports to the three shim modules, and `target-scripts-stdlib-only`, which keeps `utils/target_scripts/` free of every project import. Only the shim exemptions remain as `ignore_imports`.
@@ -285,5 +285,5 @@ See [dependencies/readme.md](dependencies/readme.md) for tool comparison, curren
 ### CI Pipeline
 
 Matrix-based (`.github/workflows/ci.yml`, `fail-fast: false`):
-- **Always**: black, isort, pylint (`-E`), pytest, mypy
-- **PR only**: import-linter, tach, pycycle, vulture
+- **Always**: black, isort, pylint (configured in `pyproject.toml`, incl. `R0401`), pytest, mypy
+- **PR only**: import-linter, tach, vulture
