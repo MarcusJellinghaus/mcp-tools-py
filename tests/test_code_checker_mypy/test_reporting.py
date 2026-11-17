@@ -200,9 +200,7 @@ def test_create_mypy_prompt_notes_only() -> None:
         '- src/a.py: 9 — Revealed type is "builtins.int"'
     )
     assert create_mypy_prompt(result, max_issues=0) == (
-        "mypy found 0 issues across 0 rules\n"
-        "\n"
-        "Notes (1): not shown with max_issues=0"
+        "mypy found 0 issues across 0 rules\n\nNotes (1): not shown with max_issues=0"
     )
 
 

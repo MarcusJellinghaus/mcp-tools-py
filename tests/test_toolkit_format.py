@@ -11,11 +11,7 @@ from mcp_tools_py.utils.tool_context import ToolContext
 _RUFF_PYPROJECT = '[tool.ruff.format]\nquote-style = "double"\n'
 # Stdlib-only imports: no first-party/third-party classification can differ.
 _FORMATTED_SRC = (
-    "import os\n"
-    "import sys\n"
-    "\n\n"
-    "def main() -> None:\n"
-    "    print(os.sep, sys.argv)\n"
+    "import os\nimport sys\n\n\ndef main() -> None:\n    print(os.sep, sys.argv)\n"
 )
 _UNFORMATTED_SRC = "import sys\nimport os\n\n\ndef add( a,b ):\n    return a+b\n"
 

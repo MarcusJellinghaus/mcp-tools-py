@@ -72,9 +72,9 @@ async def test_run_pytest_check_parameters(
                 mock_project_dir, test_folder="custom_tests", keep_temp_files=True
             )
 
-        assert (
-            len(mock_tool.call_args_list) >= 2
-        ), "Expected at least 2 tools to be registered"
+        assert len(mock_tool.call_args_list) >= 2, (
+            "Expected at least 2 tools to be registered"
+        )
         run_pytest_check = _get_tool(mock_tool, "run_pytest_check")
 
         # Call with only the dynamic parameters (without test_folder and keep_temp_files)
@@ -183,12 +183,12 @@ async def test_run_pylint_check_signature() -> None:
         params = signature.parameters
 
         assert "extra_args" in params, "run_pylint_check must have extra_args parameter"
-        assert (
-            "categories" not in params
-        ), "run_pylint_check must NOT have categories parameter"
-        assert (
-            "disable_codes" not in params
-        ), "run_pylint_check must NOT have disable_codes parameter"
+        assert "categories" not in params, (
+            "run_pylint_check must NOT have categories parameter"
+        )
+        assert "disable_codes" not in params, (
+            "run_pylint_check must NOT have disable_codes parameter"
+        )
 
 
 # Step 3: Tests for Server Interface Enhancement with show_details Parameter
@@ -476,9 +476,9 @@ async def test_mcp_tool_decorator_compatibility() -> None:
             ToolServer(project_dir=Path("/test/project"))
 
         # Verify that tools were registered correctly
-        assert (
-            len(mock_tool.call_args_list) >= 2
-        ), "Expected at least 2 tools registered"
+        assert len(mock_tool.call_args_list) >= 2, (
+            "Expected at least 2 tools registered"
+        )
 
         # Verify run_pytest_check is callable
         run_pytest_check = _get_tool(mock_tool, "run_pytest_check")

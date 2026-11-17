@@ -76,9 +76,7 @@ def register(mcp: "FastMCPProtocol", checker_tools: "CheckerTools") -> None:
             return output
 
         except Exception as e:
-            error_msg = (
-                f"Unexpected error running ruff fix: " f"{type(e).__name__}: {e}"
-            )
+            error_msg = f"Unexpected error running ruff fix: {type(e).__name__}: {e}"
             logger.error(
                 "ruff fix failed",
                 extra={

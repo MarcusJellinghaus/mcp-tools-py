@@ -370,10 +370,12 @@ def test_pylint_passes_default_timeout(tool_context: ToolContext) -> None:
 
 def test_pylint_invalid_timeout_returns_message(tool_context: ToolContext) -> None:
     """An invalid configured timeout comes back as text, and pylint is never run."""
-    (tool_context.project_dir / "pyproject.toml").write_text(textwrap.dedent("""\
+    (tool_context.project_dir / "pyproject.toml").write_text(
+        textwrap.dedent("""\
             [tool.mcp-tools-py]
             pylint-timeout = 0
-            """))
+            """)
+    )
     run_pylint = _capture_tool(tool_context, "run_pylint_check")
 
     with (

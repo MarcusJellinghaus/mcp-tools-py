@@ -4,9 +4,8 @@ import logging
 from typing import TYPE_CHECKING
 
 from mcp_tools_py.formatter.models import FormatterResult
-from mcp_tools_py.formatter.runner import resolve_steps
+from mcp_tools_py.formatter.runner import resolve_steps, step_tool, validate_steps
 from mcp_tools_py.formatter.runner import run_format_code as _run_format_code
-from mcp_tools_py.formatter.runner import step_tool, validate_steps
 from mcp_tools_py.log_utils import log_function_call
 from mcp_tools_py.utils.project_config import (
     check_line_length_conflicts,
@@ -122,8 +121,7 @@ def _unparsable_block(step: str, files: list[str]) -> str:
         `_UNPARSABLE_CAP`. No trailing newline.
     """
     lines = [
-        f"ERROR: {step} could not read {len(files)} file(s) - "
-        f"they were NOT checked.",
+        f"ERROR: {step} could not read {len(files)} file(s) - they were NOT checked.",
         "A clean result here does NOT mean CI will pass.",
         "The formatter could not parse these files.",
     ]

@@ -904,7 +904,7 @@ def _move_module_impl(
             warnings = ""
             if abs_source.exists() and not expected_dest.exists():
                 logger.warning(
-                    "move_module: rope rewrote imports but did not move " "%s to %s",
+                    "move_module: rope rewrote imports but did not move %s to %s",
                     source_module,
                     dest_package,
                 )

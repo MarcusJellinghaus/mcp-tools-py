@@ -207,8 +207,7 @@ def sanitize_extra_args(
                 has_path_args = True
                 path_args.append(arg)
                 notes.append(
-                    f"Path argument '{arg}' detected; "
-                    f"default test folder not appended."
+                    f"Path argument '{arg}' detected; default test folder not appended."
                 )
 
     return SanitizedArgs(

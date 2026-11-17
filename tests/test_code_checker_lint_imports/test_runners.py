@@ -83,12 +83,7 @@ class TestParseBrokenContracts:
         assert _parse_broken_contracts(BROKEN_OUTPUT) == ["Layered Architecture"]
 
     def test_extracts_multiple_in_order(self) -> None:
-        text = (
-            "Foo BROKEN [1]\n"
-            "Bar KEPT\n"
-            "Baz BROKEN [2]\n"
-            "Contracts: 1 kept, 2 broken."
-        )
+        text = "Foo BROKEN [1]\nBar KEPT\nBaz BROKEN [2]\nContracts: 1 kept, 2 broken."
         assert _parse_broken_contracts(text) == ["Foo", "Baz"]
 
     def test_returns_empty_when_none(self) -> None:

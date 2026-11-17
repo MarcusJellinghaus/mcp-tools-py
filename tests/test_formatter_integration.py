@@ -18,12 +18,7 @@ _BLACK_PYPROJECT = "[tool.black]\nline-length = 88\n"
 
 # Stdlib-only imports: no first-party/third-party classification can differ.
 _FORMATTED = (
-    b"import os\n"
-    b"import sys\n"
-    b"\n"
-    b"\n"
-    b"def main() -> None:\n"
-    b"    print(os.sep, sys.argv)\n"
+    b"import os\nimport sys\n\n\ndef main() -> None:\n    print(os.sep, sys.argv)\n"
 )
 _UNFORMATTED = "import sys\nimport os\n\n\ndef add( a,b ):\n    return a+b\n"
 _BLACK_EXPECTED = "import os\nimport sys\n\n\ndef add(a, b):\n    return a + b\n"

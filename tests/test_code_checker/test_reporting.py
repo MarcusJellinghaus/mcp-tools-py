@@ -762,9 +762,9 @@ def test_max_failures_limit_enforcement() -> None:
     assert prompt_limited is not None
 
     test_id_count_limited = prompt_limited.count("Test ID:")
-    assert (
-        test_id_count_limited == 3
-    ), f"Expected 3 test failures, got {test_id_count_limited}"
+    assert test_id_count_limited == 3, (
+        f"Expected 3 test failures, got {test_id_count_limited}"
+    )
 
 
 def test_collection_errors_always_shown() -> None:

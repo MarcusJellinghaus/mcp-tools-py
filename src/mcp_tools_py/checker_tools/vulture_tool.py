@@ -90,7 +90,7 @@ def register(mcp: "FastMCPProtocol", checker_tools: "CheckerTools") -> None:
             return output
 
         except Exception as e:
-            error_msg = f"Unexpected error running vulture: " f"{type(e).__name__}: {e}"
+            error_msg = f"Unexpected error running vulture: {type(e).__name__}: {e}"
             logger.error(
                 "vulture check failed",
                 extra={

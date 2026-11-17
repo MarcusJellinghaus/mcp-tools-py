@@ -218,9 +218,9 @@ def test_rename_symbol_does_not_hang(multi_module_project: Path) -> None:
         multi_module_project, "myproject/models.py", "User", "AppUser"
     )
     elapsed = time.monotonic() - start
-    assert (
-        elapsed < _HANG_TIMEOUT
-    ), f"rename_symbol took {elapsed:.1f}s (limit {_HANG_TIMEOUT}s)"
+    assert elapsed < _HANG_TIMEOUT, (
+        f"rename_symbol took {elapsed:.1f}s (limit {_HANG_TIMEOUT}s)"
+    )
     assert "modified" in result.lower() or "successfully" in result.lower()
 
 
@@ -235,9 +235,9 @@ def test_move_symbol_does_not_hang(multi_module_project: Path) -> None:
         "myproject/validation.py",
     )
     elapsed = time.monotonic() - start
-    assert (
-        elapsed < _HANG_TIMEOUT
-    ), f"move_symbol took {elapsed:.1f}s (limit {_HANG_TIMEOUT}s)"
+    assert elapsed < _HANG_TIMEOUT, (
+        f"move_symbol took {elapsed:.1f}s (limit {_HANG_TIMEOUT}s)"
+    )
     assert "modified" in result.lower() or "successfully" in result.lower()
 
 
@@ -249,9 +249,9 @@ def test_move_module_does_not_hang(multi_module_project: Path) -> None:
     start = time.monotonic()
     result = move_module(multi_module_project, "myproject/utils.py", "myproject/subpkg")
     elapsed = time.monotonic() - start
-    assert (
-        elapsed < _HANG_TIMEOUT
-    ), f"move_module took {elapsed:.1f}s (limit {_HANG_TIMEOUT}s)"
+    assert elapsed < _HANG_TIMEOUT, (
+        f"move_module took {elapsed:.1f}s (limit {_HANG_TIMEOUT}s)"
+    )
     assert "modified" in result.lower() or "successfully" in result.lower()
 
 
@@ -300,12 +300,12 @@ def test_move_module_with_pre_existing_dest_package(
     assert "successfully" in result.lower() or "modified" in result.lower()
 
     # File must be physically moved
-    assert (
-        project / "myproject" / "subpkg" / "utils.py"
-    ).exists(), "utils.py not found at destination"
-    assert not (
-        project / "myproject" / "utils.py"
-    ).exists(), "Original utils.py still exists — file was not moved"
+    assert (project / "myproject" / "subpkg" / "utils.py").exists(), (
+        "utils.py not found at destination"
+    )
+    assert not (project / "myproject" / "utils.py").exists(), (
+        "Original utils.py still exists — file was not moved"
+    )
 
 
 @pytest.mark.integration
@@ -348,9 +348,9 @@ def test_move_module_nested_project_structure(tmp_path: Path) -> None:
         "tests/app/sample/utils.py",
         "tests/app/sample/helpers",
     )
-    assert (
-        "successfully" in result.lower() or "modified" in result.lower()
-    ), f"move_module failed: {result}"
+    assert "successfully" in result.lower() or "modified" in result.lower(), (
+        f"move_module failed: {result}"
+    )
 
     # File physically moved
     assert (pkg / "helpers" / "utils.py").exists(), "utils.py not at destination"
@@ -434,7 +434,7 @@ def test_move_module_with_gitignore(tmp_path: Path) -> None:
 
     # Add a .gitignore like real projects have
     (root / ".gitignore").write_text(
-        "__pycache__/\n" "*.pyc\n" ".venv/\n" "build/\n" "dist/\n" "*.egg-info/\n"
+        "__pycache__/\n*.pyc\n.venv/\nbuild/\ndist/\n*.egg-info/\n"
     )
 
     # Nested package: tests/sample/pkg/
@@ -489,7 +489,7 @@ def test_rename_symbol_dry_run_does_not_hang(multi_module_project: Path) -> None
         dry_run=True,
     )
     elapsed = time.monotonic() - start
-    assert (
-        elapsed < _HANG_TIMEOUT
-    ), f"rename_symbol dry_run took {elapsed:.1f}s (limit {_HANG_TIMEOUT}s)"
+    assert elapsed < _HANG_TIMEOUT, (
+        f"rename_symbol dry_run took {elapsed:.1f}s (limit {_HANG_TIMEOUT}s)"
+    )
     assert "[DRY RUN]" in result

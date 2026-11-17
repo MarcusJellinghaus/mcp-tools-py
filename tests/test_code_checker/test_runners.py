@@ -522,12 +522,12 @@ def test_run_tests_surfaces_pytest_output_on_error_exit_codes(
 
     msg = str(excinfo.value)
     assert label in msg, f"case {case_id}: expected label {label!r} in {msg!r}"
-    assert (
-        "STDERR_MARKER_abc" in msg
-    ), f"case {case_id}: expected STDERR marker in {msg!r}"
-    assert (
-        "STDOUT_MARKER_xyz" in msg
-    ), f"case {case_id}: expected STDOUT marker in {msg!r}"
+    assert "STDERR_MARKER_abc" in msg, (
+        f"case {case_id}: expected STDERR marker in {msg!r}"
+    )
+    assert "STDOUT_MARKER_xyz" in msg, (
+        f"case {case_id}: expected STDOUT marker in {msg!r}"
+    )
 
     if log_substring is not None:
         matching = [

@@ -49,7 +49,7 @@ def register(mcp: "FastMCPProtocol", checker_tools: "CheckerTools") -> None:
             )
         except Exception as e:
             error_msg = (
-                f"Unexpected error running lint-imports: " f"{type(e).__name__}: {e}"
+                f"Unexpected error running lint-imports: {type(e).__name__}: {e}"
             )
             logger.error(
                 "lint-imports check failed",
