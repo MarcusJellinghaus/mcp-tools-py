@@ -234,7 +234,7 @@ mcp-coder-utils = { git = "https://github.com/MarcusJellinghaus/mcp-coder-utils.
 mcp-workspace = { git = "https://github.com/MarcusJellinghaus/mcp-workspace.git" }
 
 [build-system]
-requires = ["setuptools>=61.0", "setuptools-scm>=8.0"]
+requires = ["setuptools>=77", "setuptools-scm>=8.0", "wheel"]
 build-backend = "setuptools.build_meta"
 
 [tool.setuptools_scm]
