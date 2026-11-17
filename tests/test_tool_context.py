@@ -71,7 +71,7 @@ def _probe_stdout() -> str:
             "version": "3.11.9",
             "sys_path": [],
             "distributions": {},
-            "importable": {module: True for module in PROBED_MODULES},
+            "importable": dict.fromkeys(PROBED_MODULES, True),
         }
     )
 

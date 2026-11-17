@@ -51,7 +51,7 @@ def make_environment_info(
     Returns:
         An EnvironmentInfo with no error.
     """
-    reported = {module: True for module in PROBED_MODULES}
+    reported = dict.fromkeys(PROBED_MODULES, True)
     reported.update(importable)
     return EnvironmentInfo(
         version=version,

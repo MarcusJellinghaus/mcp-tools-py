@@ -273,7 +273,7 @@ def _failed(reason: str) -> EnvironmentInfo:
         version="",
         sys_path=(),
         distributions={},
-        importable={module: True for module in PROBED_MODULES},
+        importable=dict.fromkeys(PROBED_MODULES, True),
         error=reason,
     )
 

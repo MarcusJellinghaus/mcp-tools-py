@@ -336,7 +336,7 @@ def _common_prefix(files: dict[str, Any]) -> tuple[str, ...]:
         if parts[-1] != "__init__.py"
     ]
     prefix = []
-    for names in zip(*directories):
+    for names in zip(*directories, strict=False):  # common prefix: stop at shortest
         if len(set(names)) > 1:
             break
         prefix.append(names[0])

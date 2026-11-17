@@ -1211,8 +1211,9 @@ class TestPytestVerdictLogging:
         ]
         assert len(records) == 1
         assert records[0].levelno == logging.ERROR
-        assert getattr(records[0], "problems") == ["something broke"]
-        assert getattr(records[0], "exit_code") == 1
+        # `extra=` fields land in the record's __dict__; LogRecord doesn't declare them
+        assert records[0].__dict__["problems"] == ["something broke"]
+        assert records[0].__dict__["exit_code"] == 1
 
 
 class TestStartupConsoleScriptWarnings:
