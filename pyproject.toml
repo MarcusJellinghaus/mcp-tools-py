@@ -7,12 +7,12 @@ authors = [
 description = "An MCP server for running python code checks (pylint, pytest and mypy)"
 readme = "README.md"
 requires-python = ">=3.11"
-license = {text = "MIT"}
+license = "MIT"
+license-files = ["LICENSE"]
 keywords = ["mcp", "code-quality", "llm", "pylint", "pytest", "mypy", "claude", "ai"]
 classifiers = [
     "Programming Language :: Python :: 3",
     "Operating System :: OS Independent",
-    "License :: OSI Approved :: MIT License",
     "Development Status :: 3 - Alpha",
     "Intended Audience :: Developers",
     "Topic :: Software Development :: Libraries :: Python Modules",
