@@ -528,8 +528,8 @@ async def test_enhanced_reporting_integration_preparation(
 
         # Test that should_show_details function works
         test_results = {"summary": {"collected": 3, "failed": 1, "error": 0}}
-        assert should_show_details(test_results, True) == True
-        assert should_show_details(test_results, False) == False
+        assert should_show_details(test_results, True) is True
+        assert should_show_details(test_results, False) is False
 
 
 # Step 3: Tests for Pylint max_issues Parameter
@@ -629,7 +629,7 @@ class TestServerPylintMaxIssues:
 
             assert "max_issues" in signature.parameters
             assert signature.parameters["max_issues"].default == 1
-            assert signature.parameters["max_issues"].annotation == int
+            assert signature.parameters["max_issues"].annotation is int
 
 
 # Additional Parameter Validation Tests
@@ -645,7 +645,7 @@ async def test_integration_with_existing_server_parameters(
     # Verify that server constructor parameters are properly used
     assert server.project_dir == Path("/test/project")
     assert server.context.test_folder is None  # default
-    assert server.context.keep_temp_files == False  # default
+    assert server.context.keep_temp_files is False  # default
 
     with patch(
         "mcp_tools_py.checker_tools.pytest_tool.check_code_with_pytest"
@@ -667,7 +667,7 @@ async def test_integration_with_existing_server_parameters(
 
         assert call_args[1]["project_dir"] == str(Path("/test/project"))
         assert call_args[1]["test_folder"] is None
-        assert call_args[1]["keep_temp_files"] == False
+        assert call_args[1]["keep_temp_files"] is False
 
 
 # Tests for simplified signature and defensive error handling

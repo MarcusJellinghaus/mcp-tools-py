@@ -292,7 +292,7 @@ class TestFormatReport:
         )
         assert "(no output)" in result
         # First non-empty line is still the header.
-        non_empty = [l for l in result.splitlines() if l.strip()]
+        non_empty = [line for line in result.splitlines() if line.strip()]
         assert non_empty[0] == "=== PASSED ==="
 
 

@@ -108,9 +108,11 @@ select = [
     # listed by exact code — a bare "DOC" prefix silently enforces nothing.
     "DOC201", "DOC202", "DOC402", "DOC403", "DOC501", "DOC502",
     "C4", "B",
+    "E",
 ]
 ignore = [
     "D107",  # missing docstring in __init__ method (redundant with class docstring)
+    "E501",  # line length is owned by the formatter; not re-checked here
 ]
 
 [tool.ruff.lint.per-file-ignores]
