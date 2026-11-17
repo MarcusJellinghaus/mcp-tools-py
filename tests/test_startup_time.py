@@ -33,6 +33,15 @@ print(time.perf_counter() - start)
 """
 
 
+def _parallel_workers() -> int:
+    """Return how many pytest-xdist workers share the CPU (1 when not under xdist).
+
+    Returns:
+        The xdist worker count, or 1 outside xdist.
+    """
+    return int(os.environ.get("PYTEST_XDIST_WORKER_COUNT", "1"))
+
+
 def _measure_startup_seconds() -> float:
     """Run the startup work in a fresh interpreter and return its duration.
 
@@ -61,6 +70,11 @@ def test_server_startup_within_budget() -> None:
             "Subprocess tracing inflates startup time; "
             "the untraced CI job enforces the budget."
         )
+    if _parallel_workers() > 1:
+        pytest.skip(
+            "Competing xdist workers inflate startup time; run this file with "
+            "-n 0 (the startup-budget CI job does)."
+        )
 
     _measure_startup_seconds()  # warm-up: compile .pyc, warm caches
     elapsed = min(_measure_startup_seconds() for _ in range(3))
@@ -75,6 +89,7 @@ def test_server_startup_within_budget() -> None:
 def test_startup_budget_runs_without_tracing(monkeypatch: pytest.MonkeyPatch) -> None:
     """Without subprocess tracing the budget is measured and enforced."""
     monkeypatch.delenv("COVERAGE_PROCESS_CONFIG", raising=False)
+    monkeypatch.delenv("PYTEST_XDIST_WORKER_COUNT", raising=False)
 
     with patch(f"{__name__}._measure_startup_seconds", return_value=0.0) as measure:
         test_server_startup_within_budget()
@@ -91,3 +106,30 @@ def test_startup_budget_skips_under_tracing(monkeypatch: pytest.MonkeyPatch) -> 
             test_server_startup_within_budget()
 
     measure.assert_not_called()
+
+
+def test_startup_budget_skips_with_parallel_workers(
+    monkeypatch: pytest.MonkeyPatch,
+) -> None:
+    """Competing xdist workers skip the budget before anything is spawned."""
+    monkeypatch.delenv("COVERAGE_PROCESS_CONFIG", raising=False)
+    monkeypatch.setenv("PYTEST_XDIST_WORKER_COUNT", "4")
+
+    with patch(f"{__name__}._measure_startup_seconds") as measure:
+        with pytest.raises(pytest.skip.Exception):
+            test_server_startup_within_budget()
+
+    measure.assert_not_called()
+
+
+def test_startup_budget_runs_with_single_worker(
+    monkeypatch: pytest.MonkeyPatch,
+) -> None:
+    """A single xdist worker has no competition, so the budget is enforced."""
+    monkeypatch.delenv("COVERAGE_PROCESS_CONFIG", raising=False)
+    monkeypatch.setenv("PYTEST_XDIST_WORKER_COUNT", "1")
+
+    with patch(f"{__name__}._measure_startup_seconds", return_value=0.0) as measure:
+        test_server_startup_within_budget()
+
+    measure.assert_called()
