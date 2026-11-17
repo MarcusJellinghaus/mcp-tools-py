@@ -117,11 +117,9 @@ def _site_dirs() -> list[str]:
         at the project root as a ``site-packages``.
     """
     candidates: list[str] = []
-    try:
+    with contextlib.suppress(Exception):
         paths = sysconfig.get_paths()
         candidates += [paths.get("purelib", ""), paths.get("platlib", "")]
-    except Exception:  # pylint: disable=broad-exception-caught
-        pass
     with contextlib.suppress(Exception):
         candidates += list(site.getsitepackages())
     with contextlib.suppress(Exception):
@@ -158,7 +156,7 @@ def _locate(names: list[str]) -> dict[str, object]:
     for name in names:
         try:
             spec = importlib.util.find_spec(name)
-        except Exception:  # pylint: disable=broad-exception-caught
+        except Exception:  # noqa: S112  # pylint: disable=broad-exception-caught
             # As in _importable: a malformed name, or a parent package that
             # raises on import, leaves nothing to locate.
             continue

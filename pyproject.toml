@@ -114,6 +114,7 @@ select = [
     "SIM905",
     "E",
     "F",
+    "S",
 ]
 ignore = [
     "D107",  # missing docstring in __init__ method (redundant with class docstring)
@@ -122,8 +123,15 @@ ignore = [
 ]
 
 [tool.ruff.lint.per-file-ignores]
-"tests/**/*.py" = ["D", "DOC", "SIM117"]
+# tests: assert is the pytest idiom (S101); S105/S106/S108 fire on fake
+# credentials and "/tmp/..." literals used as test data, never opened.
+# S603/S607: tests start sys.executable and git with a fixed argv. Scoped here
+# on purpose: mcp_coder's global S603 ignore is not copied, src stays checked.
+"tests/**/*.py" = ["D", "DOC", "SIM117", "S101", "S105", "S106", "S108", "S603", "S607"]
 "src/mcp_tools_py/code_checker_ruff/*.py" = ["DOC502"]
+# git is called by name (resolved via PATH) with a fixed argv plus a
+# project-relative path.
+"src/mcp_tools_py/refactoring/rope_tools.py" = ["S603", "S607"]
 
 [tool.ruff.lint.pydocstyle]
 convention = "google"

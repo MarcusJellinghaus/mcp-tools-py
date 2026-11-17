@@ -80,6 +80,24 @@ def get_target_directories(project_dir: str) -> TargetDirs:
     return TargetDirs(directories=existing, warnings=warnings)
 
 
+def _nested_value(toml_data: dict[str, object], *keys: str) -> object | None:
+    """Walk nested TOML tables by key.
+
+    Args:
+        toml_data: Parsed pyproject.toml data.
+        *keys: Table names, then the value's key.
+
+    Returns:
+        The value, or None when a key is missing or a level is not a table.
+    """
+    node: object = toml_data
+    for key in keys:
+        if not isinstance(node, dict) or key not in node:
+            return None
+        node = node[key]
+    return node
+
+
 def _read_source_dirs(toml_data: dict[str, object], warnings: list[str]) -> list[str]:
     """Read ``[tool.setuptools.packages.find] where``, defaulting to ``["src"]``.
 
@@ -90,21 +108,8 @@ def _read_source_dirs(toml_data: dict[str, object], warnings: list[str]) -> list
     Returns:
         The configured source directories, or ``["src"]``.
     """
-    src_dirs: list[str] | None = None
-    try:
-        tool = toml_data["tool"]
-        assert isinstance(tool, dict)
-        setuptools = tool["setuptools"]
-        assert isinstance(setuptools, dict)
-        packages = setuptools["packages"]
-        assert isinstance(packages, dict)
-        find = packages["find"]
-        assert isinstance(find, dict)
-        where = find["where"]
-        assert isinstance(where, list)
-        src_dirs = [str(d) for d in where]
-    except (KeyError, AssertionError):
-        src_dirs = None
+    where = _nested_value(toml_data, "tool", "setuptools", "packages", "find", "where")
+    src_dirs = [str(d) for d in where] if isinstance(where, list) else None
 
     if src_dirs is None:
         src_dirs = ["src"]
@@ -125,19 +130,8 @@ def _read_test_dirs(toml_data: dict[str, object], warnings: list[str]) -> list[s
     Returns:
         The configured test directories, or ``["tests"]``.
     """
-    test_dirs: list[str] | None = None
-    try:
-        tool = toml_data["tool"]
-        assert isinstance(tool, dict)
-        pytest_section = tool["pytest"]
-        assert isinstance(pytest_section, dict)
-        ini_options = pytest_section["ini_options"]
-        assert isinstance(ini_options, dict)
-        testpaths = ini_options["testpaths"]
-        assert isinstance(testpaths, list)
-        test_dirs = [str(d) for d in testpaths]
-    except (KeyError, AssertionError):
-        test_dirs = None
+    testpaths = _nested_value(toml_data, "tool", "pytest", "ini_options", "testpaths")
+    test_dirs = [str(d) for d in testpaths] if isinstance(testpaths, list) else None
 
     if test_dirs is None:
         test_dirs = ["tests"]
