@@ -181,7 +181,7 @@ class TestParseBanditJsonOutput:
             ]
         )
 
-        messages, errors, parse_error = parse_bandit_json_output(
+        messages, _errors, parse_error = parse_bandit_json_output(
             raw_output, project_dir
         )
 
@@ -238,7 +238,9 @@ class TestParseBanditJsonOutput:
         data["results"][0].pop("issue_cwe", None)
         raw_output = json.dumps(data)
 
-        messages, errors, parse_error = parse_bandit_json_output(raw_output, "/project")
+        messages, _errors, parse_error = parse_bandit_json_output(
+            raw_output, "/project"
+        )
 
         assert parse_error is None
         assert len(messages) == 1

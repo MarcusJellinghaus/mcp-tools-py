@@ -130,7 +130,7 @@ class Summary:
 
 
 @dataclass
-class Warning:
+class Warning:  # pylint: disable=redefined-builtin  # pytest-json-report's name
     """A pytest warning emitted during a run."""
 
     message: str

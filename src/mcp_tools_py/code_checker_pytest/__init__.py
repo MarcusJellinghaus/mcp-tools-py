@@ -5,7 +5,7 @@ and process the test results.
 """
 
 # Re-export public models individually
-from mcp_tools_py.code_checker_pytest.models import (
+from mcp_tools_py.code_checker_pytest.models import (  # pylint: disable=redefined-builtin
     Collector,
     CollectorResult,
     Crash,

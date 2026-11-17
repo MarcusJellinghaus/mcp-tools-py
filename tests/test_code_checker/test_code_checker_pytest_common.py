@@ -167,11 +167,11 @@ def _create_test_project(test_dir: Path) -> None:
     (test_dir / "src").mkdir(parents=True, exist_ok=True)
     (test_dir / "tests").mkdir(parents=True, exist_ok=True)
 
-    with open(test_dir / "src" / "__init__.py", "w") as f:
+    with open(test_dir / "src" / "__init__.py", "w", encoding="utf-8") as f:
         f.write("")
-    with open(test_dir / "tests" / "__init__.py", "w") as f:
+    with open(test_dir / "tests" / "__init__.py", "w", encoding="utf-8") as f:
         f.write("")
-    with open(test_dir / "tests" / "test_sample.py", "w") as f:
+    with open(test_dir / "tests" / "test_sample.py", "w", encoding="utf-8") as f:
         f.write("""
 import pytest
 

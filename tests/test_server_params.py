@@ -269,7 +269,7 @@ async def test_run_pytest_check_with_show_details_true(
     mock_server: tuple[Any, MagicMock],
 ) -> None:
     """Test that run_pytest_check properly handles show_details=True parameter."""
-    server, mock_tool = mock_server
+    _server, mock_tool = mock_server
 
     with patch(
         "mcp_tools_py.checker_tools.pytest_tool.check_code_with_pytest"
@@ -303,7 +303,7 @@ async def test_run_pytest_check_with_show_details_false(
     mock_server: tuple[Any, MagicMock],
 ) -> None:
     """Test that run_pytest_check properly handles show_details=False parameter."""
-    server, mock_tool = mock_server
+    _server, mock_tool = mock_server
 
     with patch(
         "mcp_tools_py.checker_tools.pytest_tool.check_code_with_pytest"
@@ -333,7 +333,7 @@ async def test_run_pytest_check_backward_compatibility(
     mock_server: tuple[Any, MagicMock],
 ) -> None:
     """Test that existing function calls work without show_details parameter."""
-    server, mock_tool = mock_server
+    _server, mock_tool = mock_server
 
     with patch(
         "mcp_tools_py.checker_tools.pytest_tool.check_code_with_pytest"
@@ -362,7 +362,7 @@ async def test_show_details_with_focused_test_run(
     mock_server: tuple[Any, MagicMock], mock_pytest_results_few_tests: dict[str, Any]
 ) -> None:
     """Test show_details behavior with focused test run (≤3 tests)."""
-    server, mock_tool = mock_server
+    _server, mock_tool = mock_server
 
     with (
         patch(
@@ -392,7 +392,7 @@ async def test_show_details_with_many_failures(
     mock_pytest_results_many_failures: dict[str, Any],
 ) -> None:
     """Test show_details behavior with many failures (>10 failures)."""
-    server, mock_tool = mock_server
+    _server, mock_tool = mock_server
 
     with (
         patch(
@@ -421,7 +421,7 @@ async def test_show_details_output_length_limits(
     mock_server: tuple[Any, MagicMock],
 ) -> None:
     """Test that output respects length limits and truncation."""
-    server, mock_tool = mock_server
+    _server, mock_tool = mock_server
 
     # Create mock results with potential for long output
     long_output_results = make_pytest_results(
@@ -494,7 +494,7 @@ async def test_enhanced_reporting_integration_preparation(
     mock_server: tuple[Any, MagicMock],
 ) -> None:
     """Test preparation for enhanced reporting integration with show_details."""
-    server, mock_tool = mock_server
+    _server, mock_tool = mock_server
 
     # Test that current implementation can handle enhanced reporting calls
     with (

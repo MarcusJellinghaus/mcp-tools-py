@@ -14,13 +14,13 @@ from mcp_tools_py.code_checker_pylint import get_pylint_results
 def write_file(file_path: str, content: str) -> None:
     """Write content to a file."""
     os.makedirs(os.path.dirname(file_path), exist_ok=True)
-    with open(file_path, "w") as f:
+    with open(file_path, "w", encoding="utf-8") as f:
         f.write(content)
 
 
 def read_file(file_path: str) -> str:
     """Read content from a file."""
-    with open(file_path) as f:
+    with open(file_path, encoding="utf-8") as f:
         return f.read()
 
 

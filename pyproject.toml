@@ -190,11 +190,20 @@ module = ["mcp_coder_utils", "mcp_coder_utils.*"]
 ignore_missing_imports = true
 
 [tool.pylint.messages_control]
-# W, C, R: disabled by design (warnings, conventions, refactoring)
-# W1203: logging-fstring-interpolation — redundant while W is disabled, but kept
-#        as documentation: f-strings in logging calls are acceptable for readability
-disable = ["W", "C", "R", "W1203"]
-# R0401 cyclic-import: the cycle guard since pycycle was removed (mcp_coder#1367)
+disable = [
+    "C",       # conventions — not enabled in this project
+    "R",       # refactor suggestions — not enabled in this project
+    "W1203",   # logging-fstring-interpolation — project uses f-strings for readability
+    "W0621",   # redefined-outer-name — standard pytest fixture pattern
+    "W0511",   # fixme/TODO — informational only, not a quality gate
+    "W0212",   # protected-access — legitimate in tests and controlled src usage
+    "W0613",   # unused-argument — pytest fixtures injected by name
+    "W0611",   # unused-import — owned by ruff F401 (pylint flags the X-as-X re-export convention)
+    "W0404",   # reimported — reimports across test functions
+    "W0718",   # broad-exception-caught — intentional catch-all in CLI/workflow error handling
+    "W0706",   # try-except-raise — explicit re-raise for clarity in error chains
+    "W4903",   # deprecated-argument — tracked for future cleanup
+]
 enable = ["R0401"]
 
 [tool.mcp-tools-py]

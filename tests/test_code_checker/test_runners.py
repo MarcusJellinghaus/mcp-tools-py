@@ -74,7 +74,7 @@ def test_run_tests_with_custom_parameters() -> None:
         _create_test_project(test_dir)
 
         # Create a test with a custom marker
-        with open(test_dir / "tests" / "test_marked.py", "w") as f:
+        with open(test_dir / "tests" / "test_marked.py", "w", encoding="utf-8") as f:
             f.write("""
 import pytest
 
@@ -113,9 +113,9 @@ def test_run_tests_no_tests_found() -> None:
         (test_dir / "src").mkdir(parents=True, exist_ok=True)
         (test_dir / "tests").mkdir(parents=True, exist_ok=True)
 
-        with open(test_dir / "src" / "__init__.py", "w") as f:
+        with open(test_dir / "src" / "__init__.py", "w", encoding="utf-8") as f:
             f.write("")
-        with open(test_dir / "tests" / "__init__.py", "w") as f:
+        with open(test_dir / "tests" / "__init__.py", "w", encoding="utf-8") as f:
             f.write("")
 
         try:
