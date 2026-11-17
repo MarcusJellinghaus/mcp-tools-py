@@ -28,8 +28,6 @@ dependencies = [
     "pytest-xdist>=3.5.0",
     "mypy>=1.13.0",
     "deptry>=0.25.1",
-    "structlog>=24.5.0",
-    "python-json-logger>=3.2.1",
     "rope>=1.13.0",
     "jedi>=0.19.0",
     "igittigitt>=2.1.0",
@@ -141,6 +139,24 @@ ignore = [
 
 [tool.ruff.lint.pydocstyle]
 convention = "google"
+
+# Dependency-declaration hygiene. Run as `deptry src`.
+# src only: running it over tests/ yields DEP004 noise and no signal.
+[tool.deptry]
+known_first_party = ["mcp_tools_py"]
+# Extras holding dev-only packages: deptry exempts them from DEP002 and reports
+# DEP004 if src/ imports them. Keep in sync with [project.optional-dependencies]:
+# a renamed or removed extra only produces a deptry warning, not a failure.
+optional_dependencies_dev_groups = ["dev", "typecheck"]
+
+[tool.deptry.per_rule_ignores]
+# DEP002: the checkers and formatters this server runs as subprocesses or
+# pytest plugins. They are never imported, but the server needs them installed.
+DEP002 = [
+    "pylint", "pytest", "pytest-json-report", "pytest-asyncio", "pytest-xdist",
+    "mypy", "deptry", "import-linter", "vulture", "ruff", "bandit", "black",
+    "isort", "tach",
+]
 
 [tool.mypy]
 python_version = "3.11"

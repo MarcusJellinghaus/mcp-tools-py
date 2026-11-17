@@ -46,7 +46,7 @@ Compared to a general-purpose bash MCP tool, this server offers a more controlle
 
 ### Dependencies
 
-**Runtime**: `mcp[cli]`, `pylint`, `pytest` + `pytest-json-report` + `pytest-asyncio` + `pytest-xdist`, `mypy`, `deptry`, `ruff`, `bandit`, `vulture`, `tach`, `import-linter`, `black`, `isort`, `jedi`, `rope`, `structlog` + `python-json-logger`, `pathspec`, `igittigitt`, `mcp-coder-utils`
+**Runtime**: `mcp[cli]`, `pylint`, `pytest` + `pytest-json-report` + `pytest-asyncio` + `pytest-xdist`, `mypy`, `deptry`, `ruff`, `bandit`, `vulture`, `tach`, `import-linter`, `black`, `isort`, `jedi`, `rope`, `pathspec`, `igittigitt`, `mcp-coder-utils` (brings `structlog` + `python-json-logger` for logging)
 
 **Development**: `mcp-workspace`, `pydeps`
 
@@ -286,4 +286,4 @@ See [dependencies/readme.md](dependencies/readme.md) for tool comparison, curren
 
 Matrix-based (`.github/workflows/ci.yml`, `fail-fast: false`):
 - **Always**: ruff-format, ruff, pylint (configured in `pyproject.toml`, incl. `R0401`), pytest, startup-budget, mypy
-- **PR only**: import-linter, tach, vulture
+- **PR only**: import-linter, tach, vulture, deptry

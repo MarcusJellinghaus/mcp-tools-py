@@ -153,6 +153,7 @@ jobs:
           - {name: "import-linter", cmd: "lint-imports --help > /dev/null && lint-imports"}
           - {name: "tach", cmd: "tach --version && tach check"}
           - {name: "vulture", cmd: "vulture --version && vulture src tests vulture_whitelist.py --min-confidence 60"}
+          - {name: "deptry", cmd: "deptry --version && deptry src"}
     name: ${{ matrix.check.name }}
     steps:
       - uses: actions/checkout@v7
