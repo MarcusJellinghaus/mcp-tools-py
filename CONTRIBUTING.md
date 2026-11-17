@@ -219,7 +219,8 @@ pytest -m installation
 
 3. **Format code:**
    ```bash
-   tools\format_all.bat
+   ruff check --select I --fix src tests tools   # Import sorting
+   ruff format src tests tools                   # Code formatting
    ```
 
 ### Pull Request Guidelines
@@ -269,7 +270,8 @@ All tools should be run from the project root:
 tools\checks2clipboard.bat
 
 # Format code
-tools\format_all.bat
+ruff check --select I --fix src tests tools
+ruff format src tests tools
 
 # Reinstall after pyproject.toml changes
 call tools\reinstall_local.bat

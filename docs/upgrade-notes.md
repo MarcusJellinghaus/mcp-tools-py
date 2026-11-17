@@ -4,6 +4,15 @@ Behaviour changes to check when upgrading. Newest first.
 
 ---
 
+## `search_library_files` structured output is unwrapped (#107)
+
+The tool's structured output (`structuredContent`, and its `outputSchema`) is
+now the result dict itself, not `{"result": {...}}`. Clients that read
+`["result"]` must read the keys (`scope_root`, `error`, the search fields)
+directly. No other tool's output schema changed.
+
+---
+
 ## `run_pytest_check` runs `testpaths` (#58)
 
 `--test-folder` now defaults to unset. Without it, and without a path in

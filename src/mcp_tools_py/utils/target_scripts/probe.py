@@ -17,7 +17,7 @@ import sys
 import sysconfig
 import types
 from collections.abc import Callable
-from typing import Any, cast
+from typing import Any, Union, cast
 
 _USAGE = (
     "usage: probe.py info [MODULE ...] | probe.py source IMPORT_PATH MAX_LINES"
@@ -286,7 +286,7 @@ def _resolve_source(import_path: str, max_lines: int) -> str:
     try:
         # obj is resolved via importlib/getattr so it's always an inspectable symbol
         source = inspect.getsource(
-            cast(types.ModuleType | type | Callable[..., Any], obj)
+            cast(Union[types.ModuleType, type, Callable[..., Any]], obj)
         )
     except (TypeError, OSError):
         name = import_path.split(".")[-1]

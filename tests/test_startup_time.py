@@ -72,7 +72,7 @@ def test_server_startup_within_budget() -> None:
     if _parallel_workers() > 1:
         pytest.skip(
             "Competing xdist workers inflate startup time; run this file with "
-            "-n 0 (the startup-budget CI job does)."
+            "-n 0 (the unit-tests CI job's startup-budget step does)."
         )
 
     _measure_startup_seconds()  # warm-up: compile .pyc, warm caches

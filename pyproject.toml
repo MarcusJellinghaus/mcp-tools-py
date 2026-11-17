@@ -127,6 +127,9 @@ ignore = [
 # credentials and "/tmp/..." literals used as test data, never opened.
 "tests/**/*.py" = ["D", "DOC", "SIM117", "S101", "S105", "S106", "S108"]
 "src/mcp_tools_py/code_checker_ruff/*.py" = ["DOC502"]
+# Target scripts run under the project's own interpreter, which may predate
+# 3.10: a runtime X | Y union would raise there, so typing.Union stays.
+"src/mcp_tools_py/utils/target_scripts/*.py" = ["UP007"]
 # tools/: low-priority helper scripts that may move to an MCP server or be deleted;
 # Returns sections are not required there.
 "tools/**" = ["DOC201"]
