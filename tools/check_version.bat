@@ -26,6 +26,7 @@ echo --- Architecture and Dependencies ---
 pydeps --version
 tach --version
 lint-imports --version
+deptry --version
 echo.
 echo --- MCP Servers ---
 mcp-tools-py --version
