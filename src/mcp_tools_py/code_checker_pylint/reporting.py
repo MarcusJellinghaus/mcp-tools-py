@@ -2,7 +2,7 @@
 
 import logging
 from collections import defaultdict
-from typing import NamedTuple, Optional
+from typing import NamedTuple
 
 from mcp_tools_py.code_checker_pylint.models import (
     PylintMessage,
@@ -115,7 +115,7 @@ def _location_lines(messages: list[PylintMessage], project_dir: str) -> str:
 logger = logging.getLogger(__name__)
 
 
-def get_direct_instruction_for_pylint_code(code: str) -> Optional[str]:
+def get_direct_instruction_for_pylint_code(code: str) -> str | None:
     """Provides a direct instruction for a given Pylint code.
 
     Args:
@@ -155,7 +155,7 @@ def get_direct_instruction_for_pylint_code(code: str) -> Optional[str]:
 
 def get_prompt_for_known_pylint_code(
     code: str, project_dir: str, pylint_results: PylintResult, header: str
-) -> Optional[str]:
+) -> str | None:
     """Generate a prompt for a known pylint code with instructions and details.
 
     Args:
@@ -205,11 +205,11 @@ Please do two things:
 def get_pylint_prompt(
     project_dir: str,
     python_executable: str,
-    extra_args: Optional[list[str]] = None,
+    extra_args: list[str] | None = None,
     target_directories: list[str] | None = None,
     max_issues: int = 1,
     timeout_seconds: int = DEFAULT_CHECK_TIMEOUT,
-) -> Optional[str]:
+) -> str | None:
     """Generate a prompt for fixing pylint issues based on the analysis of a project.
 
     Args:

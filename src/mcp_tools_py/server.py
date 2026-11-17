@@ -2,7 +2,6 @@
 
 import logging
 from pathlib import Path
-from typing import Optional
 
 from mcp_tools_py.checker_tools import CheckerTools
 from mcp_tools_py.formatter import FormatterTools
@@ -25,13 +24,13 @@ class ToolServer:
     def __init__(
         self,
         project_dir: Path,
-        python_executable: Optional[str] = None,
-        venv_path: Optional[str] = None,
-        test_folder: Optional[str] = None,
+        python_executable: str | None = None,
+        venv_path: str | None = None,
+        test_folder: str | None = None,
         keep_temp_files: bool = False,
         refactoring_timeout: int = 120,
         vulture_whitelist: str = "vulture_whitelist.py",
-        check_timeout: Optional[int] = None,
+        check_timeout: int | None = None,
     ) -> None:
         """Initialize the server with the project directory and Python configuration.
 
@@ -89,13 +88,13 @@ class ToolServer:
 @log_function_call
 def create_server(
     project_dir: Path,
-    python_executable: Optional[str] = None,
-    venv_path: Optional[str] = None,
-    test_folder: Optional[str] = None,
+    python_executable: str | None = None,
+    venv_path: str | None = None,
+    test_folder: str | None = None,
     keep_temp_files: bool = False,
     refactoring_timeout: int = 120,
     vulture_whitelist: str = "vulture_whitelist.py",
-    check_timeout: Optional[int] = None,
+    check_timeout: int | None = None,
 ) -> ToolServer:
     """Create a new ToolServer instance.
 

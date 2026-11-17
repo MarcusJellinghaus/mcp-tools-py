@@ -1,7 +1,7 @@
 """Classify a pytest run and render the shared verdict texts."""
 
 from dataclasses import dataclass
-from enum import Enum
+from enum import StrEnum
 
 from mcp_tools_py.code_checker_pytest.models import PytestReport, Summary
 from mcp_tools_py.code_checker_pytest.reporting import (
@@ -28,7 +28,7 @@ PROBLEMS_HINT = (
 )
 
 
-class RunStatus(str, Enum):
+class RunStatus(StrEnum):
     """Overall outcome of a pytest run."""
 
     PASSED = "passed"

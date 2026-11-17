@@ -2,7 +2,6 @@
 
 import logging
 import os
-from typing import List
 
 from mcp_tools_py.code_checker_pylint.models import PylintResult
 from mcp_tools_py.code_checker_pylint.parsers import parse_pylint_json_output
@@ -21,8 +20,8 @@ logger = logging.getLogger(__name__)
 def get_pylint_results(
     project_dir: str,
     python_executable: str,
-    extra_args: List[str] | None = None,
-    target_directories: List[str] | None = None,
+    extra_args: list[str] | None = None,
+    target_directories: list[str] | None = None,
     timeout_seconds: int = DEFAULT_CHECK_TIMEOUT,
 ) -> PylintResult:
     """Runs pylint on the specified project directory and returns the results.

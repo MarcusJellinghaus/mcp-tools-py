@@ -1,7 +1,8 @@
 """Structural types for the subset of FastMCP this server uses."""
 
 import functools
-from typing import Any, Callable, Protocol, TypeVar
+from collections.abc import Callable
+from typing import Any, Protocol, TypeVar
 
 from mcp_tools_py.utils.report_budget import guard_output
 

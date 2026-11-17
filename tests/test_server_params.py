@@ -4,8 +4,9 @@ Tests for the server functionality with updated parameter exposure.
 
 import inspect
 import logging
+from collections.abc import Iterator
 from pathlib import Path
-from typing import Any, Dict, Iterator, Tuple
+from typing import Any
 from unittest.mock import MagicMock, patch
 
 import pytest
@@ -194,7 +195,7 @@ async def test_run_pylint_check_signature() -> None:
 
 
 @pytest.fixture
-def mock_server(all_modules_importable: Any) -> Tuple[Any, MagicMock]:
+def mock_server(all_modules_importable: Any) -> tuple[Any, MagicMock]:
     """Create ToolServer for testing."""
     with patch("mcp.server.fastmcp.FastMCP") as mock_fastmcp:
         mock_tool = MagicMock()
@@ -214,7 +215,7 @@ def mock_server(all_modules_importable: Any) -> Tuple[Any, MagicMock]:
 
 
 @pytest.fixture
-def mock_pytest_results_few_tests() -> Dict[str, Any]:
+def mock_pytest_results_few_tests() -> dict[str, Any]:
     """Mock results for ≤3 tests scenario."""
     return make_pytest_results(
         RunStatus.FAILED,
@@ -230,7 +231,7 @@ def mock_pytest_results_few_tests() -> Dict[str, Any]:
 
 
 @pytest.fixture
-def mock_pytest_results_many_failures() -> Dict[str, Any]:
+def mock_pytest_results_many_failures() -> dict[str, Any]:
     """Mock results for >10 failures scenario."""
     return make_pytest_results(
         RunStatus.FAILED,
@@ -246,7 +247,7 @@ def mock_pytest_results_many_failures() -> Dict[str, Any]:
 
 
 @pytest.fixture
-def mock_pytest_results_success() -> Dict[str, Any]:
+def mock_pytest_results_success() -> dict[str, Any]:
     """Mock results for successful test run."""
     return make_pytest_results(
         summary={
@@ -265,7 +266,7 @@ def mock_pytest_results_success() -> Dict[str, Any]:
 
 @pytest.mark.asyncio
 async def test_run_pytest_check_with_show_details_true(
-    mock_server: Tuple[Any, MagicMock],
+    mock_server: tuple[Any, MagicMock],
 ) -> None:
     """Test that run_pytest_check properly handles show_details=True parameter."""
     server, mock_tool = mock_server
@@ -299,7 +300,7 @@ async def test_run_pytest_check_with_show_details_true(
 
 @pytest.mark.asyncio
 async def test_run_pytest_check_with_show_details_false(
-    mock_server: Tuple[Any, MagicMock],
+    mock_server: tuple[Any, MagicMock],
 ) -> None:
     """Test that run_pytest_check properly handles show_details=False parameter."""
     server, mock_tool = mock_server
@@ -329,7 +330,7 @@ async def test_run_pytest_check_with_show_details_false(
 
 @pytest.mark.asyncio
 async def test_run_pytest_check_backward_compatibility(
-    mock_server: Tuple[Any, MagicMock],
+    mock_server: tuple[Any, MagicMock],
 ) -> None:
     """Test that existing function calls work without show_details parameter."""
     server, mock_tool = mock_server
@@ -358,7 +359,7 @@ async def test_run_pytest_check_backward_compatibility(
 
 @pytest.mark.asyncio
 async def test_show_details_with_focused_test_run(
-    mock_server: Tuple[Any, MagicMock], mock_pytest_results_few_tests: Dict[str, Any]
+    mock_server: tuple[Any, MagicMock], mock_pytest_results_few_tests: dict[str, Any]
 ) -> None:
     """Test show_details behavior with focused test run (≤3 tests)."""
     server, mock_tool = mock_server
@@ -387,8 +388,8 @@ async def test_show_details_with_focused_test_run(
 
 @pytest.mark.asyncio
 async def test_show_details_with_many_failures(
-    mock_server: Tuple[Any, MagicMock],
-    mock_pytest_results_many_failures: Dict[str, Any],
+    mock_server: tuple[Any, MagicMock],
+    mock_pytest_results_many_failures: dict[str, Any],
 ) -> None:
     """Test show_details behavior with many failures (>10 failures)."""
     server, mock_tool = mock_server
@@ -417,7 +418,7 @@ async def test_show_details_with_many_failures(
 
 @pytest.mark.asyncio
 async def test_show_details_output_length_limits(
-    mock_server: Tuple[Any, MagicMock],
+    mock_server: tuple[Any, MagicMock],
 ) -> None:
     """Test that output respects length limits and truncation."""
     server, mock_tool = mock_server
@@ -490,7 +491,7 @@ async def test_mcp_tool_decorator_compatibility() -> None:
 
 @pytest.mark.asyncio
 async def test_enhanced_reporting_integration_preparation(
-    mock_server: Tuple[Any, MagicMock],
+    mock_server: tuple[Any, MagicMock],
 ) -> None:
     """Test preparation for enhanced reporting integration with show_details."""
     server, mock_tool = mock_server
@@ -637,7 +638,7 @@ class TestServerPylintMaxIssues:
 
 @pytest.mark.asyncio
 async def test_integration_with_existing_server_parameters(
-    mock_server: Tuple[Any, MagicMock],
+    mock_server: tuple[Any, MagicMock],
 ) -> None:
     """Test integration with server constructor parameters."""
     server, mock_tool = mock_server
@@ -674,7 +675,7 @@ async def test_integration_with_existing_server_parameters(
 
 @pytest.mark.asyncio
 async def test_run_pytest_check_simplified_signature(
-    mock_server: Tuple[Any, MagicMock],
+    mock_server: tuple[Any, MagicMock],
 ) -> None:
     """Test that run_pytest_check has simplified signature without verbosity/show_details."""
     _server, mock_tool = mock_server
@@ -695,7 +696,7 @@ async def test_run_pytest_check_simplified_signature(
 
 @pytest.mark.asyncio
 async def test_run_pytest_check_never_raises(
-    mock_server: Tuple[Any, MagicMock],
+    mock_server: tuple[Any, MagicMock],
 ) -> None:
     """Test that run_pytest_check returns a string on error, never raises."""
     _server, mock_tool = mock_server
@@ -718,7 +719,7 @@ async def test_run_pytest_check_never_raises(
 
 @pytest.mark.asyncio
 async def test_run_pytest_check_prepends_dedup_notes(
-    mock_server: Tuple[Any, MagicMock],
+    mock_server: tuple[Any, MagicMock],
 ) -> None:
     """Test that deduplication notes from sanitize_extra_args are prepended to output."""
     _server, mock_tool = mock_server
@@ -747,7 +748,7 @@ async def test_run_pytest_check_prepends_dedup_notes(
 
 @pytest.mark.asyncio
 async def test_run_pytest_check_prepends_test_paths_note(
-    mock_server: Tuple[Any, MagicMock],
+    mock_server: tuple[Any, MagicMock],
 ) -> None:
     """The test_paths_note of the result leads the reply."""
     _server, mock_tool = mock_server
@@ -769,7 +770,7 @@ async def test_run_pytest_check_prepends_test_paths_note(
 
 @pytest.mark.asyncio
 async def test_run_pytest_check_turns_s_into_show_output(
-    mock_server: Tuple[Any, MagicMock],
+    mock_server: tuple[Any, MagicMock],
 ) -> None:
     """-s is removed before pytest runs, -n is kept, and the reply carries the note."""
     _server, mock_tool = mock_server
@@ -892,7 +893,7 @@ class TestPytestTimeoutArgument:
 
 _PYTEST_TOOL = "mcp_tools_py.checker_tools.pytest_tool"
 
-_COVERAGE_DATA: Dict[str, Any] = {
+_COVERAGE_DATA: dict[str, Any] = {
     "totals": {"percent_covered": 50.0, "num_statements": 4, "missing_lines": 2},
     "files": {
         "src/pkg/mod.py": {
@@ -920,7 +921,7 @@ def _parsed_report(summary: Summary) -> PytestReport:
     )
 
 
-def _pytest_results(failed: int = 0) -> Dict[str, Any]:
+def _pytest_results(failed: int = 0) -> dict[str, Any]:
     return make_pytest_results(
         RunStatus.FAILED if failed else RunStatus.PASSED,
         summary={"passed": 1, "failed": failed, "error": 0, "collected": 1},
@@ -930,7 +931,7 @@ def _pytest_results(failed: int = 0) -> Dict[str, Any]:
     )
 
 
-def _error_results_with_report() -> Dict[str, Any]:
+def _error_results_with_report() -> dict[str, Any]:
     """ERROR result carrying a real report whose summary shows no failures."""
     return make_pytest_results(
         summary={"passed": 5, "collected": 5},
@@ -1173,7 +1174,7 @@ class TestPytestVerdictLogging:
     )
     def test_log_level_follows_status(
         self,
-        results: Dict[str, Any],
+        results: dict[str, Any],
         level: int,
         message: str,
         caplog: pytest.LogCaptureFixture,

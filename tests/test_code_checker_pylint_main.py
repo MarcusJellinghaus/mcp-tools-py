@@ -2,8 +2,8 @@ import os
 import shutil
 import sys
 import tempfile
+from collections.abc import Generator
 from pathlib import Path
-from typing import Generator
 
 import pytest
 
@@ -20,7 +20,7 @@ def write_file(file_path: str, content: str) -> None:
 
 def read_file(file_path: str) -> str:
     """Read content from a file."""
-    with open(file_path, "r") as f:
+    with open(file_path) as f:
         return f.read()
 
 

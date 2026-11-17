@@ -7,8 +7,8 @@ functionality works correctly across all scenarios and meets performance require
 
 import tempfile
 import textwrap
+from collections.abc import Generator
 from pathlib import Path
-from typing import Generator
 
 import pytest
 

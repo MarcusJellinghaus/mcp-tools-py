@@ -1,7 +1,7 @@
 """CheckerTools orchestrator. Public API: from mcp_tools_py.checker_tools import CheckerTools."""
 
 import logging
-from typing import TYPE_CHECKING, Any, Optional
+from typing import TYPE_CHECKING, Any
 
 from mcp_tools_py.checker_tools import (
     bandit_tool,
@@ -57,7 +57,7 @@ class CheckerTools:
         deptry_tool.register(mcp, self)
         tach_tool.register(mcp, self)
 
-    def _format_pylint_result(self, pylint_prompt: Optional[str]) -> str:
+    def _format_pylint_result(self, pylint_prompt: str | None) -> str:
         """Format pylint check result.
 
         Returns:

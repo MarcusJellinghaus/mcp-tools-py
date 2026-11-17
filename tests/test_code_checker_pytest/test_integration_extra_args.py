@@ -2,7 +2,6 @@
 
 import sys
 from pathlib import Path
-from typing import List
 
 import pytest
 
@@ -27,7 +26,7 @@ def temp_project(tmp_path: Path) -> Path:
     return tmp_path
 
 
-def _run(project: Path, args: List[str], test_folder: str = "tests") -> PytestReport:
+def _run(project: Path, args: list[str], test_folder: str = "tests") -> PytestReport:
     """Sanitize args the way the server does, then run pytest."""
     sanitized = sanitize_extra_args(args, None, project_dir=str(project))
     return run_tests(
@@ -40,7 +39,7 @@ def _run(project: Path, args: List[str], test_folder: str = "tests") -> PytestRe
     )
 
 
-def _nodeids(report: PytestReport) -> List[str]:
+def _nodeids(report: PytestReport) -> list[str]:
     return [test.nodeid for test in report.tests or []]
 
 
@@ -59,7 +58,7 @@ class TestExtraArgsIntegration:
             ["--rootdir", "."],
         ],
     )
-    def test_option_value_not_a_path(self, temp_project: Path, args: List[str]) -> None:
+    def test_option_value_not_a_path(self, temp_project: Path, args: list[str]) -> None:
         """Only the default folder's tests run."""
         nodeids = _nodeids(_run(temp_project, args))
         assert nodeids
@@ -85,7 +84,7 @@ class TestCollectOnlyIntegration:
         ids=["serial", "xdist"],
     )
     def test_collect_only_lists_selected_ids(
-        self, temp_project: Path, args: List[str]
+        self, temp_project: Path, args: list[str]
     ) -> None:
         """Only the selected test is listed; none ran."""
         report = _run(temp_project, args)

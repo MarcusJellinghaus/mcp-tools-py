@@ -1,7 +1,5 @@
 """Tests for grouping failed collectors by cause on both reporting paths."""
 
-from typing import List, Optional
-
 from mcp_tools_py.code_checker_pytest.models import (
     Collector,
     ErrorContext,
@@ -24,13 +22,11 @@ IMPORTLIB_FRAME = (
 )
 
 
-def _collector(
-    nodeid: str, longrepr: Optional[str], outcome: str = "failed"
-) -> Collector:
+def _collector(nodeid: str, longrepr: str | None, outcome: str = "failed") -> Collector:
     return Collector(nodeid=nodeid, outcome=outcome, result=[], longrepr=longrepr)
 
 
-def _report(collectors: List[Collector], exit_code: int = 2) -> PytestReport:
+def _report(collectors: list[Collector], exit_code: int = 2) -> PytestReport:
     return PytestReport(
         created=0.0,
         duration=1.0,

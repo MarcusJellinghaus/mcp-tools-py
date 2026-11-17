@@ -10,7 +10,6 @@ script imports a project module.
 
 import configparser
 from pathlib import Path
-from typing import Optional
 
 import pytest
 
@@ -32,7 +31,7 @@ def _real_contract() -> configparser.SectionProxy:
     return parser[_CONTRACT_SECTION]
 
 
-def _lint_imports() -> Optional[Path]:
+def _lint_imports() -> Path | None:
     """Locate the lint-imports console script.
 
     Returns:
@@ -42,7 +41,7 @@ def _lint_imports() -> Optional[Path]:
 
 
 def _build_fixture(
-    tmp_path: Path, probe_source: str, extra_scripts: Optional[dict[str, str]] = None
+    tmp_path: Path, probe_source: str, extra_scripts: dict[str, str] | None = None
 ) -> str:
     """Write a miniature package mirroring the real layout.
 

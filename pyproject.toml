@@ -115,6 +115,7 @@ select = [
     "E",
     "F",
     "S",
+    "UP",
 ]
 ignore = [
     "D107",  # missing docstring in __init__ method (redundant with class docstring)
@@ -129,6 +130,9 @@ ignore = [
 # on purpose: mcp_coder's global S603 ignore is not copied, src stays checked.
 "tests/**/*.py" = ["D", "DOC", "SIM117", "S101", "S105", "S106", "S108", "S603", "S607"]
 "src/mcp_tools_py/code_checker_ruff/*.py" = ["DOC502"]
+# Target scripts run under the project's own interpreter, which may predate
+# 3.10: a runtime X | Y union would raise there, so typing.Union stays.
+"src/mcp_tools_py/utils/target_scripts/*.py" = ["UP007"]
 # git is called by name (resolved via PATH) with a fixed argv plus a
 # project-relative path.
 "src/mcp_tools_py/refactoring/rope_tools.py" = ["S603", "S607"]

@@ -16,7 +16,8 @@ import site
 import sys
 import sysconfig
 import types
-from typing import Any, Callable, Union, cast
+from collections.abc import Callable
+from typing import Any, Union, cast
 
 _USAGE = (
     "usage: probe.py info [MODULE ...] | probe.py source IMPORT_PATH MAX_LINES"

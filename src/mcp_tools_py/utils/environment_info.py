@@ -13,10 +13,10 @@ call.  `resolve_scope` also probes `stdlib` afresh after a cached failure.
 import json
 import logging
 import tempfile
+from collections.abc import Mapping
 from dataclasses import dataclass
-from functools import lru_cache
+from functools import cache
 from pathlib import Path
-from typing import Mapping, Optional
 
 from mcp_tools_py.utils.subprocess_runner import CommandResult, execute_command
 
@@ -30,7 +30,7 @@ STDERR_SNIPPET = 500
 
 # Tool key -> module for `python -m <module>`, or None when the tool is only
 # ever run through its console script. The console script is named after the key.
-TOOL_MODULES: dict[str, Optional[str]] = {
+TOOL_MODULES: dict[str, str | None] = {
     "pytest": "pytest",
     "pylint": "pylint",
     "mypy": "mypy",
@@ -78,7 +78,7 @@ class EnvironmentInfo:
     distributions: Mapping[str, str]
     importable: Mapping[str, bool]
     stdlib: str = ""
-    error: Optional[str] = None
+    error: str | None = None
 
 
 @dataclass(frozen=True)
@@ -90,8 +90,8 @@ class ScopeResolution:
         error: Why the scope could not be resolved, or None on success.
     """
 
-    directory: Optional[str] = None
-    error: Optional[str] = None
+    directory: str | None = None
+    error: str | None = None
 
 
 def probe_script_path() -> Path:
@@ -295,7 +295,7 @@ def _log_tool_versions(interpreter: str, info: EnvironmentInfo) -> None:
     )
 
 
-@lru_cache(maxsize=None)
+@cache
 def get_environment_info(interpreter: str) -> EnvironmentInfo:
     """Describe `interpreter`, running the probe at most once per path.
 

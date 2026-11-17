@@ -11,8 +11,8 @@ import os
 import sys
 import sysconfig
 import venv
+from collections.abc import Iterator
 from pathlib import Path
-from typing import Iterator
 
 import pytest
 

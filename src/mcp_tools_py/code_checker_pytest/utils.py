@@ -2,7 +2,6 @@
 
 import os
 import sys
-from typing import List, Optional, Tuple
 
 from mcp_tools_py.code_checker_pytest.models import ErrorContext, SanitizedArgs
 from mcp_tools_py.utils.file_utils import read_file as read_file
@@ -52,7 +51,7 @@ def _values_taken(arg: str) -> int:
 _COLLECT_ONLY_FLAGS = {"--collect-only", "--co", "--collectonly"}
 
 
-def _scan_args(args: List[str]) -> Tuple[List[str], bool]:
+def _scan_args(args: list[str]) -> tuple[list[str], bool]:
     """Split ``args`` into positionals and whether collect-only was requested.
 
     An option takes up to its table count of following tokens that don't
@@ -63,7 +62,7 @@ def _scan_args(args: List[str]) -> Tuple[List[str], bool]:
         The tokens that are neither options nor their values, and True when
         a collect-only flag is present.
     """
-    positionals: List[str] = []
+    positionals: list[str] = []
     collect_only = False
     i = 0
     while i < len(args):
@@ -90,8 +89,8 @@ SHOW_OUTPUT_NOTE = (
 
 
 def sanitize_extra_args(
-    extra_args: Optional[List[str]],
-    markers: Optional[List[str]],
+    extra_args: list[str] | None,
+    markers: list[str] | None,
     project_dir: str = "",
 ) -> SanitizedArgs:
     """Sanitize and deduplicate extra_args before passing to pytest.
@@ -129,9 +128,9 @@ def sanitize_extra_args(
     if not extra_args:
         return SanitizedArgs(cleaned_args=[], verbosity=2, notes=[])
 
-    cleaned: List[str] = []
+    cleaned: list[str] = []
     verbosity = 2
-    notes: List[str] = []
+    notes: list[str] = []
     skip_next = False
     show_output = False
 
@@ -182,7 +181,7 @@ def sanitize_extra_args(
     # If shape matches, run existence check; missing → "not found" note.
     # If shape doesn't match, fall back to existence check; missing → silent passthrough.
     has_path_args = False
-    path_args: List[str] = []
+    path_args: list[str] = []
     positionals, collect_only = _scan_args(cleaned)
     if project_dir:
         for arg in positionals:
@@ -223,7 +222,7 @@ def sanitize_extra_args(
     )
 
 
-def get_pytest_exit_code_info(exit_code: int) -> Tuple[str, str]:
+def get_pytest_exit_code_info(exit_code: int) -> tuple[str, str]:
     """Get detailed information and suggestions for pytest exit codes.
 
     Args:

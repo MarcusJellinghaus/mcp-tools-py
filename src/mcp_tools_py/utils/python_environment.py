@@ -5,7 +5,6 @@ import shutil
 import sys
 from dataclasses import dataclass
 from pathlib import Path
-from typing import Optional
 
 # Whether the interpreter layout is the Windows one: `Scripts/python.exe` and
 # `<name>.exe` console scripts, rather than `bin/python` and bare `<name>`.
@@ -28,8 +27,8 @@ class PythonEnvironment:
     @classmethod
     def resolve(
         cls,
-        python_executable: Optional[str] = None,
-        venv_path: Optional[str] = None,
+        python_executable: str | None = None,
+        venv_path: str | None = None,
     ) -> "PythonEnvironment":
         """Centralize venv -> python_executable -> sys.executable resolution.
 
@@ -79,7 +78,7 @@ class PythonEnvironment:
         """
         return self.interpreter.parent
 
-    def binary(self, name: str) -> Optional[Path]:
+    def binary(self, name: str) -> Path | None:
         """Locate a console script next to the interpreter.
 
         Args:

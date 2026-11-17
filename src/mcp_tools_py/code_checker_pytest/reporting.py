@@ -1,7 +1,7 @@
 """Functions for formatting and reporting pytest test results."""
 
 import logging
-from typing import Any, Dict, List, Optional
+from typing import Any
 
 from mcp_tools_py.code_checker_pytest.models import (
     Collector,
@@ -39,7 +39,7 @@ NO_CAPTURED_OUTPUT_NOTE = "Note: no passing test produced captured output."
 XDIST_MARKER = "Different tests were collected"
 
 
-def should_show_details(_test_results: Dict[str, Any], show_details: bool) -> bool:
+def should_show_details(_test_results: dict[str, Any], show_details: bool) -> bool:
     """Determine if detailed output should be shown based on test results and user preference.
 
     Args:
@@ -54,7 +54,7 @@ def should_show_details(_test_results: Dict[str, Any], show_details: bool) -> bo
     return show_details
 
 
-def _get_failed_collectors(test_session_result: PytestReport) -> List[Collector]:
+def _get_failed_collectors(test_session_result: PytestReport) -> list[Collector]:
     """Extract failed collectors from test session result.
 
     Returns:
@@ -172,7 +172,7 @@ def collectors_failed_line(report: PytestReport) -> str:
     return f"{line} ({distinct} distinct {plural(distinct, 'error')})"
 
 
-def _get_failed_tests(test_session_result: PytestReport) -> List[Test]:
+def _get_failed_tests(test_session_result: PytestReport) -> list[Test]:
     """Return every failed or errored test, in report order."""
     return [
         test
@@ -198,7 +198,7 @@ def _fenced(label: str, text: str, max_lines: int, max_chars: int) -> str:
     return f"  {label}:\n{FENCE}\n{body}\n{FENCE}"
 
 
-def _traceback(label: str, entries: List[TracebackEntry]) -> str:
+def _traceback(label: str, entries: list[TracebackEntry]) -> str:
     rows = [f"   - {entry.path}:{entry.lineno} - {entry.message}" for entry in entries]
     return "\n".join([f"  {label}:"] + rows)
 
@@ -211,8 +211,8 @@ class _Sections:
     """
 
     def __init__(self, max_lines: int, max_chars: int) -> None:
-        self.parts: List[str] = []
-        self.dropped: List[str] = []
+        self.parts: list[str] = []
+        self.dropped: list[str] = []
         self.lines = max_lines - 1
         self.chars = max_chars - DROPPED_NOTICE_CHARS
 
@@ -238,7 +238,7 @@ class _Sections:
             )
         )
 
-    def fenced(self, label: str, text: Optional[str]) -> None:
+    def fenced(self, label: str, text: str | None) -> None:
         """Append `text` as a tail-kept fenced section, if there is any.
 
         A section left too little room to show its text is recorded as dropped.
@@ -326,7 +326,7 @@ def _collector_part(report: PytestReport, max_lines: int, max_chars: int) -> str
     )
 
 
-def _undetailed(tests: List[Test]) -> str:
+def _undetailed(tests: list[Test]) -> str:
     lines = [f"Failed tests without details ({len(tests)}):"]
     lines += [f"- {test.nodeid}" for test in tests[:FAILED_IDS]]
     hidden = len(tests) - FAILED_IDS
@@ -336,8 +336,8 @@ def _undetailed(tests: List[Test]) -> str:
 
 
 def _render_tests(
-    candidates: List[Test], include_print_output: bool, max_lines: int, max_chars: int
-) -> List[str]:
+    candidates: list[Test], include_print_output: bool, max_lines: int, max_chars: int
+) -> list[str]:
     """Render the candidates in order, each with an even share of what is left.
 
     Returns:
@@ -345,7 +345,7 @@ def _render_tests(
         too small.
     """
     separator_chars = len(SEPARATOR) + 4
-    blocks: List[str] = []
+    blocks: list[str] = []
     for index, test in enumerate(candidates):
         remaining = len(candidates) - index
         lines = max_lines // remaining
@@ -368,7 +368,7 @@ def create_prompt_for_failed_tests(
     max_failures: int = MAX_FAILURES,
     max_lines: int = TOOL_LINES,
     max_chars: int = TOOL_CHARS,
-) -> Optional[str]:
+) -> str | None:
     """Creates a prompt for an LLM based on the failed tests from a test session result.
 
     Failed collectors come first. Up to `max_failures` tests then get an even
@@ -428,7 +428,7 @@ def create_prompt_for_passing_output(
     Returns:
         The captured output per test, or NO_CAPTURED_OUTPUT_NOTE if no test printed
     """
-    parts: List[str] = []
+    parts: list[str] = []
     for test in report.tests or []:
         if test.outcome in FAILED_OUTCOMES:
             continue
@@ -493,7 +493,7 @@ def selected_count(summary: Summary) -> int:
     return summary.collected - (summary.deselected or 0)
 
 
-def collected_test_ids(report: PytestReport) -> List[str]:
+def collected_test_ids(report: PytestReport) -> list[str]:
     """List the selected test IDs from the collectors, in collection order.
 
     Items that are themselves collectors (modules, classes) and deselected

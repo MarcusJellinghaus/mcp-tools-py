@@ -1,7 +1,5 @@
 """Tests for the per-test budget of the pytest failure prompt."""
 
-from typing import List, Optional
-
 from mcp_tools_py.code_checker_pytest.models import (
     Crash,
     PytestReport,
@@ -21,8 +19,8 @@ UNDETAILED = "Failed tests without details"
 
 def _failed_test(
     nodeid: str,
-    longrepr: Optional[str] = None,
-    stdout: Optional[str] = None,
+    longrepr: str | None = None,
+    stdout: str | None = None,
 ) -> Test:
     call = StageInfo(
         duration=0.1,
@@ -35,7 +33,7 @@ def _failed_test(
     return Test(nodeid=nodeid, lineno=1, keywords=[], outcome="failed", call=call)
 
 
-def _report(tests: List[Test]) -> PytestReport:
+def _report(tests: list[Test]) -> PytestReport:
     return PytestReport(
         created=0.0,
         duration=1.0,

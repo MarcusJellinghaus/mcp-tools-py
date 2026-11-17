@@ -1,7 +1,7 @@
 """Bandit security MCP tool registration."""
 
 import logging
-from typing import TYPE_CHECKING, List, Optional
+from typing import TYPE_CHECKING
 
 from mcp_tools_py.code_checker_bandit.reporting import format_bandit_report
 from mcp_tools_py.code_checker_bandit.runners import run_bandit_check_impl
@@ -22,8 +22,8 @@ def register(mcp: "FastMCPProtocol", checker_tools: "CheckerTools") -> None:
     @mcp.tool()
     @log_function_call
     def run_bandit_check(
-        target_directories: Optional[List[str]] = None,
-        extra_args: Optional[List[str]] = None,
+        target_directories: list[str] | None = None,
+        extra_args: list[str] | None = None,
         max_issues: int = 1,
     ) -> str:
         """Run bandit security linter on the project code.

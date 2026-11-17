@@ -4,7 +4,7 @@ import contextlib
 import json
 import logging
 import os
-from typing import List, NamedTuple
+from typing import NamedTuple
 
 logger = logging.getLogger(__name__)
 
@@ -52,7 +52,7 @@ def _invalid_reason(item: object) -> str | None:
 def parse_ruff_json_output(
     raw_output: str,
     project_dir: str,
-) -> tuple[List[RuffMessage], str | None]:
+) -> tuple[list[RuffMessage], str | None]:
     """Parse ruff --output-format=json output into RuffMessage objects.
 
     Args:
@@ -62,7 +62,7 @@ def parse_ruff_json_output(
     Returns:
         Tuple of (list of RuffMessage objects, error message if any)
     """
-    messages: List[RuffMessage] = []
+    messages: list[RuffMessage] = []
 
     if not raw_output or raw_output.strip() == "":
         logger.debug("Ruff produced no output")

@@ -1,7 +1,8 @@
 """Every registered tool's string output passes through the global guard."""
 
+from collections.abc import Callable
 from pathlib import Path
-from typing import Any, Callable
+from typing import Any
 
 from mcp_tools_py.server import ToolServer
 from mcp_tools_py.utils.mcp_protocols import GUARD_ATTR, GuardedMCP

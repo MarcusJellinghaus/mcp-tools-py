@@ -1,7 +1,7 @@
 """Ruff check (read-only analysis) MCP tool registration."""
 
 import logging
-from typing import TYPE_CHECKING, List, Optional
+from typing import TYPE_CHECKING
 
 from mcp_tools_py.code_checker_ruff.runners import run_ruff_check_impl
 from mcp_tools_py.log_utils import log_function_call
@@ -21,9 +21,9 @@ def register(mcp: "FastMCPProtocol", checker_tools: "CheckerTools") -> None:
     @mcp.tool()
     @log_function_call
     def run_ruff_check(
-        select: Optional[List[str]] = None,
-        target_directories: Optional[List[str]] = None,
-        extra_args: Optional[List[str]] = None,
+        select: list[str] | None = None,
+        target_directories: list[str] | None = None,
+        extra_args: list[str] | None = None,
         max_issues: int = 1,
     ) -> str:
         """Run ruff check on the project (read-only analysis).
