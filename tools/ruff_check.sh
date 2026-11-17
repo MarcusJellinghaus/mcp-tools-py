@@ -1,5 +1,5 @@
 #!/bin/bash
-# Lint with ruff (rules from [tool.ruff.lint] in pyproject.toml)
+# Lint src, tests and tools using ruff
 #
 # Usage from Git Bash: ./tools/ruff_check.sh
 

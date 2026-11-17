@@ -1,5 +1,5 @@
 @echo off
-REM Lint with ruff (rules from [tool.ruff.lint] in pyproject.toml)
+REM Lint src, tests and tools using ruff
 REM
 REM Usage from cmd.exe: tools\ruff_check.bat
 

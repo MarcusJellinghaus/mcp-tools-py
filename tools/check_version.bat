@@ -12,8 +12,7 @@ python --version
 pip --version
 echo.
 echo --- Formatting ---
-black --version
-isort --version-number
+ruff --version
 echo.
 echo --- Linting and Quality ---
 pylint --version
