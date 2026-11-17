@@ -15,7 +15,6 @@ from mcp_tools_py.code_checker_pytest.verdict import (
     RunVerdict,
     classify_run,
 )
-from mcp_tools_py.log_utils import log_function_call
 from mcp_tools_py.utils.project_config import resolve_test_paths
 from mcp_tools_py.utils.subprocess_runner import (
     check_tool_missing_error,

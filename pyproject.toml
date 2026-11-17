@@ -112,6 +112,7 @@ select = [
     # SIM905 is preview-only; see explicit-preview-rules note above.
     "SIM905",
     "E",
+    "F",
 ]
 ignore = [
     "D107",  # missing docstring in __init__ method (redundant with class docstring)

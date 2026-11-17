@@ -11,7 +11,6 @@ eager import) fails in CI instead of in a user's session.
 import os
 import subprocess
 import sys
-import time
 from unittest.mock import patch
 
 import pytest

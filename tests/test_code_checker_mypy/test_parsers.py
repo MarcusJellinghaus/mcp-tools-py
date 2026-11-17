@@ -2,7 +2,6 @@
 
 import pytest
 
-from mcp_tools_py.code_checker_mypy.models import MypyMessage
 from mcp_tools_py.code_checker_mypy.parsers import (
     parse_mypy_json_output,
     strip_json_messages,

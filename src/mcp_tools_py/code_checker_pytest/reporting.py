@@ -1,7 +1,7 @@
 """Functions for formatting and reporting pytest test results."""
 
 import logging
-from typing import Any, Dict, List, Optional, Tuple
+from typing import Any, Dict, List, Optional
 
 from mcp_tools_py.code_checker_pytest.models import (
     Collector,

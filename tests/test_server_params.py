@@ -472,7 +472,7 @@ async def test_mcp_tool_decorator_compatibility() -> None:
             "_warn_missing_console_scripts",
             return_value=None,
         ):
-            server = ToolServer(project_dir=Path("/test/project"))
+            ToolServer(project_dir=Path("/test/project"))
 
         # Verify that tools were registered correctly
         assert (
@@ -658,8 +658,7 @@ async def test_integration_with_existing_server_parameters(
         # Get the run_pytest_check function
         run_pytest_check = _get_tool(mock_tool, "run_pytest_check")
 
-        # Call function
-        result = run_pytest_check()
+        run_pytest_check()
 
         # Verify that server parameters were passed to check_code_with_pytest
         mock_check.assert_called_once()

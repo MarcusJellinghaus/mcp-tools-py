@@ -11,7 +11,7 @@ from mcp_tools_py.code_checker_pytest import (
     get_test_summary,
     parse_pytest_report,
 )
-from mcp_tools_py.code_checker_pytest.models import PytestReport, Summary
+from mcp_tools_py.code_checker_pytest.models import PytestReport
 
 from .test_code_checker_pytest_common import SAMPLE_JSON
 

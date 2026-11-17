@@ -1,7 +1,5 @@
 """Test mypy models functionality."""
 
-import pytest
-
 from mcp_tools_py.code_checker_mypy.models import (
     MypyMessage,
     MypyResult,
