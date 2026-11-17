@@ -1,5 +1,6 @@
 """Functions for parsing bandit JSON output."""
 
+import contextlib
 import json
 import logging
 import os
@@ -92,13 +93,12 @@ def parse_bandit_json_output(
         for item in results:
             filename = item["filename"]
             if filename:
-                # Bandit reports paths relative to its cwd, which is project_dir
-                try:
+                # Bandit reports paths relative to its cwd, which is project_dir.
+                # ValueError: other drive - keep the path unchanged.
+                with contextlib.suppress(ValueError):
                     filename = os.path.relpath(
                         os.path.join(project_dir, filename), project_dir
                     )
-                except ValueError:
-                    pass  # other drive: keep the path unchanged
 
             issue_cwe = item.get("issue_cwe")
             cwe_id = (issue_cwe.get("id") or 0) if isinstance(issue_cwe, dict) else 0

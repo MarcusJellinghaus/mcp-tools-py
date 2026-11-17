@@ -1,5 +1,6 @@
 """Ruff JSON output model and parser, shared by the ruff checker and formatter."""
 
+import contextlib
 import json
 import logging
 import os
@@ -96,10 +97,9 @@ def parse_ruff_json_output(
             end_location = item.get("end_location") or {}
             filename = item["filename"]
             if filename:
-                try:
+                # ValueError: other drive - keep the path unchanged
+                with contextlib.suppress(ValueError):
                     filename = os.path.relpath(filename, project_dir)
-                except ValueError:
-                    pass  # other drive: keep the path unchanged
 
             messages.append(
                 RuffMessage(

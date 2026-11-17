@@ -108,6 +108,9 @@ select = [
     # listed by exact code — a bare "DOC" prefix silently enforces nothing.
     "DOC201", "DOC202", "DOC402", "DOC403", "DOC501", "DOC502",
     "C4", "B",
+    "SIM",
+    # SIM905 is preview-only; see explicit-preview-rules note above.
+    "SIM905",
     "E",
 ]
 ignore = [
@@ -116,7 +119,7 @@ ignore = [
 ]
 
 [tool.ruff.lint.per-file-ignores]
-"tests/**/*.py" = ["D", "DOC"]
+"tests/**/*.py" = ["D", "DOC", "SIM117"]
 "src/mcp_tools_py/code_checker_ruff/*.py" = ["DOC502"]
 
 [tool.ruff.lint.pydocstyle]

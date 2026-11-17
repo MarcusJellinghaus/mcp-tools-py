@@ -49,13 +49,9 @@ def should_show_details(_test_results: Dict[str, Any], show_details: bool) -> bo
     Returns:
         True if conditions meet criteria for showing details, False otherwise
     """
-    # If show_details is False, never show details (explicit user choice)
-    if not show_details:
-        return False
-
-    # If show_details is True, always show details (but output will be limited by other mechanisms)
-    # The limitation of max failures and output length is handled in create_prompt_for_failed_tests
-    return True
+    # The user's choice decides; max failures and output length are limited
+    # separately in create_prompt_for_failed_tests
+    return show_details
 
 
 def _get_failed_collectors(test_session_result: PytestReport) -> List[Collector]:

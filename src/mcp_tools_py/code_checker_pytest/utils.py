@@ -12,6 +12,7 @@ _SWITCH_LETTERS = set("xvsql")
 
 # Hard-coded from pytest's parser with this repo's plugins. An option missing
 # from it takes no value, so a following token is read as a positional, as before.
+# A split string, not a list literal: ~85 one-per-line entries would bury it.
 _ONE_VALUE_OPTIONS = """
 -W -c -k -m -n -o -p -r
 --anyio-mode --assert --asyncio-mode --basetemp --cache-show --capture
@@ -28,7 +29,7 @@ _ONE_VALUE_OPTIONS = """
 --numprocesses --override-ini --pastebin --pdbcls --px --pythonwarnings
 --report-chars --rootdir --rsyncdir --rsyncignore --show-capture --tach-base
 --tach-head --tb --testrunuid --tx --verbosity
-""".split()
+""".split()  # noqa: SIM905
 
 # Option spelling -> most values it can take.
 _OPTION_VALUES: dict[str, int] = {

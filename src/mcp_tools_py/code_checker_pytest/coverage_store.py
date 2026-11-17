@@ -400,14 +400,10 @@ def freshness_roots(
     resolved = resolve_coverage_source(project_dir, None)
     candidates = [] if isinstance(resolved, str) else list(resolved)
     candidates += coverage_source or []
-    try:
+    with contextlib.suppress(ValueError):
         candidates += get_test_directories(project_dir)
-    except ValueError:
-        pass
-    try:
+    with contextlib.suppress(ValueError):
         candidates += resolve_test_paths(project_dir, test_folder)[0]
-    except ValueError:
-        pass
 
     unique = dict.fromkeys(norm_path(candidate) for candidate in candidates)
     return [root for root in unique if os.path.isdir(os.path.join(project_dir, root))]

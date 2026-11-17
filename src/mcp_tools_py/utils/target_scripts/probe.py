@@ -122,14 +122,10 @@ def _site_dirs() -> list[str]:
         candidates += [paths.get("purelib", ""), paths.get("platlib", "")]
     except Exception:  # pylint: disable=broad-exception-caught
         pass
-    try:
+    with contextlib.suppress(Exception):
         candidates += list(site.getsitepackages())
-    except Exception:  # pylint: disable=broad-exception-caught
-        pass
-    try:
+    with contextlib.suppress(Exception):
         candidates.append(site.getusersitepackages())
-    except Exception:  # pylint: disable=broad-exception-caught
-        pass
 
     roots = {_normalized(sys.prefix), _normalized(sys.base_prefix)}
     result: list[str] = []
