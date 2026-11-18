@@ -1,7 +1,8 @@
 """Shared output budget: limits, truncation and the global guard. See docs/architecture/output-conventions.md."""
 
 import heapq
-from typing import Literal, NamedTuple, Sequence
+from collections.abc import Sequence
+from typing import Literal, NamedTuple
 
 from mcp_tools_py.utils.report_counts import plural
 

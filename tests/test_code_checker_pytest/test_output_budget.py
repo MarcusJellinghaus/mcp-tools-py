@@ -1,7 +1,8 @@
 """Budget tests for pytest passing output, --collect-only, problems and coverage."""
 
+from collections.abc import Iterator
 from pathlib import Path
-from typing import Any, Iterator, List
+from typing import Any
 from unittest.mock import MagicMock, patch
 
 import pytest
@@ -46,7 +47,7 @@ _COVERAGE_DATA: dict[str, Any] = {
 
 
 def _report(
-    tests: List[Test], summary: Summary, collectors: List[Collector] | None = None
+    tests: list[Test], summary: Summary, collectors: list[Collector] | None = None
 ) -> PytestReport:
     return PytestReport(
         created=0.0,

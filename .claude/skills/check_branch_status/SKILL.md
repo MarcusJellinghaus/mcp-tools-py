@@ -4,9 +4,9 @@ allowed-tools:
   - mcp__mcp-workspace__check_branch_status
 ---
 
-# Check Branch Status
+Call `mcp__mcp-workspace__check_branch_status`.
 
-Call the `mcp__mcp-workspace__check_branch_status` MCP tool with no arguments and report its output.
+# Check Branch Status
 
 Checks CI status, rebase needs, task completion, and GitHub labels. Reports actionable recommendations.
 

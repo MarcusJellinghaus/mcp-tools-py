@@ -2,7 +2,6 @@
 
 import json
 import logging
-from typing import List
 
 from .models import PylintMessage
 
@@ -29,7 +28,7 @@ def _invalid_reason(item: object) -> str | None:
 
 def parse_pylint_json_output(
     raw_output: str,
-) -> tuple[List[PylintMessage], str | None]:
+) -> tuple[list[PylintMessage], str | None]:
     """Parse pylint JSON output into PylintMessage objects.
 
     Args:
@@ -38,7 +37,7 @@ def parse_pylint_json_output(
     Returns:
         Tuple of (list of PylintMessage objects, error message if any)
     """
-    messages: List[PylintMessage] = []
+    messages: list[PylintMessage] = []
     error_message = None
 
     # Check if we have any output to parse

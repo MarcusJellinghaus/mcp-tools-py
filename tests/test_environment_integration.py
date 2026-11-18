@@ -11,8 +11,8 @@ import os
 import sys
 import sysconfig
 import venv
+from collections.abc import Iterator
 from pathlib import Path
-from typing import Iterator
 
 import pytest
 
@@ -105,12 +105,7 @@ def test_list_symbols_runs_against_the_target_venv(
     project_dir = tmp_path / "project"
     project_dir.mkdir()
     (project_dir / "sample.py").write_text(
-        "def greet() -> str:\n"
-        '    return "hi"\n'
-        "\n"
-        "\n"
-        "class Widget:\n"
-        "    pass\n",
+        'def greet() -> str:\n    return "hi"\n\n\nclass Widget:\n    pass\n',
         encoding="utf-8",
     )
 

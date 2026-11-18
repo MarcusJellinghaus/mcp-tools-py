@@ -2,9 +2,9 @@
 
 import json
 from dataclasses import fields
-from typing import Any, Dict
+from typing import Any
 
-from mcp_tools_py.code_checker_pytest.models import (
+from mcp_tools_py.code_checker_pytest.models import (  # pylint: disable=redefined-builtin
     Collector,
     CollectorResult,
     Crash,
@@ -23,7 +23,7 @@ from mcp_tools_py.code_checker_pytest.models import (
 LOG_RECORD_FIELDS = {f.name for f in fields(LogRecord)} - {"extra"}
 
 
-def parse_test_stage(stage_data: Dict[str, Any]) -> StageInfo:
+def parse_test_stage(stage_data: dict[str, Any]) -> StageInfo:
     """Parse test stage data from the pytest JSON report.
 
     Args:

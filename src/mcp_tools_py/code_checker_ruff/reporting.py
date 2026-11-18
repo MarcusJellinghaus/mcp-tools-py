@@ -5,7 +5,7 @@ and formats LLM-optimized output with max_issues detail/summary control.
 """
 
 from collections import defaultdict
-from typing import List, NamedTuple, Optional
+from typing import NamedTuple
 
 from mcp_tools_py.utils.report_budget import (
     SUMMARY_TOP,
@@ -37,7 +37,7 @@ class RuffIssueGroup(NamedTuple):
     """A group of ruff messages sharing the same rule code."""
 
     code: str
-    messages: List[RuffMessage]
+    messages: list[RuffMessage]
 
 
 def get_rule_prefix(code: str) -> str:
@@ -56,8 +56,8 @@ def get_rule_prefix(code: str) -> str:
 
 
 def group_and_sort_issues(
-    messages: List[RuffMessage],
-) -> List[RuffIssueGroup]:
+    messages: list[RuffMessage],
+) -> list[RuffIssueGroup]:
     """Group by code, sort by prefix priority then frequency (descending).
 
     Returns:
@@ -90,7 +90,7 @@ def _rule_label(code: str, url: str | None) -> str:
     return f"{code} {name}".strip()
 
 
-def _summary_rows(groups: List[RuffIssueGroup]) -> list[tuple[str, int, str]]:
+def _summary_rows(groups: list[RuffIssueGroup]) -> list[tuple[str, int, str]]:
     """Build the summary rows for `render_summary`.
 
     Returns:
@@ -107,9 +107,9 @@ def _summary_rows(groups: List[RuffIssueGroup]) -> list[tuple[str, int, str]]:
 
 
 def format_ruff_check_report(
-    messages: List[RuffMessage],
+    messages: list[RuffMessage],
     max_issues: int = 1,
-) -> Optional[str]:
+) -> str | None:
     """Format ruff check results into an LLM prompt.
 
     Returns:
@@ -156,8 +156,8 @@ def format_ruff_check_report(
 
 
 def format_ruff_fix_report(
-    changed_files: List[str],
-    remaining_messages: List[RuffMessage],
+    changed_files: list[str],
+    remaining_messages: list[RuffMessage],
 ) -> str:
     """Format ruff fix results: changed files + remaining error summary.
 

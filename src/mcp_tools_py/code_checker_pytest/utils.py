@@ -2,7 +2,6 @@
 
 import os
 import sys
-from typing import List, Optional, Tuple
 
 from mcp_tools_py.code_checker_pytest.models import ErrorContext, SanitizedArgs
 from mcp_tools_py.utils.file_utils import read_file as read_file
@@ -12,23 +11,88 @@ _SWITCH_LETTERS = set("xvsql")
 
 # Hard-coded from pytest's parser with this repo's plugins. An option missing
 # from it takes no value, so a following token is read as a positional, as before.
-_ONE_VALUE_OPTIONS = """
--W -c -k -m -n -o -p -r
---anyio-mode --assert --asyncio-mode --basetemp --cache-show --capture
---code-highlight --color --confcutdir --config-file --cov --cov-config
---cov-context --cov-fail-under --cov-precision --cov-report --debug --deselect
---dist --doctest-glob --doctest-report --durations --durations-min --ignore
---ignore-glob --import-mode --json-report-file --json-report-indent
---json-report-verbosity --junit-prefix --junit-xml --junitprefix --junitxml
---last-failed-no-failures --lfnf --log-auto-indent --log-cli-date-format
---log-cli-format --log-cli-level --log-date-format --log-disable --log-file
---log-file-date-format --log-file-format --log-file-level --log-file-mode
---log-format --log-level --max-warnings --max-worker-restart --maxfail
---maxprocesses --maxschedchunk --metadata-from-json --metadata-from-json-file
---numprocesses --override-ini --pastebin --pdbcls --px --pythonwarnings
---report-chars --rootdir --rsyncdir --rsyncignore --show-capture --tach-base
---tach-head --tb --testrunuid --tx --verbosity
-""".split()
+_ONE_VALUE_OPTIONS = [
+    "-W",
+    "-c",
+    "-k",
+    "-m",
+    "-n",
+    "-o",
+    "-p",
+    "-r",
+    "--anyio-mode",
+    "--assert",
+    "--asyncio-mode",
+    "--basetemp",
+    "--cache-show",
+    "--capture",
+    "--code-highlight",
+    "--color",
+    "--confcutdir",
+    "--config-file",
+    "--cov",
+    "--cov-config",
+    "--cov-context",
+    "--cov-fail-under",
+    "--cov-precision",
+    "--cov-report",
+    "--debug",
+    "--deselect",
+    "--dist",
+    "--doctest-glob",
+    "--doctest-report",
+    "--durations",
+    "--durations-min",
+    "--ignore",
+    "--ignore-glob",
+    "--import-mode",
+    "--json-report-file",
+    "--json-report-indent",
+    "--json-report-verbosity",
+    "--junit-prefix",
+    "--junit-xml",
+    "--junitprefix",
+    "--junitxml",
+    "--last-failed-no-failures",
+    "--lfnf",
+    "--log-auto-indent",
+    "--log-cli-date-format",
+    "--log-cli-format",
+    "--log-cli-level",
+    "--log-date-format",
+    "--log-disable",
+    "--log-file",
+    "--log-file-date-format",
+    "--log-file-format",
+    "--log-file-level",
+    "--log-file-mode",
+    "--log-format",
+    "--log-level",
+    "--max-warnings",
+    "--max-worker-restart",
+    "--maxfail",
+    "--maxprocesses",
+    "--maxschedchunk",
+    "--metadata-from-json",
+    "--metadata-from-json-file",
+    "--numprocesses",
+    "--override-ini",
+    "--pastebin",
+    "--pdbcls",
+    "--px",
+    "--pythonwarnings",
+    "--report-chars",
+    "--rootdir",
+    "--rsyncdir",
+    "--rsyncignore",
+    "--show-capture",
+    "--tach-base",
+    "--tach-head",
+    "--tb",
+    "--testrunuid",
+    "--tx",
+    "--verbosity",
+]
 
 # Option spelling -> most values it can take.
 _OPTION_VALUES: dict[str, int] = {
@@ -51,7 +115,7 @@ def _values_taken(arg: str) -> int:
 _COLLECT_ONLY_FLAGS = {"--collect-only", "--co", "--collectonly"}
 
 
-def _scan_args(args: List[str]) -> Tuple[List[str], bool]:
+def _scan_args(args: list[str]) -> tuple[list[str], bool]:
     """Split ``args`` into positionals and whether collect-only was requested.
 
     An option takes up to its table count of following tokens that don't
@@ -62,7 +126,7 @@ def _scan_args(args: List[str]) -> Tuple[List[str], bool]:
         The tokens that are neither options nor their values, and True when
         a collect-only flag is present.
     """
-    positionals: List[str] = []
+    positionals: list[str] = []
     collect_only = False
     i = 0
     while i < len(args):
@@ -89,8 +153,8 @@ SHOW_OUTPUT_NOTE = (
 
 
 def sanitize_extra_args(
-    extra_args: Optional[List[str]],
-    markers: Optional[List[str]],
+    extra_args: list[str] | None,
+    markers: list[str] | None,
     project_dir: str = "",
 ) -> SanitizedArgs:
     """Sanitize and deduplicate extra_args before passing to pytest.
@@ -128,9 +192,9 @@ def sanitize_extra_args(
     if not extra_args:
         return SanitizedArgs(cleaned_args=[], verbosity=2, notes=[])
 
-    cleaned: List[str] = []
+    cleaned: list[str] = []
     verbosity = 2
-    notes: List[str] = []
+    notes: list[str] = []
     skip_next = False
     show_output = False
 
@@ -181,7 +245,7 @@ def sanitize_extra_args(
     # If shape matches, run existence check; missing → "not found" note.
     # If shape doesn't match, fall back to existence check; missing → silent passthrough.
     has_path_args = False
-    path_args: List[str] = []
+    path_args: list[str] = []
     positionals, collect_only = _scan_args(cleaned)
     if project_dir:
         for arg in positionals:
@@ -207,8 +271,7 @@ def sanitize_extra_args(
                 has_path_args = True
                 path_args.append(arg)
                 notes.append(
-                    f"Path argument '{arg}' detected; "
-                    f"default test folder not appended."
+                    f"Path argument '{arg}' detected; default test folder not appended."
                 )
 
     return SanitizedArgs(
@@ -222,7 +285,7 @@ def sanitize_extra_args(
     )
 
 
-def get_pytest_exit_code_info(exit_code: int) -> Tuple[str, str]:
+def get_pytest_exit_code_info(exit_code: int) -> tuple[str, str]:
     """Get detailed information and suggestions for pytest exit codes.
 
     Args:

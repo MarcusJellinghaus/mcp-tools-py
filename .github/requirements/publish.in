@@ -1,0 +1,8 @@
+# Release build: the frontend plus the [build-system] requires from pyproject.toml.
+# publish.yml builds with --no-isolation, so these are the versions that make the wheel.
+# Regenerate publish.txt, excluding releases from the last 7 days:
+#   uv pip compile .github/requirements/publish.in -o .github/requirements/publish.txt --generate-hashes --python-version 3.11 --python-platform linux --exclude-newer <date> --no-header
+build
+setuptools>=77
+setuptools-scm>=8.0
+wheel

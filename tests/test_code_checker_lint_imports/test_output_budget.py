@@ -37,9 +37,6 @@ def test_short_report_is_unchanged_and_has_no_hint() -> None:
         info_lines=[],
     )
     assert result == (
-        "=== PASSED ===\n"
-        "Contracts: 3 kept, 0 broken\n"
-        "\n"
-        "Contracts: 3 kept, 0 broken."
+        "=== PASSED ===\nContracts: 3 kept, 0 broken\n\nContracts: 3 kept, 0 broken."
     )
     assert _CONTRACT_HINT not in result

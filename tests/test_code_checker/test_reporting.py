@@ -11,7 +11,7 @@ from mcp_tools_py.code_checker_pytest import (
     get_test_summary,
     parse_pytest_report,
 )
-from mcp_tools_py.code_checker_pytest.models import PytestReport, Summary
+from mcp_tools_py.code_checker_pytest.models import PytestReport
 
 from .test_code_checker_pytest_common import SAMPLE_JSON
 
@@ -762,9 +762,9 @@ def test_max_failures_limit_enforcement() -> None:
     assert prompt_limited is not None
 
     test_id_count_limited = prompt_limited.count("Test ID:")
-    assert (
-        test_id_count_limited == 3
-    ), f"Expected 3 test failures, got {test_id_count_limited}"
+    assert test_id_count_limited == 3, (
+        f"Expected 3 test failures, got {test_id_count_limited}"
+    )
 
 
 def test_collection_errors_always_shown() -> None:

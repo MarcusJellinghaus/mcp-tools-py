@@ -4,7 +4,6 @@ import sys
 import tempfile
 from pathlib import Path
 
-import pytest
 from mcp_coder_utils.toolkit import ActionRequest
 
 from mcp_tools_py.code_checker_mypy import get_mypy_prompt, run_mypy_check

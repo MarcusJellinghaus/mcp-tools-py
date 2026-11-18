@@ -1,7 +1,5 @@
 """Tests for the pytest run verdict classifier and its text helpers."""
 
-from typing import List, Optional
-
 import pytest
 
 from mcp_tools_py.code_checker_pytest.models import (
@@ -27,7 +25,7 @@ from mcp_tools_py.code_checker_pytest.verdict import (
 from mcp_tools_py.utils.report_budget import TOOL_LINES
 
 
-def _summary(collected: int = 0, **counts: Optional[int]) -> Summary:
+def _summary(collected: int = 0, **counts: int | None) -> Summary:
     return Summary(collected=collected, total=collected, **counts)
 
 
@@ -45,9 +43,9 @@ def _collector(longrepr: str, outcome: str = "failed") -> Collector:
 
 
 def _report(
-    summary: Optional[Summary] = None,
-    collectors: Optional[List[Collector]] = None,
-    error_context: Optional[ErrorContext] = None,
+    summary: Summary | None = None,
+    collectors: list[Collector] | None = None,
+    error_context: ErrorContext | None = None,
 ) -> PytestReport:
     return PytestReport(
         created=0.0,
@@ -260,7 +258,7 @@ def test_format_suspicious_text_subtracts_deselected() -> None:
 
 
 def _collect_only_report(
-    ids: List[str], collected: int, deselected: Optional[int] = None
+    ids: list[str], collected: int, deselected: int | None = None
 ) -> PytestReport:
     """Build a collect-only report whose one collector lists ``ids``."""
     collector = Collector(

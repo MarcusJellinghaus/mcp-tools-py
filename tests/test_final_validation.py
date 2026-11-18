@@ -7,8 +7,8 @@ functionality works correctly across all scenarios and meets performance require
 
 import tempfile
 import textwrap
+from collections.abc import Generator
 from pathlib import Path
-from typing import Generator
 
 import pytest
 
@@ -33,7 +33,8 @@ class TestParameterCombinationsValidation:
 
             # Create a simple module
             (src_dir / "__init__.py").write_text("")
-            (src_dir / "calculator.py").write_text(textwrap.dedent("""
+            (src_dir / "calculator.py").write_text(
+                textwrap.dedent("""
                 def add(a, b):
                     return a + b
                     
@@ -45,7 +46,8 @@ class TestParameterCombinationsValidation:
                 def multiply(a, b):
                     print(f"Multiplying {a} * {b}")
                     return a * b
-            """))
+            """)
+            )
 
             # Create tests directory
             tests_dir = project_path / "tests"
@@ -54,7 +56,8 @@ class TestParameterCombinationsValidation:
             (tests_dir / "__init__.py").write_text("")
 
             # Create passing tests
-            (tests_dir / "test_passing.py").write_text(textwrap.dedent("""
+            (tests_dir / "test_passing.py").write_text(
+                textwrap.dedent("""
                 import sys
                 sys.path.insert(0, str(Path(__file__).parent.parent / "src"))
                 from pathlib import Path
@@ -70,10 +73,12 @@ class TestParameterCombinationsValidation:
                     result = multiply(3, 4)
                     print("Test completed successfully")
                     assert result == 12
-            """))
+            """)
+            )
 
             # Create failing tests
-            (tests_dir / "test_failing.py").write_text(textwrap.dedent("""
+            (tests_dir / "test_failing.py").write_text(
+                textwrap.dedent("""
                 import sys
                 sys.path.insert(0, str(Path(__file__).parent.parent / "src"))
                 from pathlib import Path
@@ -90,15 +95,18 @@ class TestParameterCombinationsValidation:
                     
                 def test_another_failure():
                     assert 1 == 2, "This should fail with custom message"
-            """))
+            """)
+            )
 
             # Create collection error test
-            (tests_dir / "test_collection_error.py").write_text(textwrap.dedent("""
+            (tests_dir / "test_collection_error.py").write_text(
+                textwrap.dedent("""
                 import nonexistent_module  # This will cause collection error
                 
                 def test_will_not_run():
                     pass
-            """))
+            """)
+            )
 
             yield project_path
 

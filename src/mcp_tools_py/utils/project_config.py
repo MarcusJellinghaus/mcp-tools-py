@@ -93,15 +93,15 @@ def _read_source_dirs(toml_data: dict[str, object], warnings: list[str]) -> list
     src_dirs: list[str] | None = None
     try:
         tool = toml_data["tool"]
-        assert isinstance(tool, dict)
+        assert isinstance(tool, dict)  # noqa: S101
         setuptools = tool["setuptools"]
-        assert isinstance(setuptools, dict)
+        assert isinstance(setuptools, dict)  # noqa: S101
         packages = setuptools["packages"]
-        assert isinstance(packages, dict)
+        assert isinstance(packages, dict)  # noqa: S101
         find = packages["find"]
-        assert isinstance(find, dict)
+        assert isinstance(find, dict)  # noqa: S101
         where = find["where"]
-        assert isinstance(where, list)
+        assert isinstance(where, list)  # noqa: S101
         src_dirs = [str(d) for d in where]
     except (KeyError, AssertionError):
         src_dirs = None
@@ -128,13 +128,13 @@ def _read_test_dirs(toml_data: dict[str, object], warnings: list[str]) -> list[s
     test_dirs: list[str] | None = None
     try:
         tool = toml_data["tool"]
-        assert isinstance(tool, dict)
+        assert isinstance(tool, dict)  # noqa: S101
         pytest_section = tool["pytest"]
-        assert isinstance(pytest_section, dict)
+        assert isinstance(pytest_section, dict)  # noqa: S101
         ini_options = pytest_section["ini_options"]
-        assert isinstance(ini_options, dict)
+        assert isinstance(ini_options, dict)  # noqa: S101
         testpaths = ini_options["testpaths"]
-        assert isinstance(testpaths, list)
+        assert isinstance(testpaths, list)  # noqa: S101
         test_dirs = [str(d) for d in testpaths]
     except (KeyError, AssertionError):
         test_dirs = None

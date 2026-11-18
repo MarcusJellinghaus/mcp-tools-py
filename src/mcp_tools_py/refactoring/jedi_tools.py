@@ -5,12 +5,12 @@ from __future__ import annotations
 import atexit
 import shutil
 import tempfile
-from functools import lru_cache
+from functools import cache
 from pathlib import Path
-from typing import Any, List, Optional, Tuple
+from typing import Any
 
 
-@lru_cache(maxsize=None)
+@cache
 def _private_cache_directory() -> str:
     """Create a jedi cache directory that only this process writes to.
 
@@ -29,10 +29,8 @@ def _private_cache_directory() -> str:
     return directory
 
 
-@lru_cache(maxsize=None)
-def _get_project(
-    project_dir: str, interpreter: str
-) -> Tuple[Optional[Any], Optional[str]]:
+@cache
+def _get_project(project_dir: str, interpreter: str) -> tuple[Any | None, str | None]:
     """Build a jedi project that resolves names in `interpreter`.
 
     The environment is forced here rather than left to `jedi.Script`, which
@@ -126,13 +124,13 @@ def _is_import(name: Any) -> bool:
     return False
 
 
-def _filter_top_level(names: List[Any], *, exclude_imports: bool = False) -> List[Any]:
+def _filter_top_level(names: list[Any], *, exclude_imports: bool = False) -> list[Any]:
     """Filter jedi names to top-level symbols only.
 
     Returns:
         Names whose parent scope is the module (optionally excluding imports).
     """
-    result: List[Any] = []
+    result: list[Any] = []
     for name in names:
         parent = name.parent()
         if parent is not None and parent.type == "module":

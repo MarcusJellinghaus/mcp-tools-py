@@ -13,7 +13,11 @@ from pathlib import Path
 def run_command(cmd: list[str]) -> str:
     """Run a command and return stdout."""
     result = subprocess.run(
-        cmd, capture_output=True, text=True, cwd=Path(__file__).parent.parent
+        cmd,
+        capture_output=True,
+        text=True,
+        cwd=Path(__file__).parent.parent,
+        check=False,
     )
     return result.stdout
 

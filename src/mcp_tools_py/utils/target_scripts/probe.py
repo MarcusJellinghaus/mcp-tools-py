@@ -16,7 +16,8 @@ import site
 import sys
 import sysconfig
 import types
-from typing import Any, Callable, Union, cast
+from collections.abc import Callable
+from typing import Any, Union, cast
 
 _USAGE = (
     "usage: probe.py info [MODULE ...] | probe.py source IMPORT_PATH MAX_LINES"
@@ -120,16 +121,12 @@ def _site_dirs() -> list[str]:
     try:
         paths = sysconfig.get_paths()
         candidates += [paths.get("purelib", ""), paths.get("platlib", "")]
-    except Exception:  # pylint: disable=broad-exception-caught
+    except Exception:  # noqa: S110 -- a failing source contributes nothing  # pylint: disable=broad-exception-caught
         pass
-    try:
+    with contextlib.suppress(Exception):
         candidates += list(site.getsitepackages())
-    except Exception:  # pylint: disable=broad-exception-caught
-        pass
-    try:
+    with contextlib.suppress(Exception):
         candidates.append(site.getusersitepackages())
-    except Exception:  # pylint: disable=broad-exception-caught
-        pass
 
     roots = {_normalized(sys.prefix), _normalized(sys.base_prefix)}
     result: list[str] = []
@@ -162,7 +159,7 @@ def _locate(names: list[str]) -> dict[str, object]:
     for name in names:
         try:
             spec = importlib.util.find_spec(name)
-        except Exception:  # pylint: disable=broad-exception-caught
+        except Exception:  # noqa: S112 -- nothing to locate  # pylint: disable=broad-exception-caught
             # As in _importable: a malformed name, or a parent package that
             # raises on import, leaves nothing to locate.
             continue

@@ -36,11 +36,7 @@ def sample_project(tmp_path: Path) -> Path:
         'MY_VAR = "hello"\n'
     )
     (src / "bar.py").write_text(
-        "from src.foo import my_func\n"
-        "\n"
-        "\n"
-        "def use_it():\n"
-        "    return my_func()\n"
+        "from src.foo import my_func\n\n\ndef use_it():\n    return my_func()\n"
     )
     (tmp_path / "test_x.py").write_text(
         'TARGET = "src.foo.my_func"\nOTHER = "src.foo.my_func_other"\n'
@@ -297,19 +293,10 @@ def test_move_symbol_removes_self_import(tmp_path: Path) -> None:
     pkg.mkdir()
     (pkg / "__init__.py").write_text("")
     (pkg / "source.py").write_text(
-        "from pkg.dest import helper\n"
-        "\n"
-        "\n"
-        "def mover():\n"
-        "    return helper()\n"
+        "from pkg.dest import helper\n\n\ndef mover():\n    return helper()\n"
     )
     (pkg / "dest.py").write_text(
-        "def helper():\n"
-        "    return 1\n"
-        "\n"
-        "\n"
-        "def stay_here():\n"
-        "    return 2\n"
+        "def helper():\n    return 1\n\n\ndef stay_here():\n    return 2\n"
     )
     result = move_symbol(tmp_path, "pkg/source.py", ["mover"], "pkg/dest.py")
     assert "successfully" in result.lower()
@@ -652,6 +639,7 @@ def test_rope_cli_returns_json_error_on_exception() -> None:
         ],
         capture_output=True,
         text=True,
+        check=False,
     )
     assert proc.returncode == 1
     output = json.loads(proc.stdout)
@@ -673,6 +661,7 @@ def test_rope_cli_unknown_operation() -> None:
         ],
         capture_output=True,
         text=True,
+        check=False,
     )
     assert proc.returncode == 1
     assert "Unknown operation" in proc.stderr

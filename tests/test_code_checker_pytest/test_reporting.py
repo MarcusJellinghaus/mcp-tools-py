@@ -2,7 +2,7 @@
 
 import json
 from pathlib import Path
-from typing import Any, Dict, List, Optional
+from typing import Any
 
 import pytest
 
@@ -503,12 +503,12 @@ class TestReporting:
             assert any(expected in new_file for expected in expected_new_files)
 
 
-def _stage(**fields: Any) -> Dict[str, Any]:
+def _stage(**fields: Any) -> dict[str, Any]:
     """Build a passing json-report stage with the given extra fields."""
     return {"duration": 0.001, "outcome": "passed", **fields}
 
 
-def _report(tests: List[Dict[str, Any]]) -> PytestReport:
+def _report(tests: list[dict[str, Any]]) -> PytestReport:
     """Parse a json-report holding the given test entries."""
     return parse_pytest_report(
         json.dumps(
@@ -527,7 +527,7 @@ def _report(tests: List[Dict[str, Any]]) -> PytestReport:
     )
 
 
-def _test(nodeid: str, outcome: str, **stages: Dict[str, Any]) -> Dict[str, Any]:
+def _test(nodeid: str, outcome: str, **stages: dict[str, Any]) -> dict[str, Any]:
     """Build a json-report test entry."""
     return {
         "nodeid": nodeid,
@@ -644,7 +644,7 @@ class TestPassingOutput:
     ids=["stopped", "stopped_deselected", "xdist_k", "all_ran", "more_ran"],
 )
 def test_did_not_run_line(
-    collected: int, total: int, deselected: Optional[int], expected: str
+    collected: int, total: int, deselected: int | None, expected: str
 ) -> None:
     """The line counts the selected tests that did not run, or is empty."""
     report = PytestReport(
@@ -658,7 +658,7 @@ def test_did_not_run_line(
     assert did_not_run_line(report) == expected
 
 
-def _ids_report(collectors: Optional[List[Collector]]) -> PytestReport:
+def _ids_report(collectors: list[Collector] | None) -> PytestReport:
     return PytestReport(
         created=0.0,
         duration=0.1,

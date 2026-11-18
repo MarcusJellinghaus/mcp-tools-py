@@ -3,7 +3,7 @@
 import logging
 import shutil
 import tempfile
-from typing import TYPE_CHECKING, Dict, List, Optional
+from typing import TYPE_CHECKING
 
 from mcp_tools_py.code_checker_pytest.coverage import (
     coverage_args,
@@ -49,12 +49,12 @@ def register(mcp: "FastMCPProtocol", checker_tools: "CheckerTools") -> None:
     @mcp.tool()
     @log_function_call
     def run_pytest_check(
-        markers: Optional[List[str]] = None,
-        extra_args: Optional[List[str]] = None,
-        env_vars: Optional[Dict[str, str]] = None,
-        timeout_seconds: Optional[int] = None,
+        markers: list[str] | None = None,
+        extra_args: list[str] | None = None,
+        env_vars: dict[str, str] | None = None,
+        timeout_seconds: int | None = None,
         coverage: bool = False,
-        coverage_source: Optional[List[str]] = None,
+        coverage_source: list[str] | None = None,
         max_modules: int = 10,
         use_last_coverage_run: bool = False,
         combine_with_previous: bool = False,
@@ -170,9 +170,9 @@ def register(mcp: "FastMCPProtocol", checker_tools: "CheckerTools") -> None:
 
         project_dir = str(context.project_dir)
         interpreter = str(context.environment.interpreter)
-        temp_dir: Optional[str] = None
+        temp_dir: str | None = None
         try:
-            sources: List[str] = []
+            sources: list[str] = []
             if coverage:
                 info = get_environment_info(interpreter)
                 if not info.error and "pytest-cov" not in info.distributions:
@@ -203,8 +203,8 @@ def register(mcp: "FastMCPProtocol", checker_tools: "CheckerTools") -> None:
 
             run_args = sanitized.cleaned_args
             run_env = env_vars
-            fail_under: Optional[float] = None
-            coverage_run: Optional[CoverageRun] = None
+            fail_under: float | None = None
+            coverage_run: CoverageRun | None = None
             run_timeout = context.resolve_timeout("pytest", timeout_seconds)
             if coverage:
                 temp_dir = tempfile.mkdtemp(prefix="pytest_cov_")
@@ -257,7 +257,7 @@ def register(mcp: "FastMCPProtocol", checker_tools: "CheckerTools") -> None:
             summary = test_results.get("summary", {})
             verdict = test_results["verdict"]
             # The digest is built first so the failure section gets what is left
-            digest: Optional[str] = None
+            digest: str | None = None
             if coverage_run is not None:
                 report = test_results.get("test_results")
                 # Without a parsed report, JSON from import-time lines proves nothing.

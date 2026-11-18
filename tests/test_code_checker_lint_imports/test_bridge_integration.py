@@ -11,7 +11,6 @@ project instead of the working tree.
 import os
 import sys
 from pathlib import Path
-from typing import Optional
 
 import pytest
 
@@ -27,7 +26,7 @@ _CONTRACT = "a must not import b"
 _VENV_TIMEOUT = 120
 
 
-def _lint_imports() -> Optional[Path]:
+def _lint_imports() -> Path | None:
     """Locate the lint-imports console script in the tool env.
 
     Returns:

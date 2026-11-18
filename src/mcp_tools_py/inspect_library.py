@@ -47,9 +47,7 @@ def _get_library_source(import_path: str, max_lines: int, interpreter: str) -> s
         return f"Error: could not run {interpreter}: {result.execution_error}"
     if result.return_code != 0:
         detail = result.stderr.strip()[:STDERR_SNIPPET]
-        return (
-            f"Error resolving '{import_path}' " f"(exit {result.return_code}): {detail}"
-        )
+        return f"Error resolving '{import_path}' (exit {result.return_code}): {detail}"
     return result.stdout
 
 

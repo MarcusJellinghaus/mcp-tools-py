@@ -1,0 +1,5 @@
+# Tools for the coverage job in ci.yml.
+# Regenerate coverage.txt, excluding releases from the last 7 days:
+#   uv pip compile .github/requirements/coverage.in -o .github/requirements/coverage.txt --generate-hashes --python-version 3.11 --python-platform linux --exclude-newer <date> --no-header
+coverage
+diff-cover

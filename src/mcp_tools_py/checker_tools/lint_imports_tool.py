@@ -1,7 +1,7 @@
 """Lint-imports MCP tool registration."""
 
 import logging
-from typing import TYPE_CHECKING, List, Optional
+from typing import TYPE_CHECKING
 
 from mcp_tools_py.code_checker_lint_imports import (
     run_lint_imports_check_impl,
@@ -22,7 +22,7 @@ def register(mcp: "FastMCPProtocol", checker_tools: "CheckerTools") -> None:
     @mcp.tool()
     @log_function_call
     def run_lint_imports_check(
-        extra_args: Optional[List[str]] = None,
+        extra_args: list[str] | None = None,
     ) -> str:
         """Run lint-imports on the project to check import contracts.
 
@@ -49,7 +49,7 @@ def register(mcp: "FastMCPProtocol", checker_tools: "CheckerTools") -> None:
             )
         except Exception as e:
             error_msg = (
-                f"Unexpected error running lint-imports: " f"{type(e).__name__}: {e}"
+                f"Unexpected error running lint-imports: {type(e).__name__}: {e}"
             )
             logger.error(
                 "lint-imports check failed",

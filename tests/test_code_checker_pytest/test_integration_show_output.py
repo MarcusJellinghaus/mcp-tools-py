@@ -2,7 +2,6 @@
 
 import sys
 from pathlib import Path
-from typing import List
 
 import pytest
 
@@ -42,7 +41,7 @@ class TestPassingOutputIntegration:
 
     @pytest.mark.parametrize("n_args", [["-n", "0"], ["-n", "2"]])
     def test_captured_output_of_passing_test(
-        self, temp_project: Path, n_args: List[str]
+        self, temp_project: Path, n_args: list[str]
     ) -> None:
         """Setup, call, teardown and stderr output all appear in the prompt."""
         report = run_tests(

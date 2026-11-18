@@ -55,3 +55,6 @@ uv.lock
 # Windows reserved-name artifacts
 nul
 
+
+# Scratch files for LLM sessions: MCP-writable via .mcp-file-access, never committed
+.scratch/

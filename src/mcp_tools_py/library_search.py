@@ -9,7 +9,7 @@ import os
 import re
 import sys
 from pathlib import Path
-from typing import TYPE_CHECKING, Any, Dict, List, Optional
+from typing import TYPE_CHECKING, Any
 
 from pathspec import GitIgnoreSpec, RegexPattern
 
@@ -25,7 +25,7 @@ if TYPE_CHECKING:
 _MAX_LINE_CHARS = 500
 
 
-def _collect_files(root: Path) -> List[str]:
+def _collect_files(root: Path) -> list[str]:
     """Walk root, collecting .py/.pyi files as sorted root-relative posix paths.
 
     Args:
@@ -35,7 +35,7 @@ def _collect_files(root: Path) -> List[str]:
         Sorted root-relative paths (posix separators) to .py and .pyi files,
         excluding __pycache__ and *.dist-info directories.
     """
-    files: List[str] = []
+    files: list[str] = []
     for dirpath, dirnames, filenames in os.walk(root):
         dirnames[:] = [
             d for d in dirnames if d != "__pycache__" and not d.endswith(".dist-info")
@@ -47,7 +47,7 @@ def _collect_files(root: Path) -> List[str]:
     return sorted(files)
 
 
-def _match_glob(glob: str, files: List[str]) -> List[str]:
+def _match_glob(glob: str, files: list[str]) -> list[str]:
     """Match root-relative paths against a gitignore-semantics glob.
 
     Args:
@@ -82,13 +82,13 @@ def _match_glob(glob: str, files: List[str]) -> List[str]:
 
 
 def _search_content(
-    files: List[str],
+    files: list[str],
     compiled: "re.Pattern[str]",
     root: Path,
     context_lines: int,
     max_results: int,
     max_result_lines: int,
-) -> Dict[str, Any]:
+) -> dict[str, Any]:
     """Search file contents for regex matches.
 
     Returns:
@@ -96,17 +96,17 @@ def _search_content(
         root-relative paths that could not be read — present only when
         non-empty.
     """
-    matches: List[Dict[str, Any]] = []
+    matches: list[dict[str, Any]] = []
     total_matches = 0
     char_budget = max_result_lines * 120
     chars_used = 0
     truncated = False
-    files_map: Dict[str, List[int]] = {}
-    skipped: List[str] = []
+    files_map: dict[str, list[int]] = {}
+    skipped: list[str] = []
 
     for rel_path in files:
         try:
-            with open(root / rel_path, "r", encoding="utf-8") as f:
+            with open(root / rel_path, encoding="utf-8") as f:
                 file_lines = f.readlines()
         except UnicodeDecodeError:
             # Must precede the next handler: UnicodeDecodeError is a subclass
@@ -148,7 +148,7 @@ def _search_content(
             matches.append({"file": rel_path, "line": i + 1, "text": context})
             chars_used += len(context)
 
-    result: Dict[str, Any] = {
+    result: dict[str, Any] = {
         "mode": "content_search",
         "details": matches,
         "total_matches": total_matches,
@@ -165,12 +165,12 @@ def _search_content(
 
 def search_in_directory(
     root: Path,
-    glob: Optional[str] = None,
-    pattern: Optional[str] = None,
+    glob: str | None = None,
+    pattern: str | None = None,
     context_lines: int = 0,
     max_results: int = 50,
     max_result_lines: int = 200,
-) -> Dict[str, Any]:
+) -> dict[str, Any]:
     """Search .py/.pyi files under root by glob and/or regex content.
 
     Args:
@@ -243,12 +243,12 @@ class LibrarySearchTools:
         @log_function_call
         def search_library_files(
             scope: str,
-            glob: Optional[str] = None,
-            pattern: Optional[str] = None,
+            glob: str | None = None,
+            pattern: str | None = None,
             context_lines: int = 0,
             max_results: int = 50,
             max_result_lines: int = 200,
-        ) -> Dict[str, Any]:
+        ) -> dict[str, Any]:
             """Search file contents and/or find files by glob in an installed scope.
 
             Greps/globs inside an installed package's source files anywhere in
@@ -273,7 +273,7 @@ class LibrarySearchTools:
             resolution = resolve_scope(interpreter, scope)
             if resolution.error is not None:
                 return {"error": resolution.error}
-            assert resolution.directory is not None
+            assert resolution.directory is not None  # noqa: S101
             if not os.path.isdir(resolution.directory):
                 return {
                     "error": f"scope '{scope}' resolved to "

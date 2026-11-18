@@ -198,7 +198,7 @@ class TestRealImports:
         assert "Available symbols:" in result
 
     def test_third_party_dep(self) -> None:
-        """structlog.get_logger resolves (structlog is a project dependency)."""
+        """structlog.get_logger resolves (installed through mcp-coder-utils)."""
         result = _src("structlog.get_logger")
 
         assert "def get_logger" in result

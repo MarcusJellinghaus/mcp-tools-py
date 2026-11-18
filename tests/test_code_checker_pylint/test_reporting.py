@@ -104,7 +104,7 @@ class TestGroupAndSortIssues:
         result = _group_and_sort_issues(msgs)
         assert len(result) == 1
         assert len(result[0].messages) == 3
-        assert set(m.line for m in result[0].messages) == {1, 2, 3}
+        assert {m.line for m in result[0].messages} == {1, 2, 3}
 
 
 class TestGetDirectInstructionForPylintCode:

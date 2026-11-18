@@ -1,6 +1,6 @@
 """Shared fixtures for the refactoring tests."""
 
-from typing import Iterator
+from collections.abc import Iterator
 
 import pytest
 

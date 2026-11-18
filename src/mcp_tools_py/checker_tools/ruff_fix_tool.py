@@ -1,7 +1,7 @@
 """Ruff fix (modifies files) MCP tool registration."""
 
 import logging
-from typing import TYPE_CHECKING, List, Optional
+from typing import TYPE_CHECKING
 
 from mcp_tools_py.code_checker_ruff.runners import run_ruff_fix_impl
 from mcp_tools_py.log_utils import log_function_call
@@ -21,9 +21,9 @@ def register(mcp: "FastMCPProtocol", checker_tools: "CheckerTools") -> None:
     @mcp.tool()
     @log_function_call
     def run_ruff_fix(
-        select: Optional[List[str]] = None,
-        target_directories: Optional[List[str]] = None,
-        extra_args: Optional[List[str]] = None,
+        select: list[str] | None = None,
+        target_directories: list[str] | None = None,
+        extra_args: list[str] | None = None,
     ) -> str:
         """Run ruff check --fix on the project (MODIFIES FILES in-place).
 
@@ -76,9 +76,7 @@ def register(mcp: "FastMCPProtocol", checker_tools: "CheckerTools") -> None:
             return output
 
         except Exception as e:
-            error_msg = (
-                f"Unexpected error running ruff fix: " f"{type(e).__name__}: {e}"
-            )
+            error_msg = f"Unexpected error running ruff fix: {type(e).__name__}: {e}"
             logger.error(
                 "ruff fix failed",
                 extra={

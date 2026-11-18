@@ -154,7 +154,7 @@ class TestSanitizeExtraArgsPathDetection:
         """An existing file path sets has_path_args=True."""
         with tempfile.TemporaryDirectory() as tmpdir:
             test_file = os.path.join(tmpdir, "test_example.py")
-            with open(test_file, "w") as f:
+            with open(test_file, "w", encoding="utf-8") as f:
                 f.write("")
             result = sanitize_extra_args(["test_example.py"], None, project_dir=tmpdir)
             assert result.has_path_args is True
@@ -172,7 +172,7 @@ class TestSanitizeExtraArgsPathDetection:
         """A node ID (file::test) with existing file sets has_path_args=True."""
         with tempfile.TemporaryDirectory() as tmpdir:
             test_file = os.path.join(tmpdir, "test_example.py")
-            with open(test_file, "w") as f:
+            with open(test_file, "w", encoding="utf-8") as f:
                 f.write("")
             result = sanitize_extra_args(
                 ["test_example.py::test_func"], None, project_dir=tmpdir
@@ -190,7 +190,7 @@ class TestSanitizeExtraArgsPathDetection:
         """An absolute path keeps has_path_args=False and adds a note."""
         with tempfile.TemporaryDirectory() as tmpdir:
             abs_path = os.path.join(tmpdir, "test_example.py")
-            with open(abs_path, "w") as f:
+            with open(abs_path, "w", encoding="utf-8") as f:
                 f.write("")
             result = sanitize_extra_args([abs_path], None, project_dir=tmpdir)
             assert result.has_path_args is False
@@ -200,7 +200,7 @@ class TestSanitizeExtraArgsPathDetection:
         """Flags are skipped, only real paths trigger has_path_args."""
         with tempfile.TemporaryDirectory() as tmpdir:
             test_file = os.path.join(tmpdir, "test_example.py")
-            with open(test_file, "w") as f:
+            with open(test_file, "w", encoding="utf-8") as f:
                 f.write("")
             result = sanitize_extra_args(
                 ["-x", "test_example.py", "--tb=short"], None, project_dir=tmpdir
@@ -272,7 +272,7 @@ class TestSanitizeExtraArgsPathDetection:
             tests_dir = os.path.join(tmpdir, "tests")
             os.makedirs(tests_dir)
             test_file = os.path.join(tests_dir, "test_file.py")
-            with open(test_file, "w") as f:
+            with open(test_file, "w", encoding="utf-8") as f:
                 f.write("")
             result = sanitize_extra_args(
                 ["-n", "auto", "tests/test_file.py"], None, project_dir=tmpdir
@@ -294,7 +294,9 @@ class TestSanitizeExtraArgsPathArgs:
         """An existing path that looks like a path is listed."""
         with tempfile.TemporaryDirectory() as tmpdir:
             os.makedirs(os.path.join(tmpdir, "tests"))
-            with open(os.path.join(tmpdir, "tests", "test_x.py"), "w") as f:
+            with open(
+                os.path.join(tmpdir, "tests", "test_x.py"), "w", encoding="utf-8"
+            ) as f:
                 f.write("")
             result = sanitize_extra_args(
                 ["-x", "tests/test_x.py::test_a"], None, project_dir=tmpdir
@@ -312,7 +314,7 @@ class TestSanitizeExtraArgsPathArgs:
         """Missing and absolute paths are not listed."""
         with tempfile.TemporaryDirectory() as tmpdir:
             abs_path = os.path.join(tmpdir, "test_example.py")
-            with open(abs_path, "w") as f:
+            with open(abs_path, "w", encoding="utf-8") as f:
                 f.write("")
             result = sanitize_extra_args(
                 ["no_such_file.py", abs_path], None, project_dir=tmpdir

@@ -12,8 +12,7 @@ python --version
 pip --version
 echo.
 echo --- Formatting ---
-black --version
-isort --version-number
+ruff --version
 echo.
 echo --- Linting and Quality ---
 pylint --version
@@ -25,9 +24,9 @@ pytest --version
 echo.
 echo --- Architecture and Dependencies ---
 pydeps --version
-pycycle --version
 tach --version
 lint-imports --version
+deptry --version
 echo.
 echo --- MCP Servers ---
 mcp-tools-py --version

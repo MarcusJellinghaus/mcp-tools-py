@@ -164,9 +164,7 @@ def _get_top_level_symbols(source: str) -> list[str]:
 
     symbols: list[str] = []
     for node in ast.iter_child_nodes(tree):
-        if isinstance(node, (ast.FunctionDef, ast.AsyncFunctionDef)):
-            symbols.append(node.name)
-        elif isinstance(node, ast.ClassDef):
+        if isinstance(node, (ast.FunctionDef, ast.AsyncFunctionDef, ast.ClassDef)):
             symbols.append(node.name)
         elif isinstance(node, ast.Assign):
             for target in node.targets:
@@ -210,11 +208,14 @@ def _find_symbol_offset(source: str, symbol_name: str) -> int | None:
                     line = target.lineno
                     col = target.col_offset
                     break
-        elif isinstance(node, ast.AnnAssign) and isinstance(node.target, ast.Name):
-            if node.target.id == symbol_name:
-                name = node.target.id
-                line = node.target.lineno
-                col = node.target.col_offset
+        elif (
+            isinstance(node, ast.AnnAssign)
+            and isinstance(node.target, ast.Name)
+            and node.target.id == symbol_name
+        ):
+            name = node.target.id
+            line = node.target.lineno
+            col = node.target.col_offset
 
         if name == symbol_name:
             # Convert line/col to offset
@@ -808,6 +809,7 @@ def _is_git_repo(project_dir: Path) -> bool:
             cwd=str(project_dir),
             capture_output=True,
             timeout=5,
+            check=False,
         )
         return result.returncode == 0
     except (OSError, _subprocess.TimeoutExpired):
@@ -826,6 +828,7 @@ def _is_git_tracked(project_dir: Path, file_path: str) -> bool:
             cwd=str(project_dir),
             capture_output=True,
             timeout=5,
+            check=False,
         )
         return result.returncode == 0
     except (OSError, _subprocess.TimeoutExpired):
@@ -901,7 +904,7 @@ def _move_module_impl(
             warnings = ""
             if abs_source.exists() and not expected_dest.exists():
                 logger.warning(
-                    "move_module: rope rewrote imports but did not move " "%s to %s",
+                    "move_module: rope rewrote imports but did not move %s to %s",
                     source_module,
                     dest_package,
                 )

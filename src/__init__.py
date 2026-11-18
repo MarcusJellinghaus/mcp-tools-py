@@ -1,3 +1,5 @@
+"""Version of the installed mcp-tools-py distribution."""
+
 from importlib.metadata import PackageNotFoundError, version
 
 try:

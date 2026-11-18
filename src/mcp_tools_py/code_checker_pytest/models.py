@@ -1,7 +1,7 @@
 """Data models for pytest test results and reports."""
 
 from dataclasses import dataclass, field
-from typing import Any, Dict, List, Optional
+from typing import Any
 
 
 @dataclass
@@ -35,15 +35,15 @@ class LogRecord:
 
     name: str
     msg: str
-    args: Optional[Any]
+    args: Any | None
     levelname: str
     levelno: int
     pathname: str
     filename: str
     module: str
-    exc_info: Optional[Any]
-    exc_text: Optional[str]
-    stack_info: Optional[str]
+    exc_info: Any | None
+    exc_text: str | None
+    stack_info: str | None
     lineno: int
     funcName: str  # pylint: disable=invalid-name
     created: float
@@ -56,14 +56,14 @@ class LogRecord:
     taskName: str = ""  # pylint: disable=invalid-name
     asctime: str = ""
     message: str = ""  # Formatted message (msg % args), included for completeness
-    extra: Dict[str, Any] = field(default_factory=dict)
+    extra: dict[str, Any] = field(default_factory=dict)
 
 
 @dataclass
 class Log:
     """Container for a list of log records."""
 
-    logs: List[LogRecord]
+    logs: list[LogRecord]
 
 
 @dataclass
@@ -72,12 +72,12 @@ class StageInfo:
 
     duration: float
     outcome: str
-    crash: Optional[Crash] = None
-    traceback: Optional[List[TracebackEntry]] = None
-    stdout: Optional[str] = None
-    stderr: Optional[str] = None
-    log: Optional[Log] = None
-    longrepr: Optional[str] = None
+    crash: Crash | None = None
+    traceback: list[TracebackEntry] | None = None
+    stdout: str | None = None
+    stderr: str | None = None
+    log: Log | None = None
+    longrepr: str | None = None
 
 
 @dataclass
@@ -86,12 +86,12 @@ class Test:
 
     nodeid: str
     lineno: int
-    keywords: List[str]
+    keywords: list[str]
     outcome: str
-    setup: Optional[StageInfo] = None
-    call: Optional[StageInfo] = None
-    teardown: Optional[StageInfo] = None
-    metadata: Optional[Dict[str, Any]] = None
+    setup: StageInfo | None = None
+    call: StageInfo | None = None
+    teardown: StageInfo | None = None
+    metadata: dict[str, Any] | None = None
 
 
 @dataclass
@@ -100,8 +100,8 @@ class CollectorResult:
 
     nodeid: str
     type: str
-    lineno: Optional[int] = None
-    deselected: Optional[bool] = None
+    lineno: int | None = None
+    deselected: bool | None = None
 
 
 @dataclass
@@ -110,8 +110,8 @@ class Collector:
 
     nodeid: str
     outcome: str
-    result: List[CollectorResult]
-    longrepr: Optional[str] = None
+    result: list[CollectorResult]
+    longrepr: str | None = None
 
 
 @dataclass
@@ -120,27 +120,27 @@ class Summary:
 
     collected: int
     total: int
-    deselected: Optional[int] = None
-    passed: Optional[int] = None
-    failed: Optional[int] = None
-    xfailed: Optional[int] = None
-    xpassed: Optional[int] = None
-    error: Optional[int] = None
-    skipped: Optional[int] = None
+    deselected: int | None = None
+    passed: int | None = None
+    failed: int | None = None
+    xfailed: int | None = None
+    xpassed: int | None = None
+    error: int | None = None
+    skipped: int | None = None
 
 
 @dataclass
-class Warning:
+class Warning:  # pylint: disable=redefined-builtin  # pytest-json-report's name
     """A pytest warning emitted during a run."""
 
     message: str
-    code: Optional[str] = None
-    path: Optional[str] = None
-    nodeid: Optional[str] = None
-    when: Optional[str] = None
-    category: Optional[str] = None
-    filename: Optional[str] = None
-    lineno: Optional[str] = None
+    code: str | None = None
+    path: str | None = None
+    nodeid: str | None = None
+    when: str | None = None
+    category: str | None = None
+    filename: str | None = None
+    lineno: str | None = None
 
 
 @dataclass
@@ -151,7 +151,7 @@ class ErrorContext:
     exit_code_meaning: str
     error_message: str
     suggestion: str
-    traceback: Optional[str] = None
+    traceback: str | None = None
 
 
 @dataclass
@@ -162,22 +162,22 @@ class PytestReport:
     duration: float
     exitcode: int
     root: str
-    environment: Dict[str, Any]
+    environment: dict[str, Any]
     summary: Summary
-    collectors: Optional[List[Collector]] = None
-    tests: Optional[List[Test]] = None
-    warnings: Optional[List[Warning]] = None
-    error_context: Optional[ErrorContext] = None
+    collectors: list[Collector] | None = None
+    tests: list[Test] | None = None
+    warnings: list[Warning] | None = None
+    error_context: ErrorContext | None = None
 
 
 @dataclass
 class SanitizedArgs:
     """Result of sanitizing extra_args for pytest execution."""
 
-    cleaned_args: List[str]
+    cleaned_args: list[str]
     verbosity: int
-    notes: List[str]
+    notes: list[str]
     has_path_args: bool = False
     show_output: bool = False
-    path_args: List[str] = field(default_factory=list)
+    path_args: list[str] = field(default_factory=list)
     collect_only: bool = False

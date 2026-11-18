@@ -102,14 +102,12 @@ This runs all checks in sequence and copies any issues to clipboard for easy ana
 Format your code before committing:
 
 ```bash
-# Format all code
-tools\format_all.bat
-
-# Or individually:
-tools\ruff_fix.bat    # Fix common issues
-tools\black.bat       # Code formatting
-tools\iSort.bat       # Import sorting
+ruff check --select I --fix src tests tools   # Import sorting
+ruff format src tests tools                   # Code formatting
 ```
+
+Or call the `run_format_code` MCP tool, which runs the same two steps because
+`pyproject.toml` declares `formatter = "ruff"`.
 
 ## Code Quality Standards
 
@@ -221,7 +219,8 @@ pytest -m installation
 
 3. **Format code:**
    ```bash
-   tools\format_all.bat
+   ruff check --select I --fix src tests tools   # Import sorting
+   ruff format src tests tools                   # Code formatting
    ```
 
 ### Pull Request Guidelines
@@ -249,7 +248,7 @@ The `tools/` directory contains helpful scripts for development:
 - `checks2clipboard.bat` - Run all checks and copy results to clipboard
 - `pylint_check_for_errors.bat` - Run pylint with error-level checking
 - `mypy.bat` - Run mypy type checking
-- `format_all.bat` - Format all code (runs ruff, black, isort)
+- `ruff_check.bat` / `ruff_check.sh` - Lint with ruff
 
 ### Development Utilities
 
@@ -271,7 +270,8 @@ All tools should be run from the project root:
 tools\checks2clipboard.bat
 
 # Format code
-tools\format_all.bat
+ruff check --select I --fix src tests tools
+ruff format src tests tools
 
 # Reinstall after pyproject.toml changes
 call tools\reinstall_local.bat

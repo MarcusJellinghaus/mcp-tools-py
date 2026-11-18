@@ -1,7 +1,7 @@
 """Vulture MCP tool registration."""
 
 import logging
-from typing import TYPE_CHECKING, List, Optional
+from typing import TYPE_CHECKING
 
 from mcp_tools_py.code_checker_vulture import format_vulture_report
 from mcp_tools_py.code_checker_vulture import run_vulture_check as run_vulture
@@ -22,9 +22,9 @@ def register(mcp: "FastMCPProtocol", checker_tools: "CheckerTools") -> None:
     @mcp.tool()
     @log_function_call
     def run_vulture_check(
-        target_directories: Optional[List[str]] = None,
+        target_directories: list[str] | None = None,
         min_confidence: int = 60,
-        extra_args: Optional[List[str]] = None,
+        extra_args: list[str] | None = None,
         max_issues: int = 1,
     ) -> str:
         """Run vulture on the project to find unused code.
@@ -90,7 +90,7 @@ def register(mcp: "FastMCPProtocol", checker_tools: "CheckerTools") -> None:
             return output
 
         except Exception as e:
-            error_msg = f"Unexpected error running vulture: " f"{type(e).__name__}: {e}"
+            error_msg = f"Unexpected error running vulture: {type(e).__name__}: {e}"
             logger.error(
                 "vulture check failed",
                 extra={

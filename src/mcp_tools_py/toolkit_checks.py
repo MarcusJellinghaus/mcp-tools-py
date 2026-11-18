@@ -74,7 +74,7 @@ def _render_fix_text(
         rows from `render_locations`; unbounded.
     """
     groups: dict[str, list[tuple[Location, bool]]] = {}
-    for i, (finding, location) in enumerate(zip(findings, locations)):
+    for i, (finding, location) in enumerate(zip(findings, locations, strict=True)):
         item = _location(finding, location, details[i] if details else ())
         groups.setdefault(finding.rule or "", []).append(item)
     lines: list[str] = []

@@ -4,7 +4,7 @@ import logging
 import os
 import shutil
 import tempfile
-from typing import Any, Dict, List, Optional
+from typing import Any
 
 from mcp_tools_py.code_checker_pytest.models import PytestReport
 from mcp_tools_py.code_checker_pytest.parsers import parse_pytest_report
@@ -15,7 +15,6 @@ from mcp_tools_py.code_checker_pytest.verdict import (
     RunVerdict,
     classify_run,
 )
-from mcp_tools_py.log_utils import log_function_call
 from mcp_tools_py.utils.project_config import resolve_test_paths
 from mcp_tools_py.utils.subprocess_runner import (
     check_tool_missing_error,
@@ -83,13 +82,13 @@ class ProcessResult:
 
 def run_tests(
     project_dir: str,
-    test_folder: Optional[str],
+    test_folder: str | None,
     python_executable: str,
-    markers: Optional[List[str]] = None,
+    markers: list[str] | None = None,
     verbosity: int = 2,
-    extra_args: Optional[List[str]] = None,
-    env_vars: Optional[Dict[str, str]] = None,
-    venv_bin: Optional[str] = None,
+    extra_args: list[str] | None = None,
+    env_vars: dict[str, str] | None = None,
+    venv_bin: str | None = None,
     keep_temp_files: bool = False,
     timeout_seconds: int = 300,
     skip_default_test_folder: bool = False,
@@ -194,7 +193,7 @@ def run_tests(
 
         # Build additive env vars — prepare_env() in subprocess_runner
         # handles the base environment (os.environ copy + Python isolation).
-        env: Dict[str, str] = {}
+        env: dict[str, str] = {}
         if env_vars:
             env.update(env_vars)
 
@@ -358,7 +357,7 @@ def run_tests(
             # Handle other error cases
             elif process.returncode == 3:
                 # error_context is guaranteed non-None here: returncode != 0 above.
-                assert error_context is not None
+                assert error_context is not None  # noqa: S101
                 logger.warning("Pytest internal error (exit 3): %s", combined_output)
                 internal_lines = "\n".join(
                     line
@@ -371,7 +370,7 @@ def run_tests(
                     f"{_build_error_detail(output, error_output)}"
                 )
             elif process.returncode == 4:
-                assert error_context is not None
+                assert error_context is not None  # noqa: S101
                 logger.warning("Pytest usage error (exit 4): %s", combined_output)
                 raise ValueError(
                     f"Usage Error: {error_context.exit_code_meaning}."
@@ -384,7 +383,7 @@ def run_tests(
                 )
             elif process.returncode > 5:
                 # Handle plugin-specific exit codes
-                assert error_context is not None
+                assert error_context is not None  # noqa: S101
                 logger.warning(
                     "Pytest plugin error (exit %s): %s",
                     process.returncode,
@@ -466,16 +465,16 @@ def run_tests(
 def check_code_with_pytest(
     project_dir: str,
     python_executable: str,
-    test_folder: Optional[str] = None,
-    markers: Optional[List[str]] = None,
+    test_folder: str | None = None,
+    markers: list[str] | None = None,
     verbosity: int = 2,
-    extra_args: Optional[List[str]] = None,
-    env_vars: Optional[Dict[str, str]] = None,
-    venv_bin: Optional[str] = None,
+    extra_args: list[str] | None = None,
+    env_vars: dict[str, str] | None = None,
+    venv_bin: str | None = None,
     keep_temp_files: bool = False,
     timeout_seconds: int = 300,
     skip_default_test_folder: bool = False,
-) -> Dict[str, Any]:
+) -> dict[str, Any]:
     """Run pytest on the specified project and return results.
 
     Args:

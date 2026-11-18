@@ -13,7 +13,6 @@ answered from `environment`, the interpreter `--python-executable` names.
 import logging
 from dataclasses import dataclass, field
 from pathlib import Path
-from typing import Optional
 
 from mcp_tools_py.utils.environment_info import (
     TOOL_MODULES,
@@ -56,10 +55,10 @@ class ToolContext:
 
     project_dir: Path
     environment: PythonEnvironment
-    test_folder: Optional[str] = None
+    test_folder: str | None = None
     keep_temp_files: bool = False
     vulture_whitelist: str = "vulture_whitelist.py"
-    check_timeout: Optional[int] = None
+    check_timeout: int | None = None
     tool_environment: PythonEnvironment = field(
         default_factory=PythonEnvironment.resolve
     )
@@ -146,7 +145,7 @@ class ToolContext:
             f"Restart the server after installing."
         )
 
-    def resolve_timeout(self, tool: ToolName, explicit: Optional[int] = None) -> int:
+    def resolve_timeout(self, tool: ToolName, explicit: int | None = None) -> int:
         """Resolve the subprocess timeout in seconds for one program.
 
         Args:

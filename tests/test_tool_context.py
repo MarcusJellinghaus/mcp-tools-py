@@ -71,7 +71,7 @@ def _probe_stdout() -> str:
             "version": "3.11.9",
             "sys_path": [],
             "distributions": {},
-            "importable": {module: True for module in PROBED_MODULES},
+            "importable": dict.fromkeys(PROBED_MODULES, True),
         }
     )
 
@@ -294,10 +294,12 @@ class TestResolveTimeout:
 
     def test_pyproject_value_beats_cli_timeout(self, tmp_path: Path) -> None:
         """A per-tool pyproject value wins over --check-timeout."""
-        (tmp_path / "pyproject.toml").write_text(textwrap.dedent("""\
+        (tmp_path / "pyproject.toml").write_text(
+            textwrap.dedent("""\
                 [tool.mcp-tools-py]
                 mypy-timeout = 600
-                """))
+                """)
+        )
         context = _context(tmp_path, check_timeout=45)
 
         assert context.resolve_timeout("mypy") == 600

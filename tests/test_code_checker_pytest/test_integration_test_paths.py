@@ -4,7 +4,7 @@ import re
 import sys
 from dataclasses import dataclass, field
 from pathlib import Path
-from typing import Any, List, Optional
+from typing import Any
 from unittest.mock import MagicMock, patch
 
 import pytest
@@ -30,12 +30,12 @@ FOLDERS = {
 class Row:
     """One scenario: project layout, call, and expected outcome."""
 
-    testpaths: Optional[str]
-    folders: List[str]
-    passed: Optional[int]  # None: usage error, nothing passed
+    testpaths: str | None
+    folders: list[str]
+    passed: int | None  # None: usage error, nothing passed
     note: bool
-    extra_args: List[str] = field(default_factory=list)
-    test_folder: Optional[str] = None
+    extra_args: list[str] = field(default_factory=list)
+    test_folder: str | None = None
 
 
 ROWS = {
@@ -56,7 +56,7 @@ ROWS = {
 }
 
 
-def _write_tests(project: Path, folders: List[str]) -> None:
+def _write_tests(project: Path, folders: list[str]) -> None:
     """Write each folder's test module with its number of passing tests."""
     for folder in folders:
         count, module = FOLDERS[folder]
@@ -65,13 +65,13 @@ def _write_tests(project: Path, folders: List[str]) -> None:
         (project / folder / module).write_text(body)
 
 
-def _write_pyproject(project: Path, testpaths: Optional[str]) -> None:
+def _write_pyproject(project: Path, testpaths: str | None) -> None:
     """Write the pytest table, with testpaths when given."""
     line = f"testpaths = {testpaths}\n" if testpaths is not None else ""
     (project / "pyproject.toml").write_text(f"[tool.pytest.ini_options]\n{line}")
 
 
-def _tool(project: Path, test_folder: Optional[str]) -> Any:
+def _tool(project: Path, test_folder: str | None) -> Any:
     """Register the tools for project under this interpreter.
 
     Returns:
