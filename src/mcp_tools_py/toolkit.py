@@ -299,7 +299,8 @@ def _run_test(context: ToolContext, depth: str) -> ActionResult:
     alone made the verdict ERROR (exit 1, or exit 2 "during collection").
 
     Returns:
-        "error" if pytest is unavailable, `quick` can't read the registered
+        "error" if pytest, pytest-json-report or (at `full`) pytest-cov
+        is unavailable, `quick` can't read the registered
         markers, the verdict is ERROR (other than
         "no tests found" or one caused by failed collectors), or FAILED
         without any failing/erroring test or collector; "skipped" for no
@@ -311,6 +312,12 @@ def _run_test(context: ToolContext, depth: str) -> ActionResult:
         return ActionResult(
             status="error", summary=context.unavailable_message("pytest")
         )
+    required = ["pytest-json-report", *(["pytest-cov"] if depth == "full" else [])]
+    for name in required:
+        if not context.is_distribution_available(name):
+            return ActionResult(
+                status="error", summary=context.unavailable_message(name)
+            )
     if depth != "quick":
         context = replace(context, check_timeout=_LONG_TEST_TIMEOUT)
 

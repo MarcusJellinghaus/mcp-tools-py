@@ -22,7 +22,11 @@ from mcp_tools_py.code_checker_pytest.verdict import (
     RunVerdict,
 )
 from mcp_tools_py.toolkit import UNATTENDED_EXCLUDED_MARKERS, PythonToolkit
+from mcp_tools_py.utils.environment_info import EnvironmentInfo
 from tests._pytest_results import make_pytest_results
+from tests.conftest import make_environment_info
+
+_GET_ENVIRONMENT_INFO = "mcp_tools_py.utils.tool_context.get_environment_info"
 
 
 def _write_passing_project(project_dir: Path) -> None:
@@ -307,6 +311,69 @@ class TestRunTestTimeout:
         assert result.status == "ok"
         assert mock_pytest.call_args.kwargs["timeout_seconds"] == 1800
         assert mock_start.call_args.args[-1] == 1800
+
+
+class TestRunTestPreflight:
+    """Missing pytest plugins refuse the run before anything is started."""
+
+    def test_quick_without_json_report_is_error(self, tmp_path: Path) -> None:
+        request = ActionRequest(
+            action="test", depth="quick", project_dir=tmp_path, params={}
+        )
+
+        with (
+            patch(
+                _GET_ENVIRONMENT_INFO,
+                return_value=make_environment_info(distributions={}),
+            ),
+            patch("mcp_tools_py.toolkit.execute_command") as mock_execute,
+            patch("mcp_tools_py.toolkit.check_code_with_pytest") as mock_pytest,
+        ):
+            result = PythonToolkit().run(request)
+
+        assert result.status == "error"
+        assert "pytest-json-report is not available" in result.summary
+        mock_execute.assert_not_called()
+        mock_pytest.assert_not_called()
+
+    def test_full_without_pytest_cov_is_error(self, tmp_path: Path) -> None:
+        request = ActionRequest(
+            action="test", depth="full", project_dir=tmp_path, params={}
+        )
+
+        with (
+            patch(_GET_ENVIRONMENT_INFO, return_value=make_environment_info()),
+            patch("mcp_tools_py.toolkit.check_code_with_pytest") as mock_pytest,
+            patch("mcp_tools_py.toolkit.finish_coverage_run") as mock_finish,
+        ):
+            result = PythonToolkit().run(request)
+
+        assert result.status == "error"
+        assert "pytest-cov is not available" in result.summary
+        mock_pytest.assert_not_called()
+        mock_finish.assert_not_called()
+
+    def test_failed_probe_fails_open(self, tmp_path: Path) -> None:
+        pytest.importorskip("pytest_cov")
+        _write_coverage_project(tmp_path)
+        request = ActionRequest(
+            action="test", depth="full", project_dir=tmp_path, params={}
+        )
+        broken = EnvironmentInfo(
+            version="", sys_path=(), distributions={}, importable={}, error="boom"
+        )
+
+        with (
+            patch(_GET_ENVIRONMENT_INFO, return_value=broken),
+            patch(
+                "mcp_tools_py.toolkit.check_code_with_pytest",
+                return_value=_passed_results(),
+            ) as mock_pytest,
+            patch("mcp_tools_py.toolkit.finish_coverage_run", return_value=None),
+        ):
+            PythonToolkit().run(request)
+
+        mock_pytest.assert_called_once()
 
 
 class TestRunTestVerdictMapping:
