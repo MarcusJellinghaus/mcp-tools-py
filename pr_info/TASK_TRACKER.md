@@ -29,9 +29,9 @@ This tracks **Feature Implementation** consisting of multiple **Tasks**.
 
 ### Step 2: Fix the two marker comments in `toolkit.py` — [step_2.md](./steps/step_2.md)
 
-- [ ] Implementation: update comments above `UNATTENDED_EXCLUDED_MARKERS` and `_STRICT_MARKERS_OFF` (comments only)
-- [ ] Quality checks (pytest unit, pylint, mypy, ruff, format) — fix all issues
-- [ ] Commit message prepared
+- [x] Implementation: update comments above `UNATTENDED_EXCLUDED_MARKERS` and `_STRICT_MARKERS_OFF` (comments only)
+- [x] Quality checks (pytest unit, pylint, mypy, ruff, format) — fix all issues
+- [x] Commit message prepared
 
 ## Pull Request
 

@@ -78,8 +78,7 @@ _XDIST_KEY = "pytest|collection|xdist"
 # pytest: "Interrupted: N error(s) during collection"
 _COLLECTION_INTERRUPTED = "during collection"
 
-# Same list as mcp-coder's workflows/rebase_automated.py::AUTOMATED_EXCLUDED_MARKERS;
-# this is the single home of the list.
+# This is the single home of the list.
 UNATTENDED_EXCLUDED_MARKERS: list[str] = [
     "not claude_cli_integration",
     "not copilot_cli_integration",
@@ -89,6 +88,8 @@ UNATTENDED_EXCLUDED_MARKERS: list[str] = [
     "not install_integration",
 ]
 # Stops --strict-markers projects rejecting marker names they don't register.
+# On pytest 8 it has no effect: a test carrying an unregistered mark still fails
+# collection under --strict-markers.
 _STRICT_MARKERS_OFF: list[str] = ["-o", "strict_markers=false"]
 _LONG_TEST_TIMEOUT = 1800  # seconds; test@standard, @unattended and @full
 # One line per marker in `pytest --markers`: "@pytest.mark.<name>[(<args>)]: <desc>"
