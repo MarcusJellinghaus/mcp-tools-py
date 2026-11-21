@@ -94,6 +94,10 @@ _LONG_TEST_TIMEOUT = 1800  # seconds; test@standard, @unattended and @full
 # One line per marker in `pytest --markers`: "@pytest.mark.<name>[(<args>)]: <desc>"
 _MARKER_LINE = re.compile(r"^@pytest\.mark\.([^(:\s]+)", re.MULTILINE)
 _MARKER_READ_FAILED = "Could not read the project's pytest markers"
+_PYTEST_COV_NOTE = (
+    "pytest-cov is not installed in the project environment; "
+    "only the `full` test depth needs it."
+)
 
 _FIX_CHECK_PROMPT = """\
 Fix the findings reported by the checkers in the output below \
@@ -166,6 +170,32 @@ def _tool_item(context: ToolContext, tool: str) -> VerifyItem:
         status="ok" if ok else "error",
         message="" if ok else context.unavailable_message(tool),
     )
+
+
+def _distribution_items(context: ToolContext) -> list[VerifyItem]:
+    """Report whether the pytest plugins the test action needs are installed.
+
+    Returns:
+        A "pytest-json-report" item ("ok" or "error" with the standard
+        message) and a "pytest-cov" item ("ok" or "warning"); both are "ok"
+        when the environment probe fails.
+    """
+    json_ok = context.is_distribution_available("pytest-json-report")
+    cov_ok = context.is_distribution_available("pytest-cov")
+    return [
+        VerifyItem(
+            name="pytest-json-report",
+            status="ok" if json_ok else "error",
+            message=""
+            if json_ok
+            else context.unavailable_message("pytest-json-report"),
+        ),
+        VerifyItem(
+            name="pytest-cov",
+            status="ok" if cov_ok else "warning",
+            message="" if cov_ok else _PYTEST_COV_NOTE,
+        ),
+    ]
 
 
 def _test_failure_summary(test: Test) -> str:
@@ -622,11 +652,11 @@ class PythonToolkit(Toolkit):
     def verify(self, project_dir: Path, action: str | None = None) -> list[VerifyItem]:
         """Check that the tools `action` drives are available.
 
-        - None: every tool, plus "formatter".
+        - None: every tool, pytest-json-report, pytest-cov, plus "formatter".
         - "format": "formatter" plus the tools of the resolved formatter
           steps (none when no formatter resolves).
         - "check": the tools of the `full` check depth.
-        - "test": pytest.
+        - "test": pytest, pytest-json-report, pytest-cov.
 
         Returns:
             One VerifyItem per tool, plus one named "formatter" for whether a
@@ -664,7 +694,14 @@ class PythonToolkit(Toolkit):
                 )
                 if action == "format":
                     tools = []
-        return [_tool_item(context, tool) for tool in tools] + formatter_items
+        distribution_items = (
+            _distribution_items(context) if action in (None, "test") else []
+        )
+        return (
+            [_tool_item(context, tool) for tool in tools]
+            + distribution_items
+            + formatter_items
+        )
 
     def prompt_fragments(self) -> dict[str, str]:
         """Prompt text PythonToolkit contributes to mcp-coder's prompts.
