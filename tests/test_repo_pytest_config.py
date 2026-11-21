@@ -48,4 +48,6 @@ def test_unregistered_marker_fails_collection(tmp_path: Path) -> None:
 
     output = result.stdout + result.stderr
     assert result.returncode != 0, output
-    assert f"'{_UNREGISTERED}' not found in `markers` configuration option" in output
+    assert f"'{_UNREGISTERED}' not found in `markers` configuration option" in output, (
+        output
+    )
