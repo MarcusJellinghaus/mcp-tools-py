@@ -47,6 +47,9 @@ def _build_error_detail(output: str, error_output: str) -> str:
 
 logger = logging.getLogger(__name__)
 
+# Attribute run_tests sets on an exception it re-raises: the command, for the error reply.
+_COMMAND_ATTR = "pytest_command"
+
 
 class ProcessResult:
     """Adapter class that mimics subprocess.CompletedProcess interface.
@@ -169,12 +172,13 @@ def run_tests(
                 command.extend(["-m", " and ".join(markers)])
 
         # Add rootdir and json-report options
+        report_file_arg = f"--json-report-file={temp_report_file}"
         command.extend(
             [
                 "--rootdir",
                 project_dir,
                 "--json-report",
-                f"--json-report-file={temp_report_file}",
+                report_file_arg,
             ]
         )
 
@@ -187,6 +191,9 @@ def run_tests(
         # Add any extra arguments
         if extra_args:
             command.extend(extra_args)
+
+        # The command as shown in error replies: without the temporary report file
+        shown_command = " ".join(arg for arg in command if arg != report_file_arg)
 
         logger.debug("Running command: %s", " ".join(command))
 
@@ -231,8 +238,7 @@ def run_tests(
                     subprocess_result.stdout, subprocess_result.stderr
                 )
                 raise TimeoutError(
-                    f"Subprocess timed out after {timeout_seconds} seconds: "
-                    f"{' '.join(command)}.{detail}"
+                    f"Subprocess timed out after {timeout_seconds} seconds.{detail}"
                 )
 
             if subprocess_result.execution_error:
@@ -372,6 +378,7 @@ def run_tests(
                 project_dir,
                 command_line,
             )
+            setattr(e, _COMMAND_ATTR, shown_command)
             raise e
 
     except Exception as e:
@@ -493,7 +500,11 @@ def check_code_with_pytest(
                 "test_folder": test_folder,
             },
         )
+        problems = [str(e)]
+        command = getattr(e, _COMMAND_ATTR, None)
+        if command:
+            problems.append(f"Command: {command}")
         return {
-            "verdict": RunVerdict(RunStatus.ERROR, [str(e)], 0),
+            "verdict": RunVerdict(RunStatus.ERROR, problems, 0),
             "test_paths_note": note,
         }

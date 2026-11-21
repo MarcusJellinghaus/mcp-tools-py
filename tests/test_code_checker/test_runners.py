@@ -2,10 +2,12 @@
 Tests for the code_checker_pytest runner functionality.
 """
 
+import json
 import logging
 import os
 import sys
 import tempfile
+from contextlib import ExitStack
 from pathlib import Path
 from unittest.mock import MagicMock, patch
 
@@ -631,3 +633,80 @@ def test_path_args_skip_default_folder_integration(mock_execute: MagicMock) -> N
     # Default test folder should NOT be in command
     test_folder_path = os.path.join("/test/project", "tests")
     assert test_folder_path not in called_command
+
+
+_RUNNERS = "mcp_tools_py.code_checker_pytest.runners"
+
+
+@pytest.mark.parametrize(
+    "case_id, mock_kwargs, unparsable_report, expected",
+    [
+        (
+            "no_tests",
+            {"return_code": 5, "stdout": "collected 0 items"},
+            False,
+            "No Tests Found",
+        ),
+        (
+            "timeout",
+            {
+                "timed_out": True,
+                "execution_error": "Process timed out after 300 seconds",
+            },
+            False,
+            "Subprocess timed out after 300 seconds",
+        ),
+        ("unparsable_report", {"return_code": 0}, True, "x"),
+    ],
+)
+@patch(f"{_RUNNERS}.execute_command")
+def test_check_code_with_pytest_error_reply_names_command(
+    mock_execute: MagicMock,
+    case_id: str,
+    mock_kwargs: dict[str, object],
+    unparsable_report: bool,
+    expected: str,
+) -> None:
+    """An exception from run_tests' handler adds one Command: line to the reply."""
+    result_kwargs: dict[str, object] = {
+        "return_code": 0,
+        "stdout": "",
+        "stderr": "",
+        "execution_error": None,
+        "timed_out": False,
+    }
+    result_kwargs.update(mock_kwargs)
+    mock_execute.return_value = MagicMock(**result_kwargs)
+
+    with ExitStack() as stack:
+        if unparsable_report:
+            stack.enter_context(patch(f"{_RUNNERS}.os.path.isfile", return_value=True))
+            stack.enter_context(patch(f"{_RUNNERS}.read_file", return_value="{}"))
+            stack.enter_context(
+                patch(
+                    f"{_RUNNERS}.parse_pytest_report",
+                    side_effect=json.JSONDecodeError("x", "", 0),
+                )
+            )
+        result = check_code_with_pytest(
+            project_dir="/test/project",
+            python_executable=sys.executable,
+            extra_args=["tests"],
+            skip_default_test_folder=True,
+        )
+
+    verdict = result["verdict"]
+    assert verdict.status is RunStatus.ERROR
+    assert expected in verdict.problems[0], case_id
+    command_lines = [
+        line
+        for problem in verdict.problems
+        for line in problem.splitlines()
+        if line.startswith("Command: ")
+    ]
+    assert len(command_lines) == 1, case_id
+    assert "-m pytest" in command_lines[0]
+    assert "--json-report" in command_lines[0]
+    assert "--json-report-file" not in command_lines[0]
+    if case_id == "timeout":
+        assert "-m pytest" not in verdict.problems[0]
