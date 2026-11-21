@@ -66,9 +66,9 @@ See [step_6.md](./steps/step_6.md)
 ### Step 7: README and architecture docs name pytest-json-report
 See [step_7.md](./steps/step_7.md)
 
-- [ ] Implementation (docs only)
-- [ ] Quality checks (pylint, pytest, mypy) — fix all issues
-- [ ] Commit message prepared
+- [x] Implementation (docs only)
+- [x] Quality checks (pylint, pytest, mypy) — fix all issues
+- [x] Commit message prepared
 
 ## Pull Request
 
