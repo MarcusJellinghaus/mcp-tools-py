@@ -32,6 +32,10 @@ def is_distribution_available(self, name: str) -> bool: ...
 - No logging (callers' `is_tool_available("pytest")` already logs a failed probe).
 - Docstrings: `name` is a distribution name compared exactly against the probe's
   lowercased (not PEP 503 normalised) keys; a failed probe counts as available.
+- Module docstring of `tool_context.py`: it says a registrar asks "the two questions"
+  (is this tool there, what to say when it is not); add the third — is a distribution
+  (pytest-json-report, pytest-cov) installed, answered by `is_distribution_available` —
+  matching the architecture-doc wording in `step_7.md`.
 
 ## ALGORITHM
 

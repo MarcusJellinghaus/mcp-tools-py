@@ -52,6 +52,13 @@ Patch `"mcp_tools_py.utils.tool_context.get_environment_info"` in each test.
    `mcp_tools_py.toolkit.finish_coverage_run`: status `"error"`,
    `"pytest-cov is not available" in summary`, both mocks not called (so saved data is
    never cleared).
+3. `full` with a failed probe
+   (`EnvironmentInfo(version="", sys_path=(), distributions={}, importable={}, error="boom")`),
+   following `test_full_uses_long_timeout_for_pytest_and_coverage_run` (its
+   `pytest.importorskip("pytest_cov")`, `_write_coverage_project(tmp_path)`, and patches
+   of `mcp_tools_py.toolkit.check_code_with_pytest` returning `_passed_results()` and
+   `mcp_tools_py.toolkit.finish_coverage_run` returning `None`): both checks fail open,
+   so `check_code_with_pytest` is called once.
 
 If adding the class would push `tests/test_toolkit_test.py` over 750 lines, put it in a new
 file `tests/test_toolkit_test_preflight.py` instead.
