@@ -1,8 +1,10 @@
 """Everything a tool registrar needs, and nothing about the server.
 
 Layer 1 and 2 of the environment model, seen from a registrar: the values a
-tool needs to build its command line, plus the two questions it asks about
-its own environment — is this tool there, and what do I say when it is not.
+tool needs to build its command line, plus the questions it asks about its
+own environment — is this tool there, what do I say when it is not, and is a
+distribution it needs (pytest-json-report, pytest-cov) installed, answered by
+`is_distribution_available`.
 
 Which environment answers depends on the tool.  The seven console-script tools
 are mcp-tools-py's own dependencies and are answered from `tool_environment`;
@@ -17,6 +19,7 @@ from pathlib import Path
 from mcp_tools_py.utils.environment_info import (
     TOOL_MODULES,
     TOOL_PACKAGES,
+    EnvironmentInfo,
     get_environment_info,
 )
 from mcp_tools_py.utils.project_config import ToolName, get_check_timeout
@@ -30,6 +33,21 @@ logger = logging.getLogger(__name__)
 CONSOLE_SCRIPT_TOOLS: frozenset[str] = frozenset(
     key for key, module in TOOL_MODULES.items() if module is None
 )
+
+
+def distribution_available(info: EnvironmentInfo, name: str) -> bool:
+    """Check whether the probed environment has distribution `name` installed.
+
+    Args:
+        info: The environment probe's result.
+        name: Distribution name, compared exactly against the probe's keys,
+            which are lowercased but not PEP 503 normalised.
+
+    Returns:
+        True if the distribution is installed, or if the probe failed: a probe
+        that could not be trusted fails open.
+    """
+    return info.error is not None or name in info.distributions
 
 
 @dataclass(frozen=True)
@@ -101,6 +119,22 @@ class ToolContext:
         if not available:
             logger.warning("%s", self.unavailable_message(tool_name))
         return available
+
+    def is_distribution_available(self, name: str) -> bool:
+        """Check whether distribution `name` is installed in `environment`.
+
+        Answered from the one-shot environment probe, which fails open: a probe
+        that could not be trusted reports the distribution available.
+
+        Args:
+            name: Distribution name, compared exactly against the probe's
+                lowercased (not PEP 503 normalised) keys.
+
+        Returns:
+            True if the distribution is installed or the probe failed.
+        """
+        info = get_environment_info(str(self.environment.interpreter))
+        return distribution_available(info, name)
 
     def unavailable_message(self, tool_name: str) -> str:
         """Build the standard "tool not available" message for `tool_name`.

@@ -47,6 +47,9 @@ def _build_error_detail(output: str, error_output: str) -> str:
 
 logger = logging.getLogger(__name__)
 
+# Attribute run_tests sets on an exception it re-raises: the command, for the error reply.
+_COMMAND_ATTR = "pytest_command"
+
 
 class ProcessResult:
     """Adapter class that mimics subprocess.CompletedProcess interface.
@@ -115,8 +118,7 @@ def run_tests(
         - error_context: Information about any errors that occurred during execution
 
     Raises:
-        RuntimeError: For pytest internal errors, plugin errors, missing pytest, or
-            failure to install pytest-json-report.
+        RuntimeError: For pytest internal errors, plugin errors, or missing pytest.
         TimeoutError: If pytest execution exceeds `timeout_seconds`.
         ValueError: For pytest usage errors or when no tests are collected.
     """
@@ -170,12 +172,13 @@ def run_tests(
                 command.extend(["-m", " and ".join(markers)])
 
         # Add rootdir and json-report options
+        report_file_arg = f"--json-report-file={temp_report_file}"
         command.extend(
             [
                 "--rootdir",
                 project_dir,
                 "--json-report",
-                f"--json-report-file={temp_report_file}",
+                report_file_arg,
             ]
         )
 
@@ -188,6 +191,9 @@ def run_tests(
         # Add any extra arguments
         if extra_args:
             command.extend(extra_args)
+
+        # The command as shown in error replies: without the temporary report file
+        shown_command = " ".join(arg for arg in command if arg != report_file_arg)
 
         logger.debug("Running command: %s", " ".join(command))
 
@@ -232,8 +238,7 @@ def run_tests(
                     subprocess_result.stdout, subprocess_result.stderr
                 )
                 raise TimeoutError(
-                    f"Subprocess timed out after {timeout_seconds} seconds: "
-                    f"{' '.join(command)}.{detail}"
+                    f"Subprocess timed out after {timeout_seconds} seconds.{detail}"
                 )
 
             if subprocess_result.execution_error:
@@ -252,80 +257,6 @@ def run_tests(
             error_output = process.stderr
             combined_output = f"{output}\n{error_output}"
             logger.debug(output)
-
-            # Check if plugin is missing
-            if (
-                "no plugin named 'json-report'" in combined_output.lower()
-                or "no module named 'pytest_json_report'" in combined_output.lower()
-            ):
-                logger.debug(
-                    "pytest-json-report plugin not found, attempting to install it..."
-                )
-                try:
-                    install_result = execute_command(
-                        command=[
-                            python_executable,
-                            "-m",
-                            "pip",
-                            "install",
-                            "pytest-json-report",
-                        ],
-                        cwd=project_dir,
-                        timeout_seconds=60,  # Give it time to install
-                        env=env,
-                    )
-
-                    if (
-                        install_result.return_code != 0
-                        or install_result.execution_error
-                    ):
-                        logger.warning(
-                            "Failed to install pytest-json-report: %s",
-                            install_result.stderr,
-                        )
-                        detail = _build_error_detail(
-                            install_result.stdout, install_result.stderr
-                        )
-                        raise RuntimeError(
-                            "Failed to install the required pytest-json-report "
-                            f"plugin.{detail}"
-                        )
-
-                    logger.debug("Installed pytest-json-report, retrying...")
-
-                    # Retry the command
-                    retry_result = execute_command(
-                        command=command,
-                        cwd=project_dir,
-                        timeout_seconds=timeout_seconds,
-                        env=env,
-                    )
-
-                    if retry_result.timed_out:
-                        logger.warning("Retry timed out")
-                        detail = _build_error_detail(
-                            retry_result.stdout, retry_result.stderr
-                        )
-                        raise TimeoutError(
-                            f"Timed out after {timeout_seconds} seconds while "
-                            "retrying the test after installing "
-                            f"pytest-json-report.{detail}"
-                        )
-
-                    # Update process object with retry results
-                    process = ProcessResult(
-                        retry_result.return_code,
-                        retry_result.stdout,
-                        retry_result.stderr,
-                    )
-                    output = process.stdout
-                    error_output = process.stderr
-                    combined_output = f"{output}\n{error_output}"
-                except Exception as install_error:
-                    logger.warning(
-                        "Error during installation or retry: %s", install_error
-                    )
-                    raise
 
             # Check specifically for 'no tests found' case
             if process.returncode == 5:
@@ -447,6 +378,7 @@ def run_tests(
                 project_dir,
                 command_line,
             )
+            setattr(e, _COMMAND_ATTR, shown_command)
             raise e
 
     except Exception as e:
@@ -568,7 +500,11 @@ def check_code_with_pytest(
                 "test_folder": test_folder,
             },
         )
+        problems = [str(e)]
+        command = getattr(e, _COMMAND_ATTR, None)
+        if command:
+            problems.append(f"Command: {command}")
         return {
-            "verdict": RunVerdict(RunStatus.ERROR, [str(e)], 0),
+            "verdict": RunVerdict(RunStatus.ERROR, problems, 0),
             "test_paths_note": note,
         }

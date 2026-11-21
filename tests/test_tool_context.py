@@ -9,7 +9,7 @@ from unittest.mock import patch
 
 import pytest
 
-from mcp_tools_py.utils.environment_info import PROBED_MODULES
+from mcp_tools_py.utils.environment_info import PROBED_MODULES, EnvironmentInfo
 from mcp_tools_py.utils.python_environment import PythonEnvironment
 from mcp_tools_py.utils.tool_context import CONSOLE_SCRIPT_TOOLS, ToolContext
 from tests.conftest import make_command_result, make_environment_info
@@ -187,6 +187,38 @@ class TestIsToolAvailableModules:
             assert context.is_tool_available("mypy") is True
 
         mock_exec.assert_called_once()
+
+
+@pytest.mark.parametrize(
+    ("info", "name", "expected"),
+    [
+        pytest.param(
+            make_environment_info(), "pytest-json-report", True, id="installed"
+        ),
+        pytest.param(
+            make_environment_info(distributions={}),
+            "pytest-json-report",
+            False,
+            id="missing",
+        ),
+        pytest.param(
+            EnvironmentInfo(
+                version="", sys_path=(), distributions={}, importable={}, error="boom"
+            ),
+            "pytest-cov",
+            True,
+            id="probe-failed",
+        ),
+    ],
+)
+def test_is_distribution_available(
+    tmp_path: Path, info: EnvironmentInfo, name: str, expected: bool
+) -> None:
+    """A distribution is looked up by exact name; a failed probe fails open."""
+    context = _context(tmp_path)
+
+    with patch(_GET_ENVIRONMENT_INFO, return_value=info):
+        assert context.is_distribution_available(name) is expected
 
 
 class TestUnavailableMessage:

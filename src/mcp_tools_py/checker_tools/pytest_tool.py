@@ -24,7 +24,6 @@ from mcp_tools_py.code_checker_pytest.runners import check_code_with_pytest
 from mcp_tools_py.code_checker_pytest.utils import sanitize_extra_args
 from mcp_tools_py.code_checker_pytest.verdict import RunStatus
 from mcp_tools_py.log_utils import log_function_call
-from mcp_tools_py.utils.environment_info import get_environment_info
 from mcp_tools_py.utils.project_config import (
     get_pytest_addopts,
     resolve_coverage_source,
@@ -168,15 +167,17 @@ def register(mcp: "FastMCPProtocol", checker_tools: "CheckerTools") -> None:
         if not context.is_tool_available("pytest"):
             return context.unavailable_message("pytest")
 
+        required = ("pytest-json-report", *(("pytest-cov",) if coverage else ()))
+        for name in required:
+            if not context.is_distribution_available(name):
+                return context.unavailable_message(name)
+
         project_dir = str(context.project_dir)
         interpreter = str(context.environment.interpreter)
         temp_dir: str | None = None
         try:
             sources: list[str] = []
             if coverage:
-                info = get_environment_info(interpreter)
-                if not info.error and "pytest-cov" not in info.distributions:
-                    return context.unavailable_message("pytest-cov")
                 resolved = resolve_coverage_source(project_dir, coverage_source)
                 if isinstance(resolved, str):
                     return resolved

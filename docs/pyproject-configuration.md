@@ -44,7 +44,7 @@ one budget:
 |-----------|------------|
 | `run_format_code` | `isort-timeout` + `black-timeout` for the black steps; 3 × `ruff-timeout` for the ruff steps (`ruff_imports` is a pre-check run then the apply run, `ruff_format` one run) |
 | `run_ruff_fix` | 2 × `ruff-timeout` (a pre-check run, then the apply run) |
-| `run_pytest_check` | 2 × `pytest-timeout` + 60s, when the pytest-json-report plugin is missing and the run is retried |
+| `run_pytest_check` | 3 × `pytest-timeout` + up to 2 × the 30 s probe timeout. pytest itself uses one; the other two are the coverage merge's `coverage combine --keep` and `coverage json`, which run only with `combine_with_previous=True`, saved earlier runs that each have a data file, and no mismatch discarding them (never from the toolkit). A plain coverage run writes its JSON through pytest-cov, so only pytest uses `pytest-timeout`. The probes are the environment probe on the first call and the `fail_under` read of each coverage run |
 
 ### Values
 

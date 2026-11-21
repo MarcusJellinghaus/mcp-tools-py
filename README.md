@@ -132,7 +132,7 @@ mcp-tools-py --project-dir /path/to/project [options]
 #### Python Configuration
 | Parameter | Type | Default | Description |
 |-----------|------|---------|-------------|
-| `--python-executable` | string | sys.executable | Path to the Python interpreter of the project's environment. pytest, pylint, mypy and deptry run in it and library/symbol lookups resolve against it, so it must be the environment holding the project's dependencies, with deptry installed. black, isort, ruff, bandit, vulture, tach and lint-imports come from mcp-tools-py's own environment and need not be installed here. A bare name is looked up on PATH; a path that neither exists nor resolves fails at startup |
+| `--python-executable` | string | sys.executable | Path to the Python interpreter of the project's environment. pytest, pylint, mypy and deptry run in it and library/symbol lookups resolve against it, so it must be the environment holding the project's dependencies, with deptry and pytest-json-report installed. black, isort, ruff, bandit, vulture, tach and lint-imports come from mcp-tools-py's own environment and need not be installed here. A bare name is looked up on PATH; a path that neither exists nor resolves fails at startup |
 | `--venv-path` | string | None | **Deprecated**, hidden from `--help`. Still accepted, and still resolves the interpreter (taking precedence over `--python-executable`), but no longer used to locate tools. Use `--python-executable` instead |
 
 #### Test Configuration
@@ -166,7 +166,7 @@ mcp-tools-py --project-dir /path/to/project [options]
 
 Two environments are in play, and only one of them is configurable:
 
-- **project env** — named by `--python-executable`. It holds your project's dependencies, and pytest, pylint, mypy and deptry, which have to import or inspect those dependencies to do their work. Library and symbol resolution (`get_library_source`, `list_symbols`, `find_references`) follows the same interpreter, so pointing the flag at the wrong venv makes those tools resolve against the wrong packages. Library lookups run in a throwaway working directory, so files a library writes on import don't land in your project, and relative `PYTHONPATH` entries are not resolved against the project.
+- **project env** — named by `--python-executable`. It holds your project's dependencies, and pytest (with pytest-json-report), pylint, mypy and deptry, which have to import or inspect those dependencies to do their work. pytest-json-report is a runtime dependency of mcp-tools-py, so it is present when mcp-tools-py is installed into the project env; installing mcp-tools-py in its own environment does not put it into the project's environment. Library and symbol resolution (`get_library_source`, `list_symbols`, `find_references`) follows the same interpreter, so pointing the flag at the wrong venv makes those tools resolve against the wrong packages. Library lookups run in a throwaway working directory, so files a library writes on import don't land in your project, and relative `PYTHONPATH` entries are not resolved against the project.
 - **tool env** — where `mcp_tools_py` itself is installed. It supplies black, isort, ruff, bandit, vulture, tach and lint-imports, which are mcp-tools-py's own dependencies. It is **not** configurable. It must be a virtual environment; see [Installation](#installation).
 
 Those seven therefore run at the tool env's versions, which may differ from what your project pins, so a project that cares about parity with its CI should keep compatible ranges in both places. lint-imports still checks your working tree: it runs from the tool env, but finds the project's root package, read from the import-linter config and located through the project interpreter. A custom `contract_types` entry inside that root package still resolves through the same bridge; one that lives in a separate distribution installed only in the project env does not, since only the root package's directory is handed over.
@@ -175,7 +175,7 @@ The first example below builds that path by interpolating an environment variabl
 
 ### Correct Configuration
 
-Point to the project's venv, with pytest, pylint, mypy and deptry installed in it, here on Windows:
+Point to the project's venv, with pytest, pytest-json-report, pylint, mypy and deptry installed in it, here on Windows:
 
 ```json
 {
@@ -215,14 +215,14 @@ Do **not** point to an interpreter that is not the project's:
 }
 ```
 
-A system interpreter, or any venv that is not the project's, reports pytest, pylint, mypy and deptry as missing and resolves library and symbol lookups against the wrong packages. Your project's own `.venv` fails the same way if those four are not installed in it — install them there rather than pointing the flag elsewhere.
+A system interpreter, or any venv that is not the project's, reports pytest, pytest-json-report, pylint, mypy and deptry as missing and resolves library and symbol lookups against the wrong packages. Your project's own `.venv` fails the same way if those five are not installed in it — install them there rather than pointing the flag elsewhere.
 
 ### Troubleshooting
 
 - **"Python interpreter not found"** at startup: `--python-executable` points at a path that doesn't exist — usually because the environment variable it interpolates is unset. The message names the flag that supplied the path.
-- **"No module named pytest"** (or pylint/mypy/deptry): Your `--python-executable` points to an environment that doesn't have the required tools installed. Point it at the project's environment and install them there.
+- **"No module named pytest"** (or pylint/mypy/deptry), or **"pytest-json-report is not available"**: Your `--python-executable` points to an environment that doesn't have the required tools installed. Point it at the project's environment and install them there.
 - **"ruff is not available"** (or black/isort/bandit/vulture/tach/lint-imports): these console scripts come from the tool env, not from `--python-executable`, so the flag is not the problem. They are dependencies of mcp-tools-py, and the message names the tool env directory searched: reinstall mcp-tools-py with its dependencies and restart the server. If mcp-tools-py was installed outside a virtual environment, redo the install inside one.
-- **After installing missing tools**: pytest, pylint, mypy and deptry are answered by a probe of the configured interpreter that runs once and is cached for the process lifetime, so restart the MCP server after installing one of those four.
+- **After installing missing tools**: pytest, pylint, mypy, deptry, pytest-json-report and pytest-cov are answered by a probe of the configured interpreter that runs once and is cached for the process lifetime, so a refusal persists until the MCP server restarts — restart it after installing any of them.
 
 ## Installation
 

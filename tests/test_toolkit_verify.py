@@ -1,13 +1,20 @@
 """Tests for PythonToolkit.verify()."""
 
 from pathlib import Path
+from unittest.mock import patch
 
 import pytest
 
 from mcp_tools_py.toolkit import PythonToolkit
+from mcp_tools_py.utils.environment_info import EnvironmentInfo
 from mcp_tools_py.utils.tool_context import ToolContext
+from tests.conftest import make_environment_info
 
 _RUFF_PYPROJECT = '[tool.ruff.format]\nquote-style = "double"\n'
+_GET_ENVIRONMENT_INFO = "mcp_tools_py.utils.tool_context.get_environment_info"
+_BOTH = make_environment_info(
+    distributions={"pytest-json-report": "1.5.0", "pytest-cov": "7.1.0"}
+)
 
 
 class TestVerify:
@@ -16,9 +23,10 @@ class TestVerify:
     def test_healthy_environment_is_all_ok(self, tmp_path: Path) -> None:
         (tmp_path / "pyproject.toml").write_text(_RUFF_PYPROJECT)
 
-        items = PythonToolkit().verify(tmp_path)
+        with patch(_GET_ENVIRONMENT_INFO, return_value=_BOTH):
+            items = PythonToolkit().verify(tmp_path)
 
-        assert len(items) == 12
+        assert len(items) == 14
         assert all(item.status == "ok" for item in items)
         names = {item.name for item in items}
         assert names == {
@@ -33,6 +41,8 @@ class TestVerify:
             "vulture",
             "tach",
             "lint-imports",
+            "pytest-json-report",
+            "pytest-cov",
             "formatter",
         }
 
@@ -129,9 +139,49 @@ class TestVerifyAction:
     def test_test_reports_pytest(self, tmp_path: Path) -> None:
         (tmp_path / "pyproject.toml").write_text(_RUFF_PYPROJECT)
 
-        items = PythonToolkit().verify(tmp_path, "test")
+        with patch(_GET_ENVIRONMENT_INFO, return_value=_BOTH):
+            items = PythonToolkit().verify(tmp_path, "test")
 
-        assert {item.name for item in items} == {"pytest"}
+        assert {item.name for item in items} == {
+            "pytest",
+            "pytest-json-report",
+            "pytest-cov",
+        }
+
+    @pytest.mark.parametrize("action", [None, "test"])
+    def test_missing_plugins_are_error_and_warning(
+        self, tmp_path: Path, action: str | None
+    ) -> None:
+        (tmp_path / "pyproject.toml").write_text(_RUFF_PYPROJECT)
+
+        with patch(
+            _GET_ENVIRONMENT_INFO,
+            return_value=make_environment_info(distributions={}),
+        ):
+            items = PythonToolkit().verify(tmp_path, action)
+
+        by_name = {item.name: item for item in items}
+        assert by_name["pytest-json-report"].status == "error"
+        assert (
+            "pytest-json-report is not available"
+            in by_name["pytest-json-report"].message
+        )
+        assert by_name["pytest-cov"].status == "warning"
+        assert "full" in by_name["pytest-cov"].message
+
+    @pytest.mark.parametrize("action", [None, "test"])
+    def test_broken_probe_fails_open(self, tmp_path: Path, action: str | None) -> None:
+        (tmp_path / "pyproject.toml").write_text(_RUFF_PYPROJECT)
+        broken = EnvironmentInfo(
+            version="", sys_path=(), distributions={}, importable={}, error="boom"
+        )
+
+        with patch(_GET_ENVIRONMENT_INFO, return_value=broken):
+            items = PythonToolkit().verify(tmp_path, action)
+
+        by_name = {item.name: item for item in items}
+        assert by_name["pytest-json-report"].status == "ok"
+        assert by_name["pytest-cov"].status == "ok"
 
     def test_undeclared_action_is_error(self, tmp_path: Path) -> None:
         items = PythonToolkit().verify(tmp_path, "deploy")

@@ -50,6 +50,23 @@ class TestToolHandlerShortCircuit:
         assert "pytest is not available" in result
         assert "Restart the server" in result
 
+    def test_pytest_json_report_missing_returns_error(self, tmp_path: Path) -> None:
+        """Without pytest-json-report in the project env, pytest is never run."""
+        _, tools = self._server_with(tmp_path)
+
+        with (
+            patch(
+                _GET_ENVIRONMENT_INFO,
+                return_value=make_environment_info(distributions={}),
+            ),
+            patch(_PYTEST_RUNNER) as mock_check,
+        ):
+            result = tools["run_pytest_check"]()
+
+        assert "pytest-json-report is not available" in result
+        assert "Restart the server" in result
+        mock_check.assert_not_called()
+
     def test_pylint_unavailable_returns_error(self, tmp_path: Path) -> None:
         """When pylint is unavailable, tool handler returns error string."""
         _, tools = self._server_with(tmp_path)

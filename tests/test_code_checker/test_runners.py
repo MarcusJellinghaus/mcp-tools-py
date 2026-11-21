@@ -2,10 +2,12 @@
 Tests for the code_checker_pytest runner functionality.
 """
 
+import json
 import logging
 import os
 import sys
 import tempfile
+from contextlib import ExitStack
 from pathlib import Path
 from unittest.mock import MagicMock, patch
 
@@ -575,35 +577,10 @@ def test_internal_error_3_preserves_internalerror_block_untruncated(
     assert "Internal Error" in msg
 
 
-@pytest.mark.parametrize(
-    "second_kind, exc_cls, msg_substring, log_substring",
-    [
-        (
-            "install_fail",
-            RuntimeError,
-            "Failed to install the required pytest-json-report plugin",
-            "failed to install pytest-json-report",
-        ),
-        (
-            "retry_timeout",
-            TimeoutError,
-            "Timed out after 300 seconds while retrying",
-            "retry timed out",
-        ),
-    ],
-)
 @patch("mcp_tools_py.code_checker_pytest.runners.execute_command")
-def test_run_tests_surfaces_pytest_output_on_install_and_retry_failures(
-    mock_execute: MagicMock,
-    caplog: pytest.LogCaptureFixture,
-    second_kind: str,
-    exc_cls: type[Exception],
-    msg_substring: str,
-    log_substring: str,
-) -> None:
-    """Install-failure (line 271) and retry-timeout (line 289) must include
-    real stdout/stderr in the raised exception AND emit a WARNING."""
-    first = MagicMock(
+def test_run_tests_never_installs_packages(mock_execute: MagicMock) -> None:
+    """A missing pytest-json-report raises; run_tests never runs pip."""
+    mock_execute.return_value = MagicMock(
         return_code=1,
         stdout="",
         stderr="No module named 'pytest_json_report'",
@@ -611,49 +588,16 @@ def test_run_tests_surfaces_pytest_output_on_install_and_retry_failures(
         timed_out=False,
     )
 
-    if second_kind == "install_fail":
-        install_fail = MagicMock(
-            return_code=1,
-            stdout="STDOUT_MARKER_xyz",
-            stderr="STDERR_MARKER_abc",
-            execution_error=None,
-            timed_out=False,
-        )
-        mock_execute.side_effect = [first, install_fail]
-    else:
-        install_ok = MagicMock(
-            return_code=0,
-            stdout="",
-            stderr="",
-            execution_error=None,
-            timed_out=False,
-        )
-        retry_timeout = MagicMock(
-            return_code=None,
-            stdout="STDOUT_MARKER_xyz",
-            stderr="STDERR_MARKER_abc",
-            execution_error="Process timed out after 300 seconds",
-            timed_out=True,
-        )
-        mock_execute.side_effect = [first, install_ok, retry_timeout]
-
-    with caplog.at_level(
-        logging.WARNING, logger="mcp_tools_py.code_checker_pytest.runners"
+    with patch(
+        "mcp_tools_py.code_checker_pytest.runners.os.path.isfile",
+        return_value=False,
     ):
-        with pytest.raises(exc_cls) as excinfo:
+        with pytest.raises(RuntimeError):
             run_tests("/test/project", "tests", python_executable=sys.executable)
 
-    msg = str(excinfo.value)
-    assert msg_substring in msg
-    assert "STDERR_MARKER_abc" in msg
-    assert "STDOUT_MARKER_xyz" in msg
-
-    matching = [
-        r
-        for r in caplog.records
-        if r.levelno == logging.WARNING and log_substring in r.getMessage().lower()
-    ]
-    assert matching, f"expected WARNING for branch {second_kind}"
+    assert mock_execute.call_count == 1
+    for call in mock_execute.call_args_list:
+        assert "pip" not in call.kwargs["command"]
 
 
 @patch("mcp_tools_py.code_checker_pytest.runners.execute_command")
@@ -689,3 +633,80 @@ def test_path_args_skip_default_folder_integration(mock_execute: MagicMock) -> N
     # Default test folder should NOT be in command
     test_folder_path = os.path.join("/test/project", "tests")
     assert test_folder_path not in called_command
+
+
+_RUNNERS = "mcp_tools_py.code_checker_pytest.runners"
+
+
+@pytest.mark.parametrize(
+    "case_id, mock_kwargs, unparsable_report, expected",
+    [
+        (
+            "no_tests",
+            {"return_code": 5, "stdout": "collected 0 items"},
+            False,
+            "No Tests Found",
+        ),
+        (
+            "timeout",
+            {
+                "timed_out": True,
+                "execution_error": "Process timed out after 300 seconds",
+            },
+            False,
+            "Subprocess timed out after 300 seconds",
+        ),
+        ("unparsable_report", {"return_code": 0}, True, "x"),
+    ],
+)
+@patch(f"{_RUNNERS}.execute_command")
+def test_check_code_with_pytest_error_reply_names_command(
+    mock_execute: MagicMock,
+    case_id: str,
+    mock_kwargs: dict[str, object],
+    unparsable_report: bool,
+    expected: str,
+) -> None:
+    """An exception from run_tests' handler adds one Command: line to the reply."""
+    result_kwargs: dict[str, object] = {
+        "return_code": 0,
+        "stdout": "",
+        "stderr": "",
+        "execution_error": None,
+        "timed_out": False,
+    }
+    result_kwargs.update(mock_kwargs)
+    mock_execute.return_value = MagicMock(**result_kwargs)
+
+    with ExitStack() as stack:
+        if unparsable_report:
+            stack.enter_context(patch(f"{_RUNNERS}.os.path.isfile", return_value=True))
+            stack.enter_context(patch(f"{_RUNNERS}.read_file", return_value="{}"))
+            stack.enter_context(
+                patch(
+                    f"{_RUNNERS}.parse_pytest_report",
+                    side_effect=json.JSONDecodeError("x", "", 0),
+                )
+            )
+        result = check_code_with_pytest(
+            project_dir="/test/project",
+            python_executable=sys.executable,
+            extra_args=["tests"],
+            skip_default_test_folder=True,
+        )
+
+    verdict = result["verdict"]
+    assert verdict.status is RunStatus.ERROR
+    assert expected in verdict.problems[0], case_id
+    command_lines = [
+        line
+        for problem in verdict.problems
+        for line in problem.splitlines()
+        if line.startswith("Command: ")
+    ]
+    assert len(command_lines) == 1, case_id
+    assert "-m pytest" in command_lines[0]
+    assert "--json-report" in command_lines[0]
+    assert "--json-report-file" not in command_lines[0]
+    if case_id == "timeout":
+        assert "-m pytest" not in verdict.problems[0]
