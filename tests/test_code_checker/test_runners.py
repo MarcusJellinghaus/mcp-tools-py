@@ -575,35 +575,10 @@ def test_internal_error_3_preserves_internalerror_block_untruncated(
     assert "Internal Error" in msg
 
 
-@pytest.mark.parametrize(
-    "second_kind, exc_cls, msg_substring, log_substring",
-    [
-        (
-            "install_fail",
-            RuntimeError,
-            "Failed to install the required pytest-json-report plugin",
-            "failed to install pytest-json-report",
-        ),
-        (
-            "retry_timeout",
-            TimeoutError,
-            "Timed out after 300 seconds while retrying",
-            "retry timed out",
-        ),
-    ],
-)
 @patch("mcp_tools_py.code_checker_pytest.runners.execute_command")
-def test_run_tests_surfaces_pytest_output_on_install_and_retry_failures(
-    mock_execute: MagicMock,
-    caplog: pytest.LogCaptureFixture,
-    second_kind: str,
-    exc_cls: type[Exception],
-    msg_substring: str,
-    log_substring: str,
-) -> None:
-    """Install-failure (line 271) and retry-timeout (line 289) must include
-    real stdout/stderr in the raised exception AND emit a WARNING."""
-    first = MagicMock(
+def test_run_tests_never_installs_packages(mock_execute: MagicMock) -> None:
+    """A missing pytest-json-report raises; run_tests never runs pip."""
+    mock_execute.return_value = MagicMock(
         return_code=1,
         stdout="",
         stderr="No module named 'pytest_json_report'",
@@ -611,49 +586,16 @@ def test_run_tests_surfaces_pytest_output_on_install_and_retry_failures(
         timed_out=False,
     )
 
-    if second_kind == "install_fail":
-        install_fail = MagicMock(
-            return_code=1,
-            stdout="STDOUT_MARKER_xyz",
-            stderr="STDERR_MARKER_abc",
-            execution_error=None,
-            timed_out=False,
-        )
-        mock_execute.side_effect = [first, install_fail]
-    else:
-        install_ok = MagicMock(
-            return_code=0,
-            stdout="",
-            stderr="",
-            execution_error=None,
-            timed_out=False,
-        )
-        retry_timeout = MagicMock(
-            return_code=None,
-            stdout="STDOUT_MARKER_xyz",
-            stderr="STDERR_MARKER_abc",
-            execution_error="Process timed out after 300 seconds",
-            timed_out=True,
-        )
-        mock_execute.side_effect = [first, install_ok, retry_timeout]
-
-    with caplog.at_level(
-        logging.WARNING, logger="mcp_tools_py.code_checker_pytest.runners"
+    with patch(
+        "mcp_tools_py.code_checker_pytest.runners.os.path.isfile",
+        return_value=False,
     ):
-        with pytest.raises(exc_cls) as excinfo:
+        with pytest.raises(RuntimeError):
             run_tests("/test/project", "tests", python_executable=sys.executable)
 
-    msg = str(excinfo.value)
-    assert msg_substring in msg
-    assert "STDERR_MARKER_abc" in msg
-    assert "STDOUT_MARKER_xyz" in msg
-
-    matching = [
-        r
-        for r in caplog.records
-        if r.levelno == logging.WARNING and log_substring in r.getMessage().lower()
-    ]
-    assert matching, f"expected WARNING for branch {second_kind}"
+    assert mock_execute.call_count == 1
+    for call in mock_execute.call_args_list:
+        assert "pip" not in call.kwargs["command"]
 
 
 @patch("mcp_tools_py.code_checker_pytest.runners.execute_command")

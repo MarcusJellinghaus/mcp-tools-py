@@ -115,8 +115,7 @@ def run_tests(
         - error_context: Information about any errors that occurred during execution
 
     Raises:
-        RuntimeError: For pytest internal errors, plugin errors, missing pytest, or
-            failure to install pytest-json-report.
+        RuntimeError: For pytest internal errors, plugin errors, or missing pytest.
         TimeoutError: If pytest execution exceeds `timeout_seconds`.
         ValueError: For pytest usage errors or when no tests are collected.
     """
@@ -252,80 +251,6 @@ def run_tests(
             error_output = process.stderr
             combined_output = f"{output}\n{error_output}"
             logger.debug(output)
-
-            # Check if plugin is missing
-            if (
-                "no plugin named 'json-report'" in combined_output.lower()
-                or "no module named 'pytest_json_report'" in combined_output.lower()
-            ):
-                logger.debug(
-                    "pytest-json-report plugin not found, attempting to install it..."
-                )
-                try:
-                    install_result = execute_command(
-                        command=[
-                            python_executable,
-                            "-m",
-                            "pip",
-                            "install",
-                            "pytest-json-report",
-                        ],
-                        cwd=project_dir,
-                        timeout_seconds=60,  # Give it time to install
-                        env=env,
-                    )
-
-                    if (
-                        install_result.return_code != 0
-                        or install_result.execution_error
-                    ):
-                        logger.warning(
-                            "Failed to install pytest-json-report: %s",
-                            install_result.stderr,
-                        )
-                        detail = _build_error_detail(
-                            install_result.stdout, install_result.stderr
-                        )
-                        raise RuntimeError(
-                            "Failed to install the required pytest-json-report "
-                            f"plugin.{detail}"
-                        )
-
-                    logger.debug("Installed pytest-json-report, retrying...")
-
-                    # Retry the command
-                    retry_result = execute_command(
-                        command=command,
-                        cwd=project_dir,
-                        timeout_seconds=timeout_seconds,
-                        env=env,
-                    )
-
-                    if retry_result.timed_out:
-                        logger.warning("Retry timed out")
-                        detail = _build_error_detail(
-                            retry_result.stdout, retry_result.stderr
-                        )
-                        raise TimeoutError(
-                            f"Timed out after {timeout_seconds} seconds while "
-                            "retrying the test after installing "
-                            f"pytest-json-report.{detail}"
-                        )
-
-                    # Update process object with retry results
-                    process = ProcessResult(
-                        retry_result.return_code,
-                        retry_result.stdout,
-                        retry_result.stderr,
-                    )
-                    output = process.stdout
-                    error_output = process.stderr
-                    combined_output = f"{output}\n{error_output}"
-                except Exception as install_error:
-                    logger.warning(
-                        "Error during installation or retry: %s", install_error
-                    )
-                    raise
 
             # Check specifically for 'no tests found' case
             if process.returncode == 5:
