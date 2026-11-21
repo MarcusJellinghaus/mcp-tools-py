@@ -46,6 +46,8 @@ def make_environment_info(
     Args:
         version: Python version the probe reports.
         distributions: Lowercased distribution name -> installed version.
+            None reports pytest-json-report installed, so pytest runs are not
+            refused; an explicit ``{}`` reports nothing installed.
         importable: Per-module overrides of the default "yes, importable".
 
     Returns:
@@ -56,7 +58,9 @@ def make_environment_info(
     return EnvironmentInfo(
         version=version,
         sys_path=(),
-        distributions=distributions or {},
+        distributions=(
+            {"pytest-json-report": "1.5.0"} if distributions is None else distributions
+        ),
         importable=reported,
     )
 
