@@ -40,6 +40,7 @@ from tests.test_code_checker_pytest._coverage_report import _file
 from tests.test_code_checker_pytest._coverage_report import _report as _coverage_report
 
 _PYTEST_TOOL = "mcp_tools_py.checker_tools.pytest_tool"
+_GET_ENVIRONMENT_INFO = "mcp_tools_py.utils.tool_context.get_environment_info"
 _COVERAGE_DATA: dict[str, Any] = {
     "totals": {"percent_covered": 50.0, "num_statements": 4, "missing_lines": 2},
     "files": {},
@@ -145,9 +146,11 @@ def run_pytest_check(tmp_path: Path, all_modules_importable: Any) -> Iterator[An
             ToolServer(project_dir=tmp_path)
 
     tools = {f.__name__: f for call in mock_tool.call_args_list for f in [call[0][0]]}
-    info = make_environment_info(distributions={"pytest-cov": "7.1.0"})
+    info = make_environment_info(
+        distributions={"pytest-json-report": "1.5.0", "pytest-cov": "7.1.0"}
+    )
     with (
-        patch(f"{_PYTEST_TOOL}.get_environment_info", return_value=info),
+        patch(_GET_ENVIRONMENT_INFO, return_value=info),
         patch(f"{_PYTEST_TOOL}.read_fail_under", return_value=0.0),
     ):
         yield tools["run_pytest_check"]

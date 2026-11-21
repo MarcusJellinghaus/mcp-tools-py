@@ -892,6 +892,7 @@ class TestPytestTimeoutArgument:
 
 
 _PYTEST_TOOL = "mcp_tools_py.checker_tools.pytest_tool"
+_GET_ENVIRONMENT_INFO = "mcp_tools_py.utils.tool_context.get_environment_info"
 
 _COVERAGE_DATA: dict[str, Any] = {
     "totals": {"percent_covered": 50.0, "num_statements": 4, "missing_lines": 2},
@@ -959,9 +960,11 @@ class TestPytestCoverage:
             ):
                 ToolServer(project_dir=tmp_path)
 
-        info = make_environment_info(distributions={"pytest-cov": "7.1.0"})
+        info = make_environment_info(
+            distributions={"pytest-json-report": "1.5.0", "pytest-cov": "7.1.0"}
+        )
         with (
-            patch(f"{_PYTEST_TOOL}.get_environment_info", return_value=info),
+            patch(_GET_ENVIRONMENT_INFO, return_value=info),
             patch(f"{_PYTEST_TOOL}.read_fail_under", return_value=0.0),
         ):
             yield _get_tool(mock_tool, "run_pytest_check")
@@ -971,10 +974,7 @@ class TestPytestCoverage:
     ) -> None:
         """Without pytest-cov in the target env, pytest is never run."""
         with (
-            patch(
-                f"{_PYTEST_TOOL}.get_environment_info",
-                return_value=make_environment_info(),
-            ),
+            patch(_GET_ENVIRONMENT_INFO, return_value=make_environment_info()),
             patch(f"{_PYTEST_TOOL}.check_code_with_pytest") as mock_check,
         ):
             result = run_pytest_check(coverage=True, coverage_source=["src"])
@@ -988,7 +988,7 @@ class TestPytestCoverage:
             version="", sys_path=(), distributions={}, importable={}, error="boom"
         )
         with (
-            patch(f"{_PYTEST_TOOL}.get_environment_info", return_value=broken),
+            patch(_GET_ENVIRONMENT_INFO, return_value=broken),
             patch(f"{_PYTEST_TOOL}.check_code_with_pytest") as mock_check,
             patch(f"{_PYTEST_TOOL}.read_coverage_report", return_value=None),
         ):
