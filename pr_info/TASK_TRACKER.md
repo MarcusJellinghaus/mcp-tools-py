@@ -21,6 +21,19 @@ This tracks **Feature Implementation** consisting of multiple **Tasks**.
 
 ## Tasks
 
-<!-- Tasks populated from pr_info/steps/ by prepare_task_tracker -->
+### Step 1: `--strict-markers` in pytest addopts, with regression test — [step_1.md](./steps/step_1.md)
+
+- [ ] Implementation: `tests/test_repo_pytest_config.py` (fails first), `pyproject.toml` addopts, `vulture_whitelist.py` comment, `.claude/CLAUDE.md` sentence
+- [ ] Quality checks (pytest targeted + full suite, pylint, mypy, ruff, format) — fix all issues
+- [ ] Commit message prepared
+
+### Step 2: Fix the two marker comments in `toolkit.py` — [step_2.md](./steps/step_2.md)
+
+- [ ] Implementation: update comments above `UNATTENDED_EXCLUDED_MARKERS` and `_STRICT_MARKERS_OFF` (comments only)
+- [ ] Quality checks (pytest unit, pylint, mypy, ruff, format) — fix all issues
+- [ ] Commit message prepared
 
 ## Pull Request
+
+- [ ] PR review: review the full branch diff against the base branch
+- [ ] PR summary prepared
