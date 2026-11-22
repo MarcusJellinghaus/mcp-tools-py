@@ -31,9 +31,10 @@ RERUN_TIP = (
 _KEYWORDS = frozenset({"and", "or", "not"})
 # The non-numeric bare kwarg values pytest accepts in ``name(key=value)``.
 _KWARG_CONSTANTS = frozenset({"True", "False", "None"})
-# pytest's -m tokens: punctuation, a quoted string or an identifier; any other
-# character is a token of its own that makes the expression invalid.
-_TOKEN = re.compile(r"""[(),=]|'[^']*'|"[^"]*"|[\w:+\-.\[\]\\/]+|\S""")
+# pytest's -m tokens: punctuation, a quoted string or an identifier; pytest skips
+# only spaces and tabs, so any other character, a newline included, is a token
+# of its own that makes the expression invalid.
+_TOKEN = re.compile(r"""[(),=]|'[^']*'|"[^"]*"|[\w:+\-.\[\]\\/]+|[^ \t]""")
 _IDENT = re.compile(r"[\w:+\-.\[\]\\/]+")
 _UNKNOWN_MARKERS = re.compile(
     r"Unknown marker\(s\) in '-m' expression: (.*)\. Use 'pytest --markers'"
@@ -47,8 +48,13 @@ def _is_ident(token: str) -> bool:
 
 
 def _is_string(token: str) -> bool:
-    """Return whether token is a quoted string."""
-    return len(token) > 1 and token[0] in "'\"" and token[-1] == token[0]
+    """Return whether token is a quoted string; pytest rejects a backslash in one."""
+    return (
+        len(token) > 1
+        and token[0] in "'\""
+        and token[-1] == token[0]
+        and "\\" not in token
+    )
 
 
 def _is_kwarg_key(token: str) -> bool:

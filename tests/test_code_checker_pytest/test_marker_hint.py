@@ -97,6 +97,9 @@ class TestScanExpression:
             ("a(if=1)", ["a"]),
             ("a(x.y=1)", ["a"]),
             ("a(x=--1)", ["a"]),
+            ('a(x="b\\c") and not unit', ["a", "unit"]),
+            ("a and\nnot unit", ["a", "unit"]),
+            ("a\rb", ["a", "b"]),
         ],
     )
     def test_invalid(self, expr: str, names: list[str]) -> None:
@@ -112,6 +115,10 @@ class TestScanExpression:
     def test_valid_kwarg_values(self, expr: str) -> None:
         """pytest's kwarg values: a string, an int, True/False/None."""
         assert scan_expression(expr) == ([("a", False)], True)
+
+    def test_tabs_separate_tokens(self) -> None:
+        """pytest skips tabs like spaces."""
+        assert scan_expression("a\tand\tnot\tb") == ([("a", False), ("b", True)], True)
 
     def test_ident_characters(self) -> None:
         """pytest's identifier characters make one name."""
@@ -207,6 +214,22 @@ class TestMarkerNotes:
             "ERROR: Wrong expression passed to '-m': slow(x=foo) and not unit: "
             'at column 8: unexpected character/s "foo"'
         )
+
+        assert marker_notes(effective, 4, error) == [
+            error,
+            _HINT_UNIT,
+            STRICT_SUGGESTION,
+        ]
+
+    @pytest.mark.parametrize(
+        "expr", ['slow(x="b\\c") and not unit', "slow and\nnot unit"]
+    )
+    def test_unscannable_expression_counts_negated_name(
+        self, tmp_path: Path, expr: str
+    ) -> None:
+        """A backslash in a string or a newline is unparseable, so ``not unit`` counts."""
+        effective = _effective(tmp_path, markers=[expr])
+        error = f"ERROR: Wrong expression passed to '-m': {expr}"
 
         assert marker_notes(effective, 4, error) == [
             error,
