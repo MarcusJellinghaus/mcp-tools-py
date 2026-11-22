@@ -50,9 +50,14 @@ def _clear_pytest_env(monkeypatch: pytest.MonkeyPatch) -> None:
 
 ## HOW
 
-- Uses `tomllib` and `os.path` only; reads `pyproject.toml` itself (catch
-  `OSError`, `tomllib.TOMLDecodeError`, `UnicodeDecodeError` → `None`). Lives in
-  `code_checker_pytest` (layer above `utils`), not in `utils/project_config.py`.
+- Uses `tomllib` and `os.path` only; reads `pyproject.toml` itself. A missing file
+  (`FileNotFoundError`) means "no pyproject section": `tox.ini` / `setup.cfg` are
+  still checked. Any other `OSError`, `tomllib.TOMLDecodeError` or
+  `UnicodeDecodeError` → `None`. Lives in `code_checker_pytest` (layer above
+  `utils`), not in `utils/project_config.py`.
+- `_parse_bool(value: str) -> bool | None` is defined here (pytest's bool spellings,
+  case-insensitive; anything else → `None`) for the string strict keys in
+  `ini_options`; step 2 reuses it.
 - `tox.ini` / `setup.cfg`: a line match (`line.strip() == "[pytest]"` /
   `"[tool:pytest]"`), no `configparser`.
 - Not used by production code yet (step 3 does); vulture sees the tests.
@@ -61,7 +66,7 @@ def _clear_pytest_env(monkeypatch: pytest.MonkeyPatch) -> None:
 
 ```
 for name in DEDICATED_FILES: if isfile(root/name): return PytestConfig([], [], None, None, name)
-tool = load(pyproject)["tool"] or {}  -> on error return None
+tool = load(pyproject)["tool"] or {}  -> FileNotFoundError: tool = {}; other error: return None
 ini, native = tool.pytest.ini_options (dict|None), tool.pytest minus "ini_options" (dict)
 if ini and native: return None                       # pytest rejects both non-empty
 if ini is None and not native: check tox.ini [pytest], then setup.cfg [tool:pytest] -> not_read
@@ -85,8 +90,8 @@ an `ini_options` table (even empty) or a non-empty `[tool.pytest]` (ignoring the
 - string and list `addopts` in `ini_options`; list `addopts` in `[tool.pytest]`;
   string `addopts` in `[tool.pytest]` → `[]`.
 - `markers` list / multi-line string; `"slow: desc"` and `"x(arg): d"` → names.
-- strict keys: bool and string spellings in `ini_options`; string in `[tool.pytest]`
-  → `None`.
+- strict keys: bool and string spellings in `ini_options` (via `_parse_bool`);
+  string in `[tool.pytest]` → `None`; unknown spelling → `None`.
 - each dedicated file → `not_read == name`, empty fields; first in order wins.
 - `tox.ini [pytest]` → `not_read="tox.ini"` without pyproject section; with an empty
   `[tool.pytest.ini_options]` → no note; with only an empty `[tool.pytest]` → note.
@@ -94,5 +99,7 @@ an `ini_options` table (even empty) or a non-empty `[tool.pytest]` (ignoring the
 - invalid TOML → `None`; both tables non-empty → `None`; non-empty `[tool.pytest]`
   plus empty `ini_options` → reads `[tool.pytest]`.
 - no `pyproject.toml` at all → `PytestConfig([], [], None, None)`.
+- no `pyproject.toml`, only `tox.ini [pytest]` → `not_read == "tox.ini"`; no
+  `pyproject.toml`, only `setup.cfg [tool:pytest]` → `not_read == "setup.cfg"`.
 - scrub fixture: a test asserting no `os.environ` name starting with `PYTEST`
   other than `PYTEST_CURRENT_TEST` is present.

@@ -8,11 +8,6 @@
 > Implement step 6 only: tests first, then code, run the checks listed in the
 > summary plus the new integration test file, then commit (one commit).
 
-## Precondition
-
-`pytest-xdist` must be importable in the project environment (the exit-3 tests need
-it). If `import xdist` fails there, write one line to `pr_info/.blocked.txt` and stop.
-
 ## WHERE
 
 - Modified: `src/mcp_tools_py/checker_tools/pytest_tool.py`

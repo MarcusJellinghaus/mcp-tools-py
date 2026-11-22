@@ -24,7 +24,7 @@ STRICT_SUGGESTION = (
     "tests carrying unregistered marks then fail collection."
 )
 RERUN_TIP = (
-    "pytest-xdist turned pytest's -m error into exit 3; to see pytest's message, "
+    "Under pytest-xdist pytest's own message is lost; to see it, "
     'rerun with extra_args=["-n", "0"].'
 )
 
@@ -55,7 +55,9 @@ def marker_notes(
 stack=[0]; pending=0; operand=True; valid=True; names=[]
 for tok: if operand: "not"->pending+=1 | "("->stack.push((stack[-1]+pending)%2), pending=0
                      | ident->names+=(tok,(stack[-1]+pending)%2==1), pending=0, operand=False,
-                              and if next tok is "(": skip to next ")" (kwargs; missing -> valid=False)
+                              and if next tok is "(": read kwargs up to ")": one or more
+                              `ident = value` separated by ","; value = ident or quoted string;
+                              anything else, or no ")" -> valid=False
                      | else -> valid=False
          else: "and"/"or"->operand=True | ")"->pop if len(stack)>1 else valid=False
                | ident -> names+=(tok, False), valid=False | else -> valid=False
@@ -88,11 +90,15 @@ Registered = `cfg.markers ∪ BUILTIN_MARKERS`. Counted names deduplicated, orde
 
 ## Tests (write first) — `test_marker_hint.py`
 
+`marker_notes` strict suggestion: table `strict_markers = true`, no `addopts` flag,
+exit 5, `-m unit` → hint without `STRICT_SUGGESTION` (decision 13).
+
 `scan_expression`:
 - `unit` → `[("unit", False)]`, valid; `not unit` → negated; `not not unit` → not negated.
 - `not (a or b) and c` → a, b negated, c not; `(not a) or b`.
 - `mark(key="v", n=1, flag=True)` → only `mark`; top-level `True` is a name.
-- `a b`, `a and`, `(a`, `a)`, `'x'`, `a $ b` → invalid, names still returned.
+- `a b`, `a and`, `(a`, `a)`, `'x'`, `a $ b`, `mark()`, `mark(x)` → invalid, names
+  still returned.
 - `a.b:c/d[1]+e-f\\g` is one name.
 
 `unknown_marker_names`: `a, b.c` from pytest 9's exact text; no match → `[]`.

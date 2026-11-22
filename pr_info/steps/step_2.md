@@ -53,9 +53,11 @@ Private helpers (one each, keep small):
 ```python
 def _option_events(tokens: list[str]) -> list[tuple[str, str]]   # (canonical option, value)
 def _env_addopts(env_vars: dict[str, str] | None) -> str
+def _split(value: str) -> list[str]                                # shlex.split; ValueError -> []
 def _strict_markers_on(tokens: list[str], table: PytestConfig | None) -> bool
-def _parse_bool(value: str) -> bool | None                         # shared with step 1's table parsing
 ```
+
+`_parse_bool` from step 1 is reused for `-o strict_markers=v` / `-o strict=v`.
 
 ## HOW
 
@@ -73,17 +75,19 @@ def _parse_bool(value: str) -> bool | None                         # shared with
 ## ALGORITHM
 
 ```
-config = read_pytest_config(dir); env = _env_addopts(env_vars); env_tokens = split(env)
+config = read_pytest_config(dir); env = _env_addopts(env_vars); env_tokens = _split(env)
 pass 1 over env_tokens then call tokens: last "-c" -> not_read; last "-o addopts=X" -> (X, origin)
 not_read = -c value or (config.not_read if config) ; ini = [] if not_read or config is None
-ini = split(X) with source "-o"/"PYTEST_ADDOPTS" if override else config.addopts ("pyproject.toml")
+ini = _split(X) with source "-o"/"PYTEST_ADDOPTS" if override else config.addopts ("pyproject.toml")
+    # _split never raises: unbalanced quotes give [], so today's error path is unchanged
 pass 2 over [(ini_source, ini), ("PYTEST_ADDOPTS", env), ("markers", m_tok), ("extra_args", args)]:
     last -m / -k -> OptionValue(value, source); last -n -> numprocesses = value != "0"
 strict: sm, s = table values; walk all tokens in order: --strict-markers/-o strict_markers=v -> sm; --strict/-o strict=v -> s; on = sm if sm is not None else bool(s)
 ```
 
-`project_strict_markers` = same walk over `config.addopts` only (False when config is
-None or not read).
+`project_strict_markers` = `_strict_markers_on(config.addopts, config)`: the walk over
+the project's ini `addopts` only, starting from the table keys `strict_markers` /
+`strict` (decision 13). False when config is None or not read.
 
 ## DATA — `addopts_notes` output
 
@@ -93,7 +97,10 @@ None or not read).
   - applied: `addopts (pyproject.toml): -n auto -m 'not slow' — to run without: extra_args=["-o", "addopts="]`
   - replaced (effective `m.source` differs from this line's source and the line has
     an `-m`): `addopts (pyproject.toml): -n auto; its -m 'not slow' was replaced by markers — to run without: extra_args=["-o", "addopts="]`
-  - `ini_source == "-o"`: `addopts (-o): <tokens>`, no way out.
+  - `ini_source == "-o"`: `addopts (-o): <tokens>`, no way out. When a later `-m`
+    replaces an `-m` inside `<tokens>`, the same replaced form applies:
+    `addopts (-o): -x; its -m slow was replaced by extra_args` (decision 6: a
+    replaced `-m` is never shown as applied).
 - env line, when `env_tokens`: `PYTEST_ADDOPTS: <tokens> — to run without: env_vars={"PYTEST_ADDOPTS": ""}`,
   same replaced form (replacing source `markers` or `extra_args`).
 - Values rendered with `shlex.join`; the replaced `-m` with `shlex.quote`; a line's
@@ -112,6 +119,9 @@ Use `tmp_path` projects with a `pyproject.toml`; set `PYTEST_ADDOPTS` via
 - `-o addopts=`, `-oaddopts=`, `--override-ini addopts=`, `--override-ini=addopts=`
   in the call and in `PYTEST_ADDOPTS` → `ini_tokens == []`; `-o addopts=-x` in the
   call → `ini_source == "-o"`, tokens `["-x"]`.
+- unbalanced quotes: `extra_args=["-o", "addopts=-m 'x"]` and
+  `PYTEST_ADDOPTS="-o \"addopts=-m 'x\""` → `ini_tokens == []`, no raise; an
+  unparsable `PYTEST_ADDOPTS` → `env_tokens == []`, no raise.
 - `-c f.ini`, `-cf.ini`, `-c=f.ini`, `--config-file f.ini`, `--config-file=f.ini`
   (call and `PYTEST_ADDOPTS`) → `not_read == "f.ini"`; `-c` inside ini addopts ignored.
 - `env_vars={"PYTEST_ADDOPTS": ""}` clears an inherited value; on Windows a
@@ -120,7 +130,11 @@ Use `tmp_path` projects with a `pyproject.toml`; set `PYTEST_ADDOPTS` via
   `strict_markers=false` + `--strict` → off; `-o strict_markers=false` beats
   `strict = true`; `PYTEST_ADDOPTS="-o strict_markers=false"` beats ini
   `--strict-markers` (and `project_strict_markers` stays True).
+- table `strict_markers = true` with no `addopts` flag → `project_strict_markers`
+  is True.
 - `-n 4`, `-n0`, `--numprocesses=auto`, last wins; none → False.
 - `addopts_notes`: applied line, replaced line (each replacing source: `markers`,
-  `extra_args`, `PYTEST_ADDOPTS`), `addopts (-o)` line, env line, both cleared → no
-  ini line, not-read note, `config is None` → `[]`.
+  `extra_args`, `PYTEST_ADDOPTS`), `addopts (-o)` line, `extra_args=["-o",
+  "addopts=-x -m slow", "-m", "fast"]` → `addopts (-o): -x; its -m slow was replaced
+  by extra_args` (no `-m slow` shown as applied), env line, both cleared → no ini
+  line, not-read note, `config is None` → `[]`.

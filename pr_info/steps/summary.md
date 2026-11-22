@@ -51,6 +51,11 @@ are binding; this plan only fixes *how*.
      each is under an odd number of `not`s, and whether the expression is valid. A
      paren-parity stack replaces a recursive-descent parser; a two-state
      operand/operator check gives validity. No `_pytest` import.
+     This is an equivalent implementation of decision 17's recursive-descent parse,
+     not a change to it: pytest's `-m` grammar has no precedence that affects
+     negation parity, so a stack of `not` parities per paren level plus the
+     operand/operator state and a strict `name(key=value, …)` check accept exactly
+     the expressions the grammar accepts, without recursion.
    - `marker_notes(effective, exit_code, marker_error) -> list[str]` — pytest's
      `ERROR:` line, the hint, the `--strict-markers` suggestion and the `-n 0` rerun
      tip (decisions 11–13, 15, 17, 19).
