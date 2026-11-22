@@ -67,9 +67,9 @@ by passing an explicit list:
 
 | Parameter | Type | Default | Description |
 |-----------|------|---------|-------------|
-| `markers` | list | None | Optional list of pytest markers to filter tests |
-| `extra_args` | list | None | Optional list of additional pytest arguments; use `-v`/`-vv`/`-vvv` to control verbosity |
-| `env_vars` | dictionary | None | Optional environment variables for the subprocess |
+| `markers` | list | None | Optional list of pytest markers to filter tests. Entries are joined with `and`; the result replaces an `-m` from the project's `addopts` as a whole expression, it is not added to it. Check the markers the project registers (`markers` in `[tool.pytest.ini_options]` / `[tool.pytest]`) before using `-m`; a wrong name is reported when the run fails. Skip integration tests the current task doesn't affect, e.g. `markers=["not integration"]` |
+| `extra_args` | list | None | Optional list of additional pytest arguments; use `-v`/`-vv`/`-vvv` to control verbosity. The project's `addopts` apply first (e.g. `-n auto`), so don't add them again; `extra_args=["-o", "addopts="]` runs without them. A later `-m` here replaces the `addopts` `-m` |
+| `env_vars` | dictionary | None | Optional environment variables for the subprocess. `PYTEST_ADDOPTS` from the environment also applies; `env_vars={"PYTEST_ADDOPTS": ""}` clears it (`-o addopts=` does not) |
 | `timeout_seconds` | integer | None (resolved from config, else 300) | Maximum seconds to wait for the test run. Positive integers only |
 | `coverage` | boolean | False | Measure coverage with pytest-cov and append a coverage digest to the reply |
 | `coverage_source` | list | None (auto-detected) | Directories to measure. Auto-detected from `[tool.setuptools.packages.find] where`, excluding test paths |

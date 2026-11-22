@@ -3,7 +3,7 @@
 import logging
 import shutil
 import tempfile
-from typing import TYPE_CHECKING
+from typing import TYPE_CHECKING, Any
 
 from mcp_tools_py.code_checker_pytest.coverage import (
     coverage_args,
@@ -20,14 +20,18 @@ from mcp_tools_py.code_checker_pytest.coverage_store import (
     format_last_run,
     start_coverage_run,
 )
+from mcp_tools_py.code_checker_pytest.marker_hint import marker_notes
+from mcp_tools_py.code_checker_pytest.pytest_config import (
+    EffectiveConfig,
+    addopts_notes,
+    call_replaced_addopts_m,
+    effective_config,
+)
 from mcp_tools_py.code_checker_pytest.runners import check_code_with_pytest
 from mcp_tools_py.code_checker_pytest.utils import sanitize_extra_args
 from mcp_tools_py.code_checker_pytest.verdict import RunStatus
 from mcp_tools_py.log_utils import log_function_call
-from mcp_tools_py.utils.project_config import (
-    get_pytest_addopts,
-    resolve_coverage_source,
-)
+from mcp_tools_py.utils.project_config import resolve_coverage_source
 from mcp_tools_py.utils.report_budget import TOOL_CHARS, TOOL_LINES, bound_text
 
 if TYPE_CHECKING:
@@ -39,6 +43,57 @@ logger = logging.getLogger(__name__)
 DIGEST_HINT = (
     "Use a smaller max_modules or narrow coverage_source to see the digest in full."
 )
+
+# Where an applied -m / -k comes from when the defaults chose it.
+_DEFAULT_SOURCES = ("pyproject.toml", "-o", "PYTEST_ADDOPTS")
+
+
+def _defaults_select(effective: EffectiveConfig) -> bool:
+    """Return whether an applied ``-m`` or ``-k`` comes from the defaults.
+
+    Args:
+        effective: The effective config of the call.
+
+    Returns:
+        True when the effective ``-m`` or ``-k`` is non-empty and comes from
+        ini ``addopts`` or ``PYTEST_ADDOPTS``.
+    """
+    return any(
+        option is not None
+        and option.value.strip() != ""
+        and option.source in _DEFAULT_SOURCES
+        for option in (effective.m, effective.k)
+    )
+
+
+def _defaults_may_explain(
+    test_results: dict[str, Any], collect_only: bool, effective: EffectiveConfig
+) -> bool:
+    """Return whether the defaults could explain the result.
+
+    Args:
+        test_results: The result of check_code_with_pytest.
+        collect_only: The call has ``--collect-only``.
+        effective: The effective config of the call.
+
+    Returns:
+        True when the run failed or errored, deselected tests, found none, is
+        suspicious (not under ``--collect-only``), may have deselected tests
+        under pytest-xdist, or the call's ``-m`` replaced a default ``-m``.
+    """
+    status = test_results["verdict"].status
+    if status in (RunStatus.FAILED, RunStatus.ERROR):
+        return True
+    summary = test_results.get("summary") or {}
+    deselected = summary.get("deselected") or 0
+    if deselected or (summary.get("collected") or 0) - deselected == 0:
+        return True
+    if status is RunStatus.SUSPICIOUS and not collect_only:
+        return True
+    # xdist does not relay pytest_deselected, so the report has no count.
+    if effective.numprocesses and _defaults_select(effective):
+        return True
+    return call_replaced_addopts_m(effective)
 
 
 def register(mcp: "FastMCPProtocol", checker_tools: "CheckerTools") -> None:
@@ -62,11 +117,23 @@ def register(mcp: "FastMCPProtocol", checker_tools: "CheckerTools") -> None:
 
         Args:
             markers: Optional list of pytest markers to filter tests. Examples: ['slow', 'integration']
+                Entries are joined with `and`. The result replaces an `-m` from
+                the project's `addopts` as a whole expression, it is not added
+                to it. Check the markers the project registers (`markers` in
+                `[tool.pytest.ini_options]` / `[tool.pytest]`) before using
+                `-m`; a wrong name is reported when the run fails. Skip
+                integration tests the current task doesn't affect, e.g.
+                markers=["not integration"].
             extra_args: Optional list of additional pytest arguments for flexible test selection.
                        Examples: ['tests/test_file.py::test_function']
                        Use -v/-vv/-vvv in extra_args to control verbosity.
                        See "Flexible Test Selection" section below for common patterns.
+                The project's `addopts` apply first (e.g. `-n auto`), so don't
+                add them again. extra_args=["-o", "addopts="] runs without them.
+                A later `-m` here replaces the `addopts` `-m`.
             env_vars: Optional dictionary of environment variables for the subprocess.
+                `PYTEST_ADDOPTS` from the environment also applies;
+                env_vars={"PYTEST_ADDOPTS": ""} clears it (`-o addopts=` does not).
             timeout_seconds: Maximum seconds to wait for the test run. Overrides the
                 configured limit for this call. Must be a positive integer.
                 Defaults to `[tool.mcp-tools-py]` config, then `--check-timeout`,
@@ -125,6 +192,12 @@ def register(mcp: "FastMCPProtocol", checker_tools: "CheckerTools") -> None:
 
             # Integration test run
             run_pytest_check(markers=["integration"])
+
+            # Skip integration tests
+            run_pytest_check(markers=["not integration"])
+
+            # Run without the project's addopts
+            run_pytest_check(extra_args=["-o", "addopts="])
 
             # Coverage digest for the full suite
             run_pytest_check(coverage=True)
@@ -202,6 +275,10 @@ def register(mcp: "FastMCPProtocol", checker_tools: "CheckerTools") -> None:
             for note in sanitized.notes:
                 logger.info("extra_args sanitized", extra={"note": note})
 
+            effective = effective_config(
+                project_dir, markers, sanitized.cleaned_args, env_vars
+            )
+
             run_args = sanitized.cleaned_args
             run_env = env_vars
             fail_under: float | None = None
@@ -213,7 +290,6 @@ def register(mcp: "FastMCPProtocol", checker_tools: "CheckerTools") -> None:
                 run_args = sanitized.cleaned_args + cov_args
                 run_env = {**(env_vars or {}), **cov_env}
                 fail_under = read_fail_under(interpreter, project_dir)
-                addopts = get_pytest_addopts(project_dir)
                 coverage_run = start_coverage_run(
                     project_dir,
                     temp_dir,
@@ -221,17 +297,12 @@ def register(mcp: "FastMCPProtocol", checker_tools: "CheckerTools") -> None:
                     coverage_source,
                     sources,
                     fail_under,
-                    selection_line(
-                        markers,
-                        sanitized.cleaned_args,
-                        sanitized.path_args,
-                        addopts,
-                    ),
+                    selection_line(effective, sanitized.path_args),
                     selection_identity(
                         markers,
+                        effective,
                         sanitized.cleaned_args,
                         sanitized.path_args,
-                        addopts,
                         env_vars,
                     ),
                     interpreter,
@@ -299,9 +370,26 @@ def register(mcp: "FastMCPProtocol", checker_tools: "CheckerTools") -> None:
                 max_chars=max_chars,
             )
 
-            # Prepend the test-paths and deduplication notes so LLM can self-correct
+            # Prepend the defaults, marker, test-paths and deduplication notes
+            # so LLM can self-correct
+            top = (
+                addopts_notes(effective)
+                if _defaults_may_explain(
+                    test_results, sanitized.collect_only, effective
+                )
+                else []
+            )
+            top += marker_notes(
+                effective,
+                test_results.get("exit_code"),
+                test_results.get("marker_error"),
+            )
             test_paths_note = test_results.get("test_paths_note")
-            notes = [*([test_paths_note] if test_paths_note else []), *sanitized.notes]
+            notes = [
+                *top,
+                *([test_paths_note] if test_paths_note else []),
+                *sanitized.notes,
+            ]
             if notes:
                 notes_text = "\n".join(notes)
                 result = f"{notes_text}\n\n{result}"

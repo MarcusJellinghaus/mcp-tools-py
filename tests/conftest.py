@@ -1,5 +1,6 @@
 """Shared test utilities and fixtures."""
 
+import os
 from collections.abc import Iterator
 from pathlib import Path
 from unittest.mock import MagicMock, patch
@@ -137,6 +138,17 @@ def _clear_virtual_env(monkeypatch: pytest.MonkeyPatch) -> None:
     tests that need it set it explicitly.
     """
     monkeypatch.delenv("VIRTUAL_ENV", raising=False)
+
+
+@pytest.fixture(autouse=True)
+def _clear_pytest_env(monkeypatch: pytest.MonkeyPatch) -> None:
+    """Keep PYTEST* variables from CI or the outer run out of these tests.
+
+    PYTEST_CURRENT_TEST is set again by pytest for each test phase; it does not
+    affect selection.
+    """
+    for name in [n for n in os.environ if n.upper().startswith("PYTEST")]:
+        monkeypatch.delenv(name)
 
 
 @pytest.fixture(autouse=True)

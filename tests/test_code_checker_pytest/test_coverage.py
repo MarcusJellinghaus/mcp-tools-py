@@ -19,6 +19,7 @@ from mcp_tools_py.code_checker_pytest.coverage import (
     selection_line,
 )
 from mcp_tools_py.code_checker_pytest.models import Collector, PytestReport, Summary
+from mcp_tools_py.code_checker_pytest.pytest_config import effective_config
 from mcp_tools_py.code_checker_pytest.verdict import RunStatus, RunVerdict
 from tests.conftest import make_command_result
 from tests.test_code_checker_pytest._coverage_report import _SELECTION, _file, _report
@@ -140,84 +141,159 @@ class TestReadFailUnder:
             assert read_fail_under("/some/python", "/proj") is None
 
 
+_INI = "[tool.pytest.ini_options]\n"
+_FULL_SUITE = "selection: full suite (no markers, -k or path arguments)"
+
+
+def _selection(
+    root: Path,
+    pyproject: str = _INI,
+    markers: list[str] | None = None,
+    args: list[str] | None = None,
+    path_args: list[str] | None = None,
+    env_vars: dict[str, str] | None = None,
+) -> str:
+    """Write *pyproject* as pyproject.toml and render the selection line."""
+    (root / "pyproject.toml").write_text(pyproject, encoding="utf-8")
+    effective = effective_config(str(root), markers, args or [], env_vars)
+    return selection_line(effective, path_args or [])
+
+
+def _addopts(value: str) -> str:
+    """Return an ini_options table with *value* as its ``addopts`` string."""
+    return f'{_INI}addopts = "{value}"\n'
+
+
 class TestSelectionLine:
     """Test the one-line echo of what narrowed the run."""
 
-    def test_full_suite(self) -> None:
+    def test_full_suite(self, tmp_path: Path) -> None:
         """Nothing narrowing yields the full-suite line."""
-        assert selection_line(None, [], [], None) == (
-            "selection: full suite (no markers, -k or path arguments)"
-        )
+        assert _selection(tmp_path) == _FULL_SUITE
 
-    def test_markers_parameter(self) -> None:
+    def test_markers_parameter(self, tmp_path: Path) -> None:
         """The markers parameter is joined with 'and'."""
-        assert selection_line(["a", "b"], [], [], None) == (
+        assert _selection(tmp_path, markers=["a", "b"]) == (
             "selection: markers 'a and b'"
         )
 
-    def test_m_in_cleaned_args(self) -> None:
+    def test_m_in_cleaned_args(self, tmp_path: Path) -> None:
         """-m in the args is reported when markers is not given."""
-        assert selection_line(None, ["-m", "slow"], [], None) == (
+        assert _selection(tmp_path, args=["-m", "slow"]) == (
             "selection: markers 'slow'"
         )
 
-    def test_m_in_addopts(self) -> None:
+    def test_m_equals_form(self, tmp_path: Path) -> None:
+        """The -m=X form is recognised."""
+        assert _selection(tmp_path, args=["-m=slow"]) == "selection: markers 'slow'"
+
+    def test_m_in_addopts(self, tmp_path: Path) -> None:
         """-m in addopts is reported with its source."""
-        line = selection_line(None, [], [], "-n auto -m 'not integration'")
+        line = _selection(tmp_path, _addopts("-n auto -m 'not integration'"))
 
         assert line == "selection: addopts -m 'not integration'"
 
-    def test_command_line_m_wins_over_addopts(self) -> None:
+    def test_m_in_addopts_list(self, tmp_path: Path) -> None:
+        """A list addopts keeps a multi-word -m value whole."""
+        line = _selection(tmp_path, f'{_INI}addopts = ["-m", "not slow"]\n')
+
+        assert line == "selection: addopts -m 'not slow'"
+
+    def test_m_in_native_table(self, tmp_path: Path) -> None:
+        """-m in a [tool.pytest] addopts list is reported as addopts."""
+        line = _selection(tmp_path, '[tool.pytest]\naddopts = ["-m", "not slow"]\n')
+
+        assert line == "selection: addopts -m 'not slow'"
+
+    def test_m_in_pytest_addopts_env(self, tmp_path: Path) -> None:
+        """-m in PYTEST_ADDOPTS is reported with that source."""
+        line = _selection(tmp_path, env_vars={"PYTEST_ADDOPTS": "-m fast"})
+
+        assert line == "selection: PYTEST_ADDOPTS -m 'fast'"
+
+    def test_cleared_addopts(self, tmp_path: Path) -> None:
+        """-o addopts= drops the addopts -m."""
+        line = _selection(tmp_path, _addopts("-m slow"), args=["-o", "addopts="])
+
+        assert line == _FULL_SUITE
+
+    def test_explicit_empty_m(self, tmp_path: Path) -> None:
+        """An explicit empty -m replaces the addopts -m and selects everything."""
+        line = _selection(tmp_path, _addopts("-m slow"), args=["-m", ""])
+
+        assert line == _FULL_SUITE
+
+    def test_command_line_m_wins_over_addopts(self, tmp_path: Path) -> None:
         """A command-line marker expression overrides the addopts one."""
-        line = selection_line(["slow"], [], [], "-m 'not integration'")
+        line = _selection(tmp_path, _addopts("-m 'not integration'"), ["slow"])
 
         assert line == "selection: markers 'slow'"
 
-    def test_extra_args_m_wins_over_markers(self) -> None:
+    def test_extra_args_m_wins_over_markers(self, tmp_path: Path) -> None:
         """extra_args follow the markers -m on the command line, so they win."""
-        line = selection_line(["slow"], ["-m", "fast"], [], None)
+        line = _selection(tmp_path, markers=["slow"], args=["-m", "fast"])
 
         assert line == "selection: markers 'fast'"
 
-    def test_k_in_args(self) -> None:
+    def test_k_in_args(self, tmp_path: Path) -> None:
         """-k in the args is reported."""
-        assert selection_line(None, ["-k", "install"], [], None) == (
+        assert _selection(tmp_path, args=["-k", "install"]) == (
             "selection: -k 'install'"
         )
 
-    def test_k_joined_form(self) -> None:
+    def test_k_joined_form(self, tmp_path: Path) -> None:
         """The joined -kfoo form is recognised."""
-        assert selection_line(None, ["-kfoo"], [], None) == "selection: -k 'foo'"
+        assert _selection(tmp_path, args=["-kfoo"]) == "selection: -k 'foo'"
 
-    def test_k_in_addopts(self) -> None:
+    def test_k_in_addopts(self, tmp_path: Path) -> None:
         """-k in addopts is reported with its source."""
-        assert selection_line(None, [], [], "-k install") == (
+        assert _selection(tmp_path, _addopts("-k install")) == (
             "selection: addopts -k 'install'"
         )
 
-    def test_last_value_wins(self) -> None:
+    def test_k_in_pytest_addopts_env(self, tmp_path: Path) -> None:
+        """-k in PYTEST_ADDOPTS is reported with that source."""
+        line = _selection(tmp_path, env_vars={"PYTEST_ADDOPTS": "-k install"})
+
+        assert line == "selection: PYTEST_ADDOPTS -k 'install'"
+
+    def test_last_value_wins(self, tmp_path: Path) -> None:
         """pytest keeps the last value of a repeated option."""
-        assert selection_line(None, ["-k", "a", "-k", "b"], [], None) == (
+        assert _selection(tmp_path, args=["-k", "a", "-k", "b"]) == (
             "selection: -k 'b'"
         )
 
-    def test_combined(self) -> None:
+    def test_combined(self, tmp_path: Path) -> None:
         """Several mechanisms are joined with '; '."""
-        line = selection_line(None, ["-k", "install"], [], "-m 'not integration'")
+        line = _selection(
+            tmp_path, _addopts("-m 'not integration'"), args=["-k", "install"]
+        )
 
         assert line == "selection: addopts -m 'not integration'; -k 'install'"
 
-    def test_path_args(self) -> None:
+    def test_path_args(self, tmp_path: Path) -> None:
         """Path arguments are listed."""
-        line = selection_line(None, [], ["tests/a.py", "tests/b.py::test_x"], None)
+        line = _selection(tmp_path, path_args=["tests/a.py", "tests/b.py::test_x"])
 
         assert line == "selection: paths tests/a.py, tests/b.py::test_x"
 
-    def test_unbalanced_quotes_in_addopts(self) -> None:
+    def test_unbalanced_quotes_in_addopts(self, tmp_path: Path) -> None:
         """Unparsable addopts is treated as empty rather than raising."""
-        assert selection_line(None, [], [], "-m 'not integration") == (
-            "selection: full suite (no markers, -k or path arguments)"
-        )
+        assert _selection(tmp_path, _addopts("-m 'not integration")) == _FULL_SUITE
+
+    def test_pytest_ini_not_read(self, tmp_path: Path) -> None:
+        """A pytest.ini wins: no pyproject.toml -m, and the line says so."""
+        (tmp_path / "pytest.ini").write_text("[pytest]\n", encoding="utf-8")
+
+        line = _selection(tmp_path, _addopts("-m slow"))
+
+        assert line == f"{_FULL_SUITE}; pytest config is in pytest.ini, not read"
+
+    def test_config_file_not_read(self, tmp_path: Path) -> None:
+        """-c other.ini names the file pytest reads instead."""
+        line = _selection(tmp_path, _addopts("-m slow"), args=["-c", "other.ini"])
+
+        assert line == f"{_FULL_SUITE}; pytest config is in other.ini, not read"
 
 
 class TestRanges:

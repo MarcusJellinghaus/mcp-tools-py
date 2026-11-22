@@ -39,6 +39,7 @@ from mcp_tools_py.code_checker_pytest.coverage_store import (
     start_coverage_run,
 )
 from mcp_tools_py.code_checker_pytest.models import PytestReport, Test
+from mcp_tools_py.code_checker_pytest.pytest_config import effective_config
 from mcp_tools_py.code_checker_pytest.reporting import (
     XDIST_MARKER,
     collectors_failed_line,
@@ -65,7 +66,6 @@ from mcp_tools_py.toolkit_checks import (
 )
 from mcp_tools_py.utils.environment_info import TOOL_MODULES
 from mcp_tools_py.utils.project_config import (
-    get_pytest_addopts,
     resolve_coverage_source,
     resolve_target_directories,
 )
@@ -376,7 +376,7 @@ def _run_test(context: ToolContext, depth: str) -> ActionResult:
             extra_args.extend(cov_args)
             env_vars = cov_env
             fail_under = read_fail_under(interpreter, project_dir)
-            addopts = get_pytest_addopts(project_dir)
+            effective = effective_config(project_dir, markers, [], None)
             coverage_run = start_coverage_run(
                 project_dir,
                 temp_dir,
@@ -384,8 +384,8 @@ def _run_test(context: ToolContext, depth: str) -> ActionResult:
                 None,
                 sources,
                 fail_under,
-                selection_line(markers, [], [], addopts),
-                selection_identity(markers, [], [], addopts, None),
+                selection_line(effective, []),
+                selection_identity(markers, effective, [], [], None),
                 interpreter,
                 None,
                 context.resolve_timeout("pytest"),
