@@ -93,6 +93,10 @@ class TestScanExpression:
             ("a $ b", ["a", "b"]),
             ("mark()", ["mark"]),
             ("mark(x)", ["mark"]),
+            ("a(x=foo) and not unit", ["a", "unit"]),
+            ("a(if=1)", ["a"]),
+            ("a(x.y=1)", ["a"]),
+            ("a(x=--1)", ["a"]),
         ],
     )
     def test_invalid(self, expr: str, names: list[str]) -> None:
@@ -101,6 +105,13 @@ class TestScanExpression:
 
         assert [name for name, _ in scanned] == names
         assert not valid
+
+    @pytest.mark.parametrize(
+        "expr", ["a(x=1)", "a(x=-1)", 'a(x="s")', "a(x=True)", "a(x=None)"]
+    )
+    def test_valid_kwarg_values(self, expr: str) -> None:
+        """pytest's kwarg values: a string, an int, True/False/None."""
+        assert scan_expression(expr) == ([("a", False)], True)
 
     def test_ident_characters(self) -> None:
         """pytest's identifier characters make one name."""
@@ -188,6 +199,20 @@ class TestMarkerNotes:
         effective = _effective(tmp_path, markers=["slow and"])
 
         assert marker_notes(effective, 4, _WRONG) == [_WRONG]
+
+    def test_wrong_kwarg_value_counts_negated_name(self, tmp_path: Path) -> None:
+        """A bare-identifier kwarg value is unparseable, so ``not unit`` counts."""
+        effective = _effective(tmp_path, markers=["slow(x=foo) and not unit"])
+        error = (
+            "ERROR: Wrong expression passed to '-m': slow(x=foo) and not unit: "
+            'at column 8: unexpected character/s "foo"'
+        )
+
+        assert marker_notes(effective, 4, error) == [
+            error,
+            _HINT_UNIT,
+            STRICT_SUGGESTION,
+        ]
 
     def test_exit_3_strict_under_xdist(self, tmp_path: Path) -> None:
         """Exit 3 with strict on and ``-n`` gets the hint and the tip."""

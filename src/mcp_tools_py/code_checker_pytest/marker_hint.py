@@ -1,5 +1,6 @@
 """Name the ``-m`` marker names a failed run can blame, and what the project registers."""
 
+import keyword
 import re
 
 from mcp_tools_py.code_checker_pytest.pytest_config import EffectiveConfig
@@ -28,6 +29,8 @@ RERUN_TIP = (
 )
 
 _KEYWORDS = frozenset({"and", "or", "not"})
+# The non-numeric bare kwarg values pytest accepts in ``name(key=value)``.
+_KWARG_CONSTANTS = frozenset({"True", "False", "None"})
 # pytest's -m tokens: punctuation, a quoted string or an identifier; any other
 # character is a token of its own that makes the expression invalid.
 _TOKEN = re.compile(r"""[(),=]|'[^']*'|"[^"]*"|[\w:+\-.\[\]\\/]+|\S""")
@@ -48,6 +51,20 @@ def _is_string(token: str) -> bool:
     return len(token) > 1 and token[0] in "'\"" and token[-1] == token[0]
 
 
+def _is_kwarg_key(token: str) -> bool:
+    """Return whether token is a kwarg key: a Python identifier, not a keyword."""
+    return token.isidentifier() and not keyword.iskeyword(token)
+
+
+def _is_kwarg_value(token: str) -> bool:
+    """Return whether token is a kwarg value: a string, an int, True/False/None."""
+    return (
+        _is_string(token)
+        or token.removeprefix("-").isdigit()
+        or token in _KWARG_CONSTANTS
+    )
+
+
 def _skip_kwargs(tokens: list[str], start: int) -> tuple[int, bool]:
     """Read ``(key=value, …)`` starting at the ``(`` at tokens[start].
 
@@ -62,7 +79,7 @@ def _skip_kwargs(tokens: list[str], start: int) -> tuple[int, bool]:
     i = start + 1
     while True:
         key, equal, value = (tokens[i : i + 3] + ["", "", ""])[:3]
-        if _is_ident(key) and equal == "=" and (_is_ident(value) or _is_string(value)):
+        if _is_kwarg_key(key) and equal == "=" and _is_kwarg_value(value):
             i += 3
             if tokens[i : i + 1] == [")"]:
                 return i + 1, True
