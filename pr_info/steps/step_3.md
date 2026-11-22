@@ -18,10 +18,12 @@
 - Modified: `tests/test_code_checker_pytest/test_coverage_selection_identity.py`
 - Modified: `tests/test_project_config.py` (delete `TestGetPytestAddopts` and its import)
 - Modified if they break: `tests/test_toolkit.py`, `tests/test_toolkit_test.py`.
-  Either way, each of these two modules gets a module-level autouse fixture that
-  removes every `PYTEST*` variable (`monkeypatch.delenv`, same body as step 1's
-  `_clear_pytest_env`): the toolkit's `full` depth now reads `PYTEST_ADDOPTS` from
-  `os.environ` (issue Constraints, "Tests").
+  No per-module scrub: step 1's autouse `_clear_pytest_env` in `tests/conftest.py`
+  already removes every `PYTEST*` variable for these and for
+  `tests/test_pytest_tool_coverage.py`, `tests/test_pytest_tool_reuse.py`,
+  `tests/test_pytest_tool_combine.py` and `tests/test_server_params.py`
+  (`TestPytestCoverage`), which now reach `effective_config` through
+  `run_pytest_check` (issue Constraints, "Tests").
 
 ## WHAT
 

@@ -55,6 +55,7 @@ def _option_events(tokens: list[str]) -> list[tuple[str, str]]   # (canonical op
 def _env_addopts(env_vars: dict[str, str] | None) -> str
 def _split(value: str) -> list[str]                                # shlex.split; ValueError -> []
 def _strict_markers_on(tokens: list[str], table: PytestConfig | None) -> bool
+def _render_line(label: str, tokens: list[str], replaced_by: str | None, way_out: str | None) -> str
 ```
 
 `_parse_bool` from step 1 is reused for `-o strict_markers=v` / `-o strict=v`.
@@ -101,10 +102,24 @@ the project's ini `addopts` only, starting from the table keys `strict_markers` 
     replaces an `-m` inside `<tokens>`, the same replaced form applies:
     `addopts (-o): -x; its -m slow was replaced by extra_args` (decision 6: a
     replaced `-m` is never shown as applied).
+  - replaced `-m` is the whole `addopts` (nothing else left): no empty
+    `<label>: ;` prefix. E.g. `addopts = "-m 'not slow'"` plus `markers=["fast"]` →
+    `addopts (pyproject.toml): -m 'not slow' was replaced by markers — to run without: extra_args=["-o", "addopts="]`.
+    Same rule for the `addopts (-o)` and env lines.
 - env line, when `env_tokens`: `PYTEST_ADDOPTS: <tokens> — to run without: env_vars={"PYTEST_ADDOPTS": ""}`,
   same replaced form (replacing source `markers` or `extra_args`).
+  - `-o addopts=X` inside `PYTEST_ADDOPTS` (`ini_source == "PYTEST_ADDOPTS"`) whose
+    `-m` was replaced by the call: the `-o addopts=X` value is rendered with the
+    same replaced-form helper as the `addopts (-o)` bullet, so its `-m` is not shown
+    as applied: `PYTEST_ADDOPTS: -o addopts=-x; its -m slow was replaced by extra_args — to run without: env_vars={"PYTEST_ADDOPTS": ""}`.
 - Values rendered with `shlex.join`; the replaced `-m` with `shlex.quote`; a line's
   `-m` tokens (all spellings) are removed from the shown values when replaced.
+- One private helper renders every line (ini, `-o`, env, and the `-o addopts=X`
+  value inside the env line):
+  `_render_line(label, tokens, replaced_by, way_out) -> str` — drops the `-m`
+  tokens when `replaced_by` is set and picks the `…; its -m X was replaced by S` or
+  the `-m X was replaced by S` (nothing left) form; `way_out` is appended as
+  ` — to run without: …` when given.
 
 ## Tests (write first) — `test_effective_config.py`
 
@@ -138,3 +153,10 @@ Use `tmp_path` projects with a `pyproject.toml`; set `PYTEST_ADDOPTS` via
   "addopts=-x -m slow", "-m", "fast"]` → `addopts (-o): -x; its -m slow was replaced
   by extra_args` (no `-m slow` shown as applied), env line, both cleared → no ini
   line, not-read note, `config is None` → `[]`.
+- `addopts_notes`, whole `addopts` replaced: `addopts = "-m 'not slow'"`,
+  `markers=["fast"]` → exactly `addopts (pyproject.toml): -m 'not slow' was replaced by markers — to run without: extra_args=["-o", "addopts="]`
+  (no `addopts (pyproject.toml): ;`).
+- `addopts_notes`, `-o addopts=` inside `PYTEST_ADDOPTS`:
+  `PYTEST_ADDOPTS="-o 'addopts=-x -m slow'"`, `extra_args=["-m", "fast"]` → no ini
+  line; env line `PYTEST_ADDOPTS: -o addopts=-x; its -m slow was replaced by extra_args — to run without: env_vars={"PYTEST_ADDOPTS": ""}`
+  (no `-m slow` shown as applied).

@@ -79,8 +79,10 @@ fixture). Patch `mcp_tools_py.checker_tools.pytest_tool.check_code_with_pytest` 
 - deselected > 0 → `addopts (pyproject.toml): … — to run without: extra_args=["-o", "addopts="]`.
 - failed run, ERROR run, SUSPICIOUS run → line present.
 - `--collect-only` SUSPICIOUS without deselection → no line; with deselection → line.
-- passing run with `markers=["fast"]` and addopts `-m 'not slow'` → replaced line
-  naming `markers`; with `extra_args=["-m", ""]` → replaced, naming `extra_args`.
+- passing run with `markers=["fast"]` and `addopts = "-m 'not slow'"` → exactly
+  `addopts (pyproject.toml): -m 'not slow' was replaced by markers — to run without: extra_args=["-o", "addopts="]`
+  (no `addopts (pyproject.toml): ;`); with `extra_args=["-m", ""]` → the same
+  wording naming `extra_args`.
 - `env_vars={"PYTEST_ADDOPTS": "-x"}` on a failure → `PYTEST_ADDOPTS: -x — to run
   without: env_vars={"PYTEST_ADDOPTS": ""}`; `env_vars={"PYTEST_ADDOPTS": ""}` → none.
 - `pytest.ini` in the root on a failure → `pytest config is in pytest.ini, not read`.

@@ -11,10 +11,20 @@
 
 - New: `src/mcp_tools_py/code_checker_pytest/pytest_config.py`
 - New: `tests/test_code_checker_pytest/test_pytest_config.py`
-- Modified: `tests/test_code_checker_pytest/conftest.py` (autouse fixture). Not
-  `tests/conftest.py`: `tests/test_startup_time.py` reads
-  `PYTEST_XDIST_WORKER_COUNT` at runtime to skip under xdist, so a repo-wide scrub
-  would break it. All tests of this issue live in `tests/test_code_checker_pytest/`.
+- Modified: `tests/conftest.py` (autouse fixture, next to `_clear_virtual_env`).
+  Repo-wide, so every test reaching `effective_config` through `run_pytest_check`
+  (`tests/test_pytest_tool_*.py`, `tests/test_server_params.py`, the toolkit tests,
+  `tests/test_code_checker_pytest/`) is covered by this one fixture; no per-module
+  scrubs.
+- Modified: `tests/test_startup_time.py`. `_parallel_workers()` reads
+  `PYTEST_XDIST_WORKER_COUNT` at runtime, which the scrub now removes. Take it
+  once at import instead (module-level `_XDIST_WORKER_COUNT =
+  int(os.environ.get("PYTEST_XDIST_WORKER_COUNT", "1"))`; xdist sets it before
+  collection) and have `_parallel_workers()` return that. The three tests that
+  set or delete the variable (`test_startup_budget_runs_without_tracing`,
+  `…_skips_with_parallel_workers`, `…_runs_with_single_worker`) use
+  `monkeypatch.setattr(<module>, "_XDIST_WORKER_COUNT", n)` instead of
+  `setenv` / `delenv`.
 
 ## WHAT
 
@@ -34,7 +44,7 @@ def read_pytest_config(project_dir: str) -> PytestConfig | None:
     """Read the project's pytest config. Never raises; None when it can't be read."""
 ```
 
-Autouse fixture in `tests/test_code_checker_pytest/conftest.py`:
+Autouse fixture in `tests/conftest.py`:
 
 ```python
 @pytest.fixture(autouse=True)
@@ -50,11 +60,13 @@ def _clear_pytest_env(monkeypatch: pytest.MonkeyPatch) -> None:
 
 ## HOW
 
-- Uses `tomllib` and `os.path` only; reads `pyproject.toml` itself. A missing file
-  (`FileNotFoundError`) means "no pyproject section": `tox.ini` / `setup.cfg` are
-  still checked. Any other `OSError`, `tomllib.TOMLDecodeError` or
-  `UnicodeDecodeError` → `None`. Lives in `code_checker_pytest` (layer above
-  `utils`), not in `utils/project_config.py`.
+- Reads `pyproject.toml` through the existing `read_pyproject_tool_tables(Path(project_dir))`
+  (`utils/project_config.py`); no own `tomllib` reader. It returns `{}` for a
+  missing file or no `[tool]` table → "no pyproject section": `tox.ini` /
+  `setup.cfg` are still checked. `ValueError` (invalid TOML; `UnicodeDecodeError`
+  is a subclass) or `OSError` → `None`. Dedicated-file and `tox.ini` / `setup.cfg`
+  checks use `os.path`. Lives in `code_checker_pytest` (layer above `utils`), not
+  in `utils/project_config.py`.
 - `_parse_bool(value: str) -> bool | None` is defined here (pytest's bool spellings,
   case-insensitive; anything else → `None`) for the string strict keys in
   `ini_options`; step 2 reuses it.
@@ -66,7 +78,7 @@ def _clear_pytest_env(monkeypatch: pytest.MonkeyPatch) -> None:
 
 ```
 for name in DEDICATED_FILES: if isfile(root/name): return PytestConfig([], [], None, None, name)
-tool = load(pyproject)["tool"] or {}  -> FileNotFoundError: tool = {}; other error: return None
+tool = read_pyproject_tool_tables(Path(dir))  -> {} when missing; ValueError/OSError: return None
 ini, native = tool.pytest.ini_options (dict|None), tool.pytest minus "ini_options" (dict)
 if ini and native: return None                       # pytest rejects both non-empty
 if ini is None and not native: check tox.ini [pytest], then setup.cfg [tool:pytest] -> not_read
@@ -96,10 +108,15 @@ an `ini_options` table (even empty) or a non-empty `[tool.pytest]` (ignoring the
 - `tox.ini [pytest]` → `not_read="tox.ini"` without pyproject section; with an empty
   `[tool.pytest.ini_options]` → no note; with only an empty `[tool.pytest]` → note.
 - `setup.cfg [tool:pytest]` same rule; `tox.ini` without `[pytest]` → no note.
-- invalid TOML → `None`; both tables non-empty → `None`; non-empty `[tool.pytest]`
-  plus empty `ini_options` → reads `[tool.pytest]`.
-- no `pyproject.toml` at all → `PytestConfig([], [], None, None)`.
+- invalid TOML → `None` (the `ValueError` from `read_pyproject_tool_tables`);
+  `read_pyproject_tool_tables` patched to raise `OSError` → `None`; both tables
+  non-empty → `None`; non-empty `[tool.pytest]` plus empty `ini_options` → reads
+  `[tool.pytest]`.
+- no `pyproject.toml` at all (`{}`) → `PytestConfig([], [], None, None)`;
+  `pyproject.toml` without a `[tool]` table → same.
 - no `pyproject.toml`, only `tox.ini [pytest]` → `not_read == "tox.ini"`; no
   `pyproject.toml`, only `setup.cfg [tool:pytest]` → `not_read == "setup.cfg"`.
 - scrub fixture: a test asserting no `os.environ` name starting with `PYTEST`
   other than `PYTEST_CURRENT_TEST` is present.
+- `tests/test_startup_time.py`: the existing tests, adapted to
+  `monkeypatch.setattr(…, "_XDIST_WORKER_COUNT", …)`, still pass.

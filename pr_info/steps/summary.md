@@ -14,6 +14,7 @@ are binding; this plan only fixes *how*.
 
 1. **One reader of the pytest config, in `code_checker_pytest/pytest_config.py`.**
    - `read_pytest_config(project_dir) -> PytestConfig | None` reads `pyproject.toml`
+     through the existing `read_pyproject_tool_tables`
      (`[tool.pytest.ini_options]` or `[tool.pytest]`) and detects pytest config files
      that win over it (`pytest.toml`, `.pytest.toml`, `pytest.ini`, `.pytest.ini`;
      `tox.ini [pytest]` / `setup.cfg [tool:pytest]` only when `pyproject.toml` has no
@@ -86,8 +87,9 @@ Modified:
 - `src/mcp_tools_py/checker_tools/pytest_tool.py`
 - `src/mcp_tools_py/toolkit.py`
 - `src/mcp_tools_py/utils/project_config.py` (remove `get_pytest_addopts`)
-- `tests/test_code_checker_pytest/conftest.py` (autouse `PYTEST*` scrub; not
-  `tests/conftest.py`, which would break `tests/test_startup_time.py`)
+- `tests/conftest.py` (one repo-wide autouse `PYTEST*` scrub; no per-module scrubs)
+- `tests/test_startup_time.py` (read `PYTEST_XDIST_WORKER_COUNT` once at import,
+  before the scrub runs)
 - `tests/test_project_config.py` (remove `TestGetPytestAddopts`)
 - `tests/test_code_checker_pytest/test_coverage.py`
 - `tests/test_code_checker_pytest/test_coverage_selection_identity.py`
