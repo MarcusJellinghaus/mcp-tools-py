@@ -34,3 +34,11 @@ Reviewing the plan against the code; checking `runners.py` exit-code handling ne
 Verdict(decision='tasks', tasks=['pr_info/steps/step_6.md:55 — Under pytest-xdist the controller\'s json-report has no `deselected` count, because workers do the deselection and xdist doesn\'t relay it. So the headline case (`addopts = "-n auto -m \'not slow\'"`, clean pass) currently gets no addopts line. Fix in `_defaults_may_explain`: when `effective.numprocesses` is true and an applied -m or -k comes from addopts or PYTEST_ADDOPTS, treat the run as possibly deselected and return True. Add a mocked-reply test: an xdist-style summary with no `deselected` key, a clean pass and `-m` in addopts → the addopts line is shown. Also have step 6\'s real-xdist integration test assert this, so the unverified plugin behaviour is confirmed when the test runs.'], escalate_reason=None)
 **Changes**:
 applied
+
+## Round 4 — 2026-11-22
+**Findings**:
+Checking `runners.py` and `pytest_tool.py` against the plan's claims about exit-code handling and note wiring.Verifying the repo-wide `PYTEST*` scrub doesn't break other env-dependent tests, then writing the report.pr_info/steps/step_1.md:85 — medium — The ALGORITHM picks `table = ini if ini is not None else native`. With an empty `[tool.pytest.ini_options]` next to a non-empty `[tool.pytest]`, `ini` is `{}`, so it reads the empty table and ignores `[tool.pytest]`. That contradicts the step's own test at line 113 ("non-empty `[tool.pytest]` plus empty `ini_options` → reads `[tool.pytest]`") and the issue's Constraint that this combination is accepted. It should be `table = native if native else (ini or {})`. The tox/setup.cfg check at line 84 keeps `ini is None`.
+**Decisions**:
+Verdict(decision='dismiss', tasks=[], escalate_reason=None)
+**Changes**:
+dismiss
