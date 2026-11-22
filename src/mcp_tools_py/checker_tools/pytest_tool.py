@@ -20,14 +20,12 @@ from mcp_tools_py.code_checker_pytest.coverage_store import (
     format_last_run,
     start_coverage_run,
 )
+from mcp_tools_py.code_checker_pytest.pytest_config import effective_config
 from mcp_tools_py.code_checker_pytest.runners import check_code_with_pytest
 from mcp_tools_py.code_checker_pytest.utils import sanitize_extra_args
 from mcp_tools_py.code_checker_pytest.verdict import RunStatus
 from mcp_tools_py.log_utils import log_function_call
-from mcp_tools_py.utils.project_config import (
-    get_pytest_addopts,
-    resolve_coverage_source,
-)
+from mcp_tools_py.utils.project_config import resolve_coverage_source
 from mcp_tools_py.utils.report_budget import TOOL_CHARS, TOOL_LINES, bound_text
 
 if TYPE_CHECKING:
@@ -202,6 +200,10 @@ def register(mcp: "FastMCPProtocol", checker_tools: "CheckerTools") -> None:
             for note in sanitized.notes:
                 logger.info("extra_args sanitized", extra={"note": note})
 
+            effective = effective_config(
+                project_dir, markers, sanitized.cleaned_args, env_vars
+            )
+
             run_args = sanitized.cleaned_args
             run_env = env_vars
             fail_under: float | None = None
@@ -213,7 +215,6 @@ def register(mcp: "FastMCPProtocol", checker_tools: "CheckerTools") -> None:
                 run_args = sanitized.cleaned_args + cov_args
                 run_env = {**(env_vars or {}), **cov_env}
                 fail_under = read_fail_under(interpreter, project_dir)
-                addopts = get_pytest_addopts(project_dir)
                 coverage_run = start_coverage_run(
                     project_dir,
                     temp_dir,
@@ -221,17 +222,12 @@ def register(mcp: "FastMCPProtocol", checker_tools: "CheckerTools") -> None:
                     coverage_source,
                     sources,
                     fail_under,
-                    selection_line(
-                        markers,
-                        sanitized.cleaned_args,
-                        sanitized.path_args,
-                        addopts,
-                    ),
+                    selection_line(effective, sanitized.path_args),
                     selection_identity(
                         markers,
+                        effective,
                         sanitized.cleaned_args,
                         sanitized.path_args,
-                        addopts,
                         env_vars,
                     ),
                     interpreter,

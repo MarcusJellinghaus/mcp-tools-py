@@ -35,9 +35,9 @@ This tracks **Feature Implementation** consisting of multiple **Tasks**.
 
 ### Step 3: Coverage selection on `EffectiveConfig`; delete `get_pytest_addopts` — [step_3.md](./steps/step_3.md)
 
-- [ ] Implementation: updated tests (`test_coverage.py`, `test_coverage_selection_identity.py`, `test_project_config.py`, toolkit tests if needed) + `selection_line` / `selection_identity` on `EffectiveConfig`, wiring in `pytest_tool.py` and `toolkit.py`, delete `_effective_option`, `_option_value`, `get_pytest_addopts`
-- [ ] Quality checks (format, pylint, pytest, mypy, vulture, lint-imports) — fix all issues
-- [ ] Commit message prepared
+- [x] Implementation: updated tests (`test_coverage.py`, `test_coverage_selection_identity.py`, `test_project_config.py`, toolkit tests if needed) + `selection_line` / `selection_identity` on `EffectiveConfig`, wiring in `pytest_tool.py` and `toolkit.py`, delete `_effective_option`, `_option_value`, `get_pytest_addopts`
+- [x] Quality checks (format, pylint, pytest, mypy, vulture, lint-imports) — fix all issues
+- [x] Commit message prepared
 
 ### Step 4: `runners.py` — transport the exit code and pytest's `-m` error line — [step_4.md](./steps/step_4.md)
 

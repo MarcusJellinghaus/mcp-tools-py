@@ -489,33 +489,3 @@ def _load_pyproject(project_dir: str) -> dict[str, object]:
             return tomllib.load(f)
         except tomllib.TOMLDecodeError as exc:
             raise ValueError(f"Invalid pyproject.toml: {exc}") from exc
-
-
-def get_pytest_addopts(project_dir: str) -> str | None:
-    """Return ``[tool.pytest.ini_options] addopts`` from pyproject.toml, or None.
-
-    The value is exposed as-is; flags are not interpreted.  A list value is
-    joined with spaces.
-
-    Args:
-        project_dir: Path to project root containing pyproject.toml.
-
-    Returns:
-        The addopts string, or None when the file, section or key is missing.
-        A ``ValueError`` from :func:`_load_pyproject` propagates when
-        pyproject.toml is not valid TOML.
-    """
-    section: object = _load_pyproject(project_dir)
-    for key in ("tool", "pytest", "ini_options"):
-        if not isinstance(section, dict):
-            return None
-        section = section.get(key)
-    if not isinstance(section, dict):
-        return None
-
-    value = section.get("addopts")
-    if isinstance(value, str):
-        return value
-    if isinstance(value, list):
-        return " ".join(str(v) for v in value)
-    return None

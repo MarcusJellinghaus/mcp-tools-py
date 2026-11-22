@@ -9,11 +9,11 @@ import hashlib
 import json
 import os
 import posixpath
-import shlex
 from collections.abc import Iterable
 from typing import Any, TypedDict
 
 from mcp_tools_py.code_checker_pytest.models import PytestReport
+from mcp_tools_py.code_checker_pytest.pytest_config import EffectiveConfig, OptionValue
 from mcp_tools_py.code_checker_pytest.reporting import failed_collector_count, plural
 from mcp_tools_py.code_checker_pytest.verdict import RunStatus, RunVerdict
 from mcp_tools_py.utils.environment_info import PROBE_TIMEOUT_SECONDS
@@ -140,52 +140,65 @@ def read_fail_under(interpreter: str, project_dir: str) -> float | None:
         return None
 
 
-def selection_line(
-    markers: list[str] | None,
-    cleaned_args: list[str],
-    path_args: list[str],
-    addopts: str | None,
-) -> str:
-    """One line naming everything that narrowed the run, or saying nothing did.
-
-    The command line overrides ``addopts`` (pytest prepends addopts), so the
-    effective ``-m`` and ``-k`` are reported, labelled with their source.
+def _option_part(option: OptionValue | None, flag: str, call_label: str) -> str | None:
+    """Render an effective ``-m`` or ``-k`` labelled with its source.
 
     Args:
-        markers: The ``markers`` parameter of run_pytest_check.
-        cleaned_args: The sanitized extra_args.
-        path_args: The path arguments among cleaned_args.
-        addopts: The target project's pytest ``addopts``, if any.
+        option: The effective option, if any.
+        flag: ``-m`` or ``-k``.
+        call_label: The label when the value comes from the call.
 
     Returns:
-        A line starting with ``selection: ``.
+        The part, or None when there is no value.
     """
-    parts = []
-    m_value, m_from_addopts = _effective_option(
-        "-m", cleaned_args, addopts, " and ".join(markers or [])
-    )
-    if m_value:
-        parts.append(
-            f"addopts -m '{m_value}'" if m_from_addopts else f"markers '{m_value}'"
+    if option is None or not option.value:
+        return None
+    if option.source in ("pyproject.toml", "-o"):
+        label = f"addopts {flag}"
+    elif option.source == "PYTEST_ADDOPTS":
+        label = f"PYTEST_ADDOPTS {flag}"
+    else:
+        label = call_label
+    return f"{label} '{option.value}'"
+
+
+def selection_line(effective: EffectiveConfig, path_args: list[str]) -> str:
+    """One line naming everything that narrowed the run, or saying nothing did.
+
+    The effective ``-m`` and ``-k`` are reported, labelled with their source.
+
+    Args:
+        effective: The effective pytest config of the call.
+        path_args: The path arguments among the sanitized extra_args.
+
+    Returns:
+        A line starting with ``selection: ``, ending with the "not read" note
+        when pytest reads another config file.
+    """
+    parts = [
+        part
+        for part in (
+            _option_part(effective.m, "-m", "markers"),
+            _option_part(effective.k, "-k", "-k"),
         )
-
-    k_value, k_from_addopts = _effective_option("-k", cleaned_args, addopts)
-    if k_value:
-        parts.append(f"addopts -k '{k_value}'" if k_from_addopts else f"-k '{k_value}'")
-
+        if part
+    ]
     if path_args:
         parts.append("paths " + ", ".join(path_args))
 
+    line = "selection: " + "; ".join(parts)
     if not parts:
-        return "selection: full suite (no markers, -k or path arguments)"
-    return "selection: " + "; ".join(parts)
+        line = "selection: full suite (no markers, -k or path arguments)"
+    if effective.not_read:
+        line += f"; pytest config is in {effective.not_read}, not read"
+    return line
 
 
 def selection_identity(
     markers: list[str] | None,
+    effective: EffectiveConfig,
     cleaned_args: list[str],
     path_args: list[str],
-    addopts: str | None,
     env_vars: dict[str, str] | None,
 ) -> str:
     """Build the value that tells whether two runs selected the same tests.
@@ -195,18 +208,18 @@ def selection_identity(
 
     Args:
         markers: The ``markers`` parameter of run_pytest_check.
+        effective: The effective pytest config of the call.
         cleaned_args: The sanitized extra_args.
         path_args: The path arguments among cleaned_args.
-        addopts: The target project's pytest ``addopts``, if any.
         env_vars: The caller's env vars, if any.
 
     Returns:
         A JSON string, to compare with ``==``.
     """
-    m_value, _ = _effective_option(
-        "-m", cleaned_args, addopts, " and ".join(sorted(markers or []))
-    )
-    k_value, _ = _effective_option("-k", cleaned_args, addopts)
+    m_value = effective.m.value if effective.m else None
+    if effective.m and effective.m.source == "markers":
+        m_value = " and ".join(sorted(markers or []))
+    k_value = effective.k.value if effective.k else None
 
     rest = []
     tokens = iter(cleaned_args)
@@ -221,50 +234,9 @@ def selection_identity(
         env = hashlib.sha256(
             json.dumps(sorted(env_vars.items())).encode("utf-8")
         ).hexdigest()
-    return json.dumps([m_value, k_value, sorted(path_args), sorted(rest), env])
-
-
-def _effective_option(
-    flag: str, cleaned_args: list[str], addopts: str | None, default: str = ""
-) -> tuple[str | None, bool]:
-    """Find the value of ``-m`` or ``-k`` that pytest ends up using.
-
-    Args:
-        flag: The short option to look up.
-        cleaned_args: The sanitized extra_args.
-        addopts: The target project's pytest ``addopts``, if any.
-        default: The value the command line has when cleaned_args has none.
-
-    Returns:
-        The value, or None when there is none, and whether it comes from
-        addopts.
-    """
-    # runners.py puts the markers -m before extra_args, so an -m there wins.
-    if value := _option_value(cleaned_args, flag) or default:
-        return value, False
-    try:
-        add = shlex.split(addopts or "")
-    except ValueError:
-        add = []
-    if add_value := _option_value(add, flag):
-        return add_value, True
-    return None, False
-
-
-def _option_value(tokens: list[str], flag: str) -> str | None:
-    """Find the value of a short option (`-m X` or `-mX`) in tokens.
-
-    Returns:
-        The last value given, as pytest keeps the last; None when absent.
-    """
-    value = None
-    for i, token in enumerate(tokens):
-        if token == flag:
-            if i + 1 < len(tokens):
-                value = tokens[i + 1]
-        elif token.startswith(flag):
-            value = token[len(flag) :]
-    return value
+    return json.dumps(
+        [m_value, k_value, sorted(path_args), sorted(rest), env, effective.not_read]
+    )
 
 
 def _warning_lines(
