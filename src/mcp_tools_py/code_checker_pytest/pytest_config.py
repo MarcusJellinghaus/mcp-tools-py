@@ -412,6 +412,25 @@ def effective_config(
     )
 
 
+def call_replaced_addopts_m(effective: EffectiveConfig) -> bool:
+    """Return whether the call's ``-m`` replaced an ``-m`` of the defaults.
+
+    Args:
+        effective: The effective config of the call.
+
+    Returns:
+        True when the effective ``-m`` comes from ``markers`` or extra_args
+        and the applied ini ``addopts`` or ``PYTEST_ADDOPTS`` hold an ``-m``.
+    """
+    if effective.m is None or effective.m.source not in ("markers", "extra_args"):
+        return False
+    return any(
+        option == "-m"
+        for tokens in (effective.ini_tokens, effective.env_tokens)
+        for option, _ in _option_events(tokens)
+    )
+
+
 def _drop_m(tokens: list[str]) -> tuple[list[str], list[str]]:
     """Take the ``-m`` options, in all spellings, out of tokens.
 

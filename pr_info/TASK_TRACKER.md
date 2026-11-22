@@ -53,9 +53,9 @@ This tracks **Feature Implementation** consisting of multiple **Tasks**.
 
 ### Step 6: Wire the notes into `run_pytest_check` — [step_6.md](./steps/step_6.md)
 
-- [ ] Implementation: tests (`test_config_notes_reply.py`, `test_integration_marker_hint.py`) + `call_replaced_addopts_m` in `pytest_config.py`, `_defaults_may_explain` / `_defaults_select` and note wiring in `pytest_tool.py`
-- [ ] Quality checks (format, pylint, pytest incl. the new integration test file, mypy, vulture, lint-imports) — fix all issues
-- [ ] Commit message prepared
+- [x] Implementation: tests (`test_config_notes_reply.py`, `test_integration_marker_hint.py`) + `call_replaced_addopts_m` in `pytest_config.py`, `_defaults_may_explain` / `_defaults_select` and note wiring in `pytest_tool.py`
+- [x] Quality checks (format, pylint, pytest incl. the new integration test file, mypy, vulture, lint-imports) — fix all issues
+- [x] Commit message prepared
 
 ### Step 7: Docstring, README, architecture doc — [step_7.md](./steps/step_7.md)
 

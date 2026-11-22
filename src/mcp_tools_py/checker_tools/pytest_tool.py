@@ -3,7 +3,7 @@
 import logging
 import shutil
 import tempfile
-from typing import TYPE_CHECKING
+from typing import TYPE_CHECKING, Any
 
 from mcp_tools_py.code_checker_pytest.coverage import (
     coverage_args,
@@ -20,7 +20,13 @@ from mcp_tools_py.code_checker_pytest.coverage_store import (
     format_last_run,
     start_coverage_run,
 )
-from mcp_tools_py.code_checker_pytest.pytest_config import effective_config
+from mcp_tools_py.code_checker_pytest.marker_hint import marker_notes
+from mcp_tools_py.code_checker_pytest.pytest_config import (
+    EffectiveConfig,
+    addopts_notes,
+    call_replaced_addopts_m,
+    effective_config,
+)
 from mcp_tools_py.code_checker_pytest.runners import check_code_with_pytest
 from mcp_tools_py.code_checker_pytest.utils import sanitize_extra_args
 from mcp_tools_py.code_checker_pytest.verdict import RunStatus
@@ -37,6 +43,57 @@ logger = logging.getLogger(__name__)
 DIGEST_HINT = (
     "Use a smaller max_modules or narrow coverage_source to see the digest in full."
 )
+
+# Where an applied -m / -k comes from when the defaults chose it.
+_DEFAULT_SOURCES = ("pyproject.toml", "-o", "PYTEST_ADDOPTS")
+
+
+def _defaults_select(effective: EffectiveConfig) -> bool:
+    """Return whether an applied ``-m`` or ``-k`` comes from the defaults.
+
+    Args:
+        effective: The effective config of the call.
+
+    Returns:
+        True when the effective ``-m`` or ``-k`` is non-empty and comes from
+        ini ``addopts`` or ``PYTEST_ADDOPTS``.
+    """
+    return any(
+        option is not None
+        and option.value.strip() != ""
+        and option.source in _DEFAULT_SOURCES
+        for option in (effective.m, effective.k)
+    )
+
+
+def _defaults_may_explain(
+    test_results: dict[str, Any], collect_only: bool, effective: EffectiveConfig
+) -> bool:
+    """Return whether the defaults could explain the result.
+
+    Args:
+        test_results: The result of check_code_with_pytest.
+        collect_only: The call has ``--collect-only``.
+        effective: The effective config of the call.
+
+    Returns:
+        True when the run failed or errored, deselected tests, found none, is
+        suspicious (not under ``--collect-only``), may have deselected tests
+        under pytest-xdist, or the call's ``-m`` replaced a default ``-m``.
+    """
+    status = test_results["verdict"].status
+    if status in (RunStatus.FAILED, RunStatus.ERROR):
+        return True
+    summary = test_results.get("summary") or {}
+    deselected = summary.get("deselected") or 0
+    if deselected or (summary.get("collected") or 0) - deselected == 0:
+        return True
+    if status is RunStatus.SUSPICIOUS and not collect_only:
+        return True
+    # xdist does not relay pytest_deselected, so the report has no count.
+    if effective.numprocesses and _defaults_select(effective):
+        return True
+    return call_replaced_addopts_m(effective)
 
 
 def register(mcp: "FastMCPProtocol", checker_tools: "CheckerTools") -> None:
@@ -295,9 +352,26 @@ def register(mcp: "FastMCPProtocol", checker_tools: "CheckerTools") -> None:
                 max_chars=max_chars,
             )
 
-            # Prepend the test-paths and deduplication notes so LLM can self-correct
+            # Prepend the defaults, marker, test-paths and deduplication notes
+            # so LLM can self-correct
+            top = (
+                addopts_notes(effective)
+                if _defaults_may_explain(
+                    test_results, sanitized.collect_only, effective
+                )
+                else []
+            )
+            top += marker_notes(
+                effective,
+                test_results.get("exit_code"),
+                test_results.get("marker_error"),
+            )
             test_paths_note = test_results.get("test_paths_note")
-            notes = [*([test_paths_note] if test_paths_note else []), *sanitized.notes]
+            notes = [
+                *top,
+                *([test_paths_note] if test_paths_note else []),
+                *sanitized.notes,
+            ]
             if notes:
                 notes_text = "\n".join(notes)
                 result = f"{notes_text}\n\n{result}"
