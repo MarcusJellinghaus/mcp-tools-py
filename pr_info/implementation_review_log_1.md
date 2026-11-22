@@ -17,3 +17,11 @@ src/mcp_tools_py/code_checker_pytest/marker_hint.py:36 — low — `_TOKEN` acce
 Verdict(decision='tasks', tasks=["Bring the `_TOKEN` scanner in src/mcp_tools_py/code_checker_pytest/marker_hint.py:36 in line with pytest's Scanner. Treat a quoted string that contains a backslash as unparseable. Skip only spaces and tabs as whitespace, so a newline or any other whitespace character makes the expression unparseable. In both cases `scan_expression` must report the expression as invalid, which triggers decision 17's 'every unregistered name counts' fallback.", 'Add unit tests to the marker_hint tests. An expression with a backslash inside a quoted kwarg value, such as `a(x="b\\\\c") and not unit`, should be unparseable so that `unit` gets a hint on exit 4. The same applies to an expression containing a newline, such as `a and\\nnot unit`. Tab-separated tokens should still parse.'], escalate_reason=None)
 **Changes**:
 applied
+
+## Round 3 — 2026-11-22
+**Findings**:
+Reviewing runners/pytest_tool for #294; checking command-build order for `-m` precedence next.Still reviewing #294: checking tests conftest and the integration tests.Running the relevant tests to confirm the branch state.NO FINDINGS
+**Decisions**:
+Verdict(decision='dismiss', tasks=[], escalate_reason=None)
+**Changes**:
+dismiss
