@@ -23,9 +23,9 @@ This tracks **Feature Implementation** consisting of multiple **Tasks**.
 
 ### Step 1: `read_pytest_config` and the `PYTEST*` test-env scrub — [step_1.md](./steps/step_1.md)
 
-- [ ] Implementation: tests (`test_pytest_config.py`, scrub fixture test, adapted `test_startup_time.py`) + `pytest_config.py` (`PytestConfig`, `read_pytest_config`, `_parse_bool`), `_clear_pytest_env` in `tests/conftest.py`, `_XDIST_WORKER_COUNT` in `tests/test_startup_time.py`
-- [ ] Quality checks (format, pylint, pytest, mypy, vulture, lint-imports) — fix all issues
-- [ ] Commit message prepared
+- [x] Implementation: tests (`test_pytest_config.py`, scrub fixture test, adapted `test_startup_time.py`) + `pytest_config.py` (`PytestConfig`, `read_pytest_config`, `_parse_bool`), `_clear_pytest_env` in `tests/conftest.py`, `_XDIST_WORKER_COUNT` in `tests/test_startup_time.py`
+- [x] Quality checks (format, pylint, pytest, mypy, vulture, lint-imports) — fix all issues
+- [x] Commit message prepared
 
 ### Step 2: `effective_config` and `addopts_notes` — [step_2.md](./steps/step_2.md)
 
