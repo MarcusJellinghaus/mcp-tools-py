@@ -59,9 +59,9 @@ This tracks **Feature Implementation** consisting of multiple **Tasks**.
 
 ### Step 7: Docstring, README, architecture doc — [step_7.md](./steps/step_7.md)
 
-- [ ] Implementation: docstring test in `test_config_notes_reply.py` + `run_pytest_check` docstring, README parameter rows, `docs/architecture/architecture.md`
-- [ ] Quality checks (format, pylint, pytest, mypy, vulture, lint-imports) — fix all issues
-- [ ] Commit message prepared
+- [x] Implementation: docstring test in `test_config_notes_reply.py` + `run_pytest_check` docstring, README parameter rows, `docs/architecture/architecture.md`
+- [x] Quality checks (format, pylint, pytest, mypy, vulture, lint-imports) — fix all issues
+- [x] Commit message prepared
 
 ## Pull Request
 

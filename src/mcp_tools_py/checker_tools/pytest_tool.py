@@ -117,11 +117,23 @@ def register(mcp: "FastMCPProtocol", checker_tools: "CheckerTools") -> None:
 
         Args:
             markers: Optional list of pytest markers to filter tests. Examples: ['slow', 'integration']
+                Entries are joined with `and`. The result replaces an `-m` from
+                the project's `addopts` as a whole expression, it is not added
+                to it. Check the markers the project registers (`markers` in
+                `[tool.pytest.ini_options]` / `[tool.pytest]`) before using
+                `-m`; a wrong name is reported when the run fails. Skip
+                integration tests the current task doesn't affect, e.g.
+                markers=["not integration"].
             extra_args: Optional list of additional pytest arguments for flexible test selection.
                        Examples: ['tests/test_file.py::test_function']
                        Use -v/-vv/-vvv in extra_args to control verbosity.
                        See "Flexible Test Selection" section below for common patterns.
+                The project's `addopts` apply first (e.g. `-n auto`), so don't
+                add them again. extra_args=["-o", "addopts="] runs without them.
+                A later `-m` here replaces the `addopts` `-m`.
             env_vars: Optional dictionary of environment variables for the subprocess.
+                `PYTEST_ADDOPTS` from the environment also applies;
+                env_vars={"PYTEST_ADDOPTS": ""} clears it (`-o addopts=` does not).
             timeout_seconds: Maximum seconds to wait for the test run. Overrides the
                 configured limit for this call. Must be a positive integer.
                 Defaults to `[tool.mcp-tools-py]` config, then `--check-timeout`,
@@ -180,6 +192,12 @@ def register(mcp: "FastMCPProtocol", checker_tools: "CheckerTools") -> None:
 
             # Integration test run
             run_pytest_check(markers=["integration"])
+
+            # Skip integration tests
+            run_pytest_check(markers=["not integration"])
+
+            # Run without the project's addopts
+            run_pytest_check(extra_args=["-o", "addopts="])
 
             # Coverage digest for the full suite
             run_pytest_check(coverage=True)

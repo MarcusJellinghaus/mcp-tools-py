@@ -288,3 +288,12 @@ def test_exit_4_error_line_after_long_stderr_reaches_the_reply(
     assert _UNKNOWN_UNIT in lines
     assert f"{_UNIT_HINT} Registered: slow" in lines
     assert lines.index(_UNKNOWN_UNIT) < lines.index(f"{_UNIT_HINT} Registered: slow")
+
+
+def test_docstring_documents_defaults_and_markers(run_pytest_check: Any) -> None:
+    doc = run_pytest_check.__doc__
+
+    assert '-o", "addopts="' in doc
+    assert 'PYTEST_ADDOPTS": ""' in doc
+    assert "replaces" in doc
+    assert "registers" in doc or "registered" in doc
