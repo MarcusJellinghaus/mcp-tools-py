@@ -41,9 +41,9 @@ This tracks **Feature Implementation** consisting of multiple **Tasks**.
 
 ### Step 4: `runners.py` — transport the exit code and pytest's `-m` error line — [step_4.md](./steps/step_4.md)
 
-- [ ] Implementation: tests (`test_runners.py`) + `_EXIT_CODE_ATTR`, `_MARKER_ERROR_ATTR`, `MARKER_ERRORS`, `marker_error_line`, `exit_code` / `marker_error` keys in `check_code_with_pytest`
-- [ ] Quality checks (format, pylint, pytest, mypy, vulture, lint-imports) — fix all issues
-- [ ] Commit message prepared
+- [x] Implementation: tests (`test_runners.py`) + `_EXIT_CODE_ATTR`, `_MARKER_ERROR_ATTR`, `MARKER_ERRORS`, `marker_error_line`, `exit_code` / `marker_error` keys in `check_code_with_pytest`
+- [x] Quality checks (format, pylint, pytest, mypy, vulture, lint-imports) — fix all issues
+- [x] Commit message prepared
 
 ### Step 5: `marker_hint.py` — expression scan and marker notes — [step_5.md](./steps/step_5.md)
 

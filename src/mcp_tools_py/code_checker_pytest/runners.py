@@ -47,8 +47,33 @@ def _build_error_detail(output: str, error_output: str) -> str:
 
 logger = logging.getLogger(__name__)
 
-# Attribute run_tests sets on an exception it re-raises: the command, for the error reply.
+# Attributes run_tests sets on an exception it re-raises: the command, for the
+# error reply; pytest's exit code; pytest's ERROR: line for a -m problem.
 _COMMAND_ATTR = "pytest_command"
+_EXIT_CODE_ATTR = "pytest_exit_code"
+_MARKER_ERROR_ATTR = "pytest_marker_error"
+
+# pytest's usage-error messages for a bad -m expression
+MARKER_ERRORS = (
+    "Unknown marker(s) in '-m' expression",
+    "Wrong expression passed to '-m'",
+)
+
+
+def marker_error_line(stderr: str) -> str | None:
+    """Find pytest's ERROR: line for a -m problem.
+
+    Args:
+        stderr: The full stderr of the pytest run.
+
+    Returns:
+        The stripped ERROR: line naming a -m problem, or None.
+    """
+    for raw_line in stderr.splitlines():
+        line = raw_line.strip()
+        if line.startswith("ERROR:") and any(m in line for m in MARKER_ERRORS):
+            return line
+    return None
 
 
 class ProcessResult:
@@ -212,6 +237,8 @@ def run_tests(
         if venv_bin:
             env["PATH"] = f"{venv_bin}{os.pathsep}{os.environ.get('PATH', '')}"
 
+        exit_code: int | None = None
+        marker_error: str | None = None
         try:
             # Execute the subprocess using subprocess_runner
             subprocess_result = execute_command(
@@ -252,9 +279,12 @@ def run_tests(
                 subprocess_result.stdout,
                 subprocess_result.stderr,
             )
+            exit_code = process.returncode
 
             output = process.stdout
             error_output = process.stderr
+            if process.returncode == 4:
+                marker_error = marker_error_line(error_output or "")
             combined_output = f"{output}\n{error_output}"
             logger.debug(output)
 
@@ -379,6 +409,8 @@ def run_tests(
                 command_line,
             )
             setattr(e, _COMMAND_ATTR, shown_command)
+            setattr(e, _EXIT_CODE_ATTR, exit_code)
+            setattr(e, _MARKER_ERROR_ATTR, marker_error)
             raise e
 
     except Exception as e:
@@ -428,6 +460,8 @@ def check_code_with_pytest(
         - summary: Summary of test results as a formatted string
         - test_results: Complete PytestReport object with detailed test information
         - test_paths_note: Note when `testpaths` is set but no entry exists, else None; present on every return
+        - exit_code: pytest's exit code, or None when pytest gave none (timeout, execution error); present on every return
+        - marker_error: pytest's ERROR: line for a bad -m expression on exit 4, else None; present on every return
     """
     logger.debug(
         "Starting pytest code check",
@@ -482,12 +516,15 @@ def check_code_with_pytest(
         )
 
         # Return both summary dict and formatted text
+        verdict = classify_run(test_results)
         return {
-            "verdict": classify_run(test_results),
+            "verdict": verdict,
             "summary": summary_dict,  # Dictionary for server.py compatibility
             "summary_text": summary_text,  # Formatted string for display
             "test_results": test_results,
             "test_paths_note": note,
+            "exit_code": verdict.exit_code,
+            "marker_error": None,
         }
 
     except Exception as e:
@@ -507,4 +544,6 @@ def check_code_with_pytest(
         return {
             "verdict": RunVerdict(RunStatus.ERROR, problems, 0),
             "test_paths_note": note,
+            "exit_code": getattr(e, _EXIT_CODE_ATTR, None),
+            "marker_error": getattr(e, _MARKER_ERROR_ATTR, None),
         }
