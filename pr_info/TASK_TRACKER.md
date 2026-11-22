@@ -47,9 +47,9 @@ This tracks **Feature Implementation** consisting of multiple **Tasks**.
 
 ### Step 5: `marker_hint.py` — expression scan and marker notes — [step_5.md](./steps/step_5.md)
 
-- [ ] Implementation: tests (`test_marker_hint.py`) + `marker_hint.py` (`scan_expression`, `unknown_marker_names`, `marker_notes`, constants)
-- [ ] Quality checks (format, pylint, pytest, mypy, vulture, lint-imports) — fix all issues
-- [ ] Commit message prepared
+- [x] Implementation: tests (`test_marker_hint.py`) + `marker_hint.py` (`scan_expression`, `unknown_marker_names`, `marker_notes`, constants)
+- [x] Quality checks (format, pylint, pytest, mypy, vulture, lint-imports) — fix all issues
+- [x] Commit message prepared
 
 ### Step 6: Wire the notes into `run_pytest_check` — [step_6.md](./steps/step_6.md)
 
