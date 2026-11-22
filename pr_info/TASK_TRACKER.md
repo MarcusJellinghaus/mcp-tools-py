@@ -29,9 +29,9 @@ This tracks **Feature Implementation** consisting of multiple **Tasks**.
 
 ### Step 2: `effective_config` and `addopts_notes` — [step_2.md](./steps/step_2.md)
 
-- [ ] Implementation: tests (`test_effective_config.py`) + `OptionValue`, `EffectiveConfig`, `effective_config`, `addopts_notes` and private helpers in `pytest_config.py`
-- [ ] Quality checks (format, pylint, pytest, mypy, vulture, lint-imports) — fix all issues
-- [ ] Commit message prepared
+- [x] Implementation: tests (`test_effective_config.py`) + `OptionValue`, `EffectiveConfig`, `effective_config`, `addopts_notes` and private helpers in `pytest_config.py`
+- [x] Quality checks (format, pylint, pytest, mypy, vulture, lint-imports) — fix all issues
+- [x] Commit message prepared
 
 ### Step 3: Coverage selection on `EffectiveConfig`; delete `get_pytest_addopts` — [step_3.md](./steps/step_3.md)
 
