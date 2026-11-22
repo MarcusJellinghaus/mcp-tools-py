@@ -28,6 +28,9 @@ def _defaults_may_explain(
     test_results: dict[str, Any], collect_only: bool, effective: EffectiveConfig
 ) -> bool:
     """Decision 5: deselected, no tests found, failed/error, suspicious, or a replaced -m."""
+
+def _defaults_select(effective: EffectiveConfig) -> bool:
+    """True when an applied -m or -k comes from addopts or PYTEST_ADDOPTS."""
 ```
 
 ## HOW
@@ -54,8 +57,16 @@ if status in (FAILED, ERROR): return True          # exit 3/4/5, missing report 
 deselected = summary.get("deselected") or 0
 if deselected or (summary.get("collected") or 0) - deselected == 0: return True
 if status is SUSPICIOUS and not collect_only: return True
+if effective.numprocesses and _defaults_select(effective): return True   # xdist hides deselected
 return call_replaced_addopts_m(effective)
 ```
+
+`_defaults_select(effective)`: `effective.m` or `effective.k` has a non-empty value
+whose source is `pyproject.toml`, `-o` or `PYTEST_ADDOPTS` (an applied `-m` / `-k`
+from `addopts` or `PYTEST_ADDOPTS`). Reason: under pytest-xdist the workers
+deselect and xdist does not relay `pytest_deselected` to the controller, so the
+controller's json-report has no `deselected` count; such a run is treated as
+possibly deselected (decision 5).
 
 `call_replaced_addopts_m`: `effective.m` source is `markers` or `extra_args`, and an
 `-m` event occurs in `ini_tokens` (when `ini_source != "PYTEST_ADDOPTS"` too) or
@@ -76,6 +87,9 @@ fixture). Patch `mcp_tools_py.checker_tools.pytest_tool.check_code_with_pytest` 
 `marker_error` keys, except where noted.
 
 - clean full pass with `addopts = "-n auto"` → no `addopts` line.
+- xdist-style clean pass: `addopts = "-n auto -m 'not slow'"`, summary without a
+  `deselected` key → `addopts (pyproject.toml): -n auto -m 'not slow' — to run without: extra_args=["-o", "addopts="]`.
+  Same summary with `addopts = "-m 'not slow'"` (no `-n`) → no line.
 - deselected > 0 → `addopts (pyproject.toml): … — to run without: extra_args=["-o", "addopts="]`.
 - failed run, ERROR run, SUSPICIOUS run → line present.
 - `--collect-only` SUSPICIOUS without deselection → no line; with deselection → line.
@@ -112,3 +126,8 @@ pytest 9 (`pytest.version_tuple < (9,)`) for exit-4 / exit-3 marker cases and
   `Wrong expression passed to '-m'` line, no tip; with `-n 0` → no tip.
 - `[tool.pytest]` project with `addopts = ["-m", "unit"]` → same `addopts` line and
   hint as the `ini_options` variant.
+- real xdist, `addopts = "-n 2 -m 'not slow'"`, one plain and one `slow` test
+  (marker registered): `check_code_with_pytest` → clean pass and
+  `result["summary"]["deselected"]` is falsy (confirms the plugin behaviour
+  `_defaults_select` relies on); the same project through `run_pytest_check` →
+  the reply shows the `addopts (pyproject.toml): -n 2 -m 'not slow' — …` line.
