@@ -75,7 +75,7 @@ mcp-tools-py = "mcp_tools_py.toolkit:PythonToolkit"
 testpaths = ["tests"]
 asyncio_default_fixture_loop_scope = "function"
 pythonpath = ["src"]
-addopts = "-n auto"
+addopts = "-n auto --strict-markers"
 markers = [
     "integration: Integration tests requiring external resources",
 ]

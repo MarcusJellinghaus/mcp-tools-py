@@ -104,6 +104,7 @@ All checks must pass before proceeding.
 **Pytest:** always use `extra_args: ["-n", "auto"]` for parallel execution.
 
 Available marker: `integration` (requires external resources).
+New markers must be registered under `[tool.pytest.ini_options] markers` in `pyproject.toml`, or collection fails (`--strict-markers`).
 
 ```python
 # Fast unit tests (recommended for regular development)
