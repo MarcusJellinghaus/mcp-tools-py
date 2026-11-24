@@ -167,8 +167,10 @@ def _clear_environment_info_cache() -> Iterator[None]:
 
 @pytest.fixture(autouse=True)
 def _isolate_pytest_workers(monkeypatch: pytest.MonkeyPatch) -> None:
-    """Never read the developer's ~/.mcp_coder/config.toml."""
+    """Never read the developer's ~/.mcp_coder/config.toml or sample the real CPU."""
     monkeypatch.setattr(f"{_WORKERS}._config_path", lambda: _NO_USER_CONFIG)
+    monkeypatch.setattr(f"{_WORKERS}._is_windows", lambda: False)
+    monkeypatch.setattr(f"{_WORKERS}._get_system_times", lambda: None)
 
 
 @pytest.fixture
