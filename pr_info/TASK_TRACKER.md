@@ -38,9 +38,9 @@ See [step_2.md](./steps/step_2.md)
 ### Step 3: `workers.py` config loader, verify data, test isolation fixtures
 See [step_3.md](./steps/step_3.md)
 
-- [ ] Implementation (tests + production code)
-- [ ] Quality checks (pylint, pytest, mypy, lint-imports, tach) — fix all issues
-- [ ] Commit message prepared
+- [x] Implementation (tests + production code)
+- [x] Quality checks (pylint, pytest, mypy, lint-imports, tach) — fix all issues
+- [x] Commit message prepared
 
 ### Step 4: Toolkit `verify()` item `pytest_workers`
 See [step_4.md](./steps/step_4.md)

@@ -1,7 +1,7 @@
 """Shared test utilities and fixtures."""
 
 import os
-from collections.abc import Iterator
+from collections.abc import Callable, Iterator
 from pathlib import Path
 from unittest.mock import MagicMock, patch
 
@@ -18,6 +18,8 @@ from mcp_tools_py.utils.tool_context import CONSOLE_SCRIPT_TOOLS, ToolContext
 from tests.test_tool_availability._helpers import _dummy_python
 
 _GET_ENVIRONMENT_INFO = "mcp_tools_py.utils.tool_context.get_environment_info"
+_WORKERS = "mcp_tools_py.code_checker_pytest.workers"
+_NO_USER_CONFIG = Path(__file__).parent / "_no_user_config" / "config.toml"
 
 
 def make_command_result(
@@ -161,3 +163,28 @@ def _clear_environment_info_cache() -> Iterator[None]:
     get_environment_info.cache_clear()
     yield
     get_environment_info.cache_clear()
+
+
+@pytest.fixture(autouse=True)
+def _isolate_pytest_workers(monkeypatch: pytest.MonkeyPatch) -> None:
+    """Never read the developer's ~/.mcp_coder/config.toml."""
+    monkeypatch.setattr(f"{_WORKERS}._config_path", lambda: _NO_USER_CONFIG)
+
+
+@pytest.fixture
+def user_config(
+    tmp_path: Path, monkeypatch: pytest.MonkeyPatch
+) -> Callable[[str], Path]:
+    """Write a config.toml under tmp_path and point the loader at it.
+
+    Call the returned function again to change the file's contents.
+    """
+    path = tmp_path / "user_config" / "config.toml"
+    path.parent.mkdir()
+    monkeypatch.setattr(f"{_WORKERS}._config_path", lambda: path)
+
+    def write(text: str) -> Path:
+        path.write_text(text, encoding="utf-8")
+        return path
+
+    return write
