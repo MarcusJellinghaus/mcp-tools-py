@@ -11,6 +11,7 @@ from mcp_tools_py.code_checker_pytest.models import (
     Test,
     TracebackEntry,
 )
+from mcp_tools_py.code_checker_pytest.report_data import skipped_count
 from mcp_tools_py.log_utils import log_function_call
 from mcp_tools_py.utils.report_budget import (
     FAILED_IDS,
@@ -554,8 +555,9 @@ def get_test_summary(test_session_result: PytestReport) -> str:
         parts.append(f"❌ Failed: {summary.failed}")
     if summary.error is not None and summary.error > 0:
         parts.append(f"⚠️ Error: {summary.error}")
-    if summary.skipped is not None and summary.skipped > 0:
-        parts.append(f"⏭️ Skipped: {summary.skipped}")
+    skipped = skipped_count(test_session_result)
+    if skipped > 0:
+        parts.append(f"⏭️ Skipped: {skipped}")
     if summary.xfailed is not None and summary.xfailed > 0:
         parts.append(f"🔶 Expected failures: {summary.xfailed}")
     if summary.xpassed is not None and summary.xpassed > 0:

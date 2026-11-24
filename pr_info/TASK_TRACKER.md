@@ -37,9 +37,9 @@ This tracks **Feature Implementation** consisting of multiple **Tasks**.
 - [x] Commit message prepared
 
 ### Step 4: Skips — entries, folding, module-level count — [step_4.md](./steps/step_4.md)
-- [ ] Implementation: `SkipKey`, `folded_skips`, `skip_lines`, `module_skip_count`, `skipped_count`; `get_test_summary` uses `skipped_count` (tests in `test_report_data.py`)
-- [ ] Quality checks (pylint, mypy, pytest) — fix all issues
-- [ ] Commit message prepared
+- [x] Implementation: `SkipKey`, `folded_skips`, `skip_lines`, `module_skip_count`, `skipped_count`; `get_test_summary` uses `skipped_count` (tests in `test_report_data.py`)
+- [x] Quality checks (pylint, mypy, pytest) — fix all issues
+- [x] Commit message prepared
 
 ### Step 5: Warning groups and duration entries — [step_5.md](./steps/step_5.md)
 - [ ] Implementation: `WarningGroup`, `warning_groups`, `warning_line`, `Duration`, `durations`, `stage_seconds` (tests in `test_report_data.py`)
