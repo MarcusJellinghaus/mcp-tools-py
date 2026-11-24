@@ -36,6 +36,7 @@ New keys on **every** return dict (success and the `except` return):
 - Add `"workers_note": plan.note, "workers_serial": plan.serial` to both return dicts.
 - Docstring: document `effective` and the two new keys ("present on every return").
 - `tests/test_code_checker/test_runners.py::test_check_code_with_pytest_with_custom_parameters` must still pass **unchanged**: no `-n` and no config, so `plan.env is env_vars`. Verify this.
+- Update `tests/test_code_checker/test_runners.py::test_check_code_with_pytest_with_error` (~line 335). It asserts exact dict equality on the exception return, so add `"workers_note": None, "workers_serial": False` to the expected dict.
 
 ## ALGORITHM
 ```

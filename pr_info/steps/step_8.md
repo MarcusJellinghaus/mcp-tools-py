@@ -48,5 +48,5 @@ except Exception: return (workers_note + "\n\n" if workers_note else "") + error
   - The note is followed by the other notes, e.g. a `test_paths_note` comes after it.
   - `workers_note=None` → the reply is unchanged.
   - A run with an `-m` from the project addopts, `-n auto` addopts, a passing result: with `workers_serial=False` the `addopts` line is shown (xdist case); with `workers_serial=True` it is not.
-  - `marker_notes`: a project with `-n auto` addopts and a result with `exit_code=3`. With `workers_serial=False` the reply contains `RERUN_TIP` (import it from `mcp_tools_py.code_checker_pytest.marker_hint`); with `workers_serial=True` it does not.
+  - `marker_notes`: a project with `-n auto` addopts, a non-empty effective `-m` (call with `markers=["fast"]`; `marker_notes` returns before `RERUN_TIP` when there is no `-m`) and a result with `exit_code=3`. With `workers_serial=False` the reply contains `RERUN_TIP` (import it from `mcp_tools_py.code_checker_pytest.marker_hint`); with `workers_serial=True` it does not.
   - An exception raised after `check_code_with_pytest` returned (e.g. patch `checker_tools._format_pytest_result_with_details` to raise) → the reply starts with the workers note and contains "Unexpected error running pytest".

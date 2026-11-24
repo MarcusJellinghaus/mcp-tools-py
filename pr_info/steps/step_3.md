@@ -26,8 +26,9 @@ class WorkersSetting:
 
 def _config_path() -> Path: ...           # get_user_app_data_dir("mcp_coder") / "config.toml"
 def read_pytest_workers() -> WorkersSetting: ...
-def pytest_workers_verify() -> tuple[str, str, str | None]: ...  # (status, message, hint)
+def pytest_workers_verify() -> tuple[Literal["ok", "warning"], str, str | None]: ...  # (status, message, hint)
 ```
+The status is typed as a `Literal`, because `VerifyItem.status` is the `VerifyStatus` Literal and step 4 unpacks this tuple into `VerifyItem` under `mypy --strict`.
 
 ## HOW
 - Import `get_user_app_data_dir` from `mcp_tools_py.utils.user_app_data` (the step-1 shim). Never import `mcp_coder_utils`.

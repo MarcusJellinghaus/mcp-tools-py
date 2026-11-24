@@ -50,7 +50,7 @@ class WorkersPlan:
 
 _config_path() -> Path
 read_pytest_workers() -> WorkersSetting                 # never raises
-pytest_workers_verify() -> tuple[str, str, str | None]  # (status, message, hint), no sampling
+pytest_workers_verify() -> tuple[Literal["ok", "warning"], str, str | None]  # (status, message, hint), no sampling
 _is_windows() -> bool                                   # platform seam
 _get_system_times() -> tuple[int, int, int] | None      # (idle, kernel, user); the only Windows-only code
 idle_fraction(before, after) -> Fraction | None
