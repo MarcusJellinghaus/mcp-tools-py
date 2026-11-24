@@ -27,9 +27,9 @@ This tracks **Feature Implementation** consisting of multiple **Tasks**.
 - [x] Commit message prepared
 
 ### Step 2: Report flags in `effective_config` — [step_2.md](./steps/step_2.md)
-- [ ] Implementation: `OptionValue.label`, `EffectiveConfig.options`, new `_VALUE_OPTIONS`/`_FLAG_OPTIONS` entries, `_label` (tests in `test_effective_config.py`)
-- [ ] Quality checks (pylint, mypy, pytest) — fix all issues
-- [ ] Commit message prepared
+- [x] Implementation: `OptionValue.label`, `EffectiveConfig.options`, new `_VALUE_OPTIONS`/`_FLAG_OPTIONS` entries, `_label` (tests in `test_effective_config.py`)
+- [x] Quality checks (pylint, mypy, pytest) — fix all issues
+- [x] Commit message prepared
 
 ### Step 3: `report_data.py` basics — [step_3.md](./steps/step_3.md)
 - [ ] Implementation: `strip_xdist_header`, `relative_path`, `format_log_record`; `Warning.lineno: int | None` (tests in `test_report_data.py`)

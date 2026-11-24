@@ -2,7 +2,7 @@
 
 import os
 import shlex
-from dataclasses import dataclass
+from dataclasses import dataclass, field
 from pathlib import Path
 
 from mcp_tools_py.code_checker_pytest.utils import is_short_group, split_short_group
@@ -33,8 +33,20 @@ _VALUE_OPTIONS = {
     "--override-ini": "-o",
     "-c": "-c",
     "--config-file": "-c",
+    "-r": "-r",
+    "--report-chars": "-r",
+    "--durations": "--durations",
+    "--durations-min": "--durations-min",
+    "--show-capture": "--show-capture",
 }
-_FLAG_OPTIONS = frozenset({"--strict-markers", "--strict"})
+# Flags, by spelling, mapped to their canonical name.
+_FLAG_OPTIONS = {
+    "--strict-markers": "--strict-markers",
+    "--strict": "--strict",
+    "--snapshot-update": "--snapshot-update",
+    "--disable-warnings": "--disable-warnings",
+    "--disable-pytest-warnings": "--disable-warnings",
+}
 
 
 @dataclass(frozen=True)
@@ -67,10 +79,14 @@ class OptionValue:
         value: The option value; ``""`` for an explicit empty value.
         source: ``pyproject.toml``, ``-o``, ``PYTEST_ADDOPTS``, ``markers``
             or ``extra_args``.
+        label: The option as spelled where it was found, without the other
+            letters of a short group: ``-rs``, ``-r s``, ``--report-chars=s``,
+            ``--durations 5``; ``""`` when not known.  Not part of equality.
     """
 
     value: str
     source: str
+    label: str = field(default="", compare=False)
 
 
 @dataclass(frozen=True)
@@ -96,6 +112,9 @@ class EffectiveConfig:
         strict_markers: Strict markers are on, from all sources.
         project_strict_markers: Strict markers are on from the project config
             alone: its ``addopts`` and table keys.
+        options: Every tracked option by its canonical name (short form for
+            value options, e.g. ``-r``; ``--disable-warnings`` for its alias),
+            the last occurrence over all sources.
     """
 
     config: PytestConfig | None
@@ -109,6 +128,7 @@ class EffectiveConfig:
     n: OptionValue | None
     strict_markers: bool
     project_strict_markers: bool
+    options: dict[str, OptionValue] = field(default_factory=dict)
 
 
 def _parse_bool(value: str) -> bool | None:
@@ -238,15 +258,15 @@ def _option_spans(tokens: list[str]) -> list[tuple[int, int, str, str]]:
     """Find the tracked options in every spelling: ``-X v``, ``-Xv``, ``-X=v``.
 
     Short groups (``-xm slow``, ``-vkrs``) are read with ``split_short_group``.
-    Long options are read as ``--long v`` and ``--long=v``; the flags
-    ``--strict-markers`` and ``--strict`` have the value ``""``.
+    Long options are read as ``--long v`` and ``--long=v``; the flags in
+    ``_FLAG_OPTIONS`` have the value ``""``.
 
     Args:
         tokens: Command-line tokens.
 
     Returns:
-        ``(start, end, short option, value)`` per occurrence, in token order;
-        ``tokens[start:end]`` is the occurrence.
+        ``(start, end, canonical option, value)`` per occurrence, in token
+        order; ``tokens[start:end]`` is the occurrence.
     """
     spans = []
     i = 0
@@ -254,7 +274,7 @@ def _option_spans(tokens: list[str]) -> list[tuple[int, int, str, str]]:
         token = tokens[i]
         name, has_value, rest = token.partition("=")
         if token in _FLAG_OPTIONS:
-            spans.append((i, i + 1, token, ""))
+            spans.append((i, i + 1, _FLAG_OPTIONS[token], ""))
         elif token in _VALUE_OPTIONS:
             if i + 1 < len(tokens):
                 spans.append((i, i + 2, _VALUE_OPTIONS[token], tokens[i + 1]))
@@ -271,6 +291,28 @@ def _option_spans(tokens: list[str]) -> list[tuple[int, int, str, str]]:
                 i += 1
         i += 1
     return spans
+
+
+def _label(tokens: list[str], start: int, end: int, option: str, value: str) -> str:
+    """Spell one occurrence of an option as it was passed.
+
+    Args:
+        tokens: Command-line tokens.
+        start: First token of the occurrence.
+        end: One past its last token.
+        option: Its canonical option.
+        value: Its value.
+
+    Returns:
+        Long options as given (``--report-chars=s``, ``--durations 5``); short
+        ones without the other letters of their group (``-xrs`` → ``-rs``,
+        ``-r s`` stays ``-r s``).
+    """
+    if tokens[start].startswith("--"):
+        return " ".join(tokens[start:end])
+    if end - start == 2:
+        return f"{option} {value}"
+    return f"{option}{value}"
 
 
 def _option_events(tokens: list[str]) -> list[tuple[str, str]]:
@@ -403,8 +445,9 @@ def effective_config(
     )
     last: dict[str, OptionValue] = {}
     for source, tokens in sources:
-        for option, value in _option_events(tokens):
-            last[option] = OptionValue(value, source)
+        for start, end, option, value in _option_spans(tokens):
+            label = _label(tokens, start, end, option, value)
+            last[option] = OptionValue(value, source, label)
     numprocesses = last.get("-n")
     return EffectiveConfig(
         config=config,
@@ -421,6 +464,7 @@ def effective_config(
         ),
         project_strict_markers=project is not None
         and _strict_markers_on(project.addopts, project),
+        options=last,
     )
 
 

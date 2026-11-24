@@ -423,6 +423,99 @@ class TestNumprocessesValue:
         assert effective.n == expected
 
 
+class TestReportOptions:
+    """Test the report flags tracked in ``options``, with their labels."""
+
+    @pytest.mark.parametrize(
+        ("args", "option", "value", "label"),
+        [
+            (["-rs"], "-r", "s", "-rs"),
+            (["-r", "s"], "-r", "s", "-r s"),
+            (["-rsw"], "-r", "sw", "-rsw"),
+            (["-xrs"], "-r", "s", "-rs"),
+            (["-svrw"], "-r", "w", "-rw"),
+            (["--report-chars=s"], "-r", "s", "--report-chars=s"),
+            (["--report-chars", "s"], "-r", "s", "--report-chars s"),
+            (["--durations", "5"], "--durations", "5", "--durations 5"),
+            (["--durations=5"], "--durations", "5", "--durations=5"),
+            (["--durations-min=0.1"], "--durations-min", "0.1", "--durations-min=0.1"),
+            (["--show-capture=log"], "--show-capture", "log", "--show-capture=log"),
+            (["--snapshot-update"], "--snapshot-update", "", "--snapshot-update"),
+            (["--disable-warnings"], "--disable-warnings", "", "--disable-warnings"),
+            (
+                ["--disable-pytest-warnings"],
+                "--disable-warnings",
+                "",
+                "--disable-pytest-warnings",
+            ),
+        ],
+    )
+    def test_spellings(
+        self, tmp_path: Path, args: list[str], option: str, value: str, label: str
+    ) -> None:
+        """Every spelling is found under its canonical name, labelled as passed."""
+        found = _effective(tmp_path, args=args).options[option]
+
+        assert (found.value, found.source, found.label) == (value, "extra_args", label)
+
+    def test_value_and_source_compared(self, tmp_path: Path) -> None:
+        """``OptionValue`` equality is on value and source; the label is kept."""
+        found = _effective(tmp_path, args=["-r", "s"]).options["-r"]
+
+        assert found == OptionValue("s", "extra_args", "-r s")
+        assert found.label == "-r s"
+
+    def test_call_replaces_ini_without_merging(self, tmp_path: Path) -> None:
+        """A call ``-rw`` replaces the ini ``-ra``; the letters are not merged."""
+        found = _effective(tmp_path, _addopts("-ra"), args=["-rw"]).options["-r"]
+
+        assert (found.value, found.source, found.label) == ("w", "extra_args", "-rw")
+
+    def test_source_order(self, tmp_path: Path) -> None:
+        """ini, then ``PYTEST_ADDOPTS``, then the call: the last one wins."""
+        ini_only = _effective(tmp_path, _addopts("--durations=3"))
+        env = _effective(
+            tmp_path,
+            _addopts("--durations=3"),
+            env_vars={"PYTEST_ADDOPTS": "--durations 4"},
+        )
+        call = _effective(
+            tmp_path,
+            _addopts("--durations=3"),
+            args=["--durations=5"],
+            env_vars={"PYTEST_ADDOPTS": "--durations 4"},
+        )
+
+        assert ini_only.options["--durations"] == OptionValue("3", "pyproject.toml")
+        assert env.options["--durations"] == OptionValue("4", "PYTEST_ADDOPTS")
+        assert call.options["--durations"] == OptionValue("5", "extra_args")
+
+    def test_snapshot_update_in_env(self, tmp_path: Path) -> None:
+        """``--snapshot-update`` in ``PYTEST_ADDOPTS`` is attributed to it."""
+        effective = _effective(
+            tmp_path, env_vars={"PYTEST_ADDOPTS": "--snapshot-update"}
+        )
+
+        assert effective.options["--snapshot-update"].source == "PYTEST_ADDOPTS"
+
+    def test_includes_m_and_markers(self, tmp_path: Path) -> None:
+        """``options`` holds the other tracked options too."""
+        effective = _effective(tmp_path, markers=["a"], args=["-n", "2"])
+
+        assert effective.options["-m"] == OptionValue("a", "markers")
+        assert effective.options["-m"].label == "-m a"
+        assert effective.options["-n"] == OptionValue("2", "extra_args")
+
+    def test_none(self, tmp_path: Path) -> None:
+        """No tracked option: ``options`` is empty."""
+        assert _effective(tmp_path).options == {}
+
+    @pytest.mark.parametrize("args", [["-vkrs"], ["-pno:cacheprovider"], ["-vWerror"]])
+    def test_not_mistaken_for_r(self, tmp_path: Path, args: list[str]) -> None:
+        """A value-taking letter before ``r`` ends the group."""
+        assert "-r" not in _effective(tmp_path, args=args).options
+
+
 class TestAddoptsNotes:
     """Test the rendered ``addopts`` lines."""
 
