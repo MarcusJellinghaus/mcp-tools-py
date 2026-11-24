@@ -42,9 +42,9 @@ This tracks **Feature Implementation** consisting of multiple **Tasks**.
 - [x] Commit message prepared
 
 ### Step 5: Warning groups and duration entries — [step_5.md](./steps/step_5.md)
-- [ ] Implementation: `WarningGroup`, `warning_groups`, `warning_line`, `Duration`, `durations`, `stage_seconds` (tests in `test_report_data.py`)
-- [ ] Quality checks (pylint, mypy, pytest) — fix all issues
-- [ ] Commit message prepared
+- [x] Implementation: `WarningGroup`, `warning_groups`, `warning_line`, `Duration`, `durations`, `stage_seconds` (tests in `test_report_data.py`)
+- [x] Quality checks (pylint, mypy, pytest) — fix all issues
+- [x] Commit message prepared
 
 ### Step 6: Failure blocks — one stage loop; passing output gains logs — [step_6.md](./steps/step_6.md)
 - [ ] Implementation: `ALL_CAPTURE`, `capture_kinds`, public `Sections.named`, two-pass `_render_test` (teardown, header strip, logs, capture), passing-output logs, `SHOW_OUTPUT_NOTE` wording (tests in `test_failure_blocks.py`, update `test_failure_budget.py`)

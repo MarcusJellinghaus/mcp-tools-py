@@ -14,16 +14,23 @@ from mcp_tools_py.code_checker_pytest.models import (
     Summary,
     Test,
 )
+from mcp_tools_py.code_checker_pytest.models import Warning as ReportWarning
 from mcp_tools_py.code_checker_pytest.parsers import parse_pytest_report
 from mcp_tools_py.code_checker_pytest.report_data import (
+    Duration,
     SkipKey,
+    WarningGroup,
+    durations,
     folded_skips,
     format_log_record,
     module_skip_count,
     relative_path,
     skip_lines,
     skipped_count,
+    stage_seconds,
     strip_xdist_header,
+    warning_groups,
+    warning_line,
 )
 from mcp_tools_py.code_checker_pytest.reporting import get_test_summary
 
@@ -379,3 +386,167 @@ def test_get_test_summary_module_skips_only(tmp_path: Path) -> None:
     """Skipped collectors alone produce the skipped part."""
     collectors = [_skipped_collector("tests/test_mod.py", None)]
     assert "⏭️ Skipped: 1" in get_test_summary(_report(tmp_path, collectors=collectors))
+
+
+def _warning(
+    root: Path,
+    lineno: int | None,
+    message: str = "old api",
+    category: str | None = "DeprecationWarning",
+    filename: str | None = "tests/x.py",
+) -> ReportWarning:
+    """A warning at `root / filename`, or without filename when None."""
+    return ReportWarning(
+        message=message,
+        category=category,
+        when="runtest",
+        filename=None if filename is None else str(root / filename),
+        lineno=lineno,
+    )
+
+
+def _warning_report(root: Path, warnings: list[ReportWarning] | None) -> PytestReport:
+    """A report rooted at `root` carrying the given warnings."""
+    report = _report(root)
+    report.warnings = warnings
+    return report
+
+
+class TestWarningGroups:
+    """warning_groups groups by (category, message), sorted by count."""
+
+    def test_same_message_many_places_one_group(self, tmp_path: Path) -> None:
+        """30 warnings, one category and message → one group, first location kept."""
+        warnings = [_warning(tmp_path, 12 + i) for i in range(30)]
+        groups = warning_groups(_warning_report(tmp_path, warnings))
+        assert groups == [
+            WarningGroup("DeprecationWarning", "old api", 30, "tests/x.py:12")
+        ]
+
+    def test_same_message_two_categories_two_groups(self, tmp_path: Path) -> None:
+        """The category is part of the key."""
+        warnings = [
+            _warning(tmp_path, 1, category="UserWarning"),
+            _warning(tmp_path, 2, category="DeprecationWarning"),
+        ]
+        groups = warning_groups(_warning_report(tmp_path, warnings))
+        assert [g.category for g in groups] == ["UserWarning", "DeprecationWarning"]
+
+    def test_sorted_by_count_ties_first_seen(self, tmp_path: Path) -> None:
+        """Higher counts first; equal counts keep first-seen order."""
+        warnings = [
+            _warning(tmp_path, 1, message="a"),
+            _warning(tmp_path, 2, message="b"),
+            _warning(tmp_path, 3, message="c"),
+            _warning(tmp_path, 4, message="c"),
+            _warning(tmp_path, 5, message="d"),
+        ]
+        groups = warning_groups(_warning_report(tmp_path, warnings))
+        assert [(g.message, g.count) for g in groups] == [
+            ("c", 2),
+            ("a", 1),
+            ("b", 1),
+            ("d", 1),
+        ]
+
+    def test_full_message_is_key(self, tmp_path: Path) -> None:
+        """Multi-line messages differing after the first line stay apart."""
+        warnings = [
+            _warning(tmp_path, 1, message="head\nalpha"),
+            _warning(tmp_path, 2, message="head\nbeta"),
+        ]
+        assert len(warning_groups(_warning_report(tmp_path, warnings))) == 2
+
+    def test_without_filename(self, tmp_path: Path) -> None:
+        """A warning without filename has first location "?"."""
+        warnings = [_warning(tmp_path, 3, filename=None)]
+        assert warning_groups(_warning_report(tmp_path, warnings))[0].first == "?"
+
+    def test_without_lineno(self, tmp_path: Path) -> None:
+        """A warning without lineno has only the path as first location."""
+        warnings = [_warning(tmp_path, None)]
+        first = warning_groups(_warning_report(tmp_path, warnings))[0].first
+        assert first == "tests/x.py"
+
+    def test_without_category(self, tmp_path: Path) -> None:
+        """A missing category reads as "Warning"."""
+        warnings = [_warning(tmp_path, 1, category=None)]
+        assert warning_groups(_warning_report(tmp_path, warnings))[0].category == (
+            "Warning"
+        )
+
+    def test_no_warnings(self, tmp_path: Path) -> None:
+        """A report without warnings gives no groups."""
+        assert not warning_groups(_warning_report(tmp_path, None))
+
+
+class TestWarningLine:
+    """warning_line formats one group."""
+
+    def test_format(self) -> None:
+        """Category, message, count and first location."""
+        group = WarningGroup("DeprecationWarning", "old api", 30, "tests/x.py:12")
+        assert warning_line(group) == (
+            "DeprecationWarning: old api — 30× (first: tests/x.py:12)"
+        )
+
+    def test_multi_line_message_first_line_only(self) -> None:
+        """Only the first message line is shown."""
+        group = WarningGroup("UserWarning", "head\nmore\nlines", 1, "a.py:1")
+        assert warning_line(group) == "UserWarning: head — 1× (first: a.py:1)"
+
+
+def _timed_test(nodeid: str, setup: float, call: float | None, teardown: float) -> Test:
+    """A passed test with the given stage durations; no call stage when None."""
+    return Test(
+        nodeid=nodeid,
+        lineno=1,
+        keywords=[],
+        outcome="passed",
+        setup=StageInfo(duration=setup, outcome="passed"),
+        call=None if call is None else StageInfo(duration=call, outcome="passed"),
+        teardown=StageInfo(duration=teardown, outcome="passed"),
+    )
+
+
+class TestDurations:
+    """durations and stage_seconds."""
+
+    def test_stages_mixed_slowest_first(self, tmp_path: Path) -> None:
+        """Every stage of every test in one list, sorted by seconds descending."""
+        tests = [
+            _timed_test("t.py::a", 0.3, 0.1, 0.01),
+            _timed_test("t.py::b", 0.02, 0.5, 0.2),
+        ]
+        assert durations(_report(tmp_path, tests)) == [
+            Duration(0.5, "call", "t.py::b"),
+            Duration(0.3, "setup", "t.py::a"),
+            Duration(0.2, "teardown", "t.py::b"),
+            Duration(0.1, "call", "t.py::a"),
+            Duration(0.02, "setup", "t.py::b"),
+            Duration(0.01, "teardown", "t.py::a"),
+        ]
+
+    def test_missing_stage_skipped(self, tmp_path: Path) -> None:
+        """A test without call stage contributes setup and teardown only."""
+        tests = [_timed_test("t.py::a", 0.2, None, 0.1)]
+        assert [d.when for d in durations(_report(tmp_path, tests))] == [
+            "setup",
+            "teardown",
+        ]
+
+    def test_no_tests(self, tmp_path: Path) -> None:
+        """A report without tests gives no entries and zero seconds."""
+        report = _report(tmp_path)
+        assert not durations(report)
+        assert stage_seconds(report) == 0.0
+
+    def test_stage_seconds_sums_all_stages(self, tmp_path: Path) -> None:
+        """setup + call + teardown of every test, not report.duration."""
+        tests = [
+            _timed_test("t.py::a", 1.0, 2.0, 0.5),
+            _timed_test("t.py::b", 0.25, None, 0.25),
+        ]
+        report = _report(tmp_path, tests)
+        assert stage_seconds(report) == pytest.approx(4.0)
+        assert report.duration == 0.5

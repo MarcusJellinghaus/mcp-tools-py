@@ -191,3 +191,113 @@ def skipped_count(report: PytestReport) -> int:
         ``summary.skipped`` (0 when missing) plus ``module_skip_count``.
     """
     return (report.summary.skipped or 0) + module_skip_count(report)
+
+
+@dataclass(frozen=True)
+class WarningGroup:
+    """Warnings sharing category and full message text."""
+
+    category: str
+    message: str
+    count: int
+    first: str
+
+
+def warning_groups(report: PytestReport) -> list[WarningGroup]:
+    """Group the report's warnings by (category, message).
+
+    Args:
+        report: The parsed pytest report.
+
+    Returns:
+        One group per key, sorted by count descending; ties keep first-seen
+        order. ``first`` is ``"path:lineno"`` of the first warning, the path
+        relative to the report root; ``"?"`` without filename.
+    """
+    counts: dict[tuple[str, str], int] = {}
+    firsts: dict[tuple[str, str], str] = {}
+    for warning in report.warnings or []:
+        key = (warning.category or "Warning", warning.message)
+        if key not in counts:
+            firsts[key] = _warning_location(warning.filename, warning.lineno, report)
+        counts[key] = counts.get(key, 0) + 1
+    groups = [
+        WarningGroup(cat, msg, n, firsts[(cat, msg)])
+        for (cat, msg), n in counts.items()
+    ]
+    return sorted(groups, key=lambda group: -group.count)
+
+
+def _warning_location(
+    filename: str | None, lineno: int | None, report: PytestReport
+) -> str:
+    """``path:lineno`` of a warning; the path alone without lineno; ``"?"`` without filename.
+
+    Args:
+        filename: The warning's file, absolute.
+        lineno: The warning's line number.
+        report: The parsed pytest report (for its root).
+
+    Returns:
+        The location text.
+    """
+    if not filename:
+        return "?"
+    path = relative_path(filename, report.root)
+    return path if lineno is None else f"{path}:{lineno}"
+
+
+def warning_line(group: WarningGroup) -> str:
+    """Format one warning group, showing only the message's first line.
+
+    Args:
+        group: An entry from ``warning_groups``.
+
+    Returns:
+        ``"DeprecationWarning: <first message line> — 30× (first: tests/x.py:12)"``.
+    """
+    first_line = group.message.split("\n", 1)[0]
+    return f"{group.category}: {first_line} — {group.count}× (first: {group.first})"
+
+
+@dataclass(frozen=True)
+class Duration:
+    """Duration of one test stage."""
+
+    seconds: float
+    when: str
+    nodeid: str
+
+
+def durations(report: PytestReport) -> list[Duration]:
+    """Every stage of every test, slowest first.
+
+    Args:
+        report: The parsed pytest report.
+
+    Returns:
+        Setup, call and teardown entries mixed, sorted by seconds descending.
+    """
+    entries = [
+        Duration(stage.duration, when, test.nodeid)
+        for test in report.tests or []
+        for when, stage in (
+            ("setup", test.setup),
+            ("call", test.call),
+            ("teardown", test.teardown),
+        )
+        if stage is not None
+    ]
+    return sorted(entries, key=lambda entry: -entry.seconds)
+
+
+def stage_seconds(report: PytestReport) -> float:
+    """Sum of all test stage durations; not ``report.duration`` (collection, xdist startup).
+
+    Args:
+        report: The parsed pytest report.
+
+    Returns:
+        The summed seconds of every setup, call and teardown stage.
+    """
+    return sum((entry.seconds for entry in durations(report)), 0.0)
