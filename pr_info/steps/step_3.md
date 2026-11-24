@@ -98,5 +98,9 @@ Pass the setter target as a string (`"module.attr"`), so `conftest.py` doesn't i
 - Section missing / key missing → default. `[mcp_tools_py]` given as a non-table → default.
 - Invalid TOML and a non-UTF-8 file → `config.toml: invalid TOML`.
 - `_config_path` raising `RuntimeError` (monkeypatch it with a raising lambda) → `config.toml: unreadable`; never raises.
+- Real `_config_path()` body. The autouse fixture replaces `_config_path` in every test, so capture the real function at module import time, before the fixture runs (as step 5 does for `_get_system_times`):
+  `from mcp_tools_py.code_checker_pytest.workers import _config_path as real_config_path`.
+  - Patch `workers.get_user_app_data_dir` with a fake that records its argument and returns `tmp_path`. Assert that `real_config_path() == tmp_path / "config.toml"` and that the fake was called with `"mcp_coder"`. This proves that the path goes through the shim name imported into `workers`.
+  - Restore the real function with `monkeypatch.setattr(workers, "_config_path", real_config_path)`, and patch `workers.get_user_app_data_dir` to raise `RuntimeError`. Then `read_pytest_workers()` returns `("auto", True, "config.toml: unreadable")`, logs a warning and does not raise. This proves that the path is resolved inside the guarded block.
 - Changed file between two calls → second call sees the new value (no caching).
 - `pytest_workers_verify()`: ok messages for default / `all` / `4`; warning + `VALID_VALUES_HINT` for an invalid value; warning with the config-file hint for invalid TOML.
