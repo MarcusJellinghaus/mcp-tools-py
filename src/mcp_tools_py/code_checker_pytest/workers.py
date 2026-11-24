@@ -154,23 +154,24 @@ def _get_system_times() -> SystemTimes | None:
         ``(idle, kernel, user)`` in 100-ns units, or None when not on Windows
         or when the call fails.
     """
-    if sys.platform != "win32":
-        return None
-    idle, kernel, user = (
-        ctypes.c_ulonglong(),
-        ctypes.c_ulonglong(),
-        ctypes.c_ulonglong(),
-    )
-    try:
-        ok = ctypes.windll.kernel32.GetSystemTimes(
-            ctypes.byref(idle), ctypes.byref(kernel), ctypes.byref(user)
+    if sys.platform == "win32":
+        idle, kernel, user = (
+            ctypes.c_ulonglong(),
+            ctypes.c_ulonglong(),
+            ctypes.c_ulonglong(),
         )
-    except (OSError, AttributeError, ctypes.ArgumentError) as exc:
-        logger.debug("GetSystemTimes failed: %s", exc)
+        try:
+            ok = ctypes.windll.kernel32.GetSystemTimes(
+                ctypes.byref(idle), ctypes.byref(kernel), ctypes.byref(user)
+            )
+        except (OSError, AttributeError, ctypes.ArgumentError) as exc:
+            logger.debug("GetSystemTimes failed: %s", exc)
+            return None
+        if not ok:
+            return None
+        return idle.value, kernel.value, user.value
+    else:  # not a trailing return: mypy flags that unreachable on win32
         return None
-    if not ok:
-        return None
-    return idle.value, kernel.value, user.value
 
 
 def idle_fraction(before: SystemTimes, after: SystemTimes) -> Fraction | None:

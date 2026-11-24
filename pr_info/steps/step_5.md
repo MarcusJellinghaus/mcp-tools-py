@@ -22,7 +22,7 @@ def workers_for(logical: int, idle: Fraction) -> int: ...
 ```
 
 ## HOW
-- `_get_system_times`: start with `if sys.platform != "win32": return None`. mypy narrows on `sys.platform`, so the `ctypes.windll` code below it passes `mypy --strict` on Linux CI. Use three `ctypes.c_ulonglong` (same layout as `FILETIME`) passed via `ctypes.byref` to `ctypes.windll.kernel32.GetSystemTimes`. A return of 0 → `None`. Wrap the call in `try/except (OSError, AttributeError, ctypes.ArgumentError)` → `None`.
+- `_get_system_times`: put the Windows-only code inside `if sys.platform == "win32":` and return `None` from its `else:` branch. mypy silently skips whichever platform-check branch doesn't apply, so this passes `mypy --strict` with `warn_unreachable` on both Linux CI and Windows. An early `return None` guard leaves the code after it unreachable on Linux; a trailing `return None` after the block is unreachable on Windows. Use three `ctypes.c_ulonglong` (same layout as `FILETIME`) passed via `ctypes.byref` to `ctypes.windll.kernel32.GetSystemTimes`. A return of 0 → `None`. Wrap the call in `try/except (OSError, AttributeError, ctypes.ArgumentError)` → `None`.
 - `_is_windows()` is the single seam for "should sizing sample?". It is **not** used for env-key case matching (step 6 uses `os.name`).
 - `sample_idle` looks up `_get_system_times` through the module global, so the autouse patch applies.
 - Extend `_isolate_pytest_workers` in `tests/conftest.py`:
