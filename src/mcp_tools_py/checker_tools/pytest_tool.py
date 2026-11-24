@@ -3,6 +3,7 @@
 import logging
 import shutil
 import tempfile
+from dataclasses import replace
 from typing import TYPE_CHECKING, Any
 
 from mcp_tools_py.code_checker_pytest.coverage import (
@@ -131,6 +132,9 @@ def register(mcp: "FastMCPProtocol", checker_tools: "CheckerTools") -> None:
                 The project's `addopts` apply first (e.g. `-n auto`), so don't
                 add them again. extra_args=["-o", "addopts="] runs without them.
                 A later `-m` here replaces the `addopts` `-m`.
+                The worker count of `-n auto` follows `[mcp_tools_py] pytest_workers`
+                in `~/.mcp_coder/config.toml` (see docs/user-config.md); `-n auto`
+                here does not bypass it, a numeric `-n N` does.
             env_vars: Optional dictionary of environment variables for the subprocess.
                 `PYTEST_ADDOPTS` from the environment also applies;
                 env_vars={"PYTEST_ADDOPTS": ""} clears it (`-o addopts=` does not).
@@ -248,6 +252,7 @@ def register(mcp: "FastMCPProtocol", checker_tools: "CheckerTools") -> None:
         project_dir = str(context.project_dir)
         interpreter = str(context.environment.interpreter)
         temp_dir: str | None = None
+        workers_note: str | None = None
         try:
             sources: list[str] = []
             if coverage:
@@ -324,7 +329,12 @@ def register(mcp: "FastMCPProtocol", checker_tools: "CheckerTools") -> None:
                 keep_temp_files=context.keep_temp_files,
                 skip_default_test_folder=sanitized.has_path_args,
                 timeout_seconds=run_timeout,
+                effective=effective,
             )
+            workers_note = test_results.get("workers_note")
+            if test_results.get("workers_serial"):
+                # A run sized to serial reports like one without -n.
+                effective = replace(effective, numprocesses=False)
 
             summary = test_results.get("summary", {})
             verdict = test_results["verdict"]
@@ -370,7 +380,7 @@ def register(mcp: "FastMCPProtocol", checker_tools: "CheckerTools") -> None:
                 max_chars=max_chars,
             )
 
-            # Prepend the defaults, marker, test-paths and deduplication notes
+            # Prepend the workers, defaults, marker, test-paths and deduplication notes
             # so LLM can self-correct
             top = (
                 addopts_notes(effective)
@@ -386,6 +396,7 @@ def register(mcp: "FastMCPProtocol", checker_tools: "CheckerTools") -> None:
             )
             test_paths_note = test_results.get("test_paths_note")
             notes = [
+                *([workers_note] if workers_note else []),
                 *top,
                 *([test_paths_note] if test_paths_note else []),
                 *sanitized.notes,
@@ -433,7 +444,7 @@ def register(mcp: "FastMCPProtocol", checker_tools: "CheckerTools") -> None:
                     "project_dir": project_dir,
                 },
             )
-            return error_msg
+            return f"{workers_note}\n\n{error_msg}" if workers_note else error_msg
         finally:
             if temp_dir is not None and not context.keep_temp_files:
                 shutil.rmtree(temp_dir, ignore_errors=True)
