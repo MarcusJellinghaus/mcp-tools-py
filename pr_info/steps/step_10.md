@@ -8,8 +8,9 @@ appears. Implement test-first. Run pylint, mypy and the non-integration pytest s
 - `src/mcp_tools_py/code_checker_pytest/reporting.py`
 - `src/mcp_tools_py/code_checker_pytest/verdict.py`
 - `src/mcp_tools_py/checker_tools/__init__.py`
-- Tests: `tests/test_code_checker_pytest/test_verdict.py`, `tests/test_checker_tools_formatting.py`,
-  `tests/test_toolkit_test.py`
+- Tests: `tests/test_code_checker_pytest/test_verdict.py`, `tests/test_checker_tools_formatting.py`, and a new
+  `tests/test_toolkit_warnings_count.py` for the toolkit test. Do not add tests to `tests/test_toolkit_test.py`
+  (713 lines; must stay under the 750-line limit).
 
 ## WHAT
 ```python

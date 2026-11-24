@@ -25,8 +25,9 @@ failing-test blocks.
 4. **New module `code_checker_pytest/report_extras.py`** — rendering of this issue's report-level output:
    `report_flags()` (flag resolution incl. pytest's `getreportopt`), the `-rs` / `-rw` / `--durations` sections,
    empty-result lines, the hint line, the flag notes, and the exit-5 skip block.
-5. **Budget reuse.** `reporting._Sections` becomes public `Sections` and gains `named(label, text)`; the report-level
-   sections use it, so the existing "Not shown, budget used up: …" notice names dropped report sections too.
+5. **Budget reuse.** `reporting._Sections` becomes public `Sections` and gains `named(label, text)`. The `-rs` /
+   `-rw` / `--durations` sections are cut to the space left (first rows kept, then an omitted-count line); only a
+   section whose first row does not fit is named in the existing "Not shown, budget used up: …" notice.
    Priority: failure blocks → `-s` passing output → report sections + hint; coverage digest keeps its share.
 6. **Failure blocks use one stage loop** over setup/call/teardown: teardown failures render (D26), the xdist
    `[gwN]` header is stripped, logs appear per stage (D23), and `--show-capture` selects stdout/stderr/log (D12).

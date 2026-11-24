@@ -36,10 +36,11 @@ sanitize group branch (arg short, not "-m" handled above):
     switches, letter, value = split; if "s" not in switches and "v" not in switches: keep arg; continue
     if "s" in switches: show_output = True;  if "v" in switches: verbosity = switches.count("v")
     rest = switches without s/v + (letter + value if letter else "");  if rest: cleaned.append("-" + rest)
-_option_spans short branch:
+_option_spans short branch, only when token.startswith("-") and not token.startswith("--") and len(token) > 1:
     switches, letter, value = split(token); option = f"-{letter}"
-    if letter and option in _VALUE_OPTIONS: inline value → span(i, i+1, option, value.removeprefix("="))
-    elif letter and option in _VALUE_OPTIONS and i+1 < len: span(i, i+2, option, tokens[i+1]); i += 1
+    if letter and option in _VALUE_OPTIONS and value: span(i, i+1, option, value.removeprefix("="))   # -xmslow, -m=slow
+    elif letter and option in _VALUE_OPTIONS and i+1 < len: span(i, i+2, option, tokens[i+1]); i += 1  # -xm slow
+    positionals (no leading "-", e.g. tests/test_markers.py) never reach split_short_group
 ```
 
 ## DATA
@@ -56,5 +57,8 @@ _option_spans short branch:
   `-vrs` → `["-rs"]`, verbosity 1; `-xvs` → `["-x"]` (existing behaviour kept); `-qs` → `["-q"]`.
 - `effective_config` regression (#294 detection), env cleaned by the root conftest:
   `-pno:cacheprovider` → `numprocesses is False`; `-vWerror` sets no `-r`/`-n`; `["-xm", "slow"]` → `m.value == "slow"`;
-  `-vkrs` → `k.value == "rs"`; `-nauto` → `numprocesses is True`; `-m=slow` → `"slow"`.
+  `-vkrs` → `k.value == "rs"`; `-nauto` → `numprocesses is True`; `-m=slow` → `"slow"`;
+  `["-xm", "slow", "tests/x.py"]` → `m.value == "slow"` (separate-value branch, `slow` consumed).
+- `_option_spans` regression: positionals with value-option letters (`tests/test_markers.py`, `tests/test_numbers.py`,
+  `markers`) give no span; `effective_config` with them → `m is None`, `numprocesses is False`.
 `test_extra_args.py`: move `["-vrs"]` out of `test_non_switch_args_pass_through` (it is now rewritten to `-rs`).
