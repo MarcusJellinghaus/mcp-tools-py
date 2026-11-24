@@ -53,6 +53,7 @@ from mcp_tools_py.code_checker_pytest.verdict import (
     format_error_text,
     format_suspicious_text,
 )
+from mcp_tools_py.code_checker_pytest.workers import pytest_workers_verify
 from mcp_tools_py.formatter.runner import (
     resolve_steps,
     run_format_code,
@@ -653,11 +654,12 @@ class PythonToolkit(Toolkit):
     def verify(self, project_dir: Path, action: str | None = None) -> list[VerifyItem]:
         """Check that the tools `action` drives are available.
 
-        - None: every tool, pytest-json-report, pytest-cov, plus "formatter".
+        - None: every tool, pytest-json-report, pytest-cov, pytest_workers,
+          plus "formatter".
         - "format": "formatter" plus the tools of the resolved formatter
           steps (none when no formatter resolves).
         - "check": the tools of the `full` check depth.
-        - "test": pytest, pytest-json-report, pytest-cov.
+        - "test": pytest, pytest-json-report, pytest-cov, pytest_workers.
 
         Returns:
             One VerifyItem per tool, plus one named "formatter" for whether a
@@ -696,7 +698,12 @@ class PythonToolkit(Toolkit):
                 if action == "format":
                     tools = []
         distribution_items = (
-            _distribution_items(context) if action in (None, "test") else []
+            [
+                *_distribution_items(context),
+                VerifyItem("pytest_workers", *pytest_workers_verify()),
+            ]
+            if action in (None, "test")
+            else []
         )
         return (
             [_tool_item(context, tool) for tool in tools]
