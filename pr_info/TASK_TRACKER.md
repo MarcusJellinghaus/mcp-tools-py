@@ -66,9 +66,9 @@ See [step_6.md](./steps/step_6.md)
 ### Step 7: Wire sizing into `check_code_with_pytest` (+ integration tests)
 See [step_7.md](./steps/step_7.md)
 
-- [ ] Implementation (tests + production code)
-- [ ] Quality checks (pylint, pytest incl. `test_integration_workers.py`, mypy) — fix all issues
-- [ ] Commit message prepared
+- [x] Implementation (tests + production code)
+- [x] Quality checks (pylint, pytest incl. `test_integration_workers.py`, mypy) — fix all issues
+- [x] Commit message prepared
 
 ### Step 8: Wire the workers note into the MCP tool `run_pytest_check`
 See [step_8.md](./steps/step_8.md)
