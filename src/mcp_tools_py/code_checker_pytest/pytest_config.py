@@ -90,6 +90,8 @@ class EffectiveConfig:
         m: The effective ``-m``; None when there is none.
         k: The effective ``-k``; None when there is none.
         numprocesses: The last ``-n`` / ``--numprocesses`` value is not ``0``.
+        n: The effective ``-n`` / ``--numprocesses`` value and its source;
+            None when there is none.
         strict_markers: Strict markers are on, from all sources.
         project_strict_markers: Strict markers are on from the project config
             alone: its ``addopts`` and table keys.
@@ -103,6 +105,7 @@ class EffectiveConfig:
     m: OptionValue | None
     k: OptionValue | None
     numprocesses: bool
+    n: OptionValue | None
     strict_markers: bool
     project_strict_markers: bool
 
@@ -404,6 +407,7 @@ def effective_config(
         m=last.get("-m"),
         k=last.get("-k"),
         numprocesses=numprocesses is not None and numprocesses.value != "0",
+        n=numprocesses,
         strict_markers=_strict_markers_on(
             [token for _, tokens in sources for token in tokens], project
         ),

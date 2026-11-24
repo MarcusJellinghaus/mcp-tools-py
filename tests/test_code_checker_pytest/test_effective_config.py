@@ -392,6 +392,37 @@ class TestNumprocesses:
         assert effective.numprocesses is False
 
 
+class TestNumprocessesValue:
+    """Test the effective ``-n`` value and its source."""
+
+    @pytest.mark.parametrize(
+        ("pyproject", "args", "env_vars", "expected"),
+        [
+            (_addopts("-n auto"), [], None, OptionValue("auto", "pyproject.toml")),
+            (_addopts("-n auto"), ["-n", "8"], None, OptionValue("8", "extra_args")),
+            (_INI, ["-nlogical"], None, OptionValue("logical", "extra_args")),
+            (_INI, ["--numprocesses=auto"], None, OptionValue("auto", "extra_args")),
+            (_INI, [], {"PYTEST_ADDOPTS": "-n 3"}, OptionValue("3", "PYTEST_ADDOPTS")),
+            (_INI, [], None, None),
+        ],
+    )
+    def test_value_and_source(
+        self,
+        tmp_path: Path,
+        monkeypatch: pytest.MonkeyPatch,
+        pyproject: str,
+        args: list[str],
+        env_vars: dict[str, str] | None,
+        expected: OptionValue | None,
+    ) -> None:
+        """The last ``-n`` is kept with the source it came from."""
+        monkeypatch.delenv("PYTEST_ADDOPTS", raising=False)
+
+        effective = _effective(tmp_path, pyproject, args=args, env_vars=env_vars)
+
+        assert effective.n == expected
+
+
 class TestAddoptsNotes:
     """Test the rendered ``addopts`` lines."""
 
