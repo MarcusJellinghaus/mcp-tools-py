@@ -170,7 +170,7 @@ def _scan_args(args: list[str]) -> tuple[list[str], bool]:
 
 SHOW_OUTPUT_NOTE = (
     "Note: -s was not passed to pytest. It was turned into the captured-output "
-    "display, which shows output printed by passing tests."
+    "display, which shows the output and log records of passing tests."
 )
 
 

@@ -109,7 +109,6 @@ class CheckerTools:
                 return f"Pytest found failures. {test_results.get('summary_text') or ''}".rstrip()
             failed_tests_prompt = create_prompt_for_failed_tests(
                 report,
-                include_print_output=True,
                 max_failures=MAX_FAILURES,
                 max_lines=max_lines,
                 max_chars=max_chars,

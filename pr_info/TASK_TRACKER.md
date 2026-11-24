@@ -47,9 +47,9 @@ This tracks **Feature Implementation** consisting of multiple **Tasks**.
 - [x] Commit message prepared
 
 ### Step 6: Failure blocks — one stage loop; passing output gains logs — [step_6.md](./steps/step_6.md)
-- [ ] Implementation: `ALL_CAPTURE`, `capture_kinds`, public `Sections.named`, two-pass `_render_test` (teardown, header strip, logs, capture), passing-output logs, `SHOW_OUTPUT_NOTE` wording (tests in `test_failure_blocks.py`, update `test_failure_budget.py`)
-- [ ] Quality checks (pylint, mypy, pytest) — fix all issues
-- [ ] Commit message prepared
+- [x] Implementation: `ALL_CAPTURE`, `capture_kinds`, public `Sections.named`, two-pass `_render_test` (teardown, header strip, logs, capture), passing-output logs, `SHOW_OUTPUT_NOTE` wording (tests in `test_failure_blocks.py`, update `test_failure_budget.py`)
+- [x] Quality checks (pylint, mypy, pytest) — fix all issues
+- [x] Commit message prepared
 
 ### Step 7: `report_extras.py` — flags, sections, empty-result lines — [step_7.md](./steps/step_7.md)
 - [ ] Implementation: `ReportFlags`, `resolve_report_chars`, `report_flags`, `report_sections`, `_head_rows` (tests in `test_report_extras.py`)

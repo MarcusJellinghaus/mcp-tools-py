@@ -11,7 +11,11 @@ from mcp_tools_py.code_checker_pytest.models import (
     Test,
     TracebackEntry,
 )
-from mcp_tools_py.code_checker_pytest.report_data import skipped_count
+from mcp_tools_py.code_checker_pytest.report_data import (
+    format_log_record,
+    skipped_count,
+    strip_xdist_header,
+)
 from mcp_tools_py.log_utils import log_function_call
 from mcp_tools_py.utils.report_budget import (
     FAILED_IDS,
@@ -38,8 +42,28 @@ MIN_FENCED_LINES = 8
 DROPPED_NOTICE = "  Not shown, budget used up:"
 DROPPED_NOTICE_CHARS = 200
 FENCE = "```"
-NO_CAPTURED_OUTPUT_NOTE = "Note: no passing test produced captured output."
+NO_CAPTURED_OUTPUT_NOTE = (
+    "Note: no passing test produced captured output or log records."
+)
 XDIST_MARKER = "Different tests were collected"
+ALL_CAPTURE = frozenset({"stdout", "stderr", "log"})
+_CAPTURE_ORDER = ("stderr", "stdout", "log")
+
+
+def capture_kinds(show_capture: str | None) -> frozenset[str]:
+    """Map pytest's --show-capture value to the captured kinds to show.
+
+    Args:
+        show_capture: The effective --show-capture value, or None when unset.
+
+    Returns:
+        ALL_CAPTURE for None or "all", nothing for "no", else just that kind.
+    """
+    if show_capture is None or show_capture == "all":
+        return ALL_CAPTURE
+    if show_capture == "no":
+        return frozenset()
+    return frozenset({show_capture})
 
 
 def should_show_details(_test_results: dict[str, Any], show_details: bool) -> bool:
@@ -206,7 +230,23 @@ def _traceback(label: str, entries: list[TracebackEntry]) -> str:
     return "\n".join([f"  {label}:"] + rows)
 
 
-class _Sections:
+def _log_text(stage: StageInfo) -> str | None:
+    """Join a stage's log records in pytest's default format.
+
+    Returns:
+        One formatted record per line, or None when the stage has no records.
+    """
+    if not stage.log or not stage.log.logs:
+        return None
+    return "\n".join(format_log_record(record) for record in stage.log.logs)
+
+
+def _stage_texts(stage: StageInfo) -> dict[str, str | None]:
+    """Return a stage's captured text per kind: stdout, stderr and log."""
+    return {"stdout": stage.stdout, "stderr": stage.stderr, "log": _log_text(stage)}
+
+
+class Sections:
     """Sections kept in order while they fit in what is left of a budget.
 
     One line and DROPPED_NOTICE_CHARS are held back for the notice naming
@@ -253,6 +293,11 @@ class _Sections:
         if not (roomy and self.add(_fenced(label, text, self.lines, self.chars - 1))):
             self.dropped.append(f"{label} ({count} {plural(count, 'line')})")
 
+    def named(self, label: str, text: str) -> None:
+        """Append `text` if it fits; otherwise record `label` as dropped."""
+        if not self.add(text):
+            self.dropped.append(label)
+
     def text(self) -> str:
         """Join the sections, then the notice naming any dropped ones.
 
@@ -266,52 +311,80 @@ class _Sections:
         return "\n".join(parts)
 
 
-def _render_setup(out: _Sections, setup: StageInfo, include_print_output: bool) -> None:
-    out.add(f"  Test Setup Outcome: {setup.outcome}")
-    if setup.crash:
-        out.bounded(
-            f"  Test Setup Crash Error Message: {setup.crash.message}\n"
-            f"  Test Setup Crash Error Path: {setup.crash.path}\n"
-            f"  Setup Crash Error Line: {setup.crash.lineno}",
-            share=3,
+def _prefix(name: str) -> str:
+    """Return the section label prefix of a stage: none for the call stage."""
+    return "" if name == "Call" else f"Test {name} "
+
+
+def _test_stages(test: Test) -> list[tuple[str, StageInfo]]:
+    """Return the test's present stages as (name, stage), setup first."""
+    return [
+        (name, stage)
+        for name, stage in (
+            ("Setup", test.setup),
+            ("Call", test.call),
+            ("Teardown", test.teardown),
         )
-    if setup.longrepr:
-        out.fenced("Test Setup Longrepr", setup.longrepr)
-    elif setup.traceback:
-        out.bounded(_traceback("Test Setup Traceback", setup.traceback))
-    if include_print_output:
-        out.fenced("Test Setup Stderr", setup.stderr)
-        out.fenced("Test Setup Stdout", setup.stdout)
+        if stage
+    ]
+
+
+def _render_failure(out: Sections, name: str, stage: StageInfo) -> None:
+    """Add a stage's outcome, crash and longrepr (else traceback) when it did not pass."""
+    prefix = _prefix(name)
+    if name != "Call" and stage.outcome == "failed":
+        out.add(f"  {prefix}Outcome: failed")
+        if stage.crash:
+            out.bounded(
+                f"  {prefix}Crash Error Message: {stage.crash.message}\n"
+                f"  {prefix}Crash Error Path: {stage.crash.path}\n"
+                f"  {prefix}Crash Error Line: {stage.crash.lineno}",
+                share=3,
+            )
+    if name == "Call" and stage.crash:
+        out.bounded(f"  Error Message: {stage.crash.message}", share=3)
+    if stage.outcome == "passed":
+        return
+    longrepr = strip_xdist_header(stage.longrepr)
+    if longrepr:
+        out.fenced(f"{prefix}Longrepr", longrepr)
+    elif stage.traceback:
+        out.bounded(_traceback(f"{prefix}Traceback", stage.traceback))
+
+
+def _render_capture(
+    out: Sections, name: str, stage: StageInfo, capture: frozenset[str]
+) -> None:
+    """Add a stage's captured stderr, stdout and log records, as `capture` selects."""
+    prefix = _prefix(name)
+    texts = _stage_texts(stage)
+    for kind in _CAPTURE_ORDER:
+        if kind in capture:
+            out.fenced(f"{prefix}{kind.capitalize()}", texts[kind])
 
 
 def _render_test(
-    test: Test, include_print_output: bool, max_lines: int, max_chars: int
+    test: Test, capture: frozenset[str], max_lines: int, max_chars: int
 ) -> str:
     """Render one failed test; each section takes from the budget left over.
 
-    Order: header and message, longrepr (else traceback), stderr, stdout,
-    then setup info when setup failed. A section that does not fit is skipped.
+    Order: header, then the failure info of every stage (setup, call,
+    teardown), then the captured output of every stage. A large captured
+    output therefore cannot crowd out a later stage's longrepr. A section
+    that does not fit is skipped.
 
     Returns:
         The rendered test, or "" when not even the header fits.
     """
-    out = _Sections(max_lines, max_chars)
+    out = Sections(max_lines, max_chars)
     out.add(f"Test ID: {test.nodeid} - outcome {test.outcome}")
     if not out.parts:
         return ""
-    call = test.call
-    if call:
-        if call.crash:
-            out.bounded(f"  Error Message: {call.crash.message}", share=3)
-        if call.longrepr:
-            out.fenced("Longrepr", call.longrepr)
-        elif call.traceback:
-            out.bounded(_traceback("Traceback", call.traceback))
-        if include_print_output:
-            out.fenced("Stderr", call.stderr)
-            out.fenced("Stdout", call.stdout)
-    if test.setup and test.setup.outcome == "failed":
-        _render_setup(out, test.setup, include_print_output)
+    stages = _test_stages(test)
+    for name, stage in stages:
+        _render_failure(out, name, stage)
+    for name, stage in stages:
+        _render_capture(out, name, stage, capture)
     return out.text()
 
 
@@ -339,7 +412,7 @@ def _undetailed(tests: list[Test]) -> str:
 
 
 def _render_tests(
-    candidates: list[Test], include_print_output: bool, max_lines: int, max_chars: int
+    candidates: list[Test], capture: frozenset[str], max_lines: int, max_chars: int
 ) -> list[str]:
     """Render the candidates in order, each with an even share of what is left.
 
@@ -355,7 +428,7 @@ def _render_tests(
         if lines < MIN_TEST_LINES:
             break
         chars = max_chars // remaining - separator_chars
-        block = _render_test(test, include_print_output, lines - 3, chars)
+        block = _render_test(test, capture, lines - 3, chars)
         if not block:
             break
         blocks.append(block)
@@ -367,7 +440,7 @@ def _render_tests(
 @log_function_call
 def create_prompt_for_failed_tests(
     test_session_result: PytestReport,
-    include_print_output: bool = True,
+    capture: frozenset[str] = ALL_CAPTURE,
     max_failures: int = MAX_FAILURES,
     max_lines: int = TOOL_LINES,
     max_chars: int = TOOL_CHARS,
@@ -380,7 +453,8 @@ def create_prompt_for_failed_tests(
 
     Args:
         test_session_result: The test session result to analyze
-        include_print_output: Whether to include stdout/stderr output
+        capture: Captured kinds ("stdout", "stderr", "log") shown per stage;
+            see capture_kinds for pytest's --show-capture
         max_failures: Maximum number of tests rendered in detail
         max_lines: Line budget of the whole prompt
         max_chars: Character budget of the whole prompt
@@ -401,9 +475,7 @@ def create_prompt_for_failed_tests(
     chars_left = max_chars - sum(
         len(part) + 2 for part in (collectors, TESTS_HEADER, reserved, closing)
     )
-    blocks = _render_tests(
-        failed[:max_failures], include_print_output, lines_left, chars_left
-    )
+    blocks = _render_tests(failed[:max_failures], capture, lines_left, chars_left)
 
     sections = [collectors] if collectors else []
     if blocks:
@@ -419,7 +491,7 @@ def create_prompt_for_failed_tests(
 def create_prompt_for_passing_output(
     report: PytestReport, max_lines: int = TOOL_LINES, max_chars: int = TOOL_CHARS
 ) -> str:
-    """List the captured stdout and stderr of tests that did not fail.
+    """List the captured stdout, stderr and log records of tests that did not fail.
 
     Covers the setup, call and teardown stages. Longrepr is never shown.
 
@@ -429,25 +501,17 @@ def create_prompt_for_passing_output(
         max_chars: Character budget
 
     Returns:
-        The captured output per test, or NO_CAPTURED_OUTPUT_NOTE if no test printed
+        The captured output per test, or NO_CAPTURED_OUTPUT_NOTE if no test
+        printed or logged
     """
     parts: list[str] = []
     for test in report.tests or []:
         if test.outcome in FAILED_OUTCOMES:
             continue
-        stages = [
-            (name, stage)
-            for name, stage in (
-                ("Setup", test.setup),
-                ("Call", test.call),
-                ("Teardown", test.teardown),
-            )
-            if stage
-        ]
         blocks = [
             (f"{name} {kind}", text)
-            for name, stage in stages
-            for kind, text in (("stdout", stage.stdout), ("stderr", stage.stderr))
+            for name, stage in _test_stages(test)
+            for kind, text in _stage_texts(stage).items()
             if text
         ]
         if not blocks:
