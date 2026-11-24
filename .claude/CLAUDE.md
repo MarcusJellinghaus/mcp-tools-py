@@ -13,6 +13,7 @@ This project depends on `mcp-coder-utils` for subprocess execution, logging, and
 | Logging (`log_function_call`, `setup_logging`, `OUTPUT`) | `mcp_tools_py.log_utils` |
 | Subprocess (`execute_command`, `CommandResult`, etc.) | `mcp_tools_py.utils.subprocess_runner` |
 | File I/O (`read_file`) | `mcp_tools_py.utils.file_utils` |
+| User app-data dir (`get_user_app_data_dir`) | `mcp_tools_py.utils.user_app_data` |
 
 This is enforced by the `mcp_coder_utils_isolation` contract in `.importlinter`.
 

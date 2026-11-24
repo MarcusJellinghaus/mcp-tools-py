@@ -41,6 +41,14 @@ def test_subprocess_runner_reexports() -> None:
     assert CommandResult is u_cr
 
 
+def test_user_app_data_reexport() -> None:
+    from mcp_coder_utils.user_app_data import get_user_app_data_dir as upstream
+
+    from mcp_tools_py.utils.user_app_data import get_user_app_data_dir
+
+    assert get_user_app_data_dir is upstream
+
+
 def test_importlinter_config_has_isolation_contract() -> None:
     """Verify the isolation contract is defined in .importlinter."""
     import pathlib
