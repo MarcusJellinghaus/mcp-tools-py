@@ -5,6 +5,7 @@ import shlex
 from dataclasses import dataclass
 from pathlib import Path
 
+from mcp_tools_py.code_checker_pytest.utils import is_short_group, split_short_group
 from mcp_tools_py.utils.file_utils import read_file
 from mcp_tools_py.utils.project_config import read_pyproject_tool_tables
 
@@ -236,6 +237,7 @@ def read_pytest_config(project_dir: str) -> PytestConfig | None:
 def _option_spans(tokens: list[str]) -> list[tuple[int, int, str, str]]:
     """Find the tracked options in every spelling: ``-X v``, ``-Xv``, ``-X=v``.
 
+    Short groups (``-xm slow``, ``-vkrs``) are read with ``split_short_group``.
     Long options are read as ``--long v`` and ``--long=v``; the flags
     ``--strict-markers`` and ``--strict`` have the value ``""``.
 
@@ -259,8 +261,14 @@ def _option_spans(tokens: list[str]) -> list[tuple[int, int, str, str]]:
             i += 1
         elif token.startswith("--") and has_value and name in _VALUE_OPTIONS:
             spans.append((i, i + 1, _VALUE_OPTIONS[name], rest))
-        elif token[:2] in _VALUE_OPTIONS:
-            spans.append((i, i + 1, token[:2], token[2:].removeprefix("=")))
+        elif is_short_group(token):
+            _, letter, value = split_short_group(token)
+            option = f"-{letter}"
+            if letter and option in _VALUE_OPTIONS and value:
+                spans.append((i, i + 1, option, value.removeprefix("=")))
+            elif letter and option in _VALUE_OPTIONS and i + 1 < len(tokens):
+                spans.append((i, i + 2, option, tokens[i + 1]))
+                i += 1
         i += 1
     return spans
 

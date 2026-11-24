@@ -77,7 +77,7 @@ class TestSanitizeExtraArgs:
     @pytest.mark.parametrize(
         "args",
         [
-            ["-vrs"],
+            ["-rs"],
             ["-rfEs"],
             ["-ktest_s"],
             ["-kfoo"],

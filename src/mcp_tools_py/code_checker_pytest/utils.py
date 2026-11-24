@@ -6,9 +6,6 @@ import sys
 from mcp_tools_py.code_checker_pytest.models import ErrorContext, SanitizedArgs
 from mcp_tools_py.utils.file_utils import read_file as read_file
 
-# Letters of short switches that take no value and may be combined (e.g. -xvs).
-_SWITCH_LETTERS = set("xvsql")
-
 # Hard-coded from pytest's parser with this repo's plugins. An option missing
 # from it takes no value, so a following token is read as a positional, as before.
 _ONE_VALUE_OPTIONS = [
@@ -101,15 +98,40 @@ _OPTION_VALUES: dict[str, int] = {
     "--json-report-omit": sys.maxsize,
 }
 
+# Letters of the short options that take a value: W c k m n o p r.
+_SHORT_VALUE_LETTERS = frozenset(o[1] for o in _ONE_VALUE_OPTIONS if len(o) == 2)
+
+
+def split_short_group(arg: str) -> tuple[str, str | None, str]:
+    """Split a single-dash token, read letter by letter.
+
+    A value-taking letter ends the group: the rest of the token is its value.
+
+    Args:
+        arg: A token starting with ``-`` but not ``--``, longer than one char.
+
+    Returns:
+        The switch letters before the value letter, the value letter (None
+        when there is none) and its inline value (``""`` when none).
+    """
+    body = arg[1:]
+    for pos, letter in enumerate(body):
+        if letter in _SHORT_VALUE_LETTERS:
+            return body[:pos], letter, body[pos + 1 :]
+    return body, None, ""
+
+
+def is_short_group(arg: str) -> bool:
+    """Return whether ``arg`` is a single-dash option token."""
+    return len(arg) > 1 and arg.startswith("-") and not arg.startswith("--")
+
 
 def _values_taken(arg: str) -> int:
     """Return how many following tokens the option ``arg`` can take."""
     if arg.startswith("--"):
         return 0 if "=" in arg else _OPTION_VALUES.get(arg, 0)
-    for pos, letter in enumerate(arg[1:], start=2):
-        if f"-{letter}" in _OPTION_VALUES:
-            return 0 if arg[pos:] else 1  # -ktests vs -xk tests
-    return 0
+    _, letter, value = split_short_group(arg)
+    return 1 if letter and not value else 0  # -xk tests vs -ktests
 
 
 _COLLECT_ONLY_FLAGS = {"--collect-only", "--co", "--collectonly"}
@@ -167,8 +189,10 @@ def sanitize_extra_args(
     Limitations:
         - Only ``-m`` as two separate args (``["-m", "slow"]``) is handled,
           not the combined ``-m=slow`` form.
-        - Only single-dash tokens made entirely of the letters ``x v s q l``
-          are split into separate flags. Others (e.g. ``-vrs``) pass through.
+        - Single-dash groups are read letter by letter up to the first
+          value-taking letter; ``s`` and ``v`` before it are removed
+          (``-svrw`` becomes ``-rw``). A value starting with ``-`` that
+          follows a value-taking option is read as a group too.
         - An ``-s`` in the project's ``addopts`` or in ``PYTEST_ADDOPTS``
           still disables capture.
         - Output printed at import or collection time is not shown.
@@ -203,20 +227,6 @@ def sanitize_extra_args(
             skip_next = False
             continue
 
-        # Combined switch group (e.g. -xvs): extract -v and -s, keep the rest
-        if (
-            len(arg) > 1
-            and arg[0] == "-"
-            and arg[1] != "-"
-            and set(arg[1:]) <= _SWITCH_LETTERS
-        ):
-            if "v" in arg:
-                verbosity = arg.count("v")
-            if "s" in arg:
-                show_output = True
-            cleaned += [f"-{c}" for c in arg[1:] if c in "xql"]
-            continue
-
         # --capture=no / --capture no: same as -s
         if arg == "--capture=no":
             show_output = True
@@ -234,6 +244,20 @@ def sanitize_extra_args(
                 "because the markers parameter was used."
             )
             continue
+
+        # Short group (e.g. -xvs, -svrw): extract -v and -s, keep the rest
+        if is_short_group(arg):
+            switches, letter, value = split_short_group(arg)
+            if "s" in switches or "v" in switches:
+                if "s" in switches:
+                    show_output = True
+                if "v" in switches:
+                    verbosity = switches.count("v")
+                rest = switches.replace("s", "").replace("v", "")
+                rest += f"{letter}{value}" if letter else ""
+                if rest:
+                    cleaned.append(f"-{rest}")
+                continue
 
         cleaned.append(arg)
 

@@ -22,9 +22,9 @@ This tracks **Feature Implementation** consisting of multiple **Tasks**.
 ## Tasks
 
 ### Step 1: Shared short-group splitter — [step_1.md](./steps/step_1.md)
-- [ ] Implementation: `split_short_group` used by `_values_taken`, `sanitize_extra_args`, `_option_spans` (tests in `test_short_groups.py`, update `test_extra_args.py`)
-- [ ] Quality checks (pylint, mypy, pytest) — fix all issues
-- [ ] Commit message prepared
+- [x] Implementation: `split_short_group` used by `_values_taken`, `sanitize_extra_args`, `_option_spans` (tests in `test_short_groups.py`, update `test_extra_args.py`)
+- [x] Quality checks (pylint, mypy, pytest) — fix all issues
+- [x] Commit message prepared
 
 ### Step 2: Report flags in `effective_config` — [step_2.md](./steps/step_2.md)
 - [ ] Implementation: `OptionValue.label`, `EffectiveConfig.options`, new `_VALUE_OPTIONS`/`_FLAG_OPTIONS` entries, `_label` (tests in `test_effective_config.py`)
