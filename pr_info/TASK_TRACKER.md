@@ -94,9 +94,9 @@ See [step_10.md](./steps/step_10.md)
 ### Step 11: Agent guidance — remove the `-n auto` rule
 See [step_11.md](./steps/step_11.md)
 
-- [ ] Implementation (documentation)
-- [ ] Quality checks (pylint, pytest, mypy) — fix all issues
-- [ ] Commit message prepared
+- [x] Implementation (documentation)
+- [x] Quality checks (pylint, pytest, mypy) — fix all issues
+- [x] Commit message prepared
 
 ## Pull Request
 
