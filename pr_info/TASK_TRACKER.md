@@ -80,9 +80,9 @@ See [step_8.md](./steps/step_8.md)
 ### Step 9: Wire the workers note into the toolkit `_run_test`
 See [step_9.md](./steps/step_9.md)
 
-- [ ] Implementation (tests + production code)
-- [ ] Quality checks (pylint, pytest, mypy, file size ≤ 750) — fix all issues
-- [ ] Commit message prepared
+- [x] Implementation (tests + production code)
+- [x] Quality checks (pylint, pytest, mypy, file size ≤ 750) — fix all issues
+- [x] Commit message prepared
 
 ### Step 10: User docs — `docs/user-config.md`, README, upgrade notes, architecture overview
 See [step_10.md](./steps/step_10.md)

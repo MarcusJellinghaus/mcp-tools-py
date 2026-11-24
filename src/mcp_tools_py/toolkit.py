@@ -39,7 +39,10 @@ from mcp_tools_py.code_checker_pytest.coverage_store import (
     start_coverage_run,
 )
 from mcp_tools_py.code_checker_pytest.models import PytestReport, Test
-from mcp_tools_py.code_checker_pytest.pytest_config import effective_config
+from mcp_tools_py.code_checker_pytest.pytest_config import (
+    EffectiveConfig,
+    effective_config,
+)
 from mcp_tools_py.code_checker_pytest.reporting import (
     XDIST_MARKER,
     collectors_failed_line,
@@ -367,6 +370,7 @@ def _run_test(context: ToolContext, depth: str) -> ActionResult:
     fail_under: float | None = None
     temp_dir: str | None = None
     coverage_run: CoverageRun | None = None
+    effective: EffectiveConfig | None = None
     try:
         if depth == "full":
             sources = resolve_coverage_source(project_dir, None)
@@ -402,9 +406,12 @@ def _run_test(context: ToolContext, depth: str) -> ActionResult:
             venv_bin=str(context.environment.bin_dir),
             keep_temp_files=context.keep_temp_files,
             timeout_seconds=context.resolve_timeout("pytest"),
+            effective=effective,
         )
 
-        note: str | None = result.get("test_paths_note")
+        # The workers note first; `_with_note` prepends the joined lines.
+        notes = [result.get("workers_note"), result.get("test_paths_note")]
+        note = "\n".join(filter(None, notes)) or None
         verdict: RunVerdict = result["verdict"]
         report: PytestReport | None = result.get("test_results")
         finished: FinishedRun | None = None
