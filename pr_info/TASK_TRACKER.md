@@ -87,9 +87,9 @@ See [step_9.md](./steps/step_9.md)
 ### Step 10: User docs — `docs/user-config.md`, README, upgrade notes, architecture overview
 See [step_10.md](./steps/step_10.md)
 
-- [ ] Implementation (documentation)
-- [ ] Quality checks (pylint, pytest, mypy) — fix all issues
-- [ ] Commit message prepared
+- [x] Implementation (documentation)
+- [x] Quality checks (pylint, pytest, mypy) — fix all issues
+- [x] Commit message prepared
 
 ### Step 11: Agent guidance — remove the `-n auto` rule
 See [step_11.md](./steps/step_11.md)

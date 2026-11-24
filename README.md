@@ -77,7 +77,7 @@ by passing an explicit list:
 | `use_last_coverage_run` | boolean | False | Run no tests and return the digest of the last coverage run. Only `coverage_source` (to narrow it) and `max_modules` can be combined with it |
 | `combine_with_previous` | boolean | False | Merge this coverage run with the saved runs. Requires `coverage=True` |
 
-**Note:** The tool never adds `-n`. Tests run in parallel only when you pass `-n` or the project's `addopts` sets it. `-n 0` disables pytest-xdist.
+**Note:** The tool never adds `-n`. Tests run in parallel only when you pass `-n` or the project's `addopts` sets it. `-n 0` disables pytest-xdist. The worker count of `-n auto` follows `[mcp_tools_py] pytest_workers` in `~/.mcp_coder/config.toml` ([docs/user-config.md](docs/user-config.md)); `-n auto` in `extra_args` does not bypass it, a numeric `-n N` does.
 
 **Run outcomes:** Only a verified pass reads "Pytest check completed." Test failures show the failure details. The reply starts with the counts, plus `N of M selected tests did not run` when a stop option such as `-x` or `--maxfail` left tests unrun. A run that errored, including a non-zero exit with no failing tests or an xdist collection mismatch, reads "Pytest run reported an error." with the problems, plus the exit code unless collection failures explain it and no test failed. A `--collect-only` run reads "Collected N tests ... No tests were run." followed by the selected test IDs, one per line, capped at 300 lines. Any other run that collected tests but reported no outcomes reads "Collected N tests but none reported an outcome. Not verified."
 
