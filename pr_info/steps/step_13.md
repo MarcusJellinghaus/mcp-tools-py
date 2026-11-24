@@ -28,4 +28,6 @@ and stop.
 2. `extra_args=["-n", "2"]` → teardown error shown, no `[gw` text in failure blocks.
 3. A second project where every file is module-skipped → exit-5 reply keeps "No Tests Found", adds
    `⏭️ Skipped: N` and the reasons.
-4. `extra_args=["--snapshot-update", "-n", "0"]` → snapshot note present.
+4. `extra_args=["--snapshot-update", "-n", "0", "-svrw"]` → snapshot note present; `-svrw` works as `-s` + `-rw`:
+   the warnings section (`DeprecationWarning: old — 30×`) and the passing test's log record in the passing output,
+   no skip-reasons section, and no capture-disabled run (the JSON still has the passing test's output).

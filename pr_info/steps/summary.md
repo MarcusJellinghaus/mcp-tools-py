@@ -58,8 +58,9 @@ failing-test blocks.
 | Create | `tests/test_code_checker_pytest/test_short_groups.py` |
 | Create | `tests/test_code_checker_pytest/test_report_data.py` |
 | Create | `tests/test_code_checker_pytest/test_report_extras.py` |
+| Create | `tests/test_code_checker_pytest/test_failure_blocks.py` |
 | Create | `tests/test_code_checker_pytest/test_integration_report_flags.py` |
-| Modify | `tests/test_code_checker_pytest/test_extra_args.py`, `test_effective_config.py`, `test_reporting.py`, `test_failure_budget.py`, `test_runners.py`, `test_verdict.py` |
+| Modify | `tests/test_code_checker_pytest/test_extra_args.py`, `test_effective_config.py`, `test_failure_budget.py`, `test_runners.py`, `test_verdict.py` |
 | Modify | `tests/test_checker_tools_formatting.py`, `tests/test_toolkit_test.py` |
 | Modify | `README.md`, `docs/architecture/architecture.md`, `docs/architecture/output-conventions.md` |
 

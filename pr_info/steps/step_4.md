@@ -8,7 +8,9 @@ One commit.
 ## WHERE
 - `src/mcp_tools_py/code_checker_pytest/report_data.py`
 - `src/mcp_tools_py/code_checker_pytest/reporting.py` (`get_test_summary`)
-- Tests: `tests/test_code_checker_pytest/test_report_data.py`, `tests/test_code_checker_pytest/test_reporting.py`
+- Tests: `tests/test_code_checker_pytest/test_report_data.py` (all tests of this step, including the
+  `get_test_summary` skip-count test). Do not add tests to `test_reporting.py` (714 lines; must stay under the
+  750-line limit).
 
 ## WHAT
 ```python
