@@ -32,9 +32,9 @@ This tracks **Feature Implementation** consisting of multiple **Tasks**.
 - [x] Commit message prepared
 
 ### Step 3: `report_data.py` basics — [step_3.md](./steps/step_3.md)
-- [ ] Implementation: `strip_xdist_header`, `relative_path`, `format_log_record`; `Warning.lineno: int | None` (tests in `test_report_data.py`)
-- [ ] Quality checks (pylint, mypy, pytest) — fix all issues
-- [ ] Commit message prepared
+- [x] Implementation: `strip_xdist_header`, `relative_path`, `format_log_record`; `Warning.lineno: int | None` (tests in `test_report_data.py`)
+- [x] Quality checks (pylint, mypy, pytest) — fix all issues
+- [x] Commit message prepared
 
 ### Step 4: Skips — entries, folding, module-level count — [step_4.md](./steps/step_4.md)
 - [ ] Implementation: `SkipKey`, `folded_skips`, `skip_lines`, `module_skip_count`, `skipped_count`; `get_test_summary` uses `skipped_count` (tests in `test_report_data.py`)
