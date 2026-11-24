@@ -52,9 +52,9 @@ This tracks **Feature Implementation** consisting of multiple **Tasks**.
 - [x] Commit message prepared
 
 ### Step 7: `report_extras.py` — flags, sections, empty-result lines — [step_7.md](./steps/step_7.md)
-- [ ] Implementation: `ReportFlags`, `resolve_report_chars`, `report_flags`, `report_sections`, `_head_rows` (tests in `test_report_extras.py`)
-- [ ] Quality checks (pylint, mypy, pytest) — fix all issues
-- [ ] Commit message prepared
+- [x] Implementation: `ReportFlags`, `resolve_report_chars`, `report_flags`, `report_sections`, `_head_rows` (tests in `test_report_extras.py`)
+- [x] Quality checks (pylint, mypy, pytest) — fix all issues
+- [x] Commit message prepared
 
 ### Step 8: Hint line and flag notes — [step_8.md](./steps/step_8.md)
 - [ ] Implementation: `hint_line`, `flag_notes`, `SNAPSHOT_NOTE`, `DURATIONS_MIN_NOTE` (tests in `test_report_extras.py`)
