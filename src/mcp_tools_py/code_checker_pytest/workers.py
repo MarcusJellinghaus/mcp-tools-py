@@ -3,6 +3,7 @@
 import ctypes
 import json
 import logging
+import os
 import sys
 import time
 import tomllib
@@ -12,6 +13,10 @@ from itertools import pairwise
 from pathlib import Path
 from typing import Literal
 
+from mcp_tools_py.code_checker_pytest.pytest_config import (
+    EffectiveConfig,
+    OptionValue,
+)
 from mcp_tools_py.utils.user_app_data import get_user_app_data_dir
 
 logger = logging.getLogger(__name__)
@@ -21,6 +26,11 @@ _SECTION, _KEY = "mcp_tools_py", "pytest_workers"
 VALID_VALUES_HINT = 'Valid values: "auto", "all", or an integer >= 0 (0 = serial).'
 _CONFIG_FILE_HINT = "Fix or remove ~/.mcp_coder/config.toml."
 _SAMPLES = 5
+_AUTO_VALUES = ("auto", "logical")
+_AUTO_ONLY = "pytest_workers applies to -n auto only"
+_XDIST_DEFAULT = "xdist default"
+# How a numeric -n's source is named on the workers: line; others as they are.
+_SOURCE_LABELS = {"pyproject.toml": "pyproject.toml addopts", "-o": "-o addopts"}
 
 SystemTimes = tuple[int, int, int]
 """``(idle, kernel, user)`` in 100-ns units; kernel time includes idle time."""
@@ -39,6 +49,22 @@ class WorkersSetting:
     value: str | int
     in_config: bool
     problem: str | None
+
+
+@dataclass(frozen=True)
+class WorkersPlan:
+    """How one pytest run is sized.
+
+    Attributes:
+        env: The env vars to pass to run_tests: the caller's dict unchanged,
+            or a copy with ``ENV_KEY`` set.
+        serial: The resolved or pre-set worker count is 0.
+        note: The ``workers: ...`` line, or None.
+    """
+
+    env: dict[str, str] | None
+    serial: bool
+    note: str | None
 
 
 def _config_path() -> Path:
@@ -204,3 +230,168 @@ def workers_for(logical: int, idle: Fraction) -> int:
     """
     n = (logical * idle.numerator) // (2 * idle.denominator)
     return n if n >= 2 else 0
+
+
+def _is_env_key(key: str) -> bool:
+    """Whether *key* names ``ENV_KEY``; case-insensitively on Windows.
+
+    Args:
+        key: An env var name from the caller.
+
+    Returns:
+        True when the subprocess would see it as ``ENV_KEY``.
+    """
+    return key == ENV_KEY or (os.name == "nt" and key.upper() == ENV_KEY)
+
+
+def _preset(env_vars: dict[str, str] | None) -> str:
+    """The run's pre-set ``ENV_KEY``: the caller's value wins over the server's.
+
+    Args:
+        env_vars: The caller's env vars, if any.
+
+    Returns:
+        The caller's last matching value, else the server's; ``""`` when unset.
+    """
+    value = os.environ.get(ENV_KEY, "")
+    for key, env_value in (env_vars or {}).items():
+        if _is_env_key(key):
+            value = env_value
+    return value
+
+
+def _with_count(env_vars: dict[str, str] | None, count: int) -> dict[str, str]:
+    """A copy of *env_vars* with ``ENV_KEY`` set to *count*, in one spelling.
+
+    Args:
+        env_vars: The caller's env vars, if any; never mutated.
+        count: The worker count.
+
+    Returns:
+        The caller's other keys plus ``ENV_KEY``.
+    """
+    env = {k: v for k, v in (env_vars or {}).items() if not _is_env_key(k)}
+    env[ENV_KEY] = str(count)
+    return env
+
+
+def _shown(count: int) -> str:
+    """How a worker count is shown on the workers: line.
+
+    Args:
+        count: The worker count.
+
+    Returns:
+        ``serial`` for 0, else the number.
+    """
+    return "serial" if count == 0 else str(count)
+
+
+def _line(setting: WorkersSetting, shown: str, *reasons: str) -> str:
+    """Render the ``workers:`` line, with the setting's problem appended.
+
+    Args:
+        setting: The pytest_workers setting.
+        shown: What the run uses, e.g. ``3``, ``serial`` or ``xdist default``.
+        reasons: Why, in order.
+
+    Returns:
+        ``workers: <shown> (<reasons>[; ignored <problem>])``.
+    """
+    parts = [*reasons]
+    if setting.problem:
+        parts.append(f"ignored {setting.problem}")
+    return f"workers: {shown} ({'; '.join(parts)})"
+
+
+def _not_auto_note(n: OptionValue | None, setting: WorkersSetting) -> str | None:
+    """The line for a run without ``-n auto``: only when the config is set.
+
+    Args:
+        n: The effective ``-n``, if any; not ``auto`` / ``logical``.
+        setting: The pytest_workers setting.
+
+    Returns:
+        The line explaining that pytest_workers does not apply, or None.
+    """
+    if not setting.in_config:
+        return None
+    if n is None:
+        return _line(setting, "no -n", _AUTO_ONLY)
+    shown = "serial" if n.value == "0" else n.value
+    source = _SOURCE_LABELS.get(n.source, n.source)
+    return _line(setting, shown, f"-n {n.value} from {source}", _AUTO_ONLY)
+
+
+def _preset_plan(
+    preset: str, setting: WorkersSetting, env_vars: dict[str, str] | None
+) -> WorkersPlan:
+    """The plan when ``ENV_KEY`` is already set: xdist reads it as it is.
+
+    Args:
+        preset: The non-empty pre-set value.
+        setting: The pytest_workers setting.
+        env_vars: The caller's env vars, passed on unchanged.
+
+    Returns:
+        The plan reporting the pre-set value.
+    """
+    try:
+        count = int(preset)
+    except ValueError:
+        reason = f'{ENV_KEY}="{preset}" is not an integer'
+        return WorkersPlan(env_vars, False, _line(setting, _XDIST_DEFAULT, reason))
+    return WorkersPlan(env_vars, count == 0, _line(setting, _shown(count), ENV_KEY))
+
+
+def _auto_count(setting: WorkersSetting) -> tuple[int | None, str]:
+    """The worker count for ``-n auto`` from the setting, sampling on Windows.
+
+    Args:
+        setting: The pytest_workers setting.
+
+    Returns:
+        ``(count, reason)``; count is None when xdist's default applies.
+    """
+    if setting.value == "all":
+        return None, "all, config.toml"
+    if isinstance(setting.value, int):
+        return setting.value, "config.toml"
+    if not _is_windows():
+        return None, "auto, not Windows"
+    idle, logical = sample_idle(), os.cpu_count()
+    if idle is None or logical is None:
+        return None, "auto, Windows, CPU load unavailable"
+    load = round(100 * (1 - idle))
+    return workers_for(logical, idle), f"auto, Windows, CPU load {load} %"
+
+
+def resolve_workers(
+    effective: EffectiveConfig, env_vars: dict[str, str] | None
+) -> WorkersPlan:
+    """Decide what ``-n auto`` means for one run; never raises.
+
+    The command line is never changed: a count reaches xdist through
+    ``ENV_KEY`` in a copy of *env_vars*. A value the caller or the server
+    already set wins and skips sampling.
+
+    Args:
+        effective: The effective config of the call.
+        env_vars: The caller's env vars, if any; never mutated.
+
+    Returns:
+        The env for run_tests, whether the run is serial, and the line.
+    """
+    setting = read_pytest_workers()
+    n = effective.n
+    if n is None or n.value not in _AUTO_VALUES:
+        return WorkersPlan(env_vars, False, _not_auto_note(n, setting))
+    preset = _preset(env_vars)
+    if preset:
+        return _preset_plan(preset, setting, env_vars)
+    count, reason = _auto_count(setting)
+    if count is None:
+        return WorkersPlan(env_vars, False, _line(setting, _XDIST_DEFAULT, reason))
+    return WorkersPlan(
+        _with_count(env_vars, count), count == 0, _line(setting, _shown(count), reason)
+    )
