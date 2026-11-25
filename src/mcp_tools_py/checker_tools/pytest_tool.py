@@ -135,7 +135,7 @@ def register(mcp: "FastMCPProtocol", checker_tools: "CheckerTools") -> None:
             extra_args: Optional list of additional pytest arguments for flexible test selection.
                        Examples: ['tests/test_file.py::test_function']
                        Use -v/-vv/-vvv in extra_args to control verbosity.
-                       See "Flexible Test Selection" section below for common patterns.
+                       See "Flexible Test Selection" and "Report Flags" below.
                 The project's `addopts` apply first (e.g. `-n auto`), so don't
                 add them again. extra_args=["-o", "addopts="] runs without them.
                 A later `-m` here replaces the `addopts` `-m`.
@@ -185,12 +185,42 @@ def register(mcp: "FastMCPProtocol", checker_tools: "CheckerTools") -> None:
             extra_args=["-k", "calculation"]  # Pattern matching
 
             # Output control
-            extra_args=["-s"]  # Show captured print output of passing tests
             extra_args=["--tb=short"]  # Short tracebacks
             extra_args=["-vvv"]  # Maximum verbosity
 
             # Execution control
             extra_args=["-x"]  # Stop on first failure
+
+        Report Flags:
+            By default the reply shows counts (incl. `⚠️ Warnings: N`) and at
+            most one hint line; failing-test blocks include log records.
+            pytest's own flags add detail, also in combined groups (`-svrw`):
+
+            extra_args=["--durations=5"]  # Slowest test stages; 0 = all
+            extra_args=["--durations-min=0"]  # Default here is a fixed 0.005 s
+            extra_args=["-rs"]  # Skip reasons, folded like pytest
+            extra_args=["-rw"]  # Warnings grouped, with count and first location
+            extra_args=["-ra"]  # Skip reasons and warnings (same for -rA)
+            extra_args=["--show-capture=log"]  # no|stdout|stderr|log|all, failing blocks only
+            extra_args=["-s"]  # Passing tests' stdout, stderr and log records
+
+            Deviations from pytest: warnings are counted only unless `-rw`;
+            `-ra`/`-rA` include `w`, with no implicit `w` otherwise; unsupported
+            letters (`x`, `X`, `p`, `P`, unknown ones) get a "no effect" note.
+            `--disable-warnings` drops the `-rw` section; the count stays.
+            `--log-level=INFO` / `DEBUG` records more than WARNING+ (the
+            default); `-p no:warnings` empties the warning list.
+
+            Snapshot baselines: run with extra_args=["--snapshot-update"], then
+            check `git status` for the rewritten baselines.
+
+            Known limits: `-r` / `--durations` set in `pytest.ini`, `tox.ini` or
+            `-c` files are not read; short options of unknown plugins in combined
+            groups are not recognised; collect-time warnings repeat once per xdist
+            worker, and the first warning location varies under xdist; with
+            `-p no:logging`, log records carry no tracebacks; module skips through a
+            shared helper count differently under `-n 0` and `-n N`; other
+            terminal-only flags (`--setup-show`, `--fixtures`, ...) show nothing.
 
         Examples:
             # Standard CI run

@@ -87,9 +87,9 @@ This tracks **Feature Implementation** consisting of multiple **Tasks**.
 - [x] Commit message prepared
 
 ### Step 14: Docstring, README and architecture docs — [step_14.md](./steps/step_14.md)
-- [ ] Implementation: `run_pytest_check` docstring, README `extra_args` row, `architecture.md`, `output-conventions.md`
-- [ ] Quality checks (pylint, mypy, pytest, file size ≤ 750 lines) — fix all issues
-- [ ] Commit message prepared
+- [x] Implementation: `run_pytest_check` docstring, README `extra_args` row, `architecture.md`, `output-conventions.md`
+- [x] Quality checks (pylint, mypy, pytest, file size ≤ 750 lines) — fix all issues
+- [x] Commit message prepared
 
 ## Pull Request
 - [ ] PR review: review full branch diff against base branch, address findings
