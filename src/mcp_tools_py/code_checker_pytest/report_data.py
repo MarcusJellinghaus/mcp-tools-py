@@ -22,7 +22,7 @@ class SkipKey:
 
 
 def strip_xdist_header(longrepr: str | None) -> str | None:
-    """Drop a leading "[gwN] ..." line; None when nothing remains.
+    """Drop a leading "[gwN] ..." line and the blank lines after it; None when nothing remains.
 
     Args:
         longrepr: A longrepr text from the report, or None.
@@ -34,7 +34,7 @@ def strip_xdist_header(longrepr: str | None) -> str | None:
         return None
     first, _, rest = longrepr.partition("\n")
     if _XDIST_HEADER.match(first):
-        longrepr = rest
+        longrepr = rest.lstrip("\r\n")
     return longrepr or None
 
 

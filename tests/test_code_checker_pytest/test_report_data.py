@@ -72,6 +72,11 @@ class TestStripXdistHeader:
         """The body after the header is kept."""
         assert strip_xdist_header("[gw1] linux -- Python\nE  boom") == "E  boom"
 
+    def test_blank_lines_after_header_dropped(self) -> None:
+        """Blank lines between the header and the body are dropped, indentation kept."""
+        text = "[gw0] win32 -- Python\n\n    @pytest.fixture\nE  boom"
+        assert strip_xdist_header(text) == "    @pytest.fixture\nE  boom"
+
     def test_without_header_unchanged(self) -> None:
         """Text without a header is returned as given."""
         text = "E  assert 1 == 2\nfoo.py:3: AssertionError"

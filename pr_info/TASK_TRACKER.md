@@ -82,9 +82,9 @@ This tracks **Feature Implementation** consisting of multiple **Tasks**.
 - [x] Commit message prepared
 
 ### Step 13: End-to-end integration tests — [step_13.md](./steps/step_13.md)
-- [ ] Implementation: `test_integration_report_flags.py` (4 cases); fix defects revealed in steps 1–12
-- [ ] Quality checks (pylint, mypy, pytest incl. `integration` marker for this file) — fix all issues
-- [ ] Commit message prepared
+- [x] Implementation: `test_integration_report_flags.py` (4 cases); fix defects revealed in steps 1–12
+- [x] Quality checks (pylint, mypy, pytest incl. `integration` marker for this file) — fix all issues
+- [x] Commit message prepared
 
 ### Step 14: Docstring, README and architecture docs — [step_14.md](./steps/step_14.md)
 - [ ] Implementation: `run_pytest_check` docstring, README `extra_args` row, `architecture.md`, `output-conventions.md`
