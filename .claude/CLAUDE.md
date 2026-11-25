@@ -13,6 +13,7 @@ This project depends on `mcp-coder-utils` for subprocess execution, logging, and
 | Logging (`log_function_call`, `setup_logging`, `OUTPUT`) | `mcp_tools_py.log_utils` |
 | Subprocess (`execute_command`, `CommandResult`, etc.) | `mcp_tools_py.utils.subprocess_runner` |
 | File I/O (`read_file`) | `mcp_tools_py.utils.file_utils` |
+| User app-data dir (`get_user_app_data_dir`) | `mcp_tools_py.utils.user_app_data` |
 
 This is enforced by the `mcp_coder_utils_isolation` contract in `.importlinter`.
 
@@ -101,20 +102,18 @@ All checks must pass before proceeding.
 
 **Ruff:** use `mcp__mcp-tools-py__run_ruff_check`. Do not call `ruff` directly.
 
-**Pytest:** always use `extra_args: ["-n", "auto"]` for parallel execution.
-
 Available marker: `integration` (requires external resources).
 New markers must be registered under `[tool.pytest.ini_options] markers` in `pyproject.toml`, or collection fails (`--strict-markers`).
 
 ```python
 # Fast unit tests (recommended for regular development)
-mcp__mcp-tools-py__run_pytest_check(extra_args=["-n", "auto", "-m", "not integration"])
+mcp__mcp-tools-py__run_pytest_check(markers=["not integration"])
 
 # All tests (slow)
-mcp__mcp-tools-py__run_pytest_check(extra_args=["-n", "auto"])
+mcp__mcp-tools-py__run_pytest_check()
 
 # Integration tests only
-mcp__mcp-tools-py__run_pytest_check(extra_args=["-n", "auto"], markers=["integration"])
+mcp__mcp-tools-py__run_pytest_check(markers=["integration"])
 ```
 
 When debugging test failures, add `"-v", "-s", "--tb=short"` to extra_args.

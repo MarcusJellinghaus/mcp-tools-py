@@ -39,7 +39,10 @@ from mcp_tools_py.code_checker_pytest.coverage_store import (
     start_coverage_run,
 )
 from mcp_tools_py.code_checker_pytest.models import PytestReport, Test
-from mcp_tools_py.code_checker_pytest.pytest_config import effective_config
+from mcp_tools_py.code_checker_pytest.pytest_config import (
+    EffectiveConfig,
+    effective_config,
+)
 from mcp_tools_py.code_checker_pytest.reporting import (
     XDIST_MARKER,
     collectors_failed_line,
@@ -53,6 +56,7 @@ from mcp_tools_py.code_checker_pytest.verdict import (
     format_error_text,
     format_suspicious_text,
 )
+from mcp_tools_py.code_checker_pytest.workers import pytest_workers_verify
 from mcp_tools_py.formatter.runner import (
     resolve_steps,
     run_format_code,
@@ -366,6 +370,7 @@ def _run_test(context: ToolContext, depth: str) -> ActionResult:
     fail_under: float | None = None
     temp_dir: str | None = None
     coverage_run: CoverageRun | None = None
+    effective: EffectiveConfig | None = None
     try:
         if depth == "full":
             sources = resolve_coverage_source(project_dir, None)
@@ -401,9 +406,12 @@ def _run_test(context: ToolContext, depth: str) -> ActionResult:
             venv_bin=str(context.environment.bin_dir),
             keep_temp_files=context.keep_temp_files,
             timeout_seconds=context.resolve_timeout("pytest"),
+            effective=effective,
         )
 
-        note: str | None = result.get("test_paths_note")
+        # The workers note first; `_with_note` prepends the joined lines.
+        notes = [result.get("workers_note"), result.get("test_paths_note")]
+        note = "\n".join(filter(None, notes)) or None
         verdict: RunVerdict = result["verdict"]
         report: PytestReport | None = result.get("test_results")
         finished: FinishedRun | None = None
@@ -653,11 +661,12 @@ class PythonToolkit(Toolkit):
     def verify(self, project_dir: Path, action: str | None = None) -> list[VerifyItem]:
         """Check that the tools `action` drives are available.
 
-        - None: every tool, pytest-json-report, pytest-cov, plus "formatter".
+        - None: every tool, pytest-json-report, pytest-cov, pytest_workers,
+          plus "formatter".
         - "format": "formatter" plus the tools of the resolved formatter
           steps (none when no formatter resolves).
         - "check": the tools of the `full` check depth.
-        - "test": pytest, pytest-json-report, pytest-cov.
+        - "test": pytest, pytest-json-report, pytest-cov, pytest_workers.
 
         Returns:
             One VerifyItem per tool, plus one named "formatter" for whether a
@@ -696,7 +705,12 @@ class PythonToolkit(Toolkit):
                 if action == "format":
                     tools = []
         distribution_items = (
-            _distribution_items(context) if action in (None, "test") else []
+            [
+                *_distribution_items(context),
+                VerifyItem("pytest_workers", *pytest_workers_verify()),
+            ]
+            if action in (None, "test")
+            else []
         )
         return (
             [_tool_item(context, tool) for tool in tools]

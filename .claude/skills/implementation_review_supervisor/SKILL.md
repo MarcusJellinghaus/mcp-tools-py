@@ -73,6 +73,6 @@ You are a technical lead supervising a software engineer (the `code-engineer` ag
 **Status**: {committed / no changes needed}
 ```
 
-**Agent instructions:** The agents load `.claude/CLAUDE.md` themselves. Still restate the most load-bearing rules in the launch prompt (use `mcp__mcp-workspace__*` tools not native file tools; pytest needs `extra_args=["-n", "auto"]` plus integration-marker exclusions; no `cd` prefix; approved commands only) as a safety net.
+**Agent instructions:** The agents load `.claude/CLAUDE.md` themselves. Still restate the most load-bearing rules in the launch prompt (use `mcp__mcp-workspace__*` tools not native file tools; pytest needs integration-marker exclusions; no `cd` prefix; approved commands only) as a safety net.
 
 **Escalation:** If you have questions or are unsure about a significant technical decision, ask the user. For borderline Accept/Skip findings, default to better code quality rather than asking — only escalate when the fix has meaningful scope or risk, not for trivial changes in either direction. Import contract or architecture violations (from `run_lint_imports_check`): escalate to the user — fixes may require moving code between layers.

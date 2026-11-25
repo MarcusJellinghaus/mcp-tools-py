@@ -337,6 +337,8 @@ def test_check_code_with_pytest_with_error(mock_run_tests: MagicMock) -> None:
         "test_paths_note": None,
         "exit_code": None,
         "marker_error": None,
+        "workers_note": None,
+        "workers_serial": False,
     }
 
 

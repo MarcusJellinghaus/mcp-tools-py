@@ -8,6 +8,10 @@ from typing import Any
 
 from mcp_tools_py.code_checker_pytest.models import PytestReport
 from mcp_tools_py.code_checker_pytest.parsers import parse_pytest_report
+from mcp_tools_py.code_checker_pytest.pytest_config import (
+    EffectiveConfig,
+    effective_config,
+)
 from mcp_tools_py.code_checker_pytest.reporting import get_test_summary
 from mcp_tools_py.code_checker_pytest.utils import create_error_context, read_file
 from mcp_tools_py.code_checker_pytest.verdict import (
@@ -15,6 +19,7 @@ from mcp_tools_py.code_checker_pytest.verdict import (
     RunVerdict,
     classify_run,
 )
+from mcp_tools_py.code_checker_pytest.workers import resolve_workers
 from mcp_tools_py.utils.project_config import resolve_test_paths
 from mcp_tools_py.utils.subprocess_runner import (
     check_tool_missing_error,
@@ -438,6 +443,7 @@ def check_code_with_pytest(
     keep_temp_files: bool = False,
     timeout_seconds: int = 300,
     skip_default_test_folder: bool = False,
+    effective: EffectiveConfig | None = None,
 ) -> dict[str, Any]:
     """Run pytest on the specified project and return results.
 
@@ -453,6 +459,7 @@ def check_code_with_pytest(
         keep_temp_files: Whether to keep temporary files after test execution. Useful for debugging when tests fail
         timeout_seconds: Maximum time in seconds to wait for test execution. Default is 300 seconds
         skip_default_test_folder: When True, do not add `test_folder` to the pytest command (caller already passed test paths via `extra_args`)
+        effective: The effective config of the call, when the caller already computed it; computed from `markers`, `extra_args` and `env_vars` when None
 
     Returns:
         Dictionary with test results containing the following keys:
@@ -462,6 +469,8 @@ def check_code_with_pytest(
         - test_paths_note: Note when `testpaths` is set but no entry exists, else None; present on every return
         - exit_code: pytest's exit code, or None when pytest gave none (timeout, execution error); present on every return
         - marker_error: pytest's ERROR: line for a bad -m expression on exit 4, else None; present on every return
+        - workers_note: The `workers: ...` line for -n auto sizing, or None; present on every return
+        - workers_serial: True when the resolved or pre-set -n auto worker count is 0; present on every return
     """
     logger.debug(
         "Starting pytest code check",
@@ -472,6 +481,11 @@ def check_code_with_pytest(
             "verbosity": verbosity,
         },
     )
+
+    # Neither raises; the plan is needed by both returns below.
+    if effective is None:
+        effective = effective_config(project_dir, markers, extra_args or [], env_vars)
+    plan = resolve_workers(effective, env_vars)
 
     note = None
     try:
@@ -484,7 +498,7 @@ def check_code_with_pytest(
             markers,
             verbosity,
             extra_args,
-            env_vars,
+            plan.env,
             venv_bin,
             keep_temp_files,
             timeout_seconds,
@@ -525,6 +539,8 @@ def check_code_with_pytest(
             "test_paths_note": note,
             "exit_code": verdict.exit_code,
             "marker_error": None,
+            "workers_note": plan.note,
+            "workers_serial": plan.serial,
         }
 
     except Exception as e:
@@ -546,4 +562,6 @@ def check_code_with_pytest(
             "test_paths_note": note,
             "exit_code": getattr(e, _EXIT_CODE_ATTR, None),
             "marker_error": getattr(e, _MARKER_ERROR_ATTR, None),
+            "workers_note": plan.note,
+            "workers_serial": plan.serial,
         }

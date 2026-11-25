@@ -52,7 +52,7 @@ If no issue number is provided:
 
 5. **Run quality checks**
    - `mcp__mcp-tools-py__run_pylint_check` — fix all issues
-   - `mcp__mcp-tools-py__run_pytest_check` (with `extra_args: ["-n", "auto"]`) — fix all failures
+   - `mcp__mcp-tools-py__run_pytest_check` — fix all failures
    - `mcp__mcp-tools-py__run_mypy_check` — fix all issues
    - `mcp__mcp-tools-py__run_ruff_check` — fix all issues
 

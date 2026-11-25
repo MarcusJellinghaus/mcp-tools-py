@@ -7,7 +7,7 @@ import logging
 from collections.abc import Iterator
 from pathlib import Path
 from typing import Any
-from unittest.mock import MagicMock, patch
+from unittest.mock import ANY, MagicMock, patch
 
 import pytest
 
@@ -99,6 +99,7 @@ async def test_run_pytest_check_parameters(
             keep_temp_files=True,  # From server constructor
             skip_default_test_folder=False,
             timeout_seconds=300,  # Built-in pytest default
+            effective=ANY,
         )
 
         # Verify the result is properly formatted

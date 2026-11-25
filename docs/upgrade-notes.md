@@ -4,6 +4,18 @@ Behaviour changes to check when upgrading. Newest first.
 
 ---
 
+## `run_pytest_check` sizes `-n auto` by CPU load on Windows (#298)
+
+On Windows, the default `-n auto` is now load-sized: `[mcp_tools_py]
+pytest_workers` in `~/.mcp_coder/config.toml` defaults to `"auto"`, which
+starts `floor(0.5 × logical cores × (1 − CPU load))` workers, or runs serially
+below 2. Runs with `-n auto` get a new `workers:` line in the reply, on every
+OS. A numeric `-n N` and runs without `-n` are unchanged. Set
+`pytest_workers = "all"` for the old behaviour. See
+[User Configuration](user-config.md).
+
+---
+
 ## `search_library_files` structured output is unwrapped (#107)
 
 The tool's structured output (`structuredContent`, and its `outputSchema`) is
