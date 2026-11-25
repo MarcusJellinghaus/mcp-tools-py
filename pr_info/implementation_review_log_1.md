@@ -9,3 +9,11 @@ src/mcp_tools_py/code_checker_pytest/report_extras.py:290 — medium — When th
 Verdict(decision='tasks', tasks=['In src/mcp_tools_py/code_checker_pytest/report_extras.py around line 379, change report_tail so that when the failure blocks and -s output use up the line budget, it still emits the "Not shown, budget used up:" notice naming every report section in effect (-rs, -rw, --durations, etc.) instead of skipping report_sections silently. Add a reply-level test where the failure blocks exhaust the line budget and assert that the dropped notice names each requested section.', 'In src/mcp_tools_py/code_checker_pytest/report_extras.py around line 290, emit the empty-result line for a -r flag passed in the call (e.g. `-rs: no skipped tests.`) with out.named(...) instead of out.add(...). That way, when the budget is used up, the dropped notice names it. Add or extend a test to cover this.'], escalate_reason=None)
 **Changes**:
 applied
+
+## Round 2 — 2026-11-25
+**Findings**:
+Round-1 fixes look in place in `report_extras.py`; now checking the reply wiring in `checker_tools`.Checking whether round 1's reply-level budget test exists.NO FINDINGS
+**Decisions**:
+Verdict(decision='dismiss', tasks=[], escalate_reason=None)
+**Changes**:
+dismiss
