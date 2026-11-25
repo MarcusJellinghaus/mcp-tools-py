@@ -206,25 +206,145 @@ def test_format_pytest_result_success_without_show_output(
     assert result == "Pytest check completed. 1 passed in 0.10s"
 
 
-def test_format_pytest_result_failure_ignores_show_output(
+def _mixed_report() -> PytestReport:
+    """Build a report with one failing test and one passing test that printed."""
+    return parse_pytest_report(
+        json.dumps(
+            {
+                "created": 0.0,
+                "duration": 0.1,
+                "exitcode": 1,
+                "root": "/project",
+                "environment": {},
+                "summary": {"collected": 2, "passed": 1, "failed": 1, "total": 2},
+                "collectors": [],
+                "tests": [
+                    {
+                        "nodeid": "tests/test_a.py::test_fails",
+                        "lineno": 1,
+                        "keywords": [],
+                        "outcome": "failed",
+                        "call": {
+                            "duration": 0.001,
+                            "outcome": "failed",
+                            "longrepr": "assert 0",
+                        },
+                    },
+                    {
+                        "nodeid": "tests/test_a.py::test_prints",
+                        "lineno": 5,
+                        "keywords": [],
+                        "outcome": "passed",
+                        "call": {
+                            "duration": 0.001,
+                            "outcome": "passed",
+                            "stdout": "HELLO\n",
+                        },
+                    },
+                ],
+                "warnings": [],
+            }
+        )
+    )
+
+
+def _mixed_results(status: RunStatus) -> dict[str, Any]:
+    """Build FAILED or ERROR results over the mixed report."""
+    report = _mixed_report()
+    return make_pytest_results(
+        summary={"passed": 1, "failed": 1, "error": 0, "collected": 2},
+        test_results=report,
+        verdict=RunVerdict(status, ["collection error"], report.exitcode),
+        summary_text="1 failed, 1 passed",
+    )
+
+
+def test_format_pytest_result_failed_with_show_output(
     checker_tools: CheckerTools,
 ) -> None:
-    """A failing run keeps the failed-tests prompt and adds no passing output."""
-    test_results = make_pytest_results(
-        RunStatus.FAILED,
-        summary={"passed": 1, "failed": 1, "error": 0, "collected": 2},
-        test_results=_passing_report_with_output(),
+    """A failing run with show_output adds passing output after the failure blocks."""
+    result = checker_tools._format_pytest_result_with_details(
+        _mixed_results(RunStatus.FAILED), show_details=True, show_output=True
     )
+    assert "tests/test_a.py::test_fails" in result
+    failures = result.index("Pytest found issues that need attention:")
+    passing = result.index("\n\nCaptured output of passing tests:")
+    assert failures < passing
+    assert result.index("assert 0") < passing
+    assert "HELLO" in result[passing:]
+
+
+def test_format_pytest_result_failed_without_show_output(
+    checker_tools: CheckerTools,
+) -> None:
+    """Without show_output, a failing run adds no passing output."""
+    result = checker_tools._format_pytest_result_with_details(
+        _mixed_results(RunStatus.FAILED), show_details=True
+    )
+    assert "Captured output of passing tests" not in result
+    assert "HELLO" not in result
+
+
+def test_format_pytest_result_error_with_tests_and_show_output(
+    checker_tools: CheckerTools,
+) -> None:
+    """ERROR with a report that has tests adds passing output after the error details."""
+    without = checker_tools._format_pytest_result_with_details(
+        _mixed_results(RunStatus.ERROR), show_details=True
+    )
+    result = checker_tools._format_pytest_result_with_details(
+        _mixed_results(RunStatus.ERROR), show_details=True, show_output=True
+    )
+    assert result.startswith(f"{without}\n\nCaptured output of passing tests:")
+    assert "HELLO" in result
+
+
+def test_format_pytest_result_error_without_tests_ignores_show_output(
+    checker_tools: CheckerTools,
+) -> None:
+    """ERROR whose report has no tests is unchanged by show_output."""
+    without = checker_tools._format_pytest_result_with_details(
+        _error_results(), show_details=True
+    )
+    result = checker_tools._format_pytest_result_with_details(
+        _error_results(), show_details=True, show_output=True
+    )
+    assert result == without
+
+
+def test_format_pytest_result_failed_passes_capture(
+    checker_tools: CheckerTools,
+) -> None:
+    """The capture kinds reach the failure blocks."""
     with patch(
         "mcp_tools_py.checker_tools.create_prompt_for_failed_tests"
     ) as mock_prompt:
         mock_prompt.return_value = "Detailed failure info..."
-        result = checker_tools._format_pytest_result_with_details(
-            test_results, show_details=True, show_output=True
+        checker_tools._format_pytest_result_with_details(
+            _mixed_results(RunStatus.FAILED),
+            show_details=True,
+            capture=frozenset({"log"}),
         )
-    mock_prompt.assert_called_once()
-    assert "Detailed failure info..." in result
-    assert "Captured output of passing tests" not in result
+    assert mock_prompt.call_args.kwargs["capture"] == frozenset({"log"})
+
+
+def test_format_pytest_result_failed_show_output_tight_budget(
+    checker_tools: CheckerTools,
+) -> None:
+    """When the failures leave too little room, the passing output is named as dropped."""
+    with patch(
+        "mcp_tools_py.checker_tools.create_prompt_for_failed_tests"
+    ) as mock_prompt:
+        mock_prompt.return_value = "\n".join(f"line {i}" for i in range(15))
+        result = checker_tools._format_pytest_result_with_details(
+            _mixed_results(RunStatus.FAILED),
+            show_details=True,
+            show_output=True,
+            max_lines=20,
+        )
+    assert result.endswith(f"\n\n{DROPPED_NOTICE} passing-test output (-s)")
+    assert "line 14" in result
+    assert "HELLO" not in result
 
 
 def test_format_pytest_result_execution_error(checker_tools: CheckerTools) -> None:

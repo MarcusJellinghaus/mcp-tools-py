@@ -72,9 +72,9 @@ This tracks **Feature Implementation** consisting of multiple **Tasks**.
 - [x] Commit message prepared
 
 ### Step 11: `--show-capture` and `-s` output on every verdict with tests — [step_11.md](./steps/step_11.md)
-- [ ] Implementation: `capture` parameter, `_with_passing_output` for PASSED/FAILED/ERROR (tests in `test_checker_tools_formatting.py`)
-- [ ] Quality checks (pylint, mypy, pytest) — fix all issues
-- [ ] Commit message prepared
+- [x] Implementation: `capture` parameter, `_with_passing_output` for PASSED/FAILED/ERROR (tests in `test_checker_tools_formatting.py`)
+- [x] Quality checks (pylint, mypy, pytest) — fix all issues
+- [x] Commit message prepared
 
 ### Step 12: Wire notes and tail block into `run_pytest_check` — [step_12.md](./steps/step_12.md)
 - [ ] Implementation: `report_tail`, `has_tests`, flag notes and tail wired into `run_pytest_check` (reply-level tests beside `test_config_notes_reply.py`)
