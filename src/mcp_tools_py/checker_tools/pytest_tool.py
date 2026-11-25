@@ -28,6 +28,13 @@ from mcp_tools_py.code_checker_pytest.pytest_config import (
     call_replaced_addopts_m,
     effective_config,
 )
+from mcp_tools_py.code_checker_pytest.report_extras import (
+    flag_notes,
+    has_tests,
+    report_flags,
+    report_tail,
+)
+from mcp_tools_py.code_checker_pytest.reporting import capture_kinds
 from mcp_tools_py.code_checker_pytest.runners import check_code_with_pytest
 from mcp_tools_py.code_checker_pytest.utils import sanitize_extra_args
 from mcp_tools_py.code_checker_pytest.verdict import RunStatus
@@ -371,6 +378,7 @@ def register(mcp: "FastMCPProtocol", checker_tools: "CheckerTools") -> None:
                 max_chars -= len(digest)
 
             # Always show detailed failure output
+            flags = report_flags(effective)
             result = checker_tools._format_pytest_result_with_details(
                 test_results,
                 show_details=True,
@@ -378,7 +386,21 @@ def register(mcp: "FastMCPProtocol", checker_tools: "CheckerTools") -> None:
                 collect_only=sanitized.collect_only,
                 max_lines=max_lines,
                 max_chars=max_chars,
+                capture=capture_kinds(flags.show_capture),
             )
+
+            # The report sections and the hint get what the main reply left
+            report = test_results.get("test_results")
+            with_tests = has_tests(report, sanitized.collect_only)
+            if with_tests and report is not None:
+                tail = report_tail(
+                    report,
+                    flags,
+                    max_lines - result.count("\n") - 2,
+                    max_chars - len(result) - 2,
+                )
+                if tail:
+                    result = f"{result}\n\n{tail}"
 
             # Prepend the workers, defaults, marker, test-paths and deduplication notes
             # so LLM can self-correct
@@ -394,6 +416,8 @@ def register(mcp: "FastMCPProtocol", checker_tools: "CheckerTools") -> None:
                 test_results.get("exit_code"),
                 test_results.get("marker_error"),
             )
+            if with_tests:
+                top += flag_notes(flags)
             test_paths_note = test_results.get("test_paths_note")
             notes = [
                 *([workers_note] if workers_note else []),

@@ -338,6 +338,50 @@ def flag_notes(flags: ReportFlags) -> list[str]:
     return notes
 
 
+def has_tests(report: PytestReport | None, collect_only: bool) -> bool:
+    """Whether a reply gets this issue's notes and tail: a report with tests.
+
+    Args:
+        report: The parsed pytest report, if any.
+        collect_only: The call has ``--collect-only``.
+
+    Returns:
+        True when the report has at least one test entry and the call is not
+        ``--collect-only``.
+    """
+    return report is not None and bool(report.tests) and not collect_only
+
+
+def report_tail(
+    report: PytestReport, flags: ReportFlags, max_lines: int, max_chars: int
+) -> str:
+    """The tail block of a reply: the report sections, then the hint line.
+
+    One line is reserved for the hint before the rest goes to the sections,
+    so the hint stays last and is kept while it fits at all.
+
+    Args:
+        report: The parsed pytest report.
+        flags: The report flags in effect.
+        max_lines: Line budget of the block.
+        max_chars: Character budget of the block.
+
+    Returns:
+        The sections and the hint joined by newlines; ``""`` when both are empty.
+    """
+    hint = hint_line(report, flags)
+    if hint is not None and (max_lines < 1 or len(hint) > max_chars):
+        hint = None
+    lines_left = max_lines - (1 if hint else 0)
+    chars_left = max_chars - (len(hint) + 1 if hint else 0)
+    sections = (
+        report_sections(report, flags, lines_left, chars_left)
+        if lines_left >= 1
+        else ""
+    )
+    return "\n".join(part for part in (sections, hint) if part)
+
+
 def skipped_block(report: PytestReport, max_lines: int, max_chars: int) -> str:
     """The skip block of an exit-5 run: the count, then the folded skip lines.
 

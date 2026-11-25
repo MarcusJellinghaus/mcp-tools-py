@@ -77,9 +77,9 @@ This tracks **Feature Implementation** consisting of multiple **Tasks**.
 - [x] Commit message prepared
 
 ### Step 12: Wire notes and tail block into `run_pytest_check` — [step_12.md](./steps/step_12.md)
-- [ ] Implementation: `report_tail`, `has_tests`, flag notes and tail wired into `run_pytest_check` (reply-level tests beside `test_config_notes_reply.py`)
-- [ ] Quality checks (pylint, mypy, pytest) — fix all issues
-- [ ] Commit message prepared
+- [x] Implementation: `report_tail`, `has_tests`, flag notes and tail wired into `run_pytest_check` (reply-level tests beside `test_config_notes_reply.py`)
+- [x] Quality checks (pylint, mypy, pytest) — fix all issues
+- [x] Commit message prepared
 
 ### Step 13: End-to-end integration tests — [step_13.md](./steps/step_13.md)
 - [ ] Implementation: `test_integration_report_flags.py` (4 cases); fix defects revealed in steps 1–12
