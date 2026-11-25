@@ -40,6 +40,7 @@ def _effective(options: dict[str, OptionValue]) -> EffectiveConfig:
         m=None,
         k=None,
         numprocesses=False,
+        n=None,
         strict_markers=False,
         project_strict_markers=False,
         options=options,
