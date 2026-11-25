@@ -237,7 +237,8 @@ def report_sections(
 
     Each present section gets an even share of the budget left and is cut to
     its first rows; one whose first row does not fit is named in the dropped
-    notice. The empty-result line is only for a call ``-r``.
+    notice. The empty-result line is only for a call ``-r``; when it does not
+    fit, it is named in the notice as ``<-r label> result``.
 
     Args:
         report: The parsed pytest report.
@@ -274,7 +275,9 @@ def report_sections(
         if "w" in sections and not groups:
             empties.append("no warnings")
         if empties:
-            out.add(f"{flags.r_label}: {', '.join(empties)}.")
+            out.named(
+                f"{flags.r_label} result", f"{flags.r_label}: {', '.join(empties)}."
+            )
     return out.text()
 
 
@@ -358,7 +361,9 @@ def report_tail(
     """The tail block of a reply: the report sections, then the hint line.
 
     One line is reserved for the hint before the rest goes to the sections,
-    so the hint stays last and is kept while it fits at all.
+    so the hint stays last and is kept while it fits at all. With no budget
+    left, the sections in effect are still named in the dropped notice; when
+    the notice and the hint do not both fit, the notice is kept.
 
     Args:
         report: The parsed pytest report.
@@ -374,11 +379,11 @@ def report_tail(
         hint = None
     lines_left = max_lines - (1 if hint else 0)
     chars_left = max_chars - (len(hint) + 1 if hint else 0)
-    sections = (
-        report_sections(report, flags, lines_left, chars_left)
-        if lines_left >= 1
-        else ""
-    )
+    sections = report_sections(report, flags, lines_left, chars_left)
+    if hint and len(sections.splitlines()) >= max_lines:
+        # No room for both: naming the dropped sections outranks the hint.
+        hint = None
+        sections = report_sections(report, flags, max_lines, max_chars)
     return "\n".join(part for part in (sections, hint) if part)
 
 

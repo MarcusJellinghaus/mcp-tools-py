@@ -17,6 +17,7 @@ from mcp_tools_py.code_checker_pytest.report_extras import (
     has_tests,
     report_tail,
 )
+from mcp_tools_py.code_checker_pytest.reporting import DROPPED_NOTICE
 from mcp_tools_py.code_checker_pytest.verdict import RunStatus
 from tests._pytest_results import make_pytest_results
 from tests.conftest import make_environment_info
@@ -210,15 +211,47 @@ class TestReportTail:
             warnings=[_warning(tmp_path)],
         )
 
-        tail = report_tail(report, _flags(letters=frozenset({"s"})), 1, 10_000)
+        tail = report_tail(report, _flags(), 1, 10_000)
 
         assert tail.startswith("For details:")
         assert len(tail.splitlines()) == 1
 
-    def test_nothing_when_no_line_is_left(self, tmp_path: Path) -> None:
+    def test_notice_outranks_hint_when_one_line_is_left(self, tmp_path: Path) -> None:
+        report = _report(
+            tmp_path,
+            tests=[_passed_test(), _skipped_test(tmp_path)],
+            warnings=[_warning(tmp_path)],
+        )
+
+        tail = report_tail(report, _flags(letters=frozenset({"s"})), 1, 10_000)
+
+        assert tail == f"{DROPPED_NOTICE} skip reasons (-rs)"
+
+    def test_nothing_when_no_line_is_left_and_no_section(self, tmp_path: Path) -> None:
         report = _report(tmp_path, warnings=[_warning(tmp_path)])
 
         assert report_tail(report, _flags(), 0, 10_000) == ""
+
+    def test_sections_named_when_no_line_is_left(self, tmp_path: Path) -> None:
+        report = _report(
+            tmp_path,
+            tests=[_passed_test(call=0.5), _skipped_test(tmp_path)],
+            warnings=[_warning(tmp_path)],
+        )
+        flags = _flags(letters=frozenset({"s", "w"}), r_label="-rsw", durations=0)
+
+        tail = report_tail(report, flags, 0, 10_000)
+
+        assert tail == (
+            f"{DROPPED_NOTICE} skip reasons (-rs), warnings (-rw), durations"
+        )
+
+    def test_empty_result_line_named_when_no_line_is_left(self, tmp_path: Path) -> None:
+        flags = _flags(letters=frozenset({"s"}), r_label="-rs")
+
+        tail = report_tail(_report(tmp_path), flags, 0, 10_000)
+
+        assert tail == f"{DROPPED_NOTICE} -rs result"
 
 
 def test_clean_run_is_one_line(run_pytest_check: Any, tmp_path: Path) -> None:
@@ -338,6 +371,62 @@ def test_failed_run_keeps_failures_before_the_tail(
     assert "AssertionError: boom" in reply
     assert reply.splitlines()[-1] == _HINT_SW
     assert reply.index("AssertionError: boom") < reply.index("For details:")
+
+
+def _huge_failure() -> ReportTest:
+    """A failed test whose longrepr is long enough to use up the line budget."""
+    failed = _failed_test()
+    assert failed.call is not None
+    failed.call.longrepr = "\n".join(f"line {i}" for i in range(5000))
+    return failed
+
+
+def test_failures_using_up_lines_still_name_requested_sections(
+    run_pytest_check: Any, tmp_path: Path
+) -> None:
+    _pyproject(tmp_path, 'markers = ["slow"]')
+    noisy = _passed_test(call=0.5)
+    assert noisy.call is not None
+    noisy.call.stdout = "\n".join(f"out {i}" for i in range(5000))
+    report = _report(
+        tmp_path,
+        tests=[_huge_failure(), noisy, _skipped_test(tmp_path)],
+        warnings=[_warning(tmp_path)],
+    )
+    results = _results(report, RunStatus.FAILED, summary_text="❌ Failed: 1")
+
+    with patch(f"{_PYTEST_TOOL}.report_tail", wraps=report_tail) as tail:
+        reply = _call(
+            run_pytest_check, results, extra_args=["-s", "-rsw", "--durations=0"]
+        )
+
+    # The failure block and the -s output leave the tail no line at all.
+    assert tail.call_args.args[2] < 1
+    notice = reply.splitlines()[-1]
+    assert notice.startswith(DROPPED_NOTICE), reply[-500:]
+    for section in ("skip reasons (-rs)", "warnings (-rw)", "durations"):
+        assert section in notice
+    assert "Skip reasons:" not in reply
+
+
+def test_call_empty_result_named_when_durations_use_up_the_budget(
+    run_pytest_check: Any, tmp_path: Path
+) -> None:
+    _pyproject(tmp_path, 'markers = ["slow"]')
+    tests = [
+        _passed_test(f"tests/test_a.py::test_{i}", call=1.0 + i / 1000)
+        for i in range(1000)
+    ]
+
+    reply = _call(
+        run_pytest_check,
+        _results(_report(tmp_path, tests=tests)),
+        extra_args=["-rs", "--durations=0"],
+    )
+
+    assert "more rows not shown, budget used up.)" in reply, reply[-500:]
+    assert reply.splitlines()[-1] == f"{DROPPED_NOTICE} -rs result", reply[-500:]
+    assert "-rs: no skipped tests." not in reply
 
 
 def test_collect_only_gets_no_tail(run_pytest_check: Any, tmp_path: Path) -> None:
