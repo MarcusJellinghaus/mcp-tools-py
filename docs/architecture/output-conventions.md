@@ -63,6 +63,10 @@ Per-tool budgets sit below the guard. The guard firing on routine output is a bu
 that tool's reporting. Caps that only shape one tool's own output (the pytest coverage
 digest) may stay local to that tool.
 
+pytest's report-level sections (`-rs`, `-rw`, `--durations`) and the hint share the
+pytest budget after the failure blocks and the `-s` passing output; a section dropped
+for lack of space is named in the `Not shown, budget used up:` notice.
+
 ## Checklist for a new tool
 
 1. Parse output into models; unparseable output modes pass through raw (bounded by the guard).

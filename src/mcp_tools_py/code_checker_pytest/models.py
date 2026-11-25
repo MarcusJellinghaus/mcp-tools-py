@@ -140,7 +140,7 @@ class Warning:  # pylint: disable=redefined-builtin  # pytest-json-report's name
     when: str | None = None
     category: str | None = None
     filename: str | None = None
-    lineno: str | None = None
+    lineno: int | None = None
 
 
 @dataclass

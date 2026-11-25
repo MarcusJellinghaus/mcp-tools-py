@@ -130,7 +130,7 @@ def test_undetailed_list_is_capped() -> None:
 def test_print_output_can_be_excluded() -> None:
     test = _failed_test("tests/t.py::t", stdout="hello from stdout")
 
-    prompt = create_prompt_for_failed_tests(_report([test]), include_print_output=False)
+    prompt = create_prompt_for_failed_tests(_report([test]), capture=frozenset())
 
     assert prompt is not None
     assert "hello from stdout" not in prompt

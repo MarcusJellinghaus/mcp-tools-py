@@ -13,6 +13,7 @@ from mcp_tools_py.code_checker_pytest.reporting import (
     group_failed_collectors,
     plural,
     selected_count,
+    warnings_part,
 )
 from mcp_tools_py.code_checker_pytest.utils import get_pytest_exit_code_info
 from mcp_tools_py.utils.report_budget import ERROR_TAIL_LINES, TOOL_LINES, bound_text
@@ -69,19 +70,23 @@ def classify_run(report: PytestReport) -> RunVerdict:
     return RunVerdict(status, problems, exit_code)
 
 
-def format_error_text(report: PytestReport | None, verdict: RunVerdict) -> str:
+def format_error_text(
+    report: PytestReport | None, verdict: RunVerdict, show_warnings: bool = False
+) -> str:
     """Render the text for an ERROR (or unknown) verdict.
 
     Args:
         report: The parsed pytest report, if any
         verdict: The verdict to render
+        show_warnings: Append the warnings count to the counts line
 
     Returns:
         Headline, counts, exit-code line and capped problems.
     """
     lines = ["Pytest run reported an error."]
     if report and _has_outcomes(report.summary):
-        lines.append(get_test_summary(report))
+        warnings = warnings_part(report) if show_warnings else ""
+        lines.append(get_test_summary(report) + warnings)
     else:
         lines.append("Pytest run did not complete.")
     code = verdict.exit_code

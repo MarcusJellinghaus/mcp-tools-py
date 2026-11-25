@@ -28,6 +28,13 @@ from mcp_tools_py.code_checker_pytest.pytest_config import (
     call_replaced_addopts_m,
     effective_config,
 )
+from mcp_tools_py.code_checker_pytest.report_extras import (
+    flag_notes,
+    has_tests,
+    report_flags,
+    report_tail,
+)
+from mcp_tools_py.code_checker_pytest.reporting import capture_kinds
 from mcp_tools_py.code_checker_pytest.runners import check_code_with_pytest
 from mcp_tools_py.code_checker_pytest.utils import sanitize_extra_args
 from mcp_tools_py.code_checker_pytest.verdict import RunStatus
@@ -128,7 +135,7 @@ def register(mcp: "FastMCPProtocol", checker_tools: "CheckerTools") -> None:
             extra_args: Optional list of additional pytest arguments for flexible test selection.
                        Examples: ['tests/test_file.py::test_function']
                        Use -v/-vv/-vvv in extra_args to control verbosity.
-                       See "Flexible Test Selection" section below for common patterns.
+                       See "Flexible Test Selection" and "Report Flags" below.
                 The project's `addopts` apply first (e.g. `-n auto`), so don't
                 add them again. extra_args=["-o", "addopts="] runs without them.
                 A later `-m` here replaces the `addopts` `-m`.
@@ -178,12 +185,42 @@ def register(mcp: "FastMCPProtocol", checker_tools: "CheckerTools") -> None:
             extra_args=["-k", "calculation"]  # Pattern matching
 
             # Output control
-            extra_args=["-s"]  # Show captured print output of passing tests
             extra_args=["--tb=short"]  # Short tracebacks
             extra_args=["-vvv"]  # Maximum verbosity
 
             # Execution control
             extra_args=["-x"]  # Stop on first failure
+
+        Report Flags:
+            By default the reply shows counts (incl. `⚠️ Warnings: N`) and at
+            most one hint line; failing-test blocks include log records.
+            pytest's own flags add detail, also in combined groups (`-svrw`):
+
+            extra_args=["--durations=5"]  # Slowest test stages; 0 = all
+            extra_args=["--durations-min=0"]  # Default here is a fixed 0.005 s
+            extra_args=["-rs"]  # Skip reasons, folded like pytest
+            extra_args=["-rw"]  # Warnings grouped, with count and first location
+            extra_args=["-ra"]  # Skip reasons and warnings (same for -rA)
+            extra_args=["--show-capture=log"]  # no|stdout|stderr|log|all, failing blocks only
+            extra_args=["-s"]  # Passing tests' stdout, stderr and log records
+
+            Deviations from pytest: warnings are counted only unless `-rw`;
+            `-ra`/`-rA` include `w`, with no implicit `w` otherwise; unsupported
+            letters (`x`, `X`, `p`, `P`, unknown ones) get a "no effect" note.
+            `--disable-warnings` drops the `-rw` section; the count stays.
+            `--log-level=INFO` / `DEBUG` records more than WARNING+ (the
+            default); `-p no:warnings` empties the warning list.
+
+            Snapshot baselines: run with extra_args=["--snapshot-update"], then
+            check `git status` for the rewritten baselines.
+
+            Known limits: `-r` / `--durations` set in `pytest.ini`, `tox.ini` or
+            `-c` files are not read; short options of unknown plugins in combined
+            groups are not recognised; collect-time warnings repeat once per xdist
+            worker, and the first warning location varies under xdist; with
+            `-p no:logging`, log records carry no tracebacks; module skips through a
+            shared helper count differently under `-n 0` and `-n N`; other
+            terminal-only flags (`--setup-show`, `--fixtures`, ...) show nothing.
 
         Examples:
             # Standard CI run
@@ -371,6 +408,7 @@ def register(mcp: "FastMCPProtocol", checker_tools: "CheckerTools") -> None:
                 max_chars -= len(digest)
 
             # Always show detailed failure output
+            flags = report_flags(effective)
             result = checker_tools._format_pytest_result_with_details(
                 test_results,
                 show_details=True,
@@ -378,7 +416,21 @@ def register(mcp: "FastMCPProtocol", checker_tools: "CheckerTools") -> None:
                 collect_only=sanitized.collect_only,
                 max_lines=max_lines,
                 max_chars=max_chars,
+                capture=capture_kinds(flags.show_capture),
             )
+
+            # The report sections and the hint get what the main reply left
+            report = test_results.get("test_results")
+            with_tests = has_tests(report, sanitized.collect_only)
+            if with_tests and report is not None:
+                tail = report_tail(
+                    report,
+                    flags,
+                    max_lines - result.count("\n") - 2,
+                    max_chars - len(result) - 2,
+                )
+                if tail:
+                    result = f"{result}\n\n{tail}"
 
             # Prepend the workers, defaults, marker, test-paths and deduplication notes
             # so LLM can self-correct
@@ -394,6 +446,8 @@ def register(mcp: "FastMCPProtocol", checker_tools: "CheckerTools") -> None:
                 test_results.get("exit_code"),
                 test_results.get("marker_error"),
             )
+            if with_tests:
+                top += flag_notes(flags)
             test_paths_note = test_results.get("test_paths_note")
             notes = [
                 *([workers_note] if workers_note else []),
