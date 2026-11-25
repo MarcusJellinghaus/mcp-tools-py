@@ -53,10 +53,12 @@ def _build_error_detail(output: str, error_output: str) -> str:
 logger = logging.getLogger(__name__)
 
 # Attributes run_tests sets on an exception it re-raises: the command, for the
-# error reply; pytest's exit code; pytest's ERROR: line for a -m problem.
+# error reply; pytest's exit code; pytest's ERROR: line for a -m problem; the
+# parsed report of an exit-5 run, for its skip block.
 _COMMAND_ATTR = "pytest_command"
 _EXIT_CODE_ATTR = "pytest_exit_code"
 _MARKER_ERROR_ATTR = "pytest_marker_error"
+_SKIP_REPORT_ATTR = "pytest_skip_report"
 
 # pytest's usage-error messages for a bad -m expression
 MARKER_ERRORS = (
@@ -79,6 +81,24 @@ def marker_error_line(stderr: str) -> str | None:
         if line.startswith("ERROR:") and any(m in line for m in MARKER_ERRORS):
             return line
     return None
+
+
+def _read_report(path: str) -> PytestReport | None:
+    """Parse the JSON report at `path`.
+
+    Args:
+        path: The pytest-json-report file.
+
+    Returns:
+        The parsed report, or None when the file is missing or unreadable.
+    """
+    if not os.path.isfile(path):
+        return None
+    try:
+        return parse_pytest_report(read_file(path))
+    except (OSError, ValueError, KeyError, TypeError):
+        logger.warning("Could not read the pytest report file: %s", path)
+        return None
 
 
 class ProcessResult:
@@ -296,9 +316,12 @@ def run_tests(
             # Check specifically for 'no tests found' case
             if process.returncode == 5:
                 detail = _build_error_detail(output, error_output)
-                raise ValueError(
+                error = ValueError(
                     f"No Tests Found: Pytest did not find any tests to run.{detail}"
                 )
+                # Read now: the finally below deletes the temporary directory.
+                setattr(error, _SKIP_REPORT_ATTR, _read_report(temp_report_file))
+                raise error
 
             # Create error context if needed
             error_context = None
@@ -341,11 +364,6 @@ def run_tests(
                 raise ValueError(
                     f"Usage Error: {error_context.exit_code_meaning}."
                     f"{_build_error_detail(output, error_output)}"
-                )
-            elif process.returncode == 5 and report_exists:
-                # Continue if we have a report file but no tests were found
-                logger.warning(
-                    "No tests were found, but report file was generated. Continuing with processing."
                 )
             elif process.returncode > 5:
                 # Handle plugin-specific exit codes
@@ -469,6 +487,7 @@ def check_code_with_pytest(
         - test_paths_note: Note when `testpaths` is set but no entry exists, else None; present on every return
         - exit_code: pytest's exit code, or None when pytest gave none (timeout, execution error); present on every return
         - marker_error: pytest's ERROR: line for a bad -m expression on exit 4, else None; present on every return
+        - skip_report: The parsed PytestReport of an exit-5 run (no tests collected), when its report file was readable, else None; present on every return
         - workers_note: The `workers: ...` line for -n auto sizing, or None; present on every return
         - workers_serial: True when the resolved or pre-set -n auto worker count is 0; present on every return
     """
@@ -539,6 +558,7 @@ def check_code_with_pytest(
             "test_paths_note": note,
             "exit_code": verdict.exit_code,
             "marker_error": None,
+            "skip_report": None,
             "workers_note": plan.note,
             "workers_serial": plan.serial,
         }
@@ -562,6 +582,7 @@ def check_code_with_pytest(
             "test_paths_note": note,
             "exit_code": getattr(e, _EXIT_CODE_ATTR, None),
             "marker_error": getattr(e, _MARKER_ERROR_ATTR, None),
+            "skip_report": getattr(e, _SKIP_REPORT_ATTR, None),
             "workers_note": plan.note,
             "workers_serial": plan.serial,
         }

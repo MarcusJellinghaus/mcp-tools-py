@@ -8,6 +8,7 @@ from mcp_tools_py.code_checker_pytest.report_data import (
     durations,
     folded_skips,
     skip_lines,
+    skipped_count,
     stage_seconds,
     warning_groups,
     warning_line,
@@ -335,3 +336,27 @@ def flag_notes(flags: ReportFlags) -> list[str]:
     if flags.snapshot_update:
         notes.append(SNAPSHOT_NOTE)
     return notes
+
+
+def skipped_block(report: PytestReport, max_lines: int, max_chars: int) -> str:
+    """The skip block of an exit-5 run: the count, then the folded skip lines.
+
+    Args:
+        report: The parsed pytest report of the run.
+        max_lines: Line budget of the block.
+        max_chars: Character budget of the block.
+
+    Returns:
+        ``⏭️ Skipped: N`` and the skip lines when they fit, else the count and
+        the dropped notice naming ``skip reasons``; ``""`` when nothing was
+        skipped.
+    """
+    count = skipped_count(report)
+    if not count:
+        return ""
+    out = Sections(max_lines, max_chars)
+    out.add(f"⏭️ Skipped: {count}")
+    reasons = "\n".join(skip_lines(folded_skips(report)))
+    if reasons:
+        out.named("skip reasons", reasons)
+    return out.text()

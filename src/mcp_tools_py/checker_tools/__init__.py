@@ -16,6 +16,7 @@ from mcp_tools_py.checker_tools import (
     vulture_tool,
 )
 from mcp_tools_py.code_checker_mypy.reporting import MYPY_SUCCESS_TEXT
+from mcp_tools_py.code_checker_pytest.report_extras import skipped_block
 from mcp_tools_py.code_checker_pytest.reporting import (
     create_prompt_for_failed_tests,
     create_prompt_for_passing_output,
@@ -80,8 +81,10 @@ class CheckerTools:
 
         With show_output, a passing run also lists the captured output of passing tests.
         With collect_only, a run with no outcomes lists the selected test IDs.
-        ERROR and unknown statuses fail closed and render the shared error text.
-        `max_lines` and `max_chars` bound the failure prompt and the passing output.
+        ERROR and unknown statuses fail closed and render the shared error text;
+        an exit-5 run's `skip_report` appends its skip block after it.
+        `max_lines` and `max_chars` bound the failure prompt, the passing output
+        and the error text with its skip block.
 
         Returns:
             User-facing summary of the pytest outcome.
@@ -128,7 +131,17 @@ class CheckerTools:
             return format_suspicious_text(
                 summary.get("collected") or 0, summary.get("deselected")
             )
-        return format_error_text(report, verdict)
+        text = format_error_text(report, verdict)
+        skip_report = test_results.get("skip_report")
+        if skip_report is not None:
+            block = skipped_block(
+                skip_report,
+                max_lines - len(text.splitlines()) - 1,
+                max_chars - len(text) - 1,
+            )
+            if block:
+                text += "\n" + block
+        return text
 
     def _format_mypy_result(self, mypy_prompt: str | None) -> str:
         """Format mypy check result.

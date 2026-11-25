@@ -7,12 +7,16 @@ from pathlib import Path
 from typing import Any
 from unittest.mock import MagicMock, patch
 
+import pytest
+
 from mcp_tools_py.checker_tools import CheckerTools
-from mcp_tools_py.code_checker_pytest.models import PytestReport, Summary
+from mcp_tools_py.code_checker_pytest.models import Collector, PytestReport, Summary
 from mcp_tools_py.code_checker_pytest.parsers import parse_pytest_report
 from mcp_tools_py.code_checker_pytest.runners import (
+    _SKIP_REPORT_ATTR,
     check_code_with_pytest,
     marker_error_line,
+    run_tests,
 )
 from mcp_tools_py.code_checker_pytest.verdict import RunStatus
 from mcp_tools_py.server import ToolServer
@@ -22,6 +26,7 @@ from tests.conftest import make_command_result
 from tests.test_code_checker_pytest._helpers import _create_large_project
 
 _EXECUTE = "mcp_tools_py.code_checker_pytest.runners.execute_command"
+_REPORT_ARG = "--json-report-file="
 
 _UNKNOWN_MARKER = (
     "ERROR: Unknown marker(s) in '-m' expression: unit. "
@@ -142,6 +147,32 @@ class TestExitCodeTransport:
         assert result["verdict"].exit_code == 0
 
     @patch(_EXECUTE)
+    def test_no_tests_found_without_report_file(
+        self, mock_exec: MagicMock, tmp_path: Path
+    ) -> None:
+        """Exit 5 without a report file leaves skip_report None."""
+        mock_exec.return_value = make_command_result(return_code=5)
+
+        result = _check(tmp_path)
+
+        assert result["skip_report"] is None
+
+    @patch("mcp_tools_py.code_checker_pytest.runners.run_tests")
+    def test_skip_report_from_attribute(
+        self, mock_run_tests: MagicMock, tmp_path: Path
+    ) -> None:
+        """check_code_with_pytest returns the report attached to the exception."""
+        report = _exit5_report(tmp_path)
+        error = ValueError("No Tests Found: Pytest did not find any tests to run.")
+        setattr(error, _SKIP_REPORT_ATTR, report)
+        mock_run_tests.side_effect = error
+
+        result = _check(tmp_path)
+
+        assert result["skip_report"] is report
+        assert result["verdict"].status is RunStatus.ERROR
+
+    @patch(_EXECUTE)
     def test_internal_error(self, mock_exec: MagicMock, tmp_path: Path) -> None:
         """Exit 3 is transported."""
         mock_exec.return_value = make_command_result(
@@ -195,6 +226,113 @@ class TestExitCodeTransport:
         assert result["verdict"].status is RunStatus.PASSED
         assert result["exit_code"] == result["verdict"].exit_code
         assert result["marker_error"] is None
+        assert result["skip_report"] is None
+
+
+def _exit5_report(root: Path) -> PytestReport:
+    """A report with one module-skipped collector and no tests."""
+    longrepr = str((str(root / "tests" / "test_a.py"), 3, "Skipped: no db"))
+    return PytestReport(
+        created=0.0,
+        duration=0.1,
+        exitcode=5,
+        root=str(root),
+        environment={},
+        summary=Summary(collected=0, total=0),
+        collectors=[
+            Collector(
+                nodeid="tests/test_a.py",
+                outcome="skipped",
+                result=[],
+                longrepr=longrepr,
+            )
+        ],
+    )
+
+
+def _write_report(content: str | None) -> Any:
+    """An execute_command side effect: write `content` to the report file, exit 5."""
+
+    def run(command: list[str], **_kwargs: Any) -> Any:
+        if content is not None:
+            for arg in command:
+                if arg.startswith(_REPORT_ARG):
+                    Path(arg[len(_REPORT_ARG) :]).write_text(content, encoding="utf-8")
+        return make_command_result(return_code=5, stdout="collected 0 items")
+
+    return run
+
+
+def _call_run_tests(project: Path) -> ValueError:
+    """Run run_tests on `project`, expecting the exit-5 ValueError."""
+    (project / "tests").mkdir(exist_ok=True)
+    with pytest.raises(ValueError) as info:
+        run_tests(str(project), None, sys.executable)
+    return info.value
+
+
+class TestExit5Report:
+    """run_tests attaches the parsed report to the exit-5 ValueError."""
+
+    @patch(_EXECUTE)
+    def test_report_attached(self, mock_exec: MagicMock, tmp_path: Path) -> None:
+        """A written report is parsed and attached; the message is unchanged."""
+        data = {
+            "created": 0.0,
+            "duration": 0.1,
+            "exitcode": 5,
+            "root": str(tmp_path),
+            "environment": {},
+            "summary": {"collected": 0, "total": 0},
+            "collectors": [
+                {
+                    "nodeid": "tests/test_a.py",
+                    "outcome": "skipped",
+                    "result": [],
+                    "longrepr": "('tests/test_a.py', 3, 'Skipped: no db')",
+                }
+            ],
+        }
+        mock_exec.side_effect = _write_report(json.dumps(data))
+
+        error = _call_run_tests(tmp_path)
+
+        report = getattr(error, _SKIP_REPORT_ATTR)
+        assert isinstance(report, PytestReport)
+        assert report.collectors is not None
+        assert report.collectors[0].outcome == "skipped"
+        assert str(error).startswith(
+            "No Tests Found: Pytest did not find any tests to run."
+        )
+
+    @patch(_EXECUTE)
+    def test_no_report_file(self, mock_exec: MagicMock, tmp_path: Path) -> None:
+        """Without a report file the attribute is None."""
+        mock_exec.side_effect = _write_report(None)
+
+        error = _call_run_tests(tmp_path)
+
+        assert getattr(error, _SKIP_REPORT_ATTR) is None
+        assert str(error).startswith("No Tests Found")
+
+    @patch(_EXECUTE)
+    def test_invalid_json(self, mock_exec: MagicMock, tmp_path: Path) -> None:
+        """An unreadable report file gives None; the message is unchanged."""
+        mock_exec.side_effect = _write_report("{not json")
+
+        error = _call_run_tests(tmp_path)
+
+        assert getattr(error, _SKIP_REPORT_ATTR) is None
+        assert str(error).startswith("No Tests Found")
+
+    @patch(_EXECUTE)
+    def test_incomplete_json(self, mock_exec: MagicMock, tmp_path: Path) -> None:
+        """Valid JSON missing report keys gives None."""
+        mock_exec.side_effect = _write_report(json.dumps({"summary": {}}))
+
+        error = _call_run_tests(tmp_path)
+
+        assert getattr(error, _SKIP_REPORT_ATTR) is None
 
 
 class TestRunners:

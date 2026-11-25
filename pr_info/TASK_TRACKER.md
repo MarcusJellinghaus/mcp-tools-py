@@ -62,9 +62,9 @@ This tracks **Feature Implementation** consisting of multiple **Tasks**.
 - [x] Commit message prepared
 
 ### Step 9: Exit 5 — report plumbing and skip block — [step_9.md](./steps/step_9.md)
-- [ ] Implementation: `_read_report`, report attached on exit 5, `skip_report` key, `skipped_block`, ERROR-branch append; remove unreachable branch (tests in `test_runners.py`, `test_checker_tools_formatting.py`, `test_report_extras.py`)
-- [ ] Quality checks (pylint, mypy, pytest) — fix all issues
-- [ ] Commit message prepared
+- [x] Implementation: `_read_report`, report attached on exit 5, `skip_report` key, `skipped_block`, ERROR-branch append; remove unreachable branch (tests in `test_runners.py`, `test_checker_tools_formatting.py`, `test_report_extras.py`)
+- [x] Quality checks (pylint, mypy, pytest) — fix all issues
+- [x] Commit message prepared
 
 ### Step 10: `⚠️ Warnings: N` count — [step_10.md](./steps/step_10.md)
 - [ ] Implementation: `warnings_part`, `format_error_text(show_warnings=...)`, count in `_format_pytest_result_with_details` (tests in `test_verdict.py`, `test_checker_tools_formatting.py`, new `test_toolkit_warnings_count.py`)
