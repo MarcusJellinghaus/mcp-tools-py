@@ -18,7 +18,11 @@ from mcp_tools_py.code_checker_pytest.pytest_config import (
 )
 from mcp_tools_py.code_checker_pytest.report_extras import (
     DEFAULT_DURATIONS_MIN,
+    DURATIONS_MIN_NOTE,
+    SNAPSHOT_NOTE,
     ReportFlags,
+    flag_notes,
+    hint_line,
     report_flags,
     report_sections,
     resolve_report_chars,
@@ -532,3 +536,170 @@ class TestBudget:
             _report(tmp_path, tests), _flags(durations=0), 3, BIG_CHARS
         )
         assert text == f"{DROPPED_NOTICE} durations"
+
+
+class TestHintLine:
+    """hint_line offers one combined -r value and --durations=5 when they add something."""
+
+    def _skips(self, root: Path) -> list[Test]:
+        return [_skipped(root, "tests/test_a.py::test_x", 4)]
+
+    def test_skips_and_warnings_no_flags(self, tmp_path: Path) -> None:
+        """Skips + warnings, nothing in effect → -rsw and --durations=5."""
+        report = _report(
+            tmp_path, self._skips(tmp_path), [_warning(tmp_path, "old api")]
+        )
+        assert hint_line(report, _flags()) == (
+            'For details: extra_args=["-rsw", "--durations=5"]'
+            " (skip reasons, warnings — counted only by default, slowest tests)"
+        )
+
+    def test_only_skips(self, tmp_path: Path) -> None:
+        """Skips only → -rs."""
+        report = _report(tmp_path, self._skips(tmp_path))
+        assert hint_line(report, _flags()) == (
+            'For details: extra_args=["-rs", "--durations=5"]'
+            " (skip reasons, slowest tests)"
+        )
+
+    def test_only_warnings(self, tmp_path: Path) -> None:
+        """Warnings only → -rw with the counted-only part."""
+        report = _report(tmp_path, warnings=[_warning(tmp_path, "old api")])
+        assert hint_line(report, _flags()) == (
+            'For details: extra_args=["-rw", "--durations=5"]'
+            " (warnings — counted only by default, slowest tests)"
+        )
+
+    def test_config_rs_with_warnings_offers_rsw(self, tmp_path: Path) -> None:
+        """addopts -rs + warnings → -rsw, so following the hint keeps skip reasons."""
+        report = _report(tmp_path, warnings=[_warning(tmp_path, "old api")])
+        hint = hint_line(report, _flags(letters=frozenset({"s"})))
+        assert hint is not None
+        assert hint.startswith('For details: extra_args=["-rsw", "--durations=5"]')
+        assert "(skip reasons, warnings — counted only by default, slowest tests)" in (
+            hint
+        )
+
+    def test_all_in_effect_fast_run(self, tmp_path: Path) -> None:
+        """-rsw in effect + fast run → no hint."""
+        report = _report(
+            tmp_path, self._skips(tmp_path), [_warning(tmp_path, "old api")]
+        )
+        assert hint_line(report, _flags(letters=frozenset({"s", "w"}))) is None
+
+    def test_ra_counts_as_s_and_w(self, tmp_path: Path) -> None:
+        """-ra in addopts resolves to s+w → no -r part, no hint."""
+        flags = report_flags(
+            _effective({"-r": OptionValue("a", "pyproject.toml", "-ra")})
+        )
+        report = _report(
+            tmp_path, self._skips(tmp_path), [_warning(tmp_path, "old api")]
+        )
+        assert hint_line(report, flags) is None
+
+    def test_rx_never_carried(self, tmp_path: Path) -> None:
+        """-rx in effect is not carried into the hint's -r value."""
+        flags = report_flags(_effective({"-r": OptionValue("x", "extra_args", "-rx")}))
+        report = _report(tmp_path, self._skips(tmp_path))
+        assert hint_line(report, flags) == (
+            'For details: extra_args=["-rs", "--durations=5"]'
+            " (skip reasons, slowest tests)"
+        )
+
+    def test_clean_fast_run(self, tmp_path: Path) -> None:
+        """Clean fast run → no hint."""
+        assert hint_line(_report(tmp_path), _flags()) is None
+
+    def test_clean_slow_run(self, tmp_path: Path) -> None:
+        """Clean run whose stages sum to 11 s → --durations=5 only."""
+        tests = [
+            _test("t.py::a", setup=1.0, call=5.0, teardown=0.0),
+            _test("t.py::b", setup=0.0, call=4.0, teardown=1.0),
+        ]
+        assert hint_line(_report(tmp_path, tests), _flags()) == (
+            'For details: extra_args=["--durations=5"] (slowest tests)'
+        )
+
+    def test_slow_run_with_durations_in_effect(self, tmp_path: Path) -> None:
+        """--durations already in effect → no durations part."""
+        tests = [_test("t.py::a", call=11.0)]
+        assert hint_line(_report(tmp_path, tests), _flags(durations=3)) is None
+
+    def test_durations_in_effect_keeps_r_part(self, tmp_path: Path) -> None:
+        """--durations in effect drops only its own part."""
+        report = _report(tmp_path, self._skips(tmp_path))
+        assert hint_line(report, _flags(durations=0)) == (
+            'For details: extra_args=["-rs"] (skip reasons)'
+        )
+
+    def test_disable_warnings_only_warnings(self, tmp_path: Path) -> None:
+        """--disable-warnings + only warnings → no -r part, no hint on a fast run."""
+        report = _report(tmp_path, warnings=[_warning(tmp_path, "old api")])
+        assert hint_line(report, _flags(disable_warnings=True)) is None
+
+    def test_disable_warnings_with_skips(self, tmp_path: Path) -> None:
+        """--disable-warnings + skips + warnings → -rs only."""
+        report = _report(
+            tmp_path, self._skips(tmp_path), [_warning(tmp_path, "old api")]
+        )
+        assert hint_line(report, _flags(disable_warnings=True)) == (
+            'For details: extra_args=["-rs", "--durations=5"]'
+            " (skip reasons, slowest tests)"
+        )
+
+
+class TestFlagNotes:
+    """flag_notes: no-effect letters, --durations-min without --durations, snapshots."""
+
+    def test_none(self) -> None:
+        """Nothing in effect → no notes."""
+        assert not flag_notes(_flags())
+
+    @pytest.mark.parametrize("letters", ["xp", "z"])
+    def test_no_effect(self, letters: str) -> None:
+        """One note listing all no-effect letters."""
+        assert flag_notes(_flags(no_effect=letters)) == [
+            f"-r{letters} has no effect here; supported: -rs, -rw"
+            " (failures are always shown; -s shows passing-test output)"
+        ]
+
+    def test_no_effect_from_report_flags(self) -> None:
+        """-rxp in the call → note for xp."""
+        flags = report_flags(
+            _effective({"-r": OptionValue("xp", "extra_args", "-rxp")})
+        )
+        assert flag_notes(flags) == [
+            "-rxp has no effect here; supported: -rs, -rw"
+            " (failures are always shown; -s shows passing-test output)"
+        ]
+
+    def test_durations_min_without_durations(self) -> None:
+        """--durations-min in the call without --durations → note."""
+        assert flag_notes(_flags(durations_min_in_call=True)) == [DURATIONS_MIN_NOTE]
+
+    def test_durations_min_with_durations(self) -> None:
+        """--durations-min with --durations → no note."""
+        assert not flag_notes(_flags(durations_min_in_call=True, durations=5))
+
+    def test_durations_min_from_config(self) -> None:
+        """A config --durations-min without --durations → no note."""
+        flags = report_flags(
+            _effective({"--durations-min": OptionValue("0", "pyproject.toml")})
+        )
+        assert not flag_notes(flags)
+
+    @pytest.mark.parametrize(
+        "source", ["extra_args", "PYTEST_ADDOPTS", "pyproject.toml"]
+    )
+    def test_snapshot_update_any_source(self, source: str) -> None:
+        """--snapshot-update from any source → the snapshot note."""
+        flags = report_flags(_effective({"--snapshot-update": OptionValue("", source)}))
+        assert flag_notes(flags) == [SNAPSHOT_NOTE]
+
+    def test_all_notes_in_order(self) -> None:
+        """No-effect, then --durations-min, then snapshot."""
+        notes = flag_notes(
+            _flags(no_effect="x", durations_min_in_call=True, snapshot_update=True)
+        )
+        assert notes[1:] == [DURATIONS_MIN_NOTE, SNAPSHOT_NOTE]
+        assert notes[0].startswith("-rx has no effect here")

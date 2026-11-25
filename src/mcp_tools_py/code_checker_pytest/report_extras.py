@@ -8,6 +8,7 @@ from mcp_tools_py.code_checker_pytest.report_data import (
     durations,
     folded_skips,
     skip_lines,
+    stage_seconds,
     warning_groups,
     warning_line,
 )
@@ -15,6 +16,16 @@ from mcp_tools_py.code_checker_pytest.reporting import Sections
 
 # Deviation from pytest: a fixed default, independent of the -v the tool passes.
 DEFAULT_DURATIONS_MIN = 0.005
+# Sum of test stage durations above which the hint suggests --durations.
+SLOW_RUN_SECONDS = 10.0
+SNAPSHOT_NOTE = (
+    "--snapshot-update was passed: baselines may have been rewritten; check git status."
+)
+DURATIONS_MIN_NOTE = "--durations-min has no effect without --durations."
+_NO_EFFECT_TAIL = (
+    "has no effect here; supported: -rs, -rw"
+    " (failures are always shown; -s shows passing-test output)"
+)
 
 _SECTION_LETTERS = frozenset({"s", "w"})
 # Letters this tool handles: sections, aliases, always-shown failures, resets.
@@ -264,3 +275,63 @@ def report_sections(
         if empties:
             out.add(f"{flags.r_label}: {', '.join(empties)}.")
     return out.text()
+
+
+def hint_line(report: PytestReport, flags: ReportFlags) -> str | None:
+    """The one hint line naming the flags that would expand this reply.
+
+    The ``-r`` part is one combined value: every applicable letter plus the
+    supported letters already in effect, so following it drops nothing.
+    ``--durations=5`` joins when an ``-r`` part is offered or the test stages
+    sum to more than ``SLOW_RUN_SECONDS``, unless ``--durations`` is in effect.
+
+    Args:
+        report: The parsed pytest report.
+        flags: The report flags in effect.
+
+    Returns:
+        ``For details: extra_args=[...] (...)``, or None when nothing remains.
+    """
+    allowed = {"s", "w"} - ({"w"} if flags.disable_warnings else set())
+    in_effect = flags.letters & allowed
+    applicable: set[str] = set()
+    if folded_skips(report):
+        applicable.add("s")
+    if report.warnings and not flags.disable_warnings:
+        applicable.add("w")
+    parts: list[str] = []
+    why: list[str] = []
+    if applicable - in_effect:
+        letters = "".join(c for c in "sw" if c in applicable | in_effect)
+        parts.append(f'"-r{letters}"')
+        if "s" in letters:
+            why.append("skip reasons")
+        if "w" in letters:
+            why.append("warnings — counted only by default")
+    if flags.durations is None and (parts or stage_seconds(report) > SLOW_RUN_SECONDS):
+        parts.append('"--durations=5"')
+        why.append("slowest tests")
+    if not parts:
+        return None
+    return f"For details: extra_args=[{', '.join(parts)}] ({', '.join(why)})"
+
+
+def flag_notes(flags: ReportFlags) -> list[str]:
+    """Notes for report flags with no or a surprising effect.
+
+    Args:
+        flags: The report flags in effect.
+
+    Returns:
+        In order: the "no effect" note for a call ``-r``, the
+        ``--durations-min`` note when it is passed without ``--durations``,
+        and the snapshot note for ``--snapshot-update`` from any source.
+    """
+    notes = []
+    if flags.no_effect:
+        notes.append(f"-r{flags.no_effect} {_NO_EFFECT_TAIL}")
+    if flags.durations_min_in_call and flags.durations is None:
+        notes.append(DURATIONS_MIN_NOTE)
+    if flags.snapshot_update:
+        notes.append(SNAPSHOT_NOTE)
+    return notes
