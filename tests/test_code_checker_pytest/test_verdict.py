@@ -9,6 +9,7 @@ from mcp_tools_py.code_checker_pytest.models import (
     PytestReport,
     Summary,
 )
+from mcp_tools_py.code_checker_pytest.models import Warning as ReportWarning
 from mcp_tools_py.code_checker_pytest.reporting import XDIST_MARKER
 from mcp_tools_py.code_checker_pytest.verdict import (
     COLLECT_HINT,
@@ -221,6 +222,29 @@ def test_format_error_text_includes_counts() -> None:
     assert "Collected 3 tests" in text
     assert "Passed: 3" in text
     assert "did not complete" not in text
+
+
+def _warned(report: PytestReport, count: int = 2) -> PytestReport:
+    report.warnings = [ReportWarning(message=f"w{i}") for i in range(count)]
+    return report
+
+
+def test_format_error_text_show_warnings_appends_count() -> None:
+    report = _warned(_report(_summary(3, passed=3), error_context=_ctx(1)))
+    text = format_error_text(report, classify_run(report), show_warnings=True)
+    assert text.splitlines()[1].endswith("| ✅ Passed: 3 | ⚠️ Warnings: 2")
+
+
+def test_format_error_text_default_has_no_count() -> None:
+    report = _warned(_report(_summary(3, passed=3), error_context=_ctx(1)))
+    assert "⚠️ Warnings" not in format_error_text(report, classify_run(report))
+
+
+def test_format_error_text_did_not_complete_has_no_count() -> None:
+    report = _warned(_report(_summary(0), error_context=_ctx(3, "boom")))
+    text = format_error_text(report, classify_run(report), show_warnings=True)
+    assert "did not complete" in text
+    assert "⚠️ Warnings" not in text
 
 
 def test_format_collection_problems_empty() -> None:

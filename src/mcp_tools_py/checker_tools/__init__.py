@@ -22,6 +22,7 @@ from mcp_tools_py.code_checker_pytest.reporting import (
     create_prompt_for_passing_output,
     did_not_run_line,
     should_show_details,
+    warnings_part,
 )
 from mcp_tools_py.code_checker_pytest.verdict import (
     RunStatus,
@@ -81,6 +82,7 @@ class CheckerTools:
 
         With show_output, a passing run also lists the captured output of passing tests.
         With collect_only, a run with no outcomes lists the selected test IDs.
+        PASSED, FAILED and ERROR append the report's warnings count to their counts.
         ERROR and unknown statuses fail closed and render the shared error text;
         an exit-5 run's `skip_report` appends its skip block after it.
         `max_lines` and `max_chars` bound the failure prompt, the passing output
@@ -96,9 +98,13 @@ class CheckerTools:
         if not isinstance(summary, dict):
             return "Error: Invalid test summary format"
 
+        summary_text = test_results.get("summary_text") or ""
+        if summary_text:
+            summary_text += warnings_part(report)
+
         if verdict.status is RunStatus.PASSED:
-            if test_results.get("summary_text"):
-                result = f"Pytest check completed. {test_results['summary_text']}"
+            if summary_text:
+                result = f"Pytest check completed. {summary_text}"
             else:
                 passed_count = summary.get("passed") or 0
                 result = f"Pytest check completed. All {passed_count} tests passed successfully."
@@ -109,18 +115,14 @@ class CheckerTools:
             return result
         if verdict.status is RunStatus.FAILED:
             if report is None or not should_show_details(test_results, show_details):
-                return f"Pytest found failures. {test_results.get('summary_text') or ''}".rstrip()
+                return f"Pytest found failures. {summary_text}".rstrip()
             failed_tests_prompt = create_prompt_for_failed_tests(
                 report,
                 max_failures=MAX_FAILURES,
                 max_lines=max_lines,
                 max_chars=max_chars,
             )
-            counts = "\n".join(
-                filter(
-                    None, [test_results.get("summary_text"), did_not_run_line(report)]
-                )
-            )
+            counts = "\n".join(filter(None, [summary_text, did_not_run_line(report)]))
             text = f"Pytest found issues that need attention:\n\n{failed_tests_prompt}"
             return "\n\n".join(
                 filter(None, [counts, format_collection_problems(verdict), text])
@@ -131,7 +133,7 @@ class CheckerTools:
             return format_suspicious_text(
                 summary.get("collected") or 0, summary.get("deselected")
             )
-        text = format_error_text(report, verdict)
+        text = format_error_text(report, verdict, show_warnings=True)
         skip_report = test_results.get("skip_report")
         if skip_report is not None:
             block = skipped_block(

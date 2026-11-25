@@ -67,9 +67,9 @@ This tracks **Feature Implementation** consisting of multiple **Tasks**.
 - [x] Commit message prepared
 
 ### Step 10: `⚠️ Warnings: N` count — [step_10.md](./steps/step_10.md)
-- [ ] Implementation: `warnings_part`, `format_error_text(show_warnings=...)`, count in `_format_pytest_result_with_details` (tests in `test_verdict.py`, `test_checker_tools_formatting.py`, new `test_toolkit_warnings_count.py`)
-- [ ] Quality checks (pylint, mypy, pytest) — fix all issues
-- [ ] Commit message prepared
+- [x] Implementation: `warnings_part`, `format_error_text(show_warnings=...)`, count in `_format_pytest_result_with_details` (tests in `test_verdict.py`, `test_checker_tools_formatting.py`, new `test_toolkit_warnings_count.py`)
+- [x] Quality checks (pylint, mypy, pytest) — fix all issues
+- [x] Commit message prepared
 
 ### Step 11: `--show-capture` and `-s` output on every verdict with tests — [step_11.md](./steps/step_11.md)
 - [ ] Implementation: `capture` parameter, `_with_passing_output` for PASSED/FAILED/ERROR (tests in `test_checker_tools_formatting.py`)

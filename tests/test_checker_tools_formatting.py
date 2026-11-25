@@ -15,6 +15,7 @@ from mcp_tools_py.code_checker_pytest.models import (
     PytestReport,
     Summary,
 )
+from mcp_tools_py.code_checker_pytest.models import Warning as ReportWarning
 from mcp_tools_py.code_checker_pytest.parsers import parse_pytest_report
 from mcp_tools_py.code_checker_pytest.reporting import DROPPED_NOTICE, XDIST_MARKER
 from mcp_tools_py.code_checker_pytest.verdict import (
@@ -612,3 +613,71 @@ def test_format_pytest_result_unknown_status_fails_closed(
     assert "Pytest run reported an error." in result
     assert "Exit code 1" in result
     assert "completed" not in result
+
+
+_WARNINGS = " | ⚠️ Warnings: 2"
+
+
+def _with_warnings(report: PytestReport) -> PytestReport:
+    report.warnings = [ReportWarning(message="w1"), ReportWarning(message="w2")]
+    return report
+
+
+def test_format_pytest_result_passed_appends_warnings_count(
+    checker_tools: CheckerTools,
+) -> None:
+    """PASSED appends the warnings count to the summary line."""
+    results = _passing_results()
+    _with_warnings(results["test_results"])
+    result = checker_tools._format_pytest_result_with_details(
+        results, show_details=True
+    )
+    assert result == f"Pytest check completed. 1 passed in 0.10s{_WARNINGS}"
+
+
+@pytest.mark.parametrize("show_details", [True, False])
+def test_format_pytest_result_failed_appends_warnings_count(
+    checker_tools: CheckerTools, show_details: bool
+) -> None:
+    """FAILED appends the warnings count to the summary text, with or without details."""
+    results = _failed_results()
+    _with_warnings(results["test_results"])
+    result = checker_tools._format_pytest_result_with_details(
+        results, show_details=show_details
+    )
+    assert result.splitlines()[0].endswith(f"1 failed, 1 passed{_WARNINGS}")
+
+
+def test_format_pytest_result_error_appends_warnings_count(
+    checker_tools: CheckerTools,
+) -> None:
+    """ERROR with a report shows the count on its summary line."""
+    results = _error_results()
+    _with_warnings(results["test_results"])
+    result = checker_tools._format_pytest_result_with_details(
+        results, show_details=True
+    )
+    assert result.splitlines()[1].endswith(f"✅ Passed: 5{_WARNINGS}")
+
+
+def test_format_pytest_result_suspicious_has_no_warnings_count(
+    checker_tools: CheckerTools,
+) -> None:
+    """SUSPICIOUS text is unchanged by warnings."""
+    report = _with_warnings(
+        PytestReport(
+            created=0.0,
+            duration=0.1,
+            exitcode=0,
+            root="/project",
+            environment={},
+            summary=Summary(collected=5, total=0),
+        )
+    )
+    results = make_pytest_results(
+        RunStatus.SUSPICIOUS, summary={"collected": 5}, test_results=report
+    )
+    result = checker_tools._format_pytest_result_with_details(
+        results, show_details=True
+    )
+    assert "⚠️ Warnings" not in result

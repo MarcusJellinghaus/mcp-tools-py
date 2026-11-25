@@ -594,6 +594,19 @@ def did_not_run_line(report: PytestReport) -> str:
     return f"{missing} of {selected} selected tests did not run"
 
 
+def warnings_part(report: PytestReport | None) -> str:
+    """Render the warnings count to append to a summary line.
+
+    Args:
+        report: The parsed pytest report, if any
+
+    Returns:
+        " | ⚠️ Warnings: N" when the report has warnings, else "".
+    """
+    count = len(report.warnings or []) if report is not None else 0
+    return f" | ⚠️ Warnings: {count}" if count else ""
+
+
 def get_test_summary(test_session_result: PytestReport) -> str:
     """Generate a human-readable summary of the test results.
 
