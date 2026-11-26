@@ -79,6 +79,10 @@ addopts = "-n auto --strict-markers"
 markers = [
     "integration: Integration tests requiring external resources",
 ]
+# rope's own Project.__init__ calls a method rope marks deprecated.
+filterwarnings = [
+    "ignore:Delete once deprecated functions are gone:DeprecationWarning:rope.*",
+]
 
 [tool.coverage.run]
 patch = ["subprocess"]

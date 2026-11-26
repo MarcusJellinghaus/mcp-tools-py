@@ -185,7 +185,7 @@ jobs:
         env:
           COVERAGE_FILE: .coverage.unit
         run: |
-          pytest --version && pytest -m 'not integration' --cov=src/mcp_tools_py --cov-report= --junitxml=unit-tests.xml
+          pytest --version && pytest -rs -m 'not integration' --cov=src/mcp_tools_py --cov-report= --junitxml=unit-tests.xml
 
       - name: Run startup-budget test
         # Timing-sensitive: skips itself next to other xdist workers; run it alone.
@@ -225,7 +225,7 @@ jobs:
         env:
           COVERAGE_FILE: .coverage.integration
         run: |
-          pytest --version && pytest -m 'integration' --cov=src/mcp_tools_py --cov-report= --junitxml=integration-tests.xml
+          pytest --version && pytest -rs -m 'integration' --cov=src/mcp_tools_py --cov-report= --junitxml=integration-tests.xml
 
       - name: Upload coverage data
         uses: actions/upload-artifact@cf430e030ddbb5b0abf93d22962f4752f3646cd9 # v7.0.2
