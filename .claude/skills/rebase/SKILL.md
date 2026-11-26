@@ -72,7 +72,7 @@ If the base branch is not `main` or `master`, ask the user to confirm before pro
    - Verify no conflict markers remain
    - `git add <file>`
    - `git rebase --continue`
-5. Run code checks: `mcp__mcp-tools-py__run_pytest_check`, `mcp__mcp-tools-py__run_pylint_check`, `mcp__mcp-tools-py__run_mypy_check`
+5. Run the project's checks and tests as CLAUDE.md maps them
 6. Fix any issues from merge
 7. Report summary
 8. Repeat the Branch Moved Check against the same `PRE_SHA`. If it stops: do not push, and print `git reset --hard <PRE_SHA>` for the human to run.
@@ -110,9 +110,9 @@ Use `refs/remotes/origin/<branch>`, not the bare name: a tag named `origin/<bran
 | File Type | Strategy |
 |-----------|----------|
 | `pr_info/` files | Auto-resolve with `--theirs` (keep feature branch version) |
-| Code files (`.py`, `.js`, etc.) | Keep both sides, merge imports |
+| Code files | Keep both sides, merge imports |
 | Test files | Keep all tests from both sides |
-| Protected config files (`.mcp*.json`, `.claude/settings*.json`, `.mcp-file-access`) | Pick a side with `git checkout --ours/--theirs`, or stop and ask the user to edit the file — never write it via Bash or PowerShell |
+| Protected config files (`.mcp*.json`, `.claude/settings*.json`, `.mcp-file-access`) | Pick a side with `git checkout --ours/--theirs`, or stop and ask the user to edit the file — never fall back to Edit/Write, Bash or PowerShell |
 | Config files | Merge additively, prefer HEAD for same keys |
 | Lockfiles (`*-lock.json`, `*.lock`) | Accept theirs (`--theirs`), notify user to regenerate after rebase |
 

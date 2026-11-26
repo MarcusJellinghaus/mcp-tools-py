@@ -55,7 +55,7 @@ skills are the process. Pick by what the launch prompt asks:
 - **Review** → apply `implementation_review`.
 - **Fix** → implement the changes listed in your launch prompt, nothing else. This overrides
   `implementation_review`'s "Do not perform any action". Then run the checks CLAUDE.md lists
-  (format, pylint, pytest, mypy).
+  (format, then the checks and tests).
 - **Branch status** → apply `check_branch_status` and report its result only. Never act on
   its Follow-Up Actions table (`/rebase`, `/commit_push`, creating a PR).
 

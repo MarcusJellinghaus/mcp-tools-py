@@ -25,14 +25,14 @@ Confirm and display the current feature branch name.
 
 Use `mcp__mcp-workspace__git` with command `"diff"` to get the changes to review.
 
-No need to run all checks; do not use pylint warnings. Feel free to further analyse any mentioned files and/or the file structure.
+No need to run all checks; do not report linter warnings. Feel free to further analyse any mentioned files and/or the file structure.
 
 ### Focus Areas:
 - Logic errors or bugs
 - Tests for `__main__` functions should be removed (not needed)
 - Unnecessary debug code or print statements
 - Code that could break existing functionality
-- Compliance with existing architecture principles, see `docs/architecture/architecture.md`
+- Compliance with existing architecture principles, see the repo's architecture doc, if it has one
 
 ### Output Format:
 1. **Summary** - What changed (1-2 sentences)

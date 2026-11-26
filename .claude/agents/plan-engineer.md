@@ -54,7 +54,7 @@ supervisor. Your preloaded skills are the process. Pick by what the launch promp
   `["--is-ancestor", "origin/<base>", "HEAD"]`. Report "rebase needed: yes/no". Never rebase.
   `merge_base --is-ancestor` returns `"true"` → rebase needed: no; `"false"` → rebase
   needed: yes; an error → report it.
-- **Requirement changes** (`pyproject.toml`, mypy overrides, other config) → apply them when
+- **Requirement changes** (dependency manifest, checker config, other config) → apply them when
   the launch prompt says so, then run the checks CLAUDE.md lists. If a new dependency must be
   installed, do not try — report it so the supervisor asks the user; run the checks only for
   config-only changes.

@@ -34,6 +34,6 @@ We do not need to challenge them again unless absolutely necessary.
 - Test coverage strategy
 - Step granularity — each step should produce exactly one commit. Flag steps with multiple independent parts (A, B, C) that should be split.
 - Potential risks or blockers
-- **Requirement changes** — flag new dependencies (`pyproject.toml`) that should be applied during planning, not deferred to implementation
+- **Requirement changes** — flag new dependencies (the dependency manifest) that should be applied during planning, not deferred to implementation
 
-For planning standards, see `.claude/knowledge_base/planning_principles.md`.
+For planning standards, read every file under `.claude/knowledge_base/` (`*.md`).

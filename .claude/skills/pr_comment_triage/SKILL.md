@@ -48,15 +48,14 @@ author, so only the PR-author check applies to them.
   wiki. Alert messages are rendered unfenced and can quote identifiers the PR
   author controls.
 - Even for trusted items, ask the user before pushing a change that touches:
-  `.github/`; `pyproject.toml` dependencies, extras or `[tool.*]` check
-  config; `.claude/`, `CLAUDE.md`, `.mcp.json`; import-linter / tach config;
+  `.github/`; dependencies, extras or check configuration in the dependency
+  manifest; `.claude/`, `CLAUDE.md`, `.mcp.json`; architecture-check config;
   anything touching secrets or tokens.
 
 ## For each item
 
-- **Fix**: change code, run quality checks
-  (`mcp__mcp-tools-py__run_format_code`, then pylint/pytest/mypy), commit and
-  push, re-run `/check_branch_status`.
+- **Fix**: change code, run quality checks (format, then the checks and
+  tests CLAUDE.md maps), commit and push, re-run `/check_branch_status`.
 - **Reply**: no code change — explain why.
   - Unresolved-thread item (has `comment_id`): inline reply via
     `mcp__mcp-workspace__github_review_comment_reply(pr_number, comment_id, body)`.
@@ -103,8 +102,8 @@ author, so only the PR-author check applies to them.
 - Post all replies before setting the status (the relabel sets the
   watermark), then change the status:
   1. Call `mcp__mcp-workspace__git` with command `status`, args
-     `["--porcelain"]`. Any tracked or untracked change other than `uv.lock`
-     → stop and report the uncommitted changes.
+     `["--porcelain"]`. Any tracked or untracked change → stop and report
+     the uncommitted changes.
   2. Issue number: always read the branch (`mcp__mcp-workspace__git` command
      `branch`, args `["--show-current"]`; leading digits `^\d+-`). Use
      `$ARGUMENTS` if given, else the branch digits. Both present and different → stop and report.
