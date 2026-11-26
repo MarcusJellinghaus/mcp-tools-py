@@ -216,6 +216,16 @@ formatter = "ruff"
 [tool.mcp-coder]
 format_code = true
 
+[tool.mcp-coder.install]
+# Extras `mcp-coder install` passes to `uv` when provisioning this repo.
+extras = "dev"
+# Run by `mcp-coder install` after provisioning; any failure fails the install.
+post_install_checks = [
+    ["mcp-coder", "--version"],
+    ["mcp-workspace", "--version"],
+    ["mcp-tools-py", "--version"],
+]
+
 [tool.mcp-coder.install-from-github]
 # All installed together WITH deps — uv resolves siblings in one pass
 packages = [

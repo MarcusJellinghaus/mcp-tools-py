@@ -25,7 +25,7 @@ Transitions the issue back to `plan-ready` status for re-implementation when cod
 
 ## Instructions
 
-1. Call `mcp__mcp-workspace__git` with command `status`, args `["--porcelain"]`. Any tracked or untracked change other than `uv.lock` → stop and report the uncommitted changes.
+1. Call `mcp__mcp-workspace__git` with command `status`, args `["--porcelain"]`. Any tracked or untracked change → stop and report the uncommitted changes.
 2. Call `mcp__mcp-workspace__git` with command `branch`, args `["--show-current"]`. Take the issue number from the leading digits of the branch name (`^\d+-`). No leading digits → stop and report.
 3. Call `mcp__mcp-workspace__github_issue_set_status(number=<issue number>, status="status-05:plan-ready", from_status="status-07:code-review")`.
 4. Confirm the status change was successful:

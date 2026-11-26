@@ -16,7 +16,7 @@ allowed-tools:
 Follow this process to commit and push your changes:
 
 ## 1. Format Code
-Use `mcp__mcp-tools-py__run_format_code` to format all code with the project's configured formatter.
+Format all code with the project's formatter, as CLAUDE.md maps it.
 
 ## 2. Review Changes
 Use `mcp__mcp-workspace__git` with command `"status"` to check working directory state.

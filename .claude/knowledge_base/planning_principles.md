@@ -3,7 +3,7 @@
 ## Step Design
 
 - **Merge tiny or intertwined steps.** Steps that are trivially small or tightly coupled should be combined. However, prefer several small steps over fewer large ones — small steps fit better in LLM context windows.
-- **Split large steps.** Ideally each step can be completed such that pylint/pytest/mypy still pass afterward.
+- **Split large steps.** Ideally each step can be completed such that the project's checks and tests still pass afterward.
 - **One step = one commit.** Each step should produce exactly one commit: write tests, implement, verify checks pass. If a step needs multiple fix-and-commit cycles, split it into smaller steps.
 - **No separate "fix all issues" steps.** Quality checks passing is an exit criterion for each step, not a separate step.
 - **No "verify everything" cleanup steps.** If each step leaves checks green, a final verification step is unnecessary. If you find yourself planning one, the earlier steps are too large.
@@ -14,7 +14,7 @@
 ## Testing
 
 - **No manual tests.** All tests must be automated.
-- **Test structure mirrors src structure.** Tests for `src/foo/bar.py` go in `tests/foo/test_bar.py`.
+- **Test structure mirrors source structure.** One test file per module, at the matching path under the test folder.
 - **Parameterized tests** are a good idea to reduce the number of required test functions while covering more cases.
 
 ## Code Quality

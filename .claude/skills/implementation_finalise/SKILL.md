@@ -38,9 +38,7 @@ If the task contains "commit message" (case-insensitive):
 
 If any code changes were made during this process:
 
-- Run pylint checks using the MCP server (fix all errors)
-- Run pytest checks using the MCP server (fix all failures)
-- Run mypy checks using the MCP server (fix all type errors)
+- Run the project's checks and tests as CLAUDE.md maps them (fix all errors and failures)
 
 ## Output
 

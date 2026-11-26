@@ -51,13 +51,11 @@ If no issue number is provided:
    - Keep changes focused and minimal — only what the issue requires
 
 5. **Run quality checks**
-   - `mcp__mcp-tools-py__run_pylint_check` — fix all issues
-   - `mcp__mcp-tools-py__run_pytest_check` — fix all failures
-   - `mcp__mcp-tools-py__run_mypy_check` — fix all issues
-   - `mcp__mcp-tools-py__run_ruff_check` — fix all issues
+   Read the language notes in `.claude/knowledge_base/` that match the project's language, if any.
+   Run the project's checks and tests as CLAUDE.md and the knowledge base's language notes map them, with the arguments they require — fix all issues and failures.
 
 6. **Format code**
-   Use `mcp__mcp-tools-py__run_format_code` to format all code with the project's configured formatter.
+   Format all code with the project's formatter, as CLAUDE.md maps it.
 
 7. **Update issue status**
    Call `mcp__mcp-workspace__github_issue_set_status(number=<issue_number>, status="status-07:code-review")` with the issue number from "Resolve Issue Number" (no `from_status`).
