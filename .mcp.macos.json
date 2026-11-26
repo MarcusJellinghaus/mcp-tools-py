@@ -45,17 +45,6 @@
         "PYTHONPATH": "${MCP_CODER_VENV_DIR}/lib"
       },
       "alwaysLoad": true
-    },
-    "obsidian-wiki": {
-      "type": "stdio",
-      "command": "npx",
-      "args": [
-        "-y",
-        "obsidian-mcp",
-        "${HOME}/Documents/GitHub/obsidian-dev-wiki"
-      ],
-      "env": {},
-      "alwaysLoad": true
     }
   }
 }
