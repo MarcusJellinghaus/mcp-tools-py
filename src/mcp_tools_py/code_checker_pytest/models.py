@@ -84,6 +84,9 @@ class StageInfo:
 class Test:
     """Single pytest test result with per-stage info."""
 
+    # Test modules import this class by name; stops pytest collecting it.
+    __test__ = False
+
     nodeid: str
     lineno: int
     keywords: list[str]
