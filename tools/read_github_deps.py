@@ -1,7 +1,8 @@
 """Print uv pip install commands for GitHub dependency overrides.
 
-Bootstrap helper for reinstall_local.bat. Reads [tool.mcp-coder.install-from-github]
-from pyproject.toml without requiring any installed packages.
+Used by the CI install step (``--specs``). Reads
+[tool.mcp-coder.install-from-github] from pyproject.toml without requiring
+any installed packages. ``mcp-coder install`` reads the same section itself.
 
 Output format (one command per line):
     uv pip install "pkg1" "pkg2"

@@ -1,175 +1,31 @@
 @echo off
-setlocal enabledelayedexpansion
-REM Reinstall mcp-tools-py package in development mode
-REM Usage: call tools\reinstall_local.bat  (from project root)
-echo =============================================
-echo MCP-Tools-Py Package Reinstallation
-echo =============================================
-echo.
+REM Reinstall mcp-tools-py in editable mode (developer convenience).
+REM Resolves an mcp-coder from OUTSIDE the repo venv, drives `mcp-coder install`
+REM against this repo, then activates the venv in the caller's shell.
 
-REM Determine project root (parent of tools directory)
-set "PROJECT_DIR=%~dp0.."
-pushd "!PROJECT_DIR!"
-set "PROJECT_DIR=%CD%"
-popd
+setlocal
+for %%d in ("%~dp0..") do set "REPO=%%~fd"
+set "REPO_BIN=%REPO%\.venv\Scripts"
 
-set "VENV_DIR=!PROJECT_DIR!\.venv"
-set "VENV_SCRIPTS=!VENV_DIR!\Scripts"
-
-REM Silently deactivate any active venv (will reactivate correct one at end)
-call deactivate 2>nul
-
-echo [0/8] Checking Python environment...
-
-REM Check if uv is available
-where uv >nul 2>&1
-if !ERRORLEVEL! NEQ 0 (
-    echo [FAIL] uv not found. Install it: pip install uv
+REM The install rewrites %REPO_BIN%\mcp-coder.exe, so the driver must not be
+REM that file: Windows locks a running executable against replacement.
+set "MC="
+if defined MCP_CODER_VENV_PATH if exist "%MCP_CODER_VENV_PATH%\mcp-coder.exe" if /i not "%MCP_CODER_VENV_PATH%"=="%REPO_BIN%" set "MC=%MCP_CODER_VENV_PATH%\mcp-coder.exe"
+if not defined MC for /f "delims=" %%i in ('where mcp-coder 2^>nul') do if not defined MC if /i not "%%~dpi"=="%REPO_BIN%\" set "MC=%%i"
+if not defined MC (
+    echo [FAIL] No mcp-coder found outside %REPO%\.venv.
+    echo        reinstall_local rewrites the repo venv, so it cannot be driven from it.
+    echo        Install the tool env first ^(pip install mcp-coder^) or set
+    echo        MCP_CODER_VENV_PATH to its Scripts/bin directory.
     exit /b 1
 )
-echo [OK] uv found
 
-REM Check if local .venv exists
-if not exist "!VENV_SCRIPTS!\activate.bat" (
-    echo Local virtual environment not found at !VENV_DIR!
-    uv venv .venv
-    echo Local virtual environment created at !VENV_DIR!
-)
-echo [OK] Target environment: !VENV_DIR!
-echo.
-
-echo [1/8] Uninstalling existing packages...
-uv pip uninstall mcp-coder mcp-tools-py mcp-workspace --python "!VENV_SCRIPTS!\python.exe" 2>nul
-echo [OK] Packages uninstalled
-
-echo.
-echo [2/8] Installing mcp-tools-py (this project) in editable mode...
-REM Editable install pulls all deps (including mcp-workspace) from PyPI first.
-pushd "!PROJECT_DIR!"
-uv pip install -e ".[dev]" --python "!VENV_SCRIPTS!\python.exe"
-if !ERRORLEVEL! NEQ 0 (
-    echo [FAIL] Installation failed!
-    popd
+"%MC%" install "%REPO%" ^
+    --source local ^
+    --local-path "%REPO%" ^
+    --refresh
+if errorlevel 1 (
+    echo [FAIL] mcp-coder install failed
     exit /b 1
 )
-popd
-echo [OK] Package and dev dependencies installed
-
-echo.
-echo [3/8] Overriding dependencies with GitHub versions...
-REM Validate read_github_deps.py succeeds before parsing its output
-"!VENV_SCRIPTS!\python.exe" tools\read_github_deps.py > nul 2>&1
-if !ERRORLEVEL! NEQ 0 (
-    echo [FAIL] read_github_deps.py failed!
-    "!VENV_SCRIPTS!\python.exe" tools\read_github_deps.py
-    exit /b 1
-)
-REM Read GitHub dependency overrides from pyproject.toml
-for /f "delims=" %%C in ('"!VENV_SCRIPTS!\python.exe" tools\read_github_deps.py') do (
-    echo   %%C
-    %%C --python "!VENV_SCRIPTS!\python.exe"
-    if !ERRORLEVEL! NEQ 0 (
-        echo [FAIL] GitHub dependency override failed!
-        exit /b 1
-    )
-)
-echo [OK] GitHub dependencies overridden from pyproject.toml
-
-echo.
-echo [4/8] Finalizing editable install of mcp-tools-py...
-REM Re-run to ensure local source is the active install after GitHub overrides
-pushd "!PROJECT_DIR!"
-uv pip install -e . --python "!VENV_SCRIPTS!\python.exe"
-if !ERRORLEVEL! NEQ 0 (
-    echo [FAIL] Final editable install failed!
-    popd
-    exit /b 1
-)
-popd
-echo [OK] mcp-tools-py installed (editable)
-
-echo.
-echo [5/8] Installing LangChain and MLflow dependencies...
-uv pip install langchain langchain-anthropic mlflow --python "!VENV_SCRIPTS!\python.exe"
-if !ERRORLEVEL! NEQ 0 (
-    echo [FAIL] LangChain/MLflow installation failed!
-    exit /b 1
-)
-echo [OK] langchain, langchain-anthropic, mlflow installed
-
-echo.
-echo [6/8] Verifying CLI entry points in venv...
-
-if not exist "!VENV_SCRIPTS!\mcp-tools-py.exe" (
-    echo [FAIL] mcp-tools-py.exe not found in !VENV_SCRIPTS!
-    echo   The entry point was not installed into the virtual environment.
-    exit /b 1
-)
-echo [OK] mcp-tools-py.exe found in !VENV_SCRIPTS!
-
-if not exist "!VENV_SCRIPTS!\mcp-workspace.exe" (
-    echo [FAIL] mcp-workspace.exe not found in !VENV_SCRIPTS!
-    echo   The entry point was not installed into the virtual environment.
-    exit /b 1
-)
-echo [OK] mcp-workspace.exe found in !VENV_SCRIPTS!
-
-if not exist "!VENV_SCRIPTS!\mcp-coder.exe" (
-    echo [FAIL] mcp-coder.exe not found in !VENV_SCRIPTS!
-    echo   The entry point was not installed into the virtual environment.
-    exit /b 1
-)
-echo [OK] mcp-coder.exe found in !VENV_SCRIPTS!
-
-echo.
-echo [7/8] Verifying CLI functionality...
-"!VENV_SCRIPTS!\mcp-tools-py.exe" --help >nul 2>&1
-if !ERRORLEVEL! NEQ 0 (
-    echo [FAIL] mcp-tools-py CLI verification failed!
-    exit /b 1
-)
-echo [OK] mcp-tools-py CLI works
-
-"!VENV_SCRIPTS!\mcp-workspace.exe" --help >nul 2>&1
-if !ERRORLEVEL! NEQ 0 (
-    echo [FAIL] mcp-workspace CLI verification failed!
-    exit /b 1
-)
-echo [OK] mcp-workspace CLI works
-
-"!VENV_SCRIPTS!\mcp-coder.exe" --help >nul 2>&1
-if !ERRORLEVEL! NEQ 0 (
-    echo [FAIL] mcp-coder CLI verification failed!
-    exit /b 1
-)
-echo [OK] mcp-coder CLI works
-
-echo.
-echo =============================================
-echo [8/8] Reinstallation completed successfully!
-echo.
-echo Entry points installed in: !VENV_SCRIPTS!
-echo   - mcp-tools-py.exe
-echo   - mcp-workspace.exe
-echo   - mcp-coder.exe
-echo =============================================
-echo.
-
-REM Pass VENV_DIR out of setlocal scope so activation persists to caller
-endlocal & set "_REINSTALL_VENV=%VENV_DIR%"
-
-REM Deactivate wrong venv if one is active
-if defined VIRTUAL_ENV (
-    if not "%VIRTUAL_ENV%"=="%_REINSTALL_VENV%" (
-        echo   Deactivating wrong virtual environment: %VIRTUAL_ENV%
-        call deactivate 2>nul
-    )
-)
-
-REM Activate the correct venv (persists to caller's shell)
-if not "%VIRTUAL_ENV%"=="%_REINSTALL_VENV%" (
-    echo   Activating virtual environment: %_REINSTALL_VENV%
-    call "%_REINSTALL_VENV%\Scripts\activate.bat"
-)
-
-set "_REINSTALL_VENV="
+endlocal & call "%~dp0..\.venv\Scripts\activate.bat"

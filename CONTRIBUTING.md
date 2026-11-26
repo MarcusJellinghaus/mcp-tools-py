@@ -66,6 +66,10 @@ Thank you for your interest in contributing to MCP Tools Py! This document provi
    ```bash
    call tools\reinstall_local.bat
    ```
+   It runs `mcp-coder install --source local` against this repo, so it needs an
+   mcp-coder **outside** the repo `.venv`: a tool env with
+   `pip install "mcp-coder[python]"` on `PATH`, or `MCP_CODER_VENV_PATH` set to
+   its `Scripts`/`bin` directory. Without one it stops with that hint.
 
 2. This is needed when you modify:
    - Entry points in `pyproject.toml`

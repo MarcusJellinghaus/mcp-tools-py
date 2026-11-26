@@ -78,6 +78,8 @@ REM === Step 5b: Print MCP server versions ===
 REM === Step 6: Set env vars and launch ===
 set "MCP_CODER_PROJECT_DIR=%CD%"
 set "DISABLE_AUTOUPDATER=1"
+REM Canonical value: mcp_coder src/mcp_coder/llm/claude_settings.py
+set "MCP_TIMEOUT=30000"
 set "PATH=!MCP_CODER_VENV_PATH!;!PATH!"
 
 echo Starting Claude Code (developer mode) with:
