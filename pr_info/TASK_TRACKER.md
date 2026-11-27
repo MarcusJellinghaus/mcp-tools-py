@@ -38,9 +38,9 @@ See [step_2.md](./steps/step_2.md)
 ### Step 3: Docs and MCP tool docstrings
 See [step_3.md](./steps/step_3.md)
 
-- [ ] Implementation: `target_directories` docstrings of seven MCP tools, `docs/pyproject-configuration.md`, `docs/README.md`, `docs/architecture/architecture.md`, `README.md`
-- [ ] Quality checks (format, pylint, pytest, mypy) — fix all issues
-- [ ] Commit message prepared
+- [x] Implementation: `target_directories` docstrings of seven MCP tools, `docs/pyproject-configuration.md`, `docs/README.md`, `docs/architecture/architecture.md`, `README.md`
+- [x] Quality checks (format, pylint, pytest, mypy) — fix all issues
+- [x] Commit message prepared
 
 ## Pull Request
 

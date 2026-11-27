@@ -32,7 +32,7 @@ The pylint tools expose the following parameters for customization:
 | Parameter | Type | Default | Description |
 |-----------|------|---------|-------------|
 | `extra_args` | list | None | Optional list of additional pylint CLI arguments (e.g. `["--disable=W0611"]`) |
-| `target_directories` | list | None (auto-detected) | Directories to analyze relative to project_dir. Auto-detected from `pyproject.toml` when omitted |
+| `target_directories` | list | None (auto-detected) | Directories to analyze relative to project_dir. Auto-detected from `pyproject.toml` when omitted, incl. `script-directories` |
 | `max_issues` | integer | 1 | Number of issue types shown in detail; the rest are summarised as counts. `0` = counts only (per-rule count and directory split) |
 
 ### Pylint Configuration
@@ -50,6 +50,9 @@ check, ruff fix, bandit, vulture, and `run_format_code`) auto-detect directories
 
 - **Source dirs** from `[tool.setuptools.packages.find] where` (fallback: `["src"]`)
 - **Test dirs** from `[tool.pytest.ini_options] testpaths` (fallback: `["tests"]`)
+- **Script dirs** from `[tool.mcp-tools-py] script-directories` (formatter, ruff check,
+  ruff fix, pylint and mypy only; not vulture or bandit). See
+  [docs/pyproject-configuration.md](docs/pyproject-configuration.md#toolmcp-tools-py-script-directories--extra-code-folders)
 
 `run_deptry_check` auto-detects source directories only, excluding test paths.
 
@@ -94,7 +97,7 @@ The mypy tools expose the following parameters for customization:
 | Parameter | Type | Default | Description |
 |-----------|------|---------|-------------|
 | `disable_error_codes` | list | None | List of mypy error codes to ignore |
-| `target_directories` | list | None (auto-detected) | Directories to check relative to project_dir. Auto-detected from `pyproject.toml` when omitted |
+| `target_directories` | list | None (auto-detected) | Directories to check relative to project_dir. Auto-detected from `pyproject.toml` when omitted, incl. `script-directories` |
 | `follow_imports` | string | None (no flag sent; the project's `[tool.mypy]` decides) | How to handle imports during type checking |
 | `cache_dir` | string | None (no flag sent; `MYPY_CACHE_DIR` decides, else `[tool.mypy] cache_dir`, else `.mypy_cache`) | Custom cache directory for incremental checking |
 | `timeout_seconds` | integer | None (resolved from config, else 120) | Maximum seconds to wait for mypy. Positive integers only |

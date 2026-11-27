@@ -49,7 +49,8 @@ class FormatterTools:
                     [tool.ruff.format] versus [tool.black]. Both or neither
                     declared is an error, and so is an empty list.
                 target_directories: Directories to format relative to project_dir.
-                    Defaults to auto-detection from pyproject.toml.
+                    Defaults to auto-detection from pyproject.toml: source, test and
+                    `[tool.mcp-tools-py] script-directories` folders.
                 check_only: If True, only check formatting without modifying files.
 
             Returns:

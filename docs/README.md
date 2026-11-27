@@ -15,7 +15,7 @@ Complete documentation for MCP Tools Py.
 
 ### Configuration
 
-- **[Project Configuration](pyproject-configuration.md)** — How pylint and mypy read `pyproject.toml`, `[tool.mcp-tools-py]` subprocess timeouts and formatter selection, migration from the old defaults, per-call overrides
+- **[Project Configuration](pyproject-configuration.md)** — How pylint and mypy read `pyproject.toml`, `[tool.mcp-tools-py]` subprocess timeouts, formatter selection and script folders (`script-directories`), migration from the old defaults, per-call overrides
 - **[User Configuration](user-config.md)** — `[mcp_tools_py]` in `~/.mcp_coder/config.toml`: `pytest_workers`, how `-n auto` is sized
 - **[Upgrade Notes](upgrade-notes.md)** — Behaviour changes to check when upgrading
 
