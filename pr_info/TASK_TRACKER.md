@@ -31,9 +31,9 @@ See [step_1.md](./steps/step_1.md)
 ### Step 2: `script-directories` in `resolve_target_directories`
 See [step_2.md](./steps/step_2.md)
 
-- [ ] Implementation (tests + production code): `tests/test_script_directories.py`, `_read_script_dirs`, new resolver body
-- [ ] Quality checks (format, pylint, pytest, mypy) — fix all issues
-- [ ] Commit message prepared
+- [x] Implementation (tests + production code): `tests/test_script_directories.py`, `_read_script_dirs`, new resolver body
+- [x] Quality checks (format, pylint, pytest, mypy) — fix all issues
+- [x] Commit message prepared
 
 ### Step 3: Docs and MCP tool docstrings
 See [step_3.md](./steps/step_3.md)
