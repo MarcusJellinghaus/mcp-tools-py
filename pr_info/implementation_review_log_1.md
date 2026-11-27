@@ -15,3 +15,11 @@ Source and test diffs reviewed; checking the docs diff before reporting.README.m
 Verdict(decision='tasks', tasks=['In README.md around line 59, limit the sentence "Only directories that exist on disk are included" to the auto-detected source and test folders. Add that a `script-directories` entry pointing to a folder that doesn\'t exist is reported as an error, not skipped. Use the same wording as the corrected passage in docs/pyproject-configuration.md.'], escalate_reason=None)
 **Changes**:
 applied
+
+## Round 3 — 2026-11-27
+**Findings**:
+Reviewing the resolver and its tests now; next I'll check `_load_pyproject` and the test coverage.NO FINDINGS
+**Decisions**:
+Verdict(decision='dismiss', tasks=[], escalate_reason=None)
+**Changes**:
+dismiss
