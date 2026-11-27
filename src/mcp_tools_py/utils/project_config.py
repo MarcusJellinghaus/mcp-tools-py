@@ -9,7 +9,7 @@ import glob
 import logging
 import os
 import tomllib
-from pathlib import Path
+from pathlib import Path, PurePath
 from typing import Literal
 
 logger = logging.getLogger(__name__)
@@ -28,11 +28,17 @@ ToolName = Literal[
     "deptry",
 ]
 
+TargetTool = Literal["formatter", "ruff", "pylint", "mypy", "vulture", "bandit"]
+
 DEFAULT_CHECK_TIMEOUT = 120
 DEFAULT_PYTEST_TIMEOUT = 300
 
 _CONFIG_SECTION = "mcp-tools-py"
 _SHARED_TIMEOUT_KEY = "check-timeout"
+_SCRIPT_DIRS_KEY = "script-directories"
+_SCRIPT_TOOLS: frozenset[TargetTool] = frozenset(
+    {"formatter", "ruff", "pylint", "mypy"}
+)
 
 
 @dataclasses.dataclass
@@ -203,25 +209,115 @@ def resolve_test_paths(
 def resolve_target_directories(
     project_dir: str,
     target_directories: list[str] | None,
+    tool: TargetTool,
 ) -> list[str] | str:
     """Resolve target directories, auto-detecting from pyproject.toml if needed.
+
+    An explicit *target_directories* is returned as given and pyproject.toml
+    is not read.  Otherwise the source (``[tool.setuptools.packages.find]
+    where``) and test (``[tool.pytest.ini_options] testpaths``) folders that
+    exist on disk are used, followed, for the formatter, ruff, pylint and
+    mypy, by the ``[tool.mcp-tools-py] script-directories`` folders.  The
+    key is validated for every *tool*, so an invalid value is reported even
+    by tools that add no scripts.
 
     Args:
         project_dir: Path to project root.
         target_directories: Explicit directories, or None to auto-detect.
+        tool: The program the directories are for.
 
     Returns:
-        A list of directory names on success, or an error message string on failure.
+        A list of directory names (source, tests, scripts) on success, or an
+        error message string on failure.  Never raises.
     """
     if target_directories is not None:
         return target_directories
     try:
-        result = get_target_directories(project_dir)
-        for warning in result.warnings:
-            logger.warning(warning)
-        return result.directories
+        toml_data = _load_pyproject(project_dir)
+        warnings: list[str] = []
+        auto = _read_source_dirs(toml_data, warnings) + _read_test_dirs(
+            toml_data, warnings
+        )
+        existing = [d for d in auto if os.path.isdir(os.path.join(project_dir, d))]
+        scripts = _read_script_dirs(toml_data, project_dir, existing)
     except ValueError as exc:
         return f"Error resolving target directories: {exc}"
+    for warning in warnings:
+        logger.warning(warning)
+    dirs = existing + (scripts if tool in _SCRIPT_TOOLS else [])
+    if dirs:
+        return dirs
+    return f"Error resolving target directories: No target directories found: {auto}"
+
+
+def _path_key(entry: str) -> tuple[str, ...]:
+    """Lexical comparison key: case- and separator-insensitive where the OS is.
+
+    Returns:
+        The path parts of *entry* after ``os.path.normcase``; ``()`` for ``.``.
+    """
+    return PurePath(os.path.normcase(entry)).parts
+
+
+def _overlaps(a: tuple[str, ...], b: tuple[str, ...]) -> bool:
+    """Compare two path keys from :func:`_path_key`.
+
+    Returns:
+        True when either key is a prefix of, or equal to, the other.
+    """
+    return a[: len(b)] == b or b[: len(a)] == a
+
+
+def _read_script_dirs(
+    toml_data: dict[str, object], project_dir: str, auto_dirs: list[str]
+) -> list[str]:
+    """Validated, normalised ``[tool.mcp-tools-py] script-directories`` entries.
+
+    Args:
+        toml_data: Parsed pyproject.toml data.
+        project_dir: Path to project root; entries must be folders inside it.
+        auto_dirs: Source and test folders on disk; no entry may overlap one.
+
+    Returns:
+        The entries in POSIX form (``./tools/`` gives ``tools``); ``[]`` when
+        the key is missing or empty.
+
+    Raises:
+        ValueError: on the first invalid entry; the message starts with the key.
+    """
+    label = f"[tool.{_CONFIG_SECTION}] {_SCRIPT_DIRS_KEY}"
+    value = _mcp_tools_section(toml_data).get(_SCRIPT_DIRS_KEY, [])
+    if not isinstance(value, list) or not all(isinstance(e, str) for e in value):
+        raise ValueError(f"{label}: must be a list of folder names, got {value!r}")
+
+    auto_keys = [(auto, _path_key(auto)) for auto in auto_dirs]
+    seen: list[tuple[str, tuple[str, ...]]] = []
+    for entry in value:
+        path = PurePath(entry)
+        if path.drive or path.root or ".." in path.parts or not path.parts:
+            raise ValueError(
+                f"{label}: entry {entry!r} must be a folder inside the project, "
+                "relative to its root"
+            )
+        if not os.path.isdir(os.path.join(project_dir, entry)):
+            raise ValueError(f"{label}: folder {entry!r} not found")
+        key = _path_key(entry)
+        for earlier, earlier_key in seen:
+            if _overlaps(key, earlier_key):
+                raise ValueError(f"{label}: folders {earlier!r} and {entry!r} overlap")
+        for auto, auto_key in auto_keys:
+            if _overlaps(key, auto_key):
+                covers = (
+                    f"; {auto!r} already covers it"
+                    if key[: len(auto_key)] == auto_key
+                    else ""
+                )
+                raise ValueError(
+                    f"{label}: folder {entry!r} overlaps source/test folder "
+                    f"{auto!r}{covers}"
+                )
+        seen.append((entry, key))
+    return [PurePath(entry).as_posix() for entry in value]
 
 
 def _resolve_source_dirs(
@@ -396,23 +492,38 @@ def read_pyproject_tool_tables(project_root: Path) -> dict[str, object]:
 
     Returns:
         The ``[tool]`` table as a dict, or an empty dict when the file is
-        missing or has no ``[tool]`` table.
-
-    Raises:
-        ValueError: If pyproject.toml is not valid TOML.
+        missing or has no ``[tool]`` table.  A ``ValueError`` from
+        :func:`_load_pyproject` propagates when pyproject.toml is not valid
+        TOML.
     """
-    pyproject_path = project_root / "pyproject.toml"
-    if not pyproject_path.is_file():
-        return {}
+    return _tool_tables(_load_pyproject(str(project_root)))
 
-    with pyproject_path.open("rb") as f:
-        try:
-            toml_data = tomllib.load(f)
-        except tomllib.TOMLDecodeError as exc:
-            raise ValueError(f"Invalid pyproject.toml: {exc}") from exc
 
+def _tool_tables(toml_data: dict[str, object]) -> dict[str, object]:
+    """The ``[tool]`` table of parsed pyproject.toml data.
+
+    Args:
+        toml_data: Parsed pyproject.toml data.
+
+    Returns:
+        The table as a dict, or an empty dict when it is missing or not a table.
+    """
     tool_section = toml_data.get("tool")
     return tool_section if isinstance(tool_section, dict) else {}
+
+
+def _mcp_tools_section(toml_data: dict[str, object]) -> dict[str, object]:
+    """The ``[tool.mcp-tools-py]`` table of parsed pyproject.toml data.
+
+    Args:
+        toml_data: Parsed pyproject.toml data.
+
+    Returns:
+        The table as a dict, or an empty dict when it or ``[tool]`` is
+        missing or not a table.
+    """
+    section = _tool_tables(toml_data).get(_CONFIG_SECTION)
+    return section if isinstance(section, dict) else {}
 
 
 def _read_mcp_tools_section(project_dir: str) -> dict[str, object]:
@@ -424,10 +535,9 @@ def _read_mcp_tools_section(project_dir: str) -> dict[str, object]:
     Returns:
         The section as a dict, or an empty dict when the file or section
         is missing or the section is not a table.  A ``ValueError`` from
-        :func:`read_pyproject_tool_tables` propagates on invalid TOML.
+        :func:`_load_pyproject` propagates on invalid TOML.
     """
-    section = read_pyproject_tool_tables(Path(project_dir)).get(_CONFIG_SECTION)
-    return section if isinstance(section, dict) else {}
+    return _mcp_tools_section(_load_pyproject(project_dir))
 
 
 def get_check_timeout(

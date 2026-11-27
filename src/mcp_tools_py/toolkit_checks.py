@@ -187,7 +187,7 @@ def _run_mypy(context: ToolContext, depth: str) -> ActionResult:
     """
     del depth
     project_dir = str(context.project_dir)
-    dirs = resolve_target_directories(project_dir, None)
+    dirs = resolve_target_directories(project_dir, None, "mypy")
     if isinstance(dirs, str):
         return ActionResult(status="error", summary=dirs)
 
@@ -241,7 +241,7 @@ def _run_pylint(context: ToolContext, depth: str) -> ActionResult:
     """
     del depth
     project_dir = str(context.project_dir)
-    dirs = resolve_target_directories(project_dir, None)
+    dirs = resolve_target_directories(project_dir, None, "pylint")
     if isinstance(dirs, str):
         return ActionResult(status="error", summary=dirs)
 
@@ -285,7 +285,7 @@ def _run_vulture(context: ToolContext, depth: str) -> ActionResult:
     """
     del depth
     project_dir = context.project_dir
-    dirs = resolve_target_directories(str(project_dir), None)
+    dirs = resolve_target_directories(str(project_dir), None, "vulture")
     if isinstance(dirs, str):
         return ActionResult(status="error", summary=dirs)
 
@@ -455,7 +455,7 @@ def _run_ruff(context: ToolContext, depth: str) -> ActionResult:
     """
     del depth
     project_dir = str(context.project_dir)
-    dirs = resolve_target_directories(project_dir, None)
+    dirs = resolve_target_directories(project_dir, None, "ruff")
     if isinstance(dirs, str):
         return ActionResult(status="error", summary=dirs)
 
@@ -513,7 +513,7 @@ def _run_bandit(context: ToolContext, depth: str) -> ActionResult:
     """
     del depth
     project_dir = str(context.project_dir)
-    dirs = resolve_target_directories(project_dir, None)
+    dirs = resolve_target_directories(project_dir, None, "bandit")
     if isinstance(dirs, str):
         return ActionResult(status="error", summary=dirs)
 

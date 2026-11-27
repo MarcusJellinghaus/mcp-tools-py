@@ -1,7 +1,8 @@
 # Project Configuration via `pyproject.toml`
 
 The checked project's `pyproject.toml` drives several parts of this server: the
-`[tool.mcp-tools-py]` section it owns itself, the sections the checkers read for
+`[tool.mcp-tools-py]` section it owns itself (timeouts, `formatter`,
+`script-directories`), the sections the checkers read for
 themselves (`[tool.pylint]`, `[tool.mypy]`), and the keys it reads to auto-detect
 target directories.
 
@@ -100,6 +101,69 @@ the project already has:
 look at anything else. Alternatively set the key.
 
 Passing `steps` explicitly bypasses selection. `steps=[]` is an error.
+
+---
+
+## `[tool.mcp-tools-py] script-directories` — extra code folders
+
+Folders with code that is neither a package nor a test, such as `tools/` or
+`scripts/`, are not found by auto-detection. List them here:
+
+```toml
+[tool.mcp-tools-py]
+script-directories = ["tools"]
+```
+
+Without `target_directories`, each tool covers these folders:
+
+| Kind | Declared in | formatter, ruff check / fix | pylint, mypy | vulture, bandit | deptry, coverage | pytest |
+|---|---|---|---|---|---|---|
+| Source | `[tool.setuptools.packages.find] where` | ✓ | ✓ | ✓ | ✓ | – |
+| Tests | `[tool.pytest.ini_options] testpaths` | ✓ | ✓ | ✓ | – | ✓ |
+| Scripts | `[tool.mcp-tools-py] script-directories` | ✓ | ✓ | – | – | – |
+
+This applies to the MCP tools and to the toolkit alike (the `format` action and
+the ruff, pylint and mypy `check` runners). Folders are passed in the order
+source, tests, scripts.
+
+### Lookup
+
+- An explicit `target_directories` wins: it is used as given and the key is not
+  read, so even an invalid value is ignored.
+- A missing key or `[]` changes nothing.
+
+### Entries
+
+- Relative folder names only, inside the project.
+- Not allowed: files, globs, absolute paths, drive- or root-prefixed paths
+  (`C:tools`, `/tools`, `\tools`), `..`, `""` and `.`.
+- Entries are normalised: `./tools/` becomes `tools`.
+
+### Errors
+
+The value must be a list of strings. Beyond that, each of these is an error that
+names the key, and the tool runs nothing:
+
+- a listed folder does not exist;
+- two entries overlap (equal, or one inside the other);
+- an entry overlaps an existing source or test folder. The flat layout
+  (`where = ["."]`) always overlaps, because `.` contains every folder.
+
+```
+Error resolving target directories: [tool.mcp-tools-py] script-directories: folder 'src/tools' overlaps source/test folder 'src'; 'src' already covers it
+```
+
+vulture and bandit validate the key too, so they report the same errors, but they
+never get the script folders.
+
+### Caveats
+
+**Duplicate module names.** mypy can still report `Duplicate module named ...`
+when files in separate folders share a name (two `setup_env.py`, say). Resolving
+that is a `[tool.mypy]` concern; see
+[Import resolution](#import-resolution-is-yours-too--and-it-fails-loudly).
+
+**Older versions.** mcp-tools-py versions without this key ignore it silently.
 
 ---
 
@@ -314,6 +378,7 @@ vulture and `run_format_code` auto-detect which directories to analyze from
 |---------|---------------------|----------|
 | Source dirs | `[tool.setuptools.packages.find] where` | `["src"]` |
 | Test dirs | `[tool.pytest.ini_options] testpaths` | `["tests"]` |
+| Script dirs (formatter, ruff, pylint and mypy only) | `[tool.mcp-tools-py] script-directories` | none |
 
 Example `pyproject.toml` that would auto-detect `["src"]` and `["tests"]`:
 
@@ -325,8 +390,11 @@ where = ["src"]
 testpaths = ["tests"]
 ```
 
-Only directories that actually exist on disk are included. If none of the resolved
-directories exist, an error is returned.
+Only source and test directories that actually exist on disk are included. If
+none of the resolved directories exist, an error is returned; existing script
+folders alone are enough to avoid it. See
+[`script-directories`](#toolmcp-tools-py-script-directories--extra-code-folders)
+for the script-folder rules.
 
 Pass an explicit `target_directories` list to override auto-detection.
 

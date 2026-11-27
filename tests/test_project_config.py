@@ -169,7 +169,7 @@ class TestResolveTargetDirectories:
     def test_explicit_dirs_returned_as_is(self, tmp_path: object) -> None:
         """When target_directories is provided, returns it without lookup."""
         path = str(tmp_path)
-        result = resolve_target_directories(path, ["custom"])
+        result = resolve_target_directories(path, ["custom"], "mypy")
         assert result == ["custom"]
 
     def test_auto_detects_from_pyproject(self, tmp_path: object) -> None:
@@ -187,7 +187,7 @@ class TestResolveTargetDirectories:
         with open(os.path.join(path, "pyproject.toml"), "w", encoding="utf-8") as f:
             f.write(pyproject)
 
-        result = resolve_target_directories(path, None)
+        result = resolve_target_directories(path, None, "mypy")
 
         assert isinstance(result, list)
         assert "src" in result
@@ -205,7 +205,7 @@ class TestResolveTargetDirectories:
         with caplog.at_level(
             logging.WARNING, logger="mcp_tools_py.utils.project_config"
         ):
-            result = resolve_target_directories(path, None)
+            result = resolve_target_directories(path, None, "mypy")
 
         assert isinstance(result, list)
         assert len(caplog.records) >= 1
@@ -224,7 +224,7 @@ class TestResolveTargetDirectories:
         with open(os.path.join(path, "pyproject.toml"), "w", encoding="utf-8") as f:
             f.write(pyproject)
 
-        result = resolve_target_directories(path, None)
+        result = resolve_target_directories(path, None, "mypy")
 
         assert isinstance(result, str)
         assert result.startswith("Error resolving target directories:")

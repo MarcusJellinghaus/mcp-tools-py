@@ -172,7 +172,9 @@ class TestTargetDirectories:
         ):
             run_format()
 
-        mock_resolve.assert_called_once_with(str(tool_context.project_dir), None)
+        mock_resolve.assert_called_once_with(
+            str(tool_context.project_dir), None, "formatter"
+        )
 
     def test_target_directories_explicit(self, tool_context: ToolContext) -> None:
         """Pass explicit dirs, verify resolve_target_directories receives them."""
@@ -195,7 +197,7 @@ class TestTargetDirectories:
             run_format(target_directories=["src", "tests"])
 
         mock_resolve.assert_called_once_with(
-            str(tool_context.project_dir), ["src", "tests"]
+            str(tool_context.project_dir), ["src", "tests"], "formatter"
         )
 
 

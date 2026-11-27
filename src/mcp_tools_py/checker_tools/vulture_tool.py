@@ -31,7 +31,8 @@ def register(mcp: "FastMCPProtocol", checker_tools: "CheckerTools") -> None:
 
         Args:
             target_directories: Directories to scan relative to project_dir.
-                Auto-detected from pyproject.toml when None.
+                Auto-detected from pyproject.toml when None: source and test
+                folders; `[tool.mcp-tools-py] script-directories` is not included.
             extra_args: Additional vulture arguments.
             min_confidence: Minimum confidence for reporting (default: 60).
             max_issues: Number of kinds (unused function, unused import, ...)
@@ -48,7 +49,7 @@ def register(mcp: "FastMCPProtocol", checker_tools: "CheckerTools") -> None:
             return context.unavailable_message("vulture")
 
         resolved = resolve_target_directories(
-            str(context.project_dir), target_directories
+            str(context.project_dir), target_directories, "vulture"
         )
         if isinstance(resolved, str):
             return resolved

@@ -32,7 +32,9 @@ def register(mcp: "FastMCPProtocol", checker_tools: "CheckerTools") -> None:
 
         Args:
             select: Override rule selection. Defaults to project config.
-            target_directories: Directories to fix relative to project_dir. Auto-detected when None.
+            target_directories: Directories to fix relative to project_dir.
+                Auto-detected from pyproject.toml when None: source, test and
+                `[tool.mcp-tools-py] script-directories` folders.
             extra_args: Additional ruff CLI flags. `--statistics` is rejected.
 
         Returns:
@@ -43,7 +45,7 @@ def register(mcp: "FastMCPProtocol", checker_tools: "CheckerTools") -> None:
             return context.unavailable_message("ruff")
 
         resolved = resolve_target_directories(
-            str(context.project_dir), target_directories
+            str(context.project_dir), target_directories, "ruff"
         )
         if isinstance(resolved, str):
             return resolved
