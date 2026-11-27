@@ -87,9 +87,11 @@ stays unchanged.
 
 ## Tests (`tests/test_script_directories.py`)
 
-Helper: `_project(tmp_path, extra_toml="", dirs=("src", "tests"))`. It writes a
-`pyproject.toml` with `where = ["src"]`, `testpaths = ["tests"]` and `extra_toml`,
-and creates the given folders plus `tools/`. `ALL_TOOLS` is the six `TargetTool`
+Helper: `_project(tmp_path, extra_toml="", dirs=("src", "tests"), where=("src",),
+testpaths=("tests",))`. It writes a `pyproject.toml` with `where = [...]` and
+`testpaths = [...]` from its arguments, plus `extra_toml` (which must not redefine
+`[tool.pytest.ini_options]` or `[tool.setuptools.packages.find]`), and creates the
+given folders plus `tools/`. `ALL_TOOLS` is the six `TargetTool`
 values and `PREFIX = "Error resolving target directories: [tool.mcp-tools-py]
 script-directories: "`.
 
@@ -100,18 +102,21 @@ script-directories: "`.
 4. Invalid values, parametrised × `ALL_TOOLS`. The result is a `str` starting with
    `PREFIX`:
    - `"tools"` (a string), `[1]`
-   - `[""]`, `["."]`, `["./"]`, `["/tools"]`, `[str(tmp_path / "tools")]`, `[".."]`,
-     `["tools/.."]`, `["../x"]`
+   - `[""]`, `["."]`, `["./"]`, `["/tools"]`, `["<abs>/tools"]`, `[".."]`,
+     `["tools/.."]`, `["../x"]`. `<abs>/tools` is a placeholder: the test body
+     replaces it with `str(tmp_path / "tools")`, because `tmp_path` doesn't exist
+     when tests are collected.
    - `["tool"]` (missing; the message contains `folder 'tool' not found`)
    - `["file.py"]` (create it as a file)
    - `["tools", "tools/sub"]`, `["tools", "./tools"]` (create `tools/sub`)
    - `["src"]`, `["src/pkg"]` (create `src/pkg`)
-5. Containing a test folder: `testpaths = ["tools/tests"]` with `tools/tests` on
-   disk, and `["tools"]` → error.
-6. Flat layout: `where = ["."]` and `["tools"]` → error containing `'.' already
-   covers it`.
+5. Containing a test folder: `_project(..., testpaths=["tools/tests"])` with
+   `tools/tests` on disk, and `["tools"]` → error.
+6. Flat layout: `_project(..., where=["."])` and `["tools"]` → error containing
+   `'.' already covers it`.
 7. An auto-detected folder that is not on disk is not an overlap:
-   `testpaths = ["tools/tests"]` without the folder, and `["tools"]` → OK.
+   `_project(..., testpaths=["tools/tests"])` without the folder, and `["tools"]`
+   → OK.
 8. Scripts alone: no `src` or `tests` on disk, and `["tools"]`. mypy gives
    `["tools"]`; vulture gives an error containing `No target directories found`.
 9. An explicit list wins: `script-directories = "tools"` and
