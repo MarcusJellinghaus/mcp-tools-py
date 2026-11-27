@@ -56,8 +56,11 @@ check, ruff fix, bandit, vulture, and `run_format_code`) auto-detect directories
 
 `run_deptry_check` auto-detects source directories only, excluding test paths.
 
-Only directories that exist on disk are included. You can override auto-detection
-by passing an explicit list:
+Only source and test directories that actually exist on disk are included. If none
+of the resolved directories exist, an error is returned; existing script folders
+alone are enough to avoid it. A `script-directories` entry whose folder does not
+exist is an error, not skipped. You can override auto-detection by passing an
+explicit list:
 
 - `["src"]` - Analyze only source code directory
 - `["src", "tests"]` - Analyze both source and test directories
