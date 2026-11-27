@@ -519,7 +519,7 @@ def _run_format(context: ToolContext, depth: str) -> ActionResult:
                 status="error", summary=context.unavailable_message(tool)
             )
 
-    dirs = resolve_target_directories(str(project_dir), None)
+    dirs = resolve_target_directories(str(project_dir), None, "formatter")
     if isinstance(dirs, str):
         return ActionResult(status="error", summary=dirs)
 

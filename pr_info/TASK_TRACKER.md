@@ -24,9 +24,9 @@ This tracks **Feature Implementation** consisting of multiple **Tasks**.
 ### Step 1: `tool` parameter on `resolve_target_directories`, passed at every call site
 See [step_1.md](./steps/step_1.md)
 
-- [ ] Implementation (tests + production code): `tests/test_target_directories_call_sites.py`, update pinned tests, add `TargetTool` and `tool` parameter, pass it at all 13 call sites
-- [ ] Quality checks (format, pylint, pytest, mypy) — fix all issues
-- [ ] Commit message prepared
+- [x] Implementation (tests + production code): `tests/test_target_directories_call_sites.py`, update pinned tests, add `TargetTool` and `tool` parameter, pass it at all 13 call sites
+- [x] Quality checks (format, pylint, pytest, mypy) — fix all issues
+- [x] Commit message prepared
 
 ### Step 2: `script-directories` in `resolve_target_directories`
 See [step_2.md](./steps/step_2.md)

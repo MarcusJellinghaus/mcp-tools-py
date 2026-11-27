@@ -84,7 +84,7 @@ def register(mcp: "FastMCPProtocol", checker_tools: "CheckerTools") -> None:
             return context.unavailable_message("mypy")
 
         resolved = resolve_target_directories(
-            str(context.project_dir), target_directories
+            str(context.project_dir), target_directories, "mypy"
         )
         if isinstance(resolved, str):
             return resolved

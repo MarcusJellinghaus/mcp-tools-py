@@ -28,6 +28,8 @@ ToolName = Literal[
     "deptry",
 ]
 
+TargetTool = Literal["formatter", "ruff", "pylint", "mypy", "vulture", "bandit"]
+
 DEFAULT_CHECK_TIMEOUT = 120
 DEFAULT_PYTEST_TIMEOUT = 300
 
@@ -203,16 +205,19 @@ def resolve_test_paths(
 def resolve_target_directories(
     project_dir: str,
     target_directories: list[str] | None,
+    tool: TargetTool,
 ) -> list[str] | str:
     """Resolve target directories, auto-detecting from pyproject.toml if needed.
 
     Args:
         project_dir: Path to project root.
         target_directories: Explicit directories, or None to auto-detect.
+        tool: The program the directories are for.
 
     Returns:
         A list of directory names on success, or an error message string on failure.
     """
+    del tool
     if target_directories is not None:
         return target_directories
     try:
